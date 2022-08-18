@@ -1,3 +1,9 @@
+# Visual Studio 2015/2017 cache/options directory
+.vs/
+
+# Ignore CMake/IntelliSense information/configuration used specifically for Visual Studio 
+CMakeSettings.json
+
 # Prerequisites
 *.d
 
