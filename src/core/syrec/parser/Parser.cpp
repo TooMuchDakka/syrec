@@ -296,11 +296,11 @@ void Parser::Expression() {
 		if (StartOf(1)) {
 			if (check_if_expression_is_number()) {
 				Number();
-			}
-			if (check_if_expression_is_binary_expression()) {
+			} else if (check_if_expression_is_binary_expression()) {
 				BinaryExpression();
+			} else {
+				ShiftExpression();
 			}
-			ShiftExpression();
 		} else if (la->kind == _ident) {
 			Signal();
 		} else if (la->kind == 32 /* "~" */ || la->kind == 51 /* "!" */) {
@@ -512,7 +512,7 @@ void Parser::Parse() {
 	la->val = coco_string_create(L"Dummy Token");
 	Get();
 	SyReC();
-	Expect(0);
+
 }
 
 Parser::Parser(Scanner *scanner) {

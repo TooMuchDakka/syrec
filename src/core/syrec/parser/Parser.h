@@ -34,6 +34,9 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include <string>
 #include <vector>
 
+#include "core/syrec/module.hpp"
+#include "core/syrec/program.hpp"
+
 
 #include "Scanner.h"
 
@@ -80,7 +83,11 @@ public:
 	Token *t;			// last recognized token
 	Token *la;			// lookahead token
 
-void Init() {
+module::vec modules;
+
+	// This method will be called by the contructor if it exits.
+	// This support is specific to the C++ version of Coco/R.
+	void Init() {
 		// nothing to do for now
 	}
 
@@ -93,14 +100,14 @@ void Init() {
 
 	[[nodiscard]] bool find_matching_token(std::vector<std::wstring> matching_token_values, std::vector<std::wstring> token_values_allowing_stop_of_search) const {
 		const std::set<std::wstring> set_of_matching_token_values { std::begin(matching_token_values), std::end(matching_token_values) };
-		const std::set<std::wstring> setOfTokenValuesAllowingStopOfSearch { std::begin(token_values_allowing_stop_of_search), std::end(token_values_allowing_stop_of_search) };
+		const std::set<std::wstring> set_of_token_values_allowing_stop_of_search { std::begin(token_values_allowing_stop_of_search), std::end(token_values_allowing_stop_of_search) };
 		bool found_matching_operator = false;
 		bool can_cancel_search = false;
 
 		while (!can_cancel_search) {
 			const Token *peeked_token = scanner->Peek();
 			found_matching_operator = set_of_matching_token_values.count(peeked_token->val);
-			can_cancel_search = found_matching_operator || peeked_token->kind == _EOF || setOfTokenValuesAllowingStopOfSearch.count(peeked_token->val);
+			can_cancel_search = found_matching_operator || peeked_token->kind == _EOF || set_of_token_values_allowing_stop_of_search.count(peeked_token->val);
 		}
 		return found_matching_operator;
 	}
@@ -132,20 +139,43 @@ void Init() {
 			else if (peeked_token->val == L")") {
 				expression_nesting_level--;
 			}
-
-			if (expression_nesting_level == 1) {
-				found_matching_operator = tokens_resulting_in_check_being_false.count(peeked_token->val);
-				can_cancel_search = found_matching_operator || set_of_operator_token_values_of_alternative.count(peeked_token->val) || peeked_token->kind == _EOF;
+			else {
+				found_matching_operator = expression_nesting_level == 0 && tokens_resulting_in_check_being_false.count(peeked_token->val);
+				can_cancel_search = found_matching_operator || set_of_operator_token_values_of_alternative.count(peeked_token->val) || peeked_token->kind == _EOF;			
 			}
+
 		}
 		return found_matching_operator;
 	}
 
-	[[nodiscard]] bool check_if_expression_is_number() const {
-		const std::vector<std::wstring> matching_tokens = {L"^", L"+", L"-", L"*"};
-		const std::vector<std::wstring> tokens_resulting_in_check_being_false = {L"("};
+	[[nodiscard]] bool is_token_not_nested_number(const Token *token) const {
+		if (token == NULL) {
+			return false;
+		}
+		return token->kind == _int || token->val == L"#" || token->val == L"$";
+	}
 
-		return find_matching_token(matching_tokens, tokens_resulting_in_check_being_false);
+	[[nodiscard]] bool check_if_expression_is_number() const {
+		const Token *peeked_token = scanner->Peek();
+		bool found_matching_operator = peeked_token->kind == _int || peeked_token->val == L"#" || peeked_token->val == L"$";
+		bool can_cancel_search = !found_matching_operator;
+
+		int nesting_level = 0;
+		while (!can_cancel_search) {
+			peeked_token = scanner->Peek();
+			if (peeked_token->val == L"(") {
+				nesting_level++;
+			} 
+			else if (peeked_token->val == L")") {
+				nesting_level--;
+			}
+			else {
+				const std::vector<std::wstring> matching_tokens = {L"^", L"+", L"-", L"*"};
+				found_matching_operator = !is_token_not_nested_number(peeked_token) && find_matching_token(matching_tokens, {}) && check_if_expression_is_number();
+				can_cancel_search = found_matching_operator;
+			}
+		}
+		return found_matching_operator;
 	}
 
 	[[nodiscard]] bool check_if_loop_variable_is_defined() const {
