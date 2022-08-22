@@ -30,6 +30,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #if !defined(syrec_COCO_PARSER_H__)
 #define syrec_COCO_PARSER_H__
 
+#include <cwchar>
 #include <set>
 #include <string>
 #include <vector>
@@ -98,6 +99,14 @@ module::vec modules;
 		// nothing to do
 	// }
 
+	[[nodiscard]] bool are_token_values_equal(const wchar_t *my_token_value, const wchar_t *other_token_value) const {
+		if (my_token_value == nullptr || other_token_value == nullptr) {
+			// TODO: Could also throw exception
+			return false;
+		}
+		return !wcscmp(my_token_value, other_token_value);
+	}
+
 	[[nodiscard]] bool find_matching_token(std::vector<std::wstring> matching_token_values, std::vector<std::wstring> token_values_allowing_stop_of_search) const {
 		const std::set<std::wstring> set_of_matching_token_values { std::begin(matching_token_values), std::end(matching_token_values) };
 		const std::set<std::wstring> set_of_token_values_allowing_stop_of_search { std::begin(token_values_allowing_stop_of_search), std::end(token_values_allowing_stop_of_search) };
@@ -133,10 +142,10 @@ module::vec modules;
 		while (!can_cancel_search) {
 			const Token *peeked_token = scanner->Peek();
 
-			if (peeked_token->val == L"("){
+			if (are_token_values_equal(peeked_token->val, L"(")) {
 				expression_nesting_level++;
 			} 
-			else if (peeked_token->val == L")") {
+			else if (are_token_values_equal(peeked_token->val, L")")) {
 				expression_nesting_level--;
 			}
 			else {
@@ -149,33 +158,29 @@ module::vec modules;
 	}
 
 	[[nodiscard]] bool is_token_not_nested_number(const Token *token) const {
-		if (token == NULL) {
+		if (token == nullptr) {
 			return false;
 		}
-		return token->kind == _int || token->val == L"#" || token->val == L"$";
+		return token->kind == _int || are_token_values_equal(token->val, L"#") || are_token_values_equal(token->val, L"$");
+	}
+
+	[[nodiscard]] bool check_if_expression_is_number(const Token *first_token_of_expression) const {
+        bool found_matching_operator;
+        const std::vector<std::wstring> matching_tokens = {L"^", L"+", L"-", L"*"};
+
+        if (are_token_values_equal(first_token_of_expression->val, L"(")) {
+            found_matching_operator = check_if_expression_is_number(scanner->Peek())
+                && find_matching_token(matching_tokens, {})
+                && check_if_expression_is_number(scanner->Peek())
+                && are_token_values_equal(scanner->Peek()->val, L")");
+        } else {
+            found_matching_operator = is_token_not_nested_number(first_token_of_expression);
+        }
+        return found_matching_operator;
 	}
 
 	[[nodiscard]] bool check_if_expression_is_number() const {
-		const Token *peeked_token = scanner->Peek();
-		bool found_matching_operator = peeked_token->kind == _int || peeked_token->val == L"#" || peeked_token->val == L"$";
-		bool can_cancel_search = !found_matching_operator;
-
-		int nesting_level = 0;
-		while (!can_cancel_search) {
-			peeked_token = scanner->Peek();
-			if (peeked_token->val == L"(") {
-				nesting_level++;
-			} 
-			else if (peeked_token->val == L")") {
-				nesting_level--;
-			}
-			else {
-				const std::vector<std::wstring> matching_tokens = {L"^", L"+", L"-", L"*"};
-				found_matching_operator = !is_token_not_nested_number(peeked_token) && find_matching_token(matching_tokens, {}) && check_if_expression_is_number();
-				can_cancel_search = found_matching_operator;
-			}
-		}
-		return found_matching_operator;
+        return la != nullptr && check_if_expression_is_number(la);
 	}
 
 	[[nodiscard]] bool check_if_loop_variable_is_defined() const {

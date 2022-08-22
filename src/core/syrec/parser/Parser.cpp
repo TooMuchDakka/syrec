@@ -363,17 +363,26 @@ void Parser::BinaryExpression() {
 		}
 		case 43 /* "||" */: {
 			Get();
-			Expect(44 /* "&" */);
+			break;
+		}
+		case 44 /* "&" */: {
+			Get();
 			break;
 		}
 		case 45 /* "|" */: {
 			Get();
-			Expect(46 /* "<" */);
+			break;
+		}
+		case 46 /* "<" */: {
+			Get();
 			break;
 		}
 		case 47 /* ">" */: {
 			Get();
-			Expect(24 /* "=" */);
+			break;
+		}
+		case 24 /* "=" */: {
+			Get();
 			break;
 		}
 		case 48 /* "!=" */: {
