@@ -109,10 +109,10 @@ void Parser::Number() {
 				Get();
 			} else if (la->kind == 9 /* "/" */) {
 				Get();
-			} else SynErr(55);
+			} else SynErr(56);
 			Number();
 			Expect(10 /* ")" */);
-		} else SynErr(56);
+		} else SynErr(57);
 }
 
 void Parser::SyReC() {
@@ -149,7 +149,7 @@ void Parser::SignalList() {
 			Get();
 		} else if (la->kind == 17 /* "signal" */) {
 			Get();
-		} else SynErr(57);
+		} else SynErr(58);
 		SignalDeclaration();
 		while (la->kind == 12 /* "," */) {
 			Get();
@@ -172,7 +172,7 @@ void Parser::Parameter() {
 			Get();
 		} else if (la->kind == 15 /* "inout" */) {
 			Get();
-		} else SynErr(58);
+		} else SynErr(59);
 		SignalDeclaration();
 }
 
@@ -195,17 +195,17 @@ void Parser::Statement() {
 			CallStatement();
 		} else if (la->kind == 23 /* "for" */) {
 			ForStatement();
-		} else if (la->kind == 28 /* "if" */) {
+		} else if (la->kind == 29 /* "if" */) {
 			IfStatement();
-		} else if (la->kind == 32 /* "~" */ || la->kind == 33 /* "++" */ || la->kind == 34 /* "--" */) {
+		} else if (la->kind == 33 /* "~" */ || la->kind == 34 /* "++" */ || la->kind == 35 /* "--" */) {
 			UnaryStatement();
-		} else if (la->kind == 37 /* "skip" */) {
+		} else if (la->kind == 38 /* "skip" */) {
 			SkipStatement();
 		} else if (check_if_is_assign_statement()) {
 			AssignStatement();
 		} else if (la->kind == _ident) {
 			SwapStatement();
-		} else SynErr(59);
+		} else SynErr(60);
 }
 
 void Parser::CallStatement() {
@@ -213,7 +213,7 @@ void Parser::CallStatement() {
 			Get();
 		} else if (la->kind == 22 /* "uncall" */) {
 			Get();
-		} else SynErr(60);
+		} else SynErr(61);
 		Expect(_ident);
 		Expect(5 /* "(" */);
 		Expect(_ident);
@@ -243,52 +243,54 @@ void Parser::ForStatement() {
 			}
 			Number();
 		}
+		Expect(27 /* "do" */);
 		StatementList();
-		Expect(27 /* "rof" */);
+		Expect(28 /* "rof" */);
 }
 
 void Parser::IfStatement() {
-		Expect(28 /* "if" */);
+		Expect(29 /* "if" */);
 		Expression();
-		Expect(29 /* "then" */);
+		Expect(30 /* "then" */);
 		StatementList();
-		Expect(30 /* "else" */);
+		Expect(31 /* "else" */);
 		StatementList();
-		Expect(31 /* "fi" */);
+		Expect(32 /* "fi" */);
+		Expression();
 }
 
 void Parser::UnaryStatement() {
-		if (la->kind == 32 /* "~" */) {
+		if (la->kind == 33 /* "~" */) {
 			Get();
-		} else if (la->kind == 33 /* "++" */) {
+		} else if (la->kind == 34 /* "++" */) {
 			Get();
-		} else if (la->kind == 34 /* "--" */) {
+		} else if (la->kind == 35 /* "--" */) {
 			Get();
-		} else SynErr(61);
+		} else SynErr(62);
 		Expect(24 /* "=" */);
 		Signal();
 }
 
 void Parser::SkipStatement() {
-		Expect(37 /* "skip" */);
+		Expect(38 /* "skip" */);
 }
 
 void Parser::AssignStatement() {
 		Signal();
-		if (la->kind == 35 /* "^" */) {
+		if (la->kind == 36 /* "^" */) {
 			Get();
 		} else if (la->kind == 6 /* "+" */) {
 			Get();
 		} else if (la->kind == 7 /* "-" */) {
 			Get();
-		} else SynErr(62);
+		} else SynErr(63);
 		Expect(24 /* "=" */);
 		Expression();
 }
 
 void Parser::SwapStatement() {
 		Signal();
-		Expect(36 /* "<=>" */);
+		Expect(37 /* "<=>" */);
 		Signal();
 }
 
@@ -303,9 +305,9 @@ void Parser::Expression() {
 			}
 		} else if (la->kind == _ident) {
 			Signal();
-		} else if (la->kind == 32 /* "~" */ || la->kind == 51 /* "!" */) {
+		} else if (la->kind == 33 /* "~" */ || la->kind == 52 /* "!" */) {
 			UnaryExpression();
-		} else SynErr(63);
+		} else SynErr(64);
 }
 
 void Parser::Signal() {
@@ -315,10 +317,10 @@ void Parser::Signal() {
 			Expression();
 			Expect(19 /* "]" */);
 		}
-		if (la->kind == 38 /* "." */) {
+		if (la->kind == 39 /* "." */) {
 			Get();
 			Number();
-			if (la->kind == 39 /* ":" */) {
+			if (la->kind == 40 /* ":" */) {
 				Get();
 				Number();
 			}
@@ -337,7 +339,7 @@ void Parser::BinaryExpression() {
 			Get();
 			break;
 		}
-		case 35 /* "^" */: {
+		case 36 /* "^" */: {
 			Get();
 			break;
 		}
@@ -349,35 +351,35 @@ void Parser::BinaryExpression() {
 			Get();
 			break;
 		}
-		case 40 /* "%" */: {
+		case 41 /* "%" */: {
 			Get();
 			break;
 		}
-		case 41 /* "*>" */: {
+		case 42 /* "*>" */: {
 			Get();
 			break;
 		}
-		case 42 /* "&&" */: {
+		case 43 /* "&&" */: {
 			Get();
 			break;
 		}
-		case 43 /* "||" */: {
+		case 44 /* "||" */: {
 			Get();
 			break;
 		}
-		case 44 /* "&" */: {
+		case 45 /* "&" */: {
 			Get();
 			break;
 		}
-		case 45 /* "|" */: {
+		case 46 /* "|" */: {
 			Get();
 			break;
 		}
-		case 46 /* "<" */: {
+		case 47 /* "<" */: {
 			Get();
 			break;
 		}
-		case 47 /* ">" */: {
+		case 48 /* ">" */: {
 			Get();
 			break;
 		}
@@ -385,19 +387,19 @@ void Parser::BinaryExpression() {
 			Get();
 			break;
 		}
-		case 48 /* "!=" */: {
+		case 49 /* "!=" */: {
 			Get();
 			break;
 		}
-		case 49 /* "<=" */: {
+		case 50 /* "<=" */: {
 			Get();
 			break;
 		}
-		case 50 /* ">=" */: {
+		case 51 /* ">=" */: {
 			Get();
 			break;
 		}
-		default: SynErr(64); break;
+		default: SynErr(65); break;
 		}
 		Expression();
 		Expect(10 /* ")" */);
@@ -406,21 +408,21 @@ void Parser::BinaryExpression() {
 void Parser::ShiftExpression() {
 		Expect(5 /* "(" */);
 		Expression();
-		if (la->kind == 52 /* "<<" */) {
+		if (la->kind == 53 /* "<<" */) {
 			Get();
-		} else if (la->kind == 53 /* ">>" */) {
+		} else if (la->kind == 54 /* ">>" */) {
 			Get();
-		} else SynErr(65);
+		} else SynErr(66);
 		Number();
 		Expect(10 /* ")" */);
 }
 
 void Parser::UnaryExpression() {
-		if (la->kind == 51 /* "!" */) {
+		if (la->kind == 52 /* "!" */) {
 			Get();
-		} else if (la->kind == 32 /* "~" */) {
+		} else if (la->kind == 33 /* "~" */) {
 			Get();
-		} else SynErr(66);
+		} else SynErr(67);
 		Expression();
 }
 
@@ -521,11 +523,11 @@ void Parser::Parse() {
 	la->val = coco_string_create(L"Dummy Token");
 	Get();
 	SyReC();
-
+	Expect(0);
 }
 
 Parser::Parser(Scanner *scanner) {
-	maxT = 54;
+	maxT = 55;
 
 	ParserInitCaller<Parser>::CallInit(this);
 	dummyToken = NULL;
@@ -540,9 +542,9 @@ bool Parser::StartOf(int s) {
 	const bool T = true;
 	const bool x = false;
 
-	static bool set[2][56] = {
-		{T,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x},
-		{x,x,T,T, T,T,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x}
+	static bool set[2][57] = {
+		{T,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x},
+		{x,x,T,T, T,T,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x, x}
 	};
 
 
@@ -590,46 +592,47 @@ void Errors::SynErr(int line, int col, int n) {
 			case 24: s = coco_string_create(L"\"=\" expected"); break;
 			case 25: s = coco_string_create(L"\"to\" expected"); break;
 			case 26: s = coco_string_create(L"\"step\" expected"); break;
-			case 27: s = coco_string_create(L"\"rof\" expected"); break;
-			case 28: s = coco_string_create(L"\"if\" expected"); break;
-			case 29: s = coco_string_create(L"\"then\" expected"); break;
-			case 30: s = coco_string_create(L"\"else\" expected"); break;
-			case 31: s = coco_string_create(L"\"fi\" expected"); break;
-			case 32: s = coco_string_create(L"\"~\" expected"); break;
-			case 33: s = coco_string_create(L"\"++\" expected"); break;
-			case 34: s = coco_string_create(L"\"--\" expected"); break;
-			case 35: s = coco_string_create(L"\"^\" expected"); break;
-			case 36: s = coco_string_create(L"\"<=>\" expected"); break;
-			case 37: s = coco_string_create(L"\"skip\" expected"); break;
-			case 38: s = coco_string_create(L"\".\" expected"); break;
-			case 39: s = coco_string_create(L"\":\" expected"); break;
-			case 40: s = coco_string_create(L"\"%\" expected"); break;
-			case 41: s = coco_string_create(L"\"*>\" expected"); break;
-			case 42: s = coco_string_create(L"\"&&\" expected"); break;
-			case 43: s = coco_string_create(L"\"||\" expected"); break;
-			case 44: s = coco_string_create(L"\"&\" expected"); break;
-			case 45: s = coco_string_create(L"\"|\" expected"); break;
-			case 46: s = coco_string_create(L"\"<\" expected"); break;
-			case 47: s = coco_string_create(L"\">\" expected"); break;
-			case 48: s = coco_string_create(L"\"!=\" expected"); break;
-			case 49: s = coco_string_create(L"\"<=\" expected"); break;
-			case 50: s = coco_string_create(L"\">=\" expected"); break;
-			case 51: s = coco_string_create(L"\"!\" expected"); break;
-			case 52: s = coco_string_create(L"\"<<\" expected"); break;
-			case 53: s = coco_string_create(L"\">>\" expected"); break;
-			case 54: s = coco_string_create(L"??? expected"); break;
-			case 55: s = coco_string_create(L"invalid Number"); break;
+			case 27: s = coco_string_create(L"\"do\" expected"); break;
+			case 28: s = coco_string_create(L"\"rof\" expected"); break;
+			case 29: s = coco_string_create(L"\"if\" expected"); break;
+			case 30: s = coco_string_create(L"\"then\" expected"); break;
+			case 31: s = coco_string_create(L"\"else\" expected"); break;
+			case 32: s = coco_string_create(L"\"fi\" expected"); break;
+			case 33: s = coco_string_create(L"\"~\" expected"); break;
+			case 34: s = coco_string_create(L"\"++\" expected"); break;
+			case 35: s = coco_string_create(L"\"--\" expected"); break;
+			case 36: s = coco_string_create(L"\"^\" expected"); break;
+			case 37: s = coco_string_create(L"\"<=>\" expected"); break;
+			case 38: s = coco_string_create(L"\"skip\" expected"); break;
+			case 39: s = coco_string_create(L"\".\" expected"); break;
+			case 40: s = coco_string_create(L"\":\" expected"); break;
+			case 41: s = coco_string_create(L"\"%\" expected"); break;
+			case 42: s = coco_string_create(L"\"*>\" expected"); break;
+			case 43: s = coco_string_create(L"\"&&\" expected"); break;
+			case 44: s = coco_string_create(L"\"||\" expected"); break;
+			case 45: s = coco_string_create(L"\"&\" expected"); break;
+			case 46: s = coco_string_create(L"\"|\" expected"); break;
+			case 47: s = coco_string_create(L"\"<\" expected"); break;
+			case 48: s = coco_string_create(L"\">\" expected"); break;
+			case 49: s = coco_string_create(L"\"!=\" expected"); break;
+			case 50: s = coco_string_create(L"\"<=\" expected"); break;
+			case 51: s = coco_string_create(L"\">=\" expected"); break;
+			case 52: s = coco_string_create(L"\"!\" expected"); break;
+			case 53: s = coco_string_create(L"\"<<\" expected"); break;
+			case 54: s = coco_string_create(L"\">>\" expected"); break;
+			case 55: s = coco_string_create(L"??? expected"); break;
 			case 56: s = coco_string_create(L"invalid Number"); break;
-			case 57: s = coco_string_create(L"invalid SignalList"); break;
-			case 58: s = coco_string_create(L"invalid Parameter"); break;
-			case 59: s = coco_string_create(L"invalid Statement"); break;
-			case 60: s = coco_string_create(L"invalid CallStatement"); break;
-			case 61: s = coco_string_create(L"invalid UnaryStatement"); break;
-			case 62: s = coco_string_create(L"invalid AssignStatement"); break;
-			case 63: s = coco_string_create(L"invalid Expression"); break;
-			case 64: s = coco_string_create(L"invalid BinaryExpression"); break;
-			case 65: s = coco_string_create(L"invalid ShiftExpression"); break;
-			case 66: s = coco_string_create(L"invalid UnaryExpression"); break;
+			case 57: s = coco_string_create(L"invalid Number"); break;
+			case 58: s = coco_string_create(L"invalid SignalList"); break;
+			case 59: s = coco_string_create(L"invalid Parameter"); break;
+			case 60: s = coco_string_create(L"invalid Statement"); break;
+			case 61: s = coco_string_create(L"invalid CallStatement"); break;
+			case 62: s = coco_string_create(L"invalid UnaryStatement"); break;
+			case 63: s = coco_string_create(L"invalid AssignStatement"); break;
+			case 64: s = coco_string_create(L"invalid Expression"); break;
+			case 65: s = coco_string_create(L"invalid BinaryExpression"); break;
+			case 66: s = coco_string_create(L"invalid ShiftExpression"); break;
+			case 67: s = coco_string_create(L"invalid UnaryExpression"); break;
 
 		default:
 		{

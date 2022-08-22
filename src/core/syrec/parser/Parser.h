@@ -107,6 +107,11 @@ module::vec modules;
 		return !wcscmp(my_token_value, other_token_value);
 	}
 
+	[[nodiscard]] bool token_matches_one_of(const Token *tokenToCheck, std::vector<std::wstring> one_of_many_token_values) const {
+        const std::set<std::wstring> set_of_matching_token_values{std::begin(one_of_many_token_values), std::end(one_of_many_token_values)};
+        return set_of_matching_token_values.count(tokenToCheck->val);
+	}
+
 	[[nodiscard]] bool find_matching_token(std::vector<std::wstring> matching_token_values, std::vector<std::wstring> token_values_allowing_stop_of_search) const {
 		const std::set<std::wstring> set_of_matching_token_values { std::begin(matching_token_values), std::end(matching_token_values) };
 		const std::set<std::wstring> set_of_token_values_allowing_stop_of_search { std::begin(token_values_allowing_stop_of_search), std::end(token_values_allowing_stop_of_search) };
@@ -170,7 +175,7 @@ module::vec modules;
 
         if (are_token_values_equal(first_token_of_expression->val, L"(")) {
             found_matching_operator = check_if_expression_is_number(scanner->Peek())
-                && find_matching_token(matching_tokens, {})
+                && token_matches_one_of(scanner->Peek(), matching_tokens)
                 && check_if_expression_is_number(scanner->Peek())
                 && are_token_values_equal(scanner->Peek()->val, L")");
         } else {
