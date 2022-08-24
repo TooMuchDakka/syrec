@@ -117,45 +117,121 @@ void Parser::Number() {
 
 void Parser::SyReC() {
 		module::ptr module = nullptr; 
+		symbol_table.open_scope();
+		
 		Module(module);
+		symbol_table.close_scope();	
+		if (nullptr != module) {
+		symbol_table.add_entry(module);
+		}
+		
 		while (la->kind == 11 /* "module" */) {
+			symbol_table.open_scope();		
+			module = nullptr;
+			
 			Module(module);
+			symbol_table.close_scope();	
+			if (nullptr != module) {
+			if (symbol_table.contains(module)) {
+			// TODO: GEN_ERROR 
+			// TODO: Do not cancel parsing	
+			}
+			else {
+			symbol_table.add_entry(module);
+			}
+			}
+			
 		}
 }
 
 void Parser::Module(module::ptr &parsed_module) {
-		parsed_module = std::make_shared<module>(module("test"));		
+		std::vector<variable::ptr> locals {};	
 		Expect(11 /* "module" */);
 		Expect(_ident);
+		const std::string module_name = convert_to_uniform_text_format(t->val);
+		parsed_module = std::make_shared<module>(module(module_name));	
+		
 		Expect(5 /* "(" */);
 		if (la->kind == 13 /* "in" */ || la->kind == 14 /* "out" */ || la->kind == 15 /* "inout" */) {
-			ParameterList();
+			ParameterList(parsed_module);
 		}
 		Expect(10 /* ")" */);
 		while (la->kind == 16 /* "wire" */ || la->kind == 17 /* "signal" */) {
-			SignalList();
+			SignalList(locals);
+			parsed_module->variables = locals;	
 		}
 		StatementList();
 }
 
-void Parser::ParameterList() {
-		Parameter();
+void Parser::ParameterList(const module::ptr &module) {
+		variable::ptr parameter = nullptr;	
+		Parameter(parameter);
+		if (nullptr != parameter) {
+		module->add_parameter(parameter);
+		}
+		
 		while (la->kind == 12 /* "," */) {
+			parameter = nullptr;	
 			Get();
-			Parameter();
+			Parameter(parameter);
+			if (nullptr != parameter) {
+			// TODO: Check for duplicates
+			if (symbol_table.contains(parameter->name)) {
+			// TODO: GEN_ERROR 
+			// TODO: Do not cancel parsing
+			}
+			else {
+			module->add_parameter(parameter);
+			symbol_table.add_entry(parameter);
+			}
+			}
+			
 		}
 }
 
-void Parser::SignalList() {
+void Parser::SignalList(std::vector<variable::ptr> &signals ) {
+		variable::types signal_type = variable::in;
+		variable::ptr variable = nullptr;
+		
 		if (la->kind == 16 /* "wire" */) {
 			Get();
+			signal_type = variable::wire;		
 		} else if (la->kind == 17 /* "signal" */) {
 			Get();
+			signal_type = variable::state;	
 		} else SynErr(58);
-		SignalDeclaration();
+		if (variable::wire != signal_type && variable::state != signal_type) {
+		// TODO: GEN_ERROR ?
+		// TODO: Do not cancel parsing
+		}
+		
+		SignalDeclaration(signal_type, variable);
+		if (nullptr != variable){
+		if (symbol_table.contains(variable->name)) {
+		// TODO: GEN_ERROR 
+		// TODO: Do not cancel parsing
+		}
+		else {
+		signals.emplace_back(variable);
+		symbol_table.add_entry(variable);
+		}
+		}
+		
 		while (la->kind == 12 /* "," */) {
+			variable = nullptr;					
 			Get();
-			SignalDeclaration();
+			SignalDeclaration(signal_type, variable);
+			if (nullptr != variable){
+			if (symbol_table.contains(variable->name)) {
+			// TODO: GEN_ERROR 
+			// TODO: Do not cancel parsing
+			}
+			else {
+			signals.emplace_back(variable);
+			symbol_table.add_entry(variable);
+			}
+			}
+			
 		}
 }
 
@@ -167,29 +243,64 @@ void Parser::StatementList() {
 		}
 }
 
-void Parser::Parameter() {
+void Parser::Parameter(variable::ptr &parameter) {
+		variable::types parameter_type = variable::wire;	
 		if (la->kind == 13 /* "in" */) {
 			Get();
+			parameter_type = variable::in;	
 		} else if (la->kind == 14 /* "out" */) {
 			Get();
+			parameter_type = variable::out;	
 		} else if (la->kind == 15 /* "inout" */) {
 			Get();
+			parameter_type = variable::inout;	
 		} else SynErr(59);
-		SignalDeclaration();
+		if (variable::wire == parameter_type) {
+		// TODO: GEN_ERROR 
+		// TODO: Do not cancel parsing
+		}
+		
+		SignalDeclaration(parameter_type, parameter);
 }
 
-void Parser::SignalDeclaration() {
+void Parser::SignalDeclaration(variable::types variable_type, variable::ptr &declared_signal) {
+		std::string signal_ident = ""; 
+		std::vector<unsigned int> dimensions{};
+		// TODO: Use default bit width
+		unsigned int signal_width = 0;	
+		
 		Expect(_ident);
+		signal_ident = convert_to_uniform_text_format(t->val); 
+		if (symbol_table.contains(signal_ident)) {
+		// TODO: GEN_ERROR
+		// TODO: Do not cancel parsing
+		}
+		
 		while (la->kind == 18 /* "[" */) {
 			Get();
 			Expect(_int);
+			const unsigned int dimension = std::stoul(convert_to_uniform_text_format(t->val));
+			if (!dimension) {
+			// TODO: GEN_ERROR
+			// TODO: Do not cancel parsing
+			}
+			dimensions.emplace_back(dimension);	
+			
 			Expect(19 /* "]" */);
 		}
 		if (la->kind == 5 /* "(" */) {
 			Get();
 			Expect(_int);
+			signal_width = std::stoul(convert_to_uniform_text_format(t->val));
+			if (!signal_width) {
+			// TODO: GEN_ERROR
+			// TODO: Do not cancel parsing
+			}
+			
 			Expect(10 /* ")" */);
 		}
+		declared_signal = std::make_shared<variable>(variable(variable_type, signal_ident, dimensions, signal_width));	
+		
 }
 
 void Parser::Statement() {

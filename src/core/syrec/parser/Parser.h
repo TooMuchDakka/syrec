@@ -38,6 +38,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include "core/syrec/module.hpp"
 #include "core/syrec/parser/parser_error_message_generator.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
+#include "core/syrec/parser/text_utils.hpp"
 
 
 #include "Scanner.h"
@@ -218,11 +219,11 @@ module::vec modules;
 	void Number();
 	void SyReC();
 	void Module(module::ptr &parsed_module);
-	void ParameterList();
-	void SignalList();
+	void ParameterList(const module::ptr &module);
+	void SignalList(std::vector<variable::ptr> &signals );
 	void StatementList();
-	void Parameter();
-	void SignalDeclaration();
+	void Parameter(variable::ptr &parameter);
+	void SignalDeclaration(variable::types variable_type, variable::ptr &declared_signal);
 	void Statement();
 	void CallStatement();
 	void ForStatement();
