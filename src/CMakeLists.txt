@@ -11,8 +11,10 @@ add_library(${PROJECT_NAME}
 
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Parser.h
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Scanner.h
+			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/parser_error_message_generator.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Parser.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Scanner.cpp
+			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/parser_error_message_generator.cpp
 
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
