@@ -10,14 +10,16 @@ add_library(${PROJECT_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/variable.cpp
 
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Parser.h
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Scanner.h
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/parser_error_message_generator.hpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Parser.cpp
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Scanner.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/parser_error_message_generator.cpp
+			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Scanner.h
+			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Scanner.cpp
+			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/symbol_table.cpp
 
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
+			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_error_message_generator.hpp
+			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/module.hpp
@@ -26,7 +28,9 @@ add_library(${PROJECT_NAME}
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/program.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/statement.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/variable.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/utils/timer.hpp)
+            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/utils/timer.hpp
+
+)
 
 # set include directories
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${${PROJECT_NAME}_SOURCE_DIR}/include>)

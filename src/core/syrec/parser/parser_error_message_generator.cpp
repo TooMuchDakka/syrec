@@ -1,4 +1,4 @@
-#include "parser_error_message_generator.hpp"
+#include "core/syrec/parser/parser_error_message_generator.hpp"
 
 namespace syrec {
 

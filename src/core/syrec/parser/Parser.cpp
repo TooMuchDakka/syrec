@@ -116,13 +116,15 @@ void Parser::Number() {
 }
 
 void Parser::SyReC() {
-		Module();
+		module::ptr module = nullptr; 
+		Module(module);
 		while (la->kind == 11 /* "module" */) {
-			Module();
+			Module(module);
 		}
 }
 
-void Parser::Module() {
+void Parser::Module(module::ptr &parsed_module) {
+		parsed_module = std::make_shared<module>(module("test"));		
 		Expect(11 /* "module" */);
 		Expect(_ident);
 		Expect(5 /* "(" */);

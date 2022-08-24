@@ -36,7 +36,8 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include <vector>
 
 #include "core/syrec/module.hpp"
-#include "core/syrec/program.hpp"
+#include "core/syrec/parser/parser_error_message_generator.hpp"
+#include "core/syrec/parser/symbol_table.hpp"
 
 
 #include "Scanner.h"
@@ -85,11 +86,13 @@ public:
 	Token *la;			// lookahead token
 
 module::vec modules;
+	parser_error_message_generator error_message_generator;
+	symbol_table symbol_table;
 
 	// This method will be called by the contructor if it exits.
 	// This support is specific to the C++ version of Coco/R.
 	void Init() {
-		// nothing to do for now
+		// nothing to do
 	}
 
 	// Uncomment this method if cleanup is necessary,
@@ -214,7 +217,7 @@ module::vec modules;
 
 	void Number();
 	void SyReC();
-	void Module();
+	void Module(module::ptr &parsed_module);
 	void ParameterList();
 	void SignalList();
 	void StatementList();
