@@ -23,12 +23,13 @@ COMPILER SyReC
 	// Place declarations of objects referenced in this ATG
 	module::vec modules;
 	parser_error_message_generator error_message_generator;
-	symbol_table symbol_table;
+	symbol_table::ptr current_symbol_table_scope;
 
 	// This method will be called by the contructor if it exits.
 	// This support is specific to the C++ version of Coco/R.
 	void Init() {
 		// nothing to do
+		current_symbol_table_scope = nullptr;
 	}
 
 	// Uncomment this method if cleanup is necessary,
@@ -178,25 +179,25 @@ Program and Modules
 -------------------------------------------------------------------------*/
 
 SyReC								(.	module::ptr module = nullptr; 
-										symbol_table.open_scope();
+										symbol_table::open_scope(current_symbol_table_scope);
 									.)
 =
-Module<module>						(.	symbol_table.close_scope();	
+Module<module>						(.	symbol_table::close_scope(current_symbol_table_scope);
 										if (nullptr != module) {
-											symbol_table.add_entry(module);
+											current_symbol_table_scope->add_entry(module);
 										}
 									.)
-{									(.	symbol_table.open_scope();		
+{									(.	symbol_table::open_scope(current_symbol_table_scope);
 										module = nullptr;
 									.)
-	Module<module>					(.	symbol_table.close_scope();	
+	Module<module>					(.	symbol_table::close_scope(current_symbol_table_scope);
 										if (nullptr != module) {
-											if (symbol_table.contains(module)) {
+											if (current_symbol_table_scope->contains(module)) {
 												// TODO: GEN_ERROR 
 												// TODO: Do not cancel parsing	
 											}
 											else {
-												symbol_table.add_entry(module);
+												current_symbol_table_scope->add_entry(module);
 											}
 										}
 									.)
@@ -224,20 +225,22 @@ Parameter<parameter>										(.	if (nullptr != parameter) {
 {															(.	parameter = nullptr;	.)
 	"," Parameter<parameter>								(.	if (nullptr != parameter) {
 																	// TODO: Check for duplicates
-																	if (symbol_table.contains(parameter->name)) {
+																	if (current_symbol_table_scope->contains(parameter->name)) {
 																		// TODO: GEN_ERROR 
 																		// TODO: Do not cancel parsing
 																	}
 																	else {
 																		module->add_parameter(parameter);
-																		symbol_table.add_entry(parameter);
+																		current_symbol_table_scope->add_entry(parameter);
 																	}
 																}
 															.)
 }
 .
 
-Parameter<variable::ptr &parameter>						(.	variable::types parameter_type = variable::wire;	.)	
+Parameter<variable::ptr &parameter>						(.	variable::types parameter_type = variable::wire;
+															bool valid_variable_type = true;
+														.)	
 = 
 (
 	"in"												(.	parameter_type = variable::in;	.)
@@ -246,79 +249,87 @@ Parameter<variable::ptr &parameter>						(.	variable::types parameter_type = var
 )														(.	if (variable::wire == parameter_type) {
 																// TODO: GEN_ERROR 
 																// TODO: Do not cancel parsing
+																valid_variable_type = false;
 															}
 														.)
-SignalDeclaration<parameter_type, parameter>
+SignalDeclaration<parameter_type, parameter>			(.	if (!valid_variable_type) {
+																parameter = nullptr;
+															}
+														.)
 .
 
 SignalList <. std::vector<variable::ptr> &signals .>				(.	variable::types signal_type = variable::in;
 																		variable::ptr variable = nullptr;
+																		bool valid_signal_type = true;
 																	.)
 =
 (
 	"wire"															(.	signal_type = variable::wire;		.)
-	| "signal"														(.	signal_type = variable::state;	.)
+	| "signal"														(.	signal_type = variable::state;		.)
 )																	(.	if (variable::wire != signal_type && variable::state != signal_type) {
 																			// TODO: GEN_ERROR ?
 																			// TODO: Do not cancel parsing
+																			valid_signal_type = false;
 																		}
 																	.)
-SignalDeclaration<signal_type, variable>							(.	if (nullptr != variable){
-																			if (symbol_table.contains(variable->name)) {
+SignalDeclaration<signal_type, variable>							(.	if (nullptr != variable && valid_signal_type){
+																			if (current_symbol_table_scope->contains(variable->name)) {
 																				// TODO: GEN_ERROR 
 																				// TODO: Do not cancel parsing
 																			}
 																			else {
 																				signals.emplace_back(variable);
-																				symbol_table.add_entry(variable);
+																				current_symbol_table_scope->add_entry(variable);
 																			}
 																		}
 																	.)
 {																	(.	variable = nullptr;					.)	
-	"," SignalDeclaration<signal_type, variable>					(.	if (nullptr != variable){
-																			if (symbol_table.contains(variable->name)) {
+	"," SignalDeclaration<signal_type, variable>					(.	if (nullptr != variable && valid_signal_type){
+																			if (current_symbol_table_scope->contains(variable->name)) {
 																				// TODO: GEN_ERROR 
 																				// TODO: Do not cancel parsing
 																			}
 																			else {
 																				signals.emplace_back(variable);
-																				symbol_table.add_entry(variable);
+																				current_symbol_table_scope->add_entry(variable);
 																			}
 																		}
 																	.)
 }
 .
 
-SignalDeclaration<variable::types variable_type, variable::ptr &declared_signal>		(.	std::string signal_ident = ""; 
-																							std::vector<unsigned int> dimensions{};
+SignalDeclaration<variable::types variable_type, variable::ptr &declared_signal>		(.	std::vector<unsigned int> dimensions{};
 																							// TODO: Use default bit width
 																							unsigned int signal_width = 0;	
+																							bool valid_declaration = true;
 																						.)
 =
-ident																					(.	signal_ident = convert_to_uniform_text_format(t->val); 
-																							if (symbol_table.contains(signal_ident)) {
-																								// TODO: GEN_ERROR
-																								// TODO: Do not cancel parsing
-																							}
-																						.)
+ident																					(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);	.)
 {"[" 
 	int																					(.	const unsigned int dimension = std::stoul(convert_to_uniform_text_format(t->val));
 																							if (!dimension) {
+																								valid_declaration = false;
 																								// TODO: GEN_ERROR
-																								// TODO: Do not cancel parsing
 																							}
-																							dimensions.emplace_back(dimension);	
+																							else {
+																								dimensions.emplace_back(dimension);	
+																							}
 																						.)
 "]"} 
 ["(" 
 	int																					(.	signal_width = std::stoul(convert_to_uniform_text_format(t->val));
 																							if (!signal_width) {
 																								// TODO: GEN_ERROR
-																								// TODO: Do not cancel parsing
+																								valid_declaration = false;
 																							}
 																						.)
 ")"]																					(.	// TODO: What if no dimensions is specified, add default dimension entry ?
-																							declared_signal = std::make_shared<variable>(variable(variable_type, signal_ident, dimensions, signal_width));	
+																							if (valid_declaration) {
+																								declared_signal = std::make_shared<variable>(variable(variable_type, signal_ident, dimensions, signal_width));	
+																							}
+																							else {
+																								declared_signal = nullptr;
+																							}
 																						.)	
 .
 
