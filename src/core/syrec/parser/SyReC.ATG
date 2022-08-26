@@ -10,8 +10,10 @@ $namespace=syrec
 
 // Place includes here
 #include <cwchar>
+#include <optional>
 #include <set>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "core/syrec/module.hpp"
@@ -20,6 +22,10 @@ $namespace=syrec
 #include "core/syrec/parser/text_utils.hpp"
 
 COMPILER SyReC
+	
+	typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_evaluation_result;
+	typedef std::optional<std::variant<binary_expression, numeric_expression, shift_expression, variable_expression>> expression_evaluation_result;
+
 	// Place declarations of objects referenced in this ATG
 	module::vec modules;
 	parser_error_message_generator error_message_generator;
@@ -169,9 +175,22 @@ PRODUCTIONS
 Since Coco/R does not accept recursive token definitions, 
 we redefine the token 'number as a non-terminal symbol
 -------------------------------------------------------------------------*/
-Number
+Number<number::ptr number>													(.	number = nullptr;	.)
 =
-int | '#' ident | '$' ident | ('(' Number ('+'|'-'|'*'|'/') Number ')')
+int 
+| '#' ident 
+| '$' ident 
+| (																			(.	number::ptr lhs_operand, rhs_operand;	.)
+	'(' 
+		Number<lhs_operand>
+		('+'
+		|'-'
+		|'*'
+		|'/'
+		) 
+		Number<rhs_operand>
+	')'
+)
 .
 
 /*-------------------------------------------------------------------------
@@ -220,7 +239,6 @@ Parameter<parameter>										(.	if (nullptr != parameter) {
 															.)
 {															(.	parameter = nullptr;	.)
 	"," Parameter<parameter>								(.	if (nullptr != parameter) {
-																	// TODO: Check for duplicates
 																	if (current_symbol_table_scope->contains(parameter->name)) {
 																		// TODO: GEN_ERROR 
 																		// TODO: Do not cancel parsing
@@ -354,29 +372,54 @@ CallStatement
 ("call" | "uncall") ident "(" ident {"," ident} ")"
 .
 
-ForStatement
+ForStatement													(.	number::ptr number;	.)
 =
-"for" [IF (check_if_loop_iteration_range_start_is_defined()) ([IF (check_if_loop_variable_is_defined()) ("$" ident "=")] Number "to")] Number ["step" ["-"] Number] "do" StatementList "rof"
+"for" 
+[IF (check_if_loop_iteration_range_start_is_defined()) (
+	[
+		IF (check_if_loop_variable_is_defined()) (
+			"$" ident 
+			"="
+		)
+	] 
+	Number<number>
+	"to"
+)] 
+Number<number>
+["step" 
+	[	"-"
+	] 
+Number<number>
+] 
+"do" 
+StatementList 
+"rof"
 .
 
-IfStatement
+IfStatement															(.	expression_evaluation_result condition;
+																		expression_evaluation_result closing_condition;
+																	.)	
 =
-"if" Expression "then" StatementList "else" StatementList "fi" Expression
+"if" Expression<condition> "then" StatementList "else" StatementList "fi" Expression<closing_condition>
 .
 
-UnaryStatement
+UnaryStatement														(.	signal_evaluation_result unary_stmt_operand;	.)
 =
-("~" | "++" | "--") "=" Signal
+("~" | "++" | "--") "=" Signal<unary_stmt_operand>
 .
 
-AssignStatement
+AssignStatement														(.	signal_evaluation_result assign_stmt_lhs;
+																		expression_evaluation_result assign_stmt_rhs;
+																	.)
 =
-Signal ("^" | "+" | "-") "=" Expression
+Signal<assign_stmt_lhs> 
+("^" | "+" | "-") 
+"=" Expression<assign_stmt_rhs>
 .
 
-SwapStatement
+SwapStatement														(.	signal_evaluation_result swap_me, swap_there;	.)
 =
-Signal "<=>" Signal
+Signal<swap_me> "<=>" Signal<swap_there>
 .
 
 SkipStatement
@@ -384,38 +427,81 @@ SkipStatement
 "skip"
 .
 
-Signal
+Signal<signal_evaluation_result &signal_access>					(.	variable_access::ptr signal;	.)				
 =
-ident {"[" Expression "]"} ["." Number [":" Number]]
+ident															(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);
+																	if (!current_symbol_table_scope->contains(signal_ident)) {
+																		// TODO: GEN_ERROR
+																	}
+																	else {
+																		signal.reset(new variable_access());
+																		// TODO: Set with variable from symbol table
+																		signal->set_var({});
+																	}
+																.)
+{"["															(.	expression_evaluation_result index_expression;	.)
+	Expression<index_expression>								
+"]"
+} 
+[																(.	number::ptr range_start, range_end;
+																	range_start, range_end = nullptr;
+																	bool defined_range = false;
+																.)
+	"." Number<range_start>									
+	[
+		":" Number<range_end>									(.	defined_range = true;	.)
+	]															(.	if (nullptr == range_start || (defined_range && nullptr == range_end)) {
+																		return;
+																	}
+
+																	bool isBitIndex = nullptr != range_end;
+																	if (isBitIndex) {
+																		// TODO:
+																	}
+																	else {
+																		// TODO:
+																	}
+																.)
+]
 .
 
 /*-------------------------------------------------------------------------
 Expressions
 -------------------------------------------------------------------------*/
 
-Expression
+Expression<expression_evaluation_result &expression>									(.	signal_evaluation_result signal;
+																							number::ptr number;
+																						.)
 =
 (
-	IF (check_if_expression_is_number()) Number
-	| IF (check_if_expression_is_binary_expression()) BinaryExpression
-	| ShiftExpression
+	IF (check_if_expression_is_number()) Number<number>									
+	| IF (check_if_expression_is_binary_expression()) BinaryExpression<expression>
+	| ShiftExpression<expression>
 )
-	| Signal | UnaryExpression
+	| Signal<signal>					
+	| UnaryExpression<expression>
 .
 
-BinaryExpression
+BinaryExpression<expression_evaluation_result &binary_expression>						(.	expression_evaluation_result binary_expr_lhs;
+																							expression_evaluation_result binary_expr_rhs;
+																						.)
 =
-"(" Expression ("+" | "-" | "^" | "*" | "/" | "%" | "*>" | "&&" | "||" | "&" | "|" | "<" | ">" | "=" | "!=" | "<=" | ">=") Expression ")"
+"(" Expression<binary_expr_lhs> 
+	("+" | "-" | "^" | "*" | "/" | "%" | "*>" | "&&" | "||" | "&" | "|" | "<" | ">" | "=" | "!=" | "<=" | ">=") 
+	Expression<binary_expr_rhs>
+")"
 .
 
-UnaryExpression
+UnaryExpression<expression_evaluation_result &unary_expression>							(.	expression_evaluation_result unary_expression_operand;	.)
 =
-("!" | "~") Expression
+("!" | "~") Expression<unary_expression_operand>
 .
 
-ShiftExpression
+ShiftExpression<expression_evaluation_result &shift_expression>							(.	expression_evaluation_result shift_expression_lhs;
+																							number::ptr shift_amount;
+																						.)
 =
-"(" Expression ("<<" | ">>") Number ")"
+"(" Expression<shift_expression_lhs> ("<<" | ">>") Number<shift_amount> ")"
 .
 
 END SyReC.

@@ -31,8 +31,10 @@ Coco/R itself) does not fall under the GNU General Public License.
 #define syrec_COCO_PARSER_H__
 
 #include <cwchar>
+#include <optional>
 #include <set>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "core/syrec/module.hpp"
@@ -86,7 +88,11 @@ public:
 	Token *t;			// last recognized token
 	Token *la;			// lookahead token
 
-module::vec modules;
+typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_evaluation_result;
+	typedef std::optional<std::variant<binary_expression, numeric_expression, shift_expression, variable_expression>> expression_evaluation_result;
+
+	// Place declarations of objects referenced in this ATG
+	module::vec modules;
 	parser_error_message_generator error_message_generator;
 	symbol_table::ptr current_symbol_table_scope;
 
@@ -94,7 +100,7 @@ module::vec modules;
 	// This support is specific to the C++ version of Coco/R.
 	void Init() {
 		// nothing to do
-        symbol_table::open_scope(current_symbol_table_scope);
+		symbol_table::open_scope(current_symbol_table_scope);
 	}
 
 	// Uncomment this method if cleanup is necessary,
@@ -217,7 +223,7 @@ module::vec modules;
 	~Parser();
 	void SemErr(const wchar_t* msg);
 
-	void Number();
+	void Number(number::ptr number);
 	void SyReC();
 	void Module(module::ptr &parsed_module);
 	void ParameterList(const module::ptr &module);
@@ -233,11 +239,11 @@ module::vec modules;
 	void SkipStatement();
 	void AssignStatement();
 	void SwapStatement();
-	void Expression();
-	void Signal();
-	void BinaryExpression();
-	void ShiftExpression();
-	void UnaryExpression();
+	void Expression(expression_evaluation_result &expression);
+	void Signal(signal_evaluation_result &signal_access);
+	void BinaryExpression(expression_evaluation_result &binary_expression);
+	void ShiftExpression(expression_evaluation_result &shift_expression);
+	void UnaryExpression(expression_evaluation_result &unary_expression);
 
 	void Parse();
 

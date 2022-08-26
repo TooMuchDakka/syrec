@@ -89,7 +89,8 @@ bool Parser::WeakSeparator(int n, int syFol, int repFol) {
 	}
 }
 
-void Parser::Number() {
+void Parser::Number(number::ptr number) {
+		number = nullptr;	
 		if (la->kind == _int) {
 			Get();
 		} else if (la->kind == 3 /* "#" */) {
@@ -99,8 +100,9 @@ void Parser::Number() {
 			Get();
 			Expect(_ident);
 		} else if (la->kind == 5 /* "(" */) {
+			number::ptr lhs_operand, rhs_operand;	
 			Get();
-			Number();
+			Number(lhs_operand);
 			if (la->kind == 6 /* "+" */) {
 				Get();
 			} else if (la->kind == 7 /* "-" */) {
@@ -110,7 +112,7 @@ void Parser::Number() {
 			} else if (la->kind == 9 /* "/" */) {
 				Get();
 			} else SynErr(56);
-			Number();
+			Number(rhs_operand);
 			Expect(10 /* ")" */);
 		} else SynErr(57);
 }
@@ -172,7 +174,6 @@ void Parser::ParameterList(const module::ptr &module) {
 			Get();
 			Parameter(parameter);
 			if (nullptr != parameter) {
-			// TODO: Check for duplicates
 			if (current_symbol_table_scope->contains(parameter->name)) {
 			// TODO: GEN_ERROR 
 			// TODO: Do not cancel parsing
@@ -183,7 +184,7 @@ void Parser::ParameterList(const module::ptr &module) {
 			}
 			}
 			
-		}	
+		}
 }
 
 void Parser::SignalList(std::vector<variable::ptr> &signals ) {
@@ -346,6 +347,7 @@ void Parser::CallStatement() {
 }
 
 void Parser::ForStatement() {
+		number::ptr number;	
 		Expect(23 /* "for" */);
 		if (check_if_loop_iteration_range_start_is_defined()) {
 			if (check_if_loop_variable_is_defined()) {
@@ -353,16 +355,16 @@ void Parser::ForStatement() {
 				Expect(_ident);
 				Expect(24 /* "=" */);
 			}
-			Number();
+			Number(number);
 			Expect(25 /* "to" */);
 		}
-		Number();
+		Number(number);
 		if (la->kind == 26 /* "step" */) {
 			Get();
 			if (la->kind == 7 /* "-" */) {
 				Get();
 			}
-			Number();
+			Number(number);
 		}
 		Expect(27 /* "do" */);
 		StatementList();
@@ -370,17 +372,21 @@ void Parser::ForStatement() {
 }
 
 void Parser::IfStatement() {
+		expression_evaluation_result condition;
+		expression_evaluation_result closing_condition;
+		
 		Expect(29 /* "if" */);
-		Expression();
+		Expression(condition);
 		Expect(30 /* "then" */);
 		StatementList();
 		Expect(31 /* "else" */);
 		StatementList();
 		Expect(32 /* "fi" */);
-		Expression();
+		Expression(closing_condition);
 }
 
 void Parser::UnaryStatement() {
+		signal_evaluation_result unary_stmt_operand;	
 		if (la->kind == 33 /* "~" */) {
 			Get();
 		} else if (la->kind == 34 /* "++" */) {
@@ -389,7 +395,7 @@ void Parser::UnaryStatement() {
 			Get();
 		} else SynErr(62);
 		Expect(24 /* "=" */);
-		Signal();
+		Signal(unary_stmt_operand);
 }
 
 void Parser::SkipStatement() {
@@ -397,7 +403,10 @@ void Parser::SkipStatement() {
 }
 
 void Parser::AssignStatement() {
-		Signal();
+		signal_evaluation_result assign_stmt_lhs;
+		expression_evaluation_result assign_stmt_rhs;
+		
+		Signal(assign_stmt_lhs);
 		if (la->kind == 36 /* "^" */) {
 			Get();
 		} else if (la->kind == 6 /* "+" */) {
@@ -406,51 +415,87 @@ void Parser::AssignStatement() {
 			Get();
 		} else SynErr(63);
 		Expect(24 /* "=" */);
-		Expression();
+		Expression(assign_stmt_rhs);
 }
 
 void Parser::SwapStatement() {
-		Signal();
+		signal_evaluation_result swap_me, swap_there;	
+		Signal(swap_me);
 		Expect(37 /* "<=>" */);
-		Signal();
+		Signal(swap_there);
 }
 
-void Parser::Expression() {
+void Parser::Expression(expression_evaluation_result &expression) {
+		signal_evaluation_result signal;
+		number::ptr number;
+		
 		if (StartOf(1)) {
 			if (check_if_expression_is_number()) {
-				Number();
+				Number(number);
 			} else if (check_if_expression_is_binary_expression()) {
-				BinaryExpression();
+				BinaryExpression(expression);
 			} else {
-				ShiftExpression();
+				ShiftExpression(expression);
 			}
 		} else if (la->kind == _ident) {
-			Signal();
+			Signal(signal);
 		} else if (la->kind == 33 /* "~" */ || la->kind == 52 /* "!" */) {
-			UnaryExpression();
+			UnaryExpression(expression);
 		} else SynErr(64);
 }
 
-void Parser::Signal() {
+void Parser::Signal(signal_evaluation_result &signal_access) {
+		variable_access::ptr signal;	
 		Expect(_ident);
+		const std::string signal_ident = convert_to_uniform_text_format(t->val);
+		if (!current_symbol_table_scope->contains(signal_ident)) {
+		// TODO: GEN_ERROR
+		}
+		else {
+		signal.reset(new variable_access());
+		// TODO: Set with variable from symbol table
+		signal->set_var({});
+		}
+		
 		while (la->kind == 18 /* "[" */) {
 			Get();
-			Expression();
+			expression_evaluation_result index_expression;	
+			Expression(index_expression);
 			Expect(19 /* "]" */);
 		}
 		if (la->kind == 39 /* "." */) {
+			number::ptr range_start, range_end;
+			range_start, range_end = nullptr;
+			bool defined_range = false;
+			
 			Get();
-			Number();
+			Number(range_start);
 			if (la->kind == 40 /* ":" */) {
 				Get();
-				Number();
+				Number(range_end);
+				defined_range = true;	
 			}
+			if (nullptr == range_start || (defined_range && nullptr == range_end)) {
+			return;
+			}
+			
+			bool isBitIndex = nullptr != range_end;
+			if (isBitIndex) {
+			// TODO:
+			}
+			else {
+			// TODO:
+			}
+			
 		}
 }
 
-void Parser::BinaryExpression() {
+void Parser::BinaryExpression(expression_evaluation_result &binary_expression) {
+		expression_evaluation_result binary_expr_lhs;
+		expression_evaluation_result binary_expr_rhs;
+		
 		Expect(5 /* "(" */);
-		Expression();
+		Expression(binary_expr_lhs);
 		switch (la->kind) {
 		case 6 /* "+" */: {
 			Get();
@@ -522,29 +567,33 @@ void Parser::BinaryExpression() {
 		}
 		default: SynErr(65); break;
 		}
-		Expression();
+		Expression(binary_expr_rhs);
 		Expect(10 /* ")" */);
 }
 
-void Parser::ShiftExpression() {
+void Parser::ShiftExpression(expression_evaluation_result &shift_expression) {
+		expression_evaluation_result shift_expression_lhs;
+		number::ptr shift_amount;
+		
 		Expect(5 /* "(" */);
-		Expression();
+		Expression(shift_expression_lhs);
 		if (la->kind == 53 /* "<<" */) {
 			Get();
 		} else if (la->kind == 54 /* ">>" */) {
 			Get();
 		} else SynErr(66);
-		Number();
+		Number(shift_amount);
 		Expect(10 /* ")" */);
 }
 
-void Parser::UnaryExpression() {
+void Parser::UnaryExpression(expression_evaluation_result &unary_expression) {
+		expression_evaluation_result unary_expression_operand;	
 		if (la->kind == 52 /* "!" */) {
 			Get();
 		} else if (la->kind == 33 /* "~" */) {
 			Get();
 		} else SynErr(67);
-		Expression();
+		Expression(unary_expression_operand);
 }
 
 
