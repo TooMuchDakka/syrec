@@ -29,7 +29,7 @@ COMPILER SyReC
 	// This support is specific to the C++ version of Coco/R.
 	void Init() {
 		// nothing to do
-		current_symbol_table_scope = nullptr;
+		symbol_table::open_scope(current_symbol_table_scope);
 	}
 
 	// Uncomment this method if cleanup is necessary,
@@ -178,20 +178,14 @@ int | '#' ident | '$' ident | ('(' Number ('+'|'-'|'*'|'/') Number ')')
 Program and Modules
 -------------------------------------------------------------------------*/
 
-SyReC								(.	module::ptr module = nullptr; 
-										symbol_table::open_scope(current_symbol_table_scope);
-									.)
+SyReC								(.	module::ptr module = nullptr;	.)
 =
-Module<module>						(.	symbol_table::close_scope(current_symbol_table_scope);
-										if (nullptr != module) {
+Module<module>						(.	if (nullptr != module) {
 											current_symbol_table_scope->add_entry(module);
 										}
 									.)
-{									(.	symbol_table::open_scope(current_symbol_table_scope);
-										module = nullptr;
-									.)
-	Module<module>					(.	symbol_table::close_scope(current_symbol_table_scope);
-										if (nullptr != module) {
+{									(.	module = nullptr;	.)
+	Module<module>					(.	if (nullptr != module) {
 											if (current_symbol_table_scope->contains(module)) {
 												// TODO: GEN_ERROR 
 												// TODO: Do not cancel parsing	
@@ -204,7 +198,9 @@ Module<module>						(.	symbol_table::close_scope(current_symbol_table_scope);
 }
 .
 
-Module <module::ptr &parsed_module>						(.	std::vector<variable::ptr> locals {};	.)	
+Module <module::ptr &parsed_module>						(.	symbol_table::open_scope(current_symbol_table_scope);
+															std::vector<variable::ptr> locals {};	
+														.)	
 =
 "module" ident											(.	const std::string module_name = convert_to_uniform_text_format(t->val);
 															parsed_module = std::make_shared<module>(module(module_name));	
@@ -213,7 +209,7 @@ Module <module::ptr &parsed_module>						(.	std::vector<variable::ptr> locals {}
 {
 	SignalList<locals>									(.	parsed_module->variables = locals;	.)
 }														
-StatementList
+StatementList											(.	symbol_table::close_scope(current_symbol_table_scope);	.)
 .
 
 ParameterList<const module::ptr &module>					(.	variable::ptr parameter = nullptr;	.)
@@ -235,7 +231,7 @@ Parameter<parameter>										(.	if (nullptr != parameter) {
 																	}
 																}
 															.)
-}
+}															
 .
 
 Parameter<variable::ptr &parameter>						(.	variable::types parameter_type = variable::wire;

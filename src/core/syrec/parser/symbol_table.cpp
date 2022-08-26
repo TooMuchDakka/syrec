@@ -4,7 +4,7 @@
 
 namespace syrec {
     bool                              symbol_table::contains(const std::string& literal) {
-        return this->locals.find(literal) != this->locals.end();
+        return this->locals.find(literal) != this->locals.end() || (nullptr != outer && outer->contains(literal));
     }
 
     bool                              symbol_table::contains(const module::ptr& module) {
@@ -23,7 +23,7 @@ namespace syrec {
             }
         }
 
-        return found_module_matching_signature;
+        return found_module_matching_signature || (nullptr != outer && outer->contains(module));
     }
 
     [[nodiscard]] variable::ptr symbol_table::get_variable(const std::string& literal) {
@@ -37,12 +37,28 @@ namespace syrec {
         }
     }
 
-    void                              symbol_table::add_entry(const variable::ptr& local_entry) {
-        // TODO: Implement me
+    bool                              symbol_table::add_entry(const variable::ptr& local_entry) {
+        if (nullptr == local_entry || contains(local_entry->name)) {
+            return false;
+        }
+
+        const std::pair new_local_entry(local_entry->name, local_entry);
+        locals.insert(new_local_entry);
+        return true;
     }
 
-    void                              symbol_table::add_entry(const module::ptr& module) {
-        // TODO: Implement me
+    bool                              symbol_table::add_entry(const module::ptr& module) {
+        if (nullptr == module) {
+            return false;
+        }
+
+        if (!contains(module)) {
+            modules.insert(std::pair<std::string, std::vector<std::shared_ptr<syrec::module>>>(module->name, std::vector<module::ptr>()));
+        }
+        
+        std::vector<module::ptr> &modules_for_name = modules.find(module->name)->second;
+        modules_for_name.emplace_back(module);
+        return true;
     }
 
     void symbol_table::open_scope(symbol_table::ptr &current_scope) {
@@ -53,11 +69,9 @@ namespace syrec {
     }
 
     void symbol_table::close_scope(symbol_table::ptr &current_scope) {
-        const symbol_table::ptr &outer_scope = current_scope->outer;
-        if (nullptr != outer_scope) {
-            current_scope->outer = nullptr;
-        }
-        current_scope = outer_scope;
+        if (nullptr != current_scope) {
+            current_scope = current_scope->outer;
+        } 
     }
 
     [[nodiscard]] bool symbol_table::do_module_signatures_match(const module::ptr& module, const module::ptr& other_module) {
