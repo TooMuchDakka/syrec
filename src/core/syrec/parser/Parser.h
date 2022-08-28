@@ -33,11 +33,13 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include <cwchar>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <variant>
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_error_message_generator.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/text_utils.hpp"
@@ -215,6 +217,20 @@ typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_ev
 		return find_matching_token(matching_tokens, tokens_resulting_in_check_being_false);
 	}
 
+	[[nodiscard]] std::optional<unsigned int> convert_token_value_to_number(const Token &token) {
+		std::optional<unsigned int> token_as_number;
+		try {
+			token_as_number.emplace(std::stoul(convert_to_uniform_text_format(token.val)));
+		} 
+		catch (std::invalid_argument const &ex) {
+			// TODO: GEN_ERROR
+		}
+		catch (std::out_of_range const &ex) {
+			// TODO: GEN_ERROR
+		}
+		return token_as_number;
+	}
+
 /*-------------------------------------------------------------------------*/
 
 
@@ -223,7 +239,7 @@ typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_ev
 	~Parser();
 	void SemErr(const wchar_t* msg);
 
-	void Number(std::optional<number::ptr> &number );
+	void Number(std::optional<number::ptr> &parsed_number );
 	void SyReC();
 	void Module(std::optional<module::ptr> &parsed_module	);
 	void ParameterList(bool &is_valid_module_definition, const module::ptr &module);

@@ -12,11 +12,13 @@ $namespace=syrec
 #include <cwchar>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <variant>
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_error_message_generator.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/text_utils.hpp"
@@ -150,6 +152,20 @@ COMPILER SyReC
 		return find_matching_token(matching_tokens, tokens_resulting_in_check_being_false);
 	}
 
+	[[nodiscard]] std::optional<unsigned int> convert_token_value_to_number(const Token &token) {
+		std::optional<unsigned int> token_as_number;
+		try {
+			token_as_number.emplace(std::stoul(convert_to_uniform_text_format(token.val)));
+		} 
+		catch (std::invalid_argument const &ex) {
+			// TODO: GEN_ERROR
+		}
+		catch (std::out_of_range const &ex) {
+			// TODO: GEN_ERROR
+		}
+		return token_as_number;
+	}
+
 /*-------------------------------------------------------------------------*/
 
 CHARACTERS
@@ -175,21 +191,41 @@ PRODUCTIONS
 Since Coco/R does not accept recursive token definitions, 
 we redefine the token 'number as a non-terminal symbol
 -------------------------------------------------------------------------*/
-Number<. std::optional<number::ptr> &number .>									
+Number<. std::optional<number::ptr> &parsed_number .>									
 =
-int 
+int																			(.	const std::optional<unsigned int> conversion_result = convert_token_value_to_number(*t);
+																				if (conversion_result.has_value()) {
+																					const number::ptr result = std::make_shared<number>(number(conversion_result.value())); 
+																					parsed_number.emplace(result);
+																				}
+																				else {
+																					// TODO: GEN_ERROR
+																				}
+																			.)
 | '#' ident 
 | '$' ident 
-| (																			(.	std::optional<number::ptr> lhs_operand, rhs_operand;	.)
+| (																			(.	std::optional<number::ptr> lhs_operand, rhs_operand;  
+																				std::optional<syrec_operation::operation> op;
+																			.)
 	'(' 
 		Number<lhs_operand>
-		('+'
-		|'-'
-		|'*'
-		|'/'
+		('+'																(.	op.emplace(syrec_operation::operation::addition);		.)
+		|'-'																(.	op.emplace(syrec_operation::operation::subtraction);	.)
+		|'*'																(.	op.emplace(syrec_operation::operation::multiplication);	.)
+		|'/'																(.	op.emplace(syrec_operation::operation::division);		.)
 		) 
-		Number<rhs_operand>
-	')'
+		Number<rhs_operand>													(.	if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
+																					const std::optional<unsigned int> op_result = syrec_operation::apply(op.value(), lhs_operand.value(), rhs_operand.value());
+																					if (op_result.has_value()) {
+																						const number::ptr result = std::make_shared<number>(number(op_result.value())); 
+																						parsed_number.emplace(result);
+																					}
+																					else {
+																						// TODO: GEN_ERROR
+																					}
+																				}
+																			.)
+	')'																	
 )
 .
 
@@ -335,21 +371,24 @@ SignalDeclaration<. variable::types variable_type, std::optional<variable::ptr> 
 =
 ident																										(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);	.)
 {"[" 
-	int																										(.	const unsigned int dimension = std::stoul(convert_to_uniform_text_format(t->val));
-																												if (!dimension) {
+	int																										(.	const std::optional<unsigned int> dimension = convert_token_value_to_number(*t);
+																												if (!dimension.has_value()) {
 																													valid_declaration = false;
 																													// TODO: GEN_ERROR
 																												}
 																												else {
-																													dimensions.emplace_back(dimension);	
+																													dimensions.emplace_back(dimension.value());	
 																												}
 																											.)
 "]"} 
 ["(" 
-	int																									(.	signal_width = std::stoul(convert_to_uniform_text_format(t->val));
-																											if (!signal_width) {
+	int																									(.	const std::optional<unsigned int> user_defined_signal_width = convert_token_value_to_number(*t);
+																											if (!user_defined_signal_width.has_value()) {
 																												// TODO: GEN_ERROR
 																												valid_declaration = false;
+																											}
+																											else {
+																												signal_width = user_defined_signal_width.value();
 																											}
 																										.)
 ")"]																									(.	// TODO: What if no dimensions is specified, add default dimension entry ?
@@ -465,7 +504,7 @@ ident															(.	const std::string signal_ident = convert_to_uniform_text_
 																		return;
 																	}
 
-																	bool isBitIndex = nullptr != range_end;
+																	bool isBitIndex = range_end.has_value();
 																	if (isBitIndex) {
 																		// TODO:
 																	}

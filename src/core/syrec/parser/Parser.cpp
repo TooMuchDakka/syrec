@@ -89,9 +89,18 @@ bool Parser::WeakSeparator(int n, int syFol, int repFol) {
 	}
 }
 
-void Parser::Number(std::optional<number::ptr> &number ) {
+void Parser::Number(std::optional<number::ptr> &parsed_number ) {
 		if (la->kind == _int) {
 			Get();
+			const std::optional<unsigned int> conversion_result = convert_token_value_to_number(*t);
+			if (conversion_result.has_value()) {
+			const number::ptr result = std::make_shared<number>(number(conversion_result.value())); 
+			parsed_number.emplace(result);
+			}
+			else {
+			// TODO: GEN_ERROR
+			}
+			
 		} else if (la->kind == 3 /* "#" */) {
 			Get();
 			Expect(_ident);
@@ -99,19 +108,36 @@ void Parser::Number(std::optional<number::ptr> &number ) {
 			Get();
 			Expect(_ident);
 		} else if (la->kind == 5 /* "(" */) {
-			std::optional<number::ptr> lhs_operand, rhs_operand;	
+			std::optional<number::ptr> lhs_operand, rhs_operand;  
+			std::optional<syrec_operation::operation> op;
+			
 			Get();
 			Number(lhs_operand);
 			if (la->kind == 6 /* "+" */) {
 				Get();
+				op.emplace(syrec_operation::operation::addition);		
 			} else if (la->kind == 7 /* "-" */) {
 				Get();
+				op.emplace(syrec_operation::operation::subtraction);	
 			} else if (la->kind == 8 /* "*" */) {
 				Get();
+				op.emplace(syrec_operation::operation::multiplication);	
 			} else if (la->kind == 9 /* "/" */) {
 				Get();
+				op.emplace(syrec_operation::operation::division);		
 			} else SynErr(56);
 			Number(rhs_operand);
+			if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
+			const std::optional<unsigned int> op_result = syrec_operation::apply(op.value(), lhs_operand.value(), rhs_operand.value());
+			if (op_result.has_value()) {
+			const number::ptr result = std::make_shared<number>(number(op_result.value())); 
+			parsed_number.emplace(result);
+			}
+			else {
+			// TODO: GEN_ERROR
+			}
+			}
+			
 			Expect(10 /* ")" */);
 		} else SynErr(57);
 }
@@ -296,13 +322,13 @@ void Parser::SignalDeclaration(variable::types variable_type, std::optional<vari
 		while (la->kind == 18 /* "[" */) {
 			Get();
 			Expect(_int);
-			const unsigned int dimension = std::stoul(convert_to_uniform_text_format(t->val));
-			if (!dimension) {
+			const std::optional<unsigned int> dimension = convert_token_value_to_number(*t);
+			if (!dimension.has_value()) {
 			valid_declaration = false;
 			// TODO: GEN_ERROR
 			}
 			else {
-			dimensions.emplace_back(dimension);	
+			dimensions.emplace_back(dimension.value());	
 			}
 			
 			Expect(19 /* "]" */);
@@ -310,10 +336,13 @@ void Parser::SignalDeclaration(variable::types variable_type, std::optional<vari
 		if (la->kind == 5 /* "(" */) {
 			Get();
 			Expect(_int);
-			signal_width = std::stoul(convert_to_uniform_text_format(t->val));
-			if (!signal_width) {
+			const std::optional<unsigned int> user_defined_signal_width = convert_token_value_to_number(*t);
+			if (!user_defined_signal_width.has_value()) {
 			// TODO: GEN_ERROR
 			valid_declaration = false;
+			}
+			else {
+			signal_width = user_defined_signal_width.value();
 			}
 			
 			Expect(10 /* ")" */);
@@ -490,7 +519,7 @@ void Parser::Signal(signal_evaluation_result &signal_access) {
 			return;
 			}
 			
-			bool isBitIndex = nullptr != range_end;
+			bool isBitIndex = range_end.has_value();
 			if (isBitIndex) {
 			// TODO:
 			}
