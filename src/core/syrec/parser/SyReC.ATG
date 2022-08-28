@@ -26,7 +26,7 @@ $namespace=syrec
 COMPILER SyReC
 	
 	typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_evaluation_result;
-	typedef std::optional<std::variant<binary_expression, numeric_expression, shift_expression, variable_expression>> expression_evaluation_result;
+	typedef std::optional<expression::ptr> expression_evaluation_result;
 
 	// Place declarations of objects referenced in this ATG
 	module::vec modules;
@@ -116,7 +116,7 @@ COMPILER SyReC
 		}
 		return token->kind == _int || are_token_values_equal(token->val, L"#") || are_token_values_equal(token->val, L"$");
 	}
-
+		
 	[[nodiscard]] bool check_if_expression_is_number(const Token *first_token_of_expression) const {
         bool found_matching_operator;
         const std::vector<std::wstring> matching_tokens = {L"^", L"+", L"-", L"*"};
@@ -166,6 +166,44 @@ COMPILER SyReC
 		return token_as_number;
 	}
 
+	[[nodiscard]] static std::optional<unsigned int> map_operation_to_assign_operation(const syrec_operation::operation operation) {
+		std::optional<unsigned int> mapping_result;
+		switch (operation) {
+			case syrec_operation::operation::add_assign:
+				mapping_result.emplace(assign_statement::add);
+				break;
+			case syrec_operation::operation::minus_assign:
+				mapping_result.emplace(assign_statement::subtract);
+				break;
+			case syrec_operation::operation::xor_assign:
+				mapping_result.emplace(assign_statement::exor);
+				break;
+			default:
+				// TODO: GEN_ERROR ?
+				break;
+		}
+		return mapping_result;
+	}
+
+	[[nodiscard]] static std::optional<unsigned int> map_operation_to_unary_operation(const syrec_operation::operation operation) {
+		std::optional<unsigned int> mapping_result;
+		switch (operation) {
+			case syrec_operation::operation::increment_assign:
+				mapping_result.emplace(unary_statement::increment);
+				break;
+			case syrec_operation::operation::decrement_assign:
+				mapping_result.emplace(unary_statement::decrement);
+				break;
+			case syrec_operation::operation::negate_assign:
+				mapping_result.emplace(unary_statement::invert);
+				break;
+			default:
+				// TODO: GEN_ERROR ?
+				break;
+		}
+		return mapping_result;
+	}
+
 /*-------------------------------------------------------------------------*/
 
 CHARACTERS
@@ -194,7 +232,7 @@ Number production
 Since Coco/R does not accept recursive token definitions, 
 we redefine the token 'number as a non-terminal symbol
 -------------------------------------------------------------------------*/
-Number<. std::optional<number::ptr> &parsed_number .>									
+Number<. std::optional<number::ptr> &parsed_number, bool simplify_if_possible .>									
 =
 int																			(.	const std::optional<unsigned int> conversion_result = convert_token_value_to_number(*t);
 																				if (conversion_result.has_value()) {
@@ -211,13 +249,13 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 																				std::optional<syrec_operation::operation> op;
 																			.)
 	'(' 
-		Number<lhs_operand>
+		Number<lhs_operand, simplify_if_possible>
 		('+'																(.	op.emplace(syrec_operation::operation::addition);		.)
 		|'-'																(.	op.emplace(syrec_operation::operation::subtraction);	.)
 		|'*'																(.	op.emplace(syrec_operation::operation::multiplication);	.)
 		|'/'																(.	op.emplace(syrec_operation::operation::division);		.)
 		) 
-		Number<rhs_operand>													(.	if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
+		Number<rhs_operand, simplify_if_possible>							(.	if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
 																					const std::optional<unsigned int> op_result = syrec_operation::apply(op.value(), lhs_operand.value(), rhs_operand.value());
 																					if (op_result.has_value()) {
 																						const number::ptr result = std::make_shared<number>(number(op_result.value())); 
@@ -236,24 +274,24 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 Program and Modules
 -------------------------------------------------------------------------*/
 
-SyReC								(.	std::optional<module::ptr> module;	.)
+SyReC										(.	std::optional<module::ptr> module;	.)
 =
-Module<module>						(.	if (module.has_value()) {
-											current_symbol_table_scope->add_entry(module.value());
-										}
-									.)
-{									(.	module.reset();	.)
-	Module<module>					(.	if (module.has_value()) {
-											const module::ptr well_formed_module = module.value();
-											if (current_symbol_table_scope->contains(well_formed_module)) {
-												// TODO: GEN_ERROR 
-												// TODO: Do not cancel parsing	
-											}
-											else {
-												current_symbol_table_scope->add_entry(well_formed_module);
-											}
-										}
-									.)
+Module<module>								(.	if (module.has_value()) {
+													current_symbol_table_scope->add_entry(module.value());
+												}
+											.)
+{											(.	module.reset();	.)
+	Module<module>							(.	if (module.has_value()) {
+													const module::ptr well_formed_module = module.value();
+													if (current_symbol_table_scope->contains(well_formed_module)) {
+														// TODO: GEN_ERROR 
+														// TODO: Do not cancel parsing	
+													}
+													else {
+														current_symbol_table_scope->add_entry(well_formed_module);
+													}
+												}
+											.)
 }
 .
 
@@ -497,14 +535,14 @@ ForStatement<. std::optional<statement::ptr> &statement .>								(.	std::option
 			"="
 		)
 	] 
-	Number<number>
+	Number<number, false>
 	"to"
 )] 
-Number<number>
+Number<number, false>
 ["step" 
 	[	"-"
 	] 
-Number<number>
+Number<number, false>
 ] 
 "do" 
 StatementList<loop_body> 
@@ -521,20 +559,54 @@ IfStatement<. std::optional<statement::ptr> &statement .>		(.	expression_evaluat
 																	statement::vec false_branch{};
 																.)	
 =
-"if" Expression<condition> 
+"if" Expression<condition, false> 
 "then" 
 StatementList<true_branch> 
 "else" StatementList<false_branch>
-"fi" Expression<closing_condition>
+"fi" Expression<closing_condition, false>						(.	// TODO: Add check that condition and closing_condition match
+																	const bool conditional_well_formed = condition.has_value() 
+																		&& closing_condition.has_value()
+																		&& !true_branch.empty()
+																		&& !false_branch.empty();
+																	if (!conditional_well_formed) {
+																		return;
+																	}
+															
+																	if_statement::ptr stmt_pointer = std::make_shared<if_statement>(if_statement());
+																	if_statement      reference_stmt = dynamic_cast<if_statement&>(*stmt_pointer);
+
+																	reference_stmt.condition = condition.value();
+																	reference_stmt.fi_condition = closing_condition.value();
+																	reference_stmt.then_statements = true_branch;
+																	reference_stmt.else_statements = false_branch;
+
+																	statement.emplace(stmt_pointer);
+																.)
 .
 
 /*-------------------------------------------------------------------------
 UnaryStatement production
 -------------------------------------------------------------------------*/
 
-UnaryStatement<. std::optional<statement::ptr> &statement .>			(.	signal_evaluation_result unary_stmt_operand;	.)
+UnaryStatement<. std::optional<statement::ptr> &statement .>			(.	signal_evaluation_result unary_stmt_operand;
+																			std::optional<syrec_operation::operation> unary_operation;	
+																		.)
 =
-("~" | "++" | "--") "=" Signal<unary_stmt_operand>
+(
+	"~"																	(.	unary_operation.emplace(syrec_operation::operation::negate_assign);	.)
+	| "++"																(.	unary_operation.emplace(syrec_operation::operation::increment_assign);	.)
+	| "--"																(.	unary_operation.emplace(syrec_operation::operation::decrement_assign);	.)
+) 
+"=" Signal<unary_stmt_operand, false>									(.	if (!unary_operation.has_value() || !unary_stmt_operand.has_value() || nullptr == std::get<variable_access::ptr>(unary_stmt_operand.value())) {
+																				return;
+																			}
+
+																			const variable_access::ptr unary_operand_variable = std::get<variable_access::ptr>(unary_stmt_operand.value());
+																			const std::optional<unsigned int> mapped_operation = map_operation_to_unary_operation(unary_operation.value());
+																			if (mapped_operation.has_value()) {
+																				statement.emplace(std::make_shared<unary_statement>(unary_statement(mapped_operation.value(), unary_operand_variable)));
+																			}
+																		.)
 .
 
 
@@ -542,22 +614,49 @@ UnaryStatement<. std::optional<statement::ptr> &statement .>			(.	signal_evaluat
 AssignStatement production
 -------------------------------------------------------------------------*/
 
-AssignStatement<. std::optional<statement::ptr> &statement .>	(.	signal_evaluation_result assign_stmt_lhs;
+AssignStatement<. std::optional<statement::ptr> &statement .>	(.		signal_evaluation_result assign_stmt_lhs;
 																		expression_evaluation_result assign_stmt_rhs;
-																	.)
+																		std::optional<syrec_operation::operation> assign_operation;
+																.)
 =
-Signal<assign_stmt_lhs> 
-("^" | "+" | "-") 
-"=" Expression<assign_stmt_rhs>
+Signal<assign_stmt_lhs, false> 
+(
+	"^"															(.		assign_operation.emplace(syrec_operation::operation::xor_assign);	.)
+	| "+"														(.		assign_operation.emplace(syrec_operation::operation::add_assign);	.)
+	| "-"														(.		assign_operation.emplace(syrec_operation::operation::minus_assign);	.)
+)					
+"=" Expression<assign_stmt_rhs, false>							(.		if (!assign_stmt_lhs.has_value() || std::holds_alternative<variable_access::ptr>(assign_stmt_lhs.value()) || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
+																			return;
+																		}
+																		const variable_access::ptr assigned_to_obj = std::get<variable_access::ptr>(assign_stmt_lhs.value());
+																		const std::optional<unsigned int> mapped_operation = map_operation_to_assign_operation(assign_operation.value());
+																		if (mapped_operation.has_value()) {
+																			statement.emplace(std::make_shared<assign_statement>(assign_statement(assigned_to_obj,
+																																				mapped_operation.value(),
+																																				assign_stmt_rhs.value())));
+																		}
+																.)		
 .
 
 /*-------------------------------------------------------------------------
 SwapStatement production
 -------------------------------------------------------------------------*/
 
-SwapStatement<. std::optional<statement::ptr> &statement .>			(.	signal_evaluation_result swap_me, swap_there;	.)
+SwapStatement<. std::optional<statement::ptr> &statement .>			(.	signal_evaluation_result swap_me, swap_other;
+																		bool swap_operator_specified = false;
+																	.)
 =
-Signal<swap_me> "<=>" Signal<swap_there>
+Signal<swap_me, false> 
+"<=>"																(.	swap_operator_specified = true;	.)
+Signal<swap_other, false>											(.	const bool lhs_operand_valid = swap_me.has_value() && std::holds_alternative<variable_access::ptr>(swap_me.value());
+																		const bool rhs_operand_valid = swap_other.has_value() && std::holds_alternative<variable_access::ptr>(swap_other.value());
+
+																		if (swap_operator_specified && lhs_operand_valid && rhs_operand_valid) {
+																			const variable_access::ptr &lhs = std::get<variable_access::ptr>(swap_me.value());
+																			const variable_access::ptr &rhs = std::get<variable_access::ptr>(swap_other.value());
+																			statement.emplace(std::make_shared<swap_statement>(swap_statement(lhs, rhs)));
+																		}			
+																	.)
 .
 
 
@@ -567,7 +666,7 @@ SkipStatement production
 
 SkipStatement<. std::optional<statement::ptr> &statement .>
 =
-"skip"
+"skip"															(.	statement.emplace(std::make_shared<skip_statement>(skip_statement()));	.)
 .
 
 
@@ -575,40 +674,40 @@ SkipStatement<. std::optional<statement::ptr> &statement .>
 Signal production
 -------------------------------------------------------------------------*/
 
-Signal<signal_evaluation_result &signal_access>					(.	variable_access::ptr signal;	.)				
+Signal<signal_evaluation_result &signal_access, bool simplify_if_possible>	(.	variable_access::ptr signal;	.)				
 =
-ident															(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);
-																	if (!current_symbol_table_scope->contains(signal_ident)) {
-																		// TODO: GEN_ERROR
-																	}
-																	else {
-																		signal.reset(new variable_access());
-																		// TODO: Set with variable from symbol table
-																		signal->set_var({});
-																	}
-																.)
-{"["															(.	expression_evaluation_result index_expression;	.)
-	Expression<index_expression>								
+ident																		(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);
+																				if (!current_symbol_table_scope->contains(signal_ident)) {
+																					// TODO: GEN_ERROR
+																				}
+																				else {
+																					signal.reset(new variable_access());
+																					// TODO: Set with variable from symbol table
+																					signal->set_var({});
+																				}
+																			.)
+{"["																		(.	expression_evaluation_result index_expression;	.)
+	Expression<index_expression, simplify_if_possible>								
 "]"
 } 
-[																(.	std::optional<number::ptr> range_start, range_end;
-																	bool defined_range = false;
-																.)
-	"." Number<range_start>									
+[																			(.	std::optional<number::ptr> range_start, range_end;
+																				bool defined_range = false;
+																			.)
+	"." Number<range_start, false>									
 	[
-		":" Number<range_end>									(.	defined_range = true;	.)
-	]															(.	if (!range_start.has_value() || (defined_range && !range_end.has_value())) {
-																		return;
-																	}
+		":" Number<range_end, false>										(.	defined_range = true;	.)
+	]																		(.	if (!range_start.has_value() || (defined_range && !range_end.has_value())) {
+																					return;
+																				}
 
-																	bool isBitIndex = range_end.has_value();
-																	if (isBitIndex) {
-																		// TODO:
-																	}
-																	else {
-																		// TODO:
-																	}
-																.)
+																				bool isBitIndex = range_end.has_value();
+																				if (isBitIndex) {
+																					// TODO:
+																				}
+																				else {
+																					// TODO:
+																				}
+																			.)
 ]
 .
 
@@ -620,30 +719,30 @@ Expressions variants
 Expression production
 -------------------------------------------------------------------------*/
 
-Expression<expression_evaluation_result &expression>									(.	signal_evaluation_result signal;
+Expression<expression_evaluation_result &expression, bool simplify_if_possible>			(.	signal_evaluation_result signal;
 																							std::optional<number::ptr> number;
 																						.)
 =
 (
-	IF (check_if_expression_is_number()) Number<number>									
-	| IF (check_if_expression_is_binary_expression()) BinaryExpression<expression>
-	| ShiftExpression<expression>
+	IF (check_if_expression_is_number()) Number<number, simplify_if_possible>									
+	| IF (check_if_expression_is_binary_expression()) BinaryExpression<expression, simplify_if_possible>
+	| ShiftExpression<expression, simplify_if_possible>
 )
-	| Signal<signal>					
-	| UnaryExpression<expression>
+	| Signal<signal, simplify_if_possible>					
+	| UnaryExpression<expression, simplify_if_possible>
 .
 
 /*-------------------------------------------------------------------------
 BinaryExpression production
 -------------------------------------------------------------------------*/
 
-BinaryExpression<expression_evaluation_result &binary_expression>						(.	expression_evaluation_result binary_expr_lhs;
-																							expression_evaluation_result binary_expr_rhs;
-																						.)
+BinaryExpression<expression_evaluation_result &binary_expression, bool simplify_if_possible>						(.	expression_evaluation_result binary_expr_lhs;
+																														expression_evaluation_result binary_expr_rhs;
+																													.)	
 =
-"(" Expression<binary_expr_lhs> 
+"(" Expression<binary_expr_lhs, simplify_if_possible> 
 	("+" | "-" | "^" | "*" | "/" | "%" | "*>" | "&&" | "||" | "&" | "|" | "<" | ">" | "=" | "!=" | "<=" | ">=") 
-	Expression<binary_expr_rhs>
+	Expression<binary_expr_rhs, simplify_if_possible>
 ")"
 .
 
@@ -652,9 +751,9 @@ BinaryExpression<expression_evaluation_result &binary_expression>						(.	expres
 UnaryExpression production
 -------------------------------------------------------------------------*/
 
-UnaryExpression<expression_evaluation_result &unary_expression>							(.	expression_evaluation_result unary_expression_operand;	.)
+UnaryExpression<expression_evaluation_result &unary_expression, bool simplify_if_possible>							(.	expression_evaluation_result unary_expression_operand;	.)
 =
-("!" | "~") Expression<unary_expression_operand>
+("!" | "~") Expression<unary_expression_operand, simplify_if_possible>
 .
 
 
@@ -662,11 +761,11 @@ UnaryExpression<expression_evaluation_result &unary_expression>							(.	express
 ShiftExpression production
 -------------------------------------------------------------------------*/
 
-ShiftExpression<expression_evaluation_result &shift_expression>							(.	expression_evaluation_result shift_expression_lhs;
-																							std::optional<number::ptr> shift_amount;
-																						.)
+ShiftExpression<expression_evaluation_result &shift_expression, bool simplify_if_possible>	(.	expression_evaluation_result shift_expression_lhs;
+																								std::optional<number::ptr> shift_amount;
+																							.)
 =
-"(" Expression<shift_expression_lhs> ("<<" | ">>") Number<shift_amount> ")"
+"(" Expression<shift_expression_lhs, simplify_if_possible> ("<<" | ">>") Number<shift_amount, simplify_if_possible> ")"
 .
 
 END SyReC.

@@ -12,7 +12,15 @@ namespace syrec {
             addition,
             subtraction,
             multiplication,
-            division  
+            division ,
+
+            increment_assign,
+            decrement_assign,
+            negate_assign,
+
+            add_assign,
+            minus_assign,
+            xor_assign
         };
 
         [[nodiscard]] static std::optional<unsigned int>                apply(operation operation, const number::ptr &left_operand, const number::ptr &right_operand);

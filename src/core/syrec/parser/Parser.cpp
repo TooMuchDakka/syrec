@@ -89,7 +89,7 @@ bool Parser::WeakSeparator(int n, int syFol, int repFol) {
 	}
 }
 
-void Parser::Number(std::optional<number::ptr> &parsed_number ) {
+void Parser::Number(std::optional<number::ptr> &parsed_number, bool simplify_if_possible ) {
 		if (la->kind == _int) {
 			Get();
 			const std::optional<unsigned int> conversion_result = convert_token_value_to_number(*t);
@@ -112,7 +112,7 @@ void Parser::Number(std::optional<number::ptr> &parsed_number ) {
 			std::optional<syrec_operation::operation> op;
 			
 			Get();
-			Number(lhs_operand);
+			Number(lhs_operand, simplify_if_possible);
 			if (la->kind == 6 /* "+" */) {
 				Get();
 				op.emplace(syrec_operation::operation::addition);		
@@ -126,7 +126,7 @@ void Parser::Number(std::optional<number::ptr> &parsed_number ) {
 				Get();
 				op.emplace(syrec_operation::operation::division);		
 			} else SynErr(56);
-			Number(rhs_operand);
+			Number(rhs_operand, simplify_if_possible);
 			if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
 			const std::optional<unsigned int> op_result = syrec_operation::apply(op.value(), lhs_operand.value(), rhs_operand.value());
 			if (op_result.has_value()) {
@@ -416,16 +416,16 @@ void Parser::ForStatement(std::optional<statement::ptr> &statement ) {
 				Expect(_ident);
 				Expect(24 /* "=" */);
 			}
-			Number(number);
+			Number(number, false);
 			Expect(25 /* "to" */);
 		}
-		Number(number);
+		Number(number, false);
 		if (la->kind == 26 /* "step" */) {
 			Get();
 			if (la->kind == 7 /* "-" */) {
 				Get();
 			}
-			Number(number);
+			Number(number, false);
 		}
 		Expect(27 /* "do" */);
 		StatementList(loop_body);
@@ -439,75 +439,136 @@ void Parser::IfStatement(std::optional<statement::ptr> &statement ) {
 		statement::vec false_branch{};
 		
 		Expect(29 /* "if" */);
-		Expression(condition);
+		Expression(condition, false);
 		Expect(30 /* "then" */);
 		StatementList(true_branch);
 		Expect(31 /* "else" */);
 		StatementList(false_branch);
 		Expect(32 /* "fi" */);
-		Expression(closing_condition);
+		Expression(closing_condition, false);
+		const bool conditional_well_formed = condition.has_value() 
+		&& closing_condition.has_value()
+		&& !true_branch.empty()
+		&& !false_branch.empty();
+		if (!conditional_well_formed) {
+		return;
+		}
+		
+		if_statement::ptr stmt_pointer = std::make_shared<if_statement>(if_statement());
+		if_statement      reference_stmt = dynamic_cast<if_statement&>(*stmt_pointer);
+		
+		reference_stmt.condition = condition.value();
+		reference_stmt.fi_condition = closing_condition.value();
+		reference_stmt.then_statements = true_branch;
+		reference_stmt.else_statements = false_branch;
+		
+		statement.emplace(stmt_pointer);
+		
 }
 
 void Parser::UnaryStatement(std::optional<statement::ptr> &statement ) {
-		signal_evaluation_result unary_stmt_operand;	
+		signal_evaluation_result unary_stmt_operand;
+		std::optional<syrec_operation::operation> unary_operation;	
+		
 		if (la->kind == 33 /* "~" */) {
 			Get();
+			unary_operation.emplace(syrec_operation::operation::negate_assign);	
 		} else if (la->kind == 34 /* "++" */) {
 			Get();
+			unary_operation.emplace(syrec_operation::operation::increment_assign);	
 		} else if (la->kind == 35 /* "--" */) {
 			Get();
+			unary_operation.emplace(syrec_operation::operation::decrement_assign);	
 		} else SynErr(62);
 		Expect(24 /* "=" */);
-		Signal(unary_stmt_operand);
+		Signal(unary_stmt_operand, false);
+		if (!unary_operation.has_value() || !unary_stmt_operand.has_value() || nullptr == std::get<variable_access::ptr>(unary_stmt_operand.value())) {
+		return;
+		}
+		
+		const variable_access::ptr unary_operand_variable = std::get<variable_access::ptr>(unary_stmt_operand.value());
+		const std::optional<unsigned int> mapped_operation = map_operation_to_unary_operation(unary_operation.value());
+		if (mapped_operation.has_value()) {
+		statement.emplace(std::make_shared<unary_statement>(unary_statement(mapped_operation.value(), unary_operand_variable)));
+		}
+		
 }
 
 void Parser::SkipStatement(std::optional<statement::ptr> &statement ) {
 		Expect(38 /* "skip" */);
+		statement.emplace(std::make_shared<skip_statement>(skip_statement()));	
 }
 
 void Parser::AssignStatement(std::optional<statement::ptr> &statement ) {
 		signal_evaluation_result assign_stmt_lhs;
 		expression_evaluation_result assign_stmt_rhs;
+		std::optional<syrec_operation::operation> assign_operation;
 		
-		Signal(assign_stmt_lhs);
+		Signal(assign_stmt_lhs, false);
 		if (la->kind == 36 /* "^" */) {
 			Get();
+			assign_operation.emplace(syrec_operation::operation::xor_assign);	
 		} else if (la->kind == 6 /* "+" */) {
 			Get();
+			assign_operation.emplace(syrec_operation::operation::add_assign);	
 		} else if (la->kind == 7 /* "-" */) {
 			Get();
+			assign_operation.emplace(syrec_operation::operation::minus_assign);	
 		} else SynErr(63);
 		Expect(24 /* "=" */);
-		Expression(assign_stmt_rhs);
+		Expression(assign_stmt_rhs, false);
+		if (!assign_stmt_lhs.has_value() || std::holds_alternative<variable_access::ptr>(assign_stmt_lhs.value()) || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
+		return;
+		}
+		const variable_access::ptr assigned_to_obj = std::get<variable_access::ptr>(assign_stmt_lhs.value());
+		const std::optional<unsigned int> mapped_operation = map_operation_to_assign_operation(assign_operation.value());
+		if (mapped_operation.has_value()) {
+		statement.emplace(std::make_shared<assign_statement>(assign_statement(assigned_to_obj,
+		mapped_operation.value(),
+		assign_stmt_rhs.value())));
+		}
+		
 }
 
 void Parser::SwapStatement(std::optional<statement::ptr> &statement ) {
-		signal_evaluation_result swap_me, swap_there;	
-		Signal(swap_me);
+		signal_evaluation_result swap_me, swap_other;
+		bool swap_operator_specified = false;
+		
+		Signal(swap_me, false);
 		Expect(37 /* "<=>" */);
-		Signal(swap_there);
+		swap_operator_specified = true;	
+		Signal(swap_other, false);
+		const bool lhs_operand_valid = swap_me.has_value() && std::holds_alternative<variable_access::ptr>(swap_me.value());
+		const bool rhs_operand_valid = swap_other.has_value() && std::holds_alternative<variable_access::ptr>(swap_other.value());
+		
+		if (swap_operator_specified && lhs_operand_valid && rhs_operand_valid) {
+		const variable_access::ptr &lhs = std::get<variable_access::ptr>(swap_me.value());
+		const variable_access::ptr &rhs = std::get<variable_access::ptr>(swap_other.value());
+		statement.emplace(std::make_shared<swap_statement>(swap_statement(lhs, rhs)));
+		}			
+		
 }
 
-void Parser::Expression(expression_evaluation_result &expression) {
+void Parser::Expression(expression_evaluation_result &expression, bool simplify_if_possible) {
 		signal_evaluation_result signal;
 		std::optional<number::ptr> number;
 		
 		if (StartOf(1)) {
 			if (check_if_expression_is_number()) {
-				Number(number);
+				Number(number, simplify_if_possible);
 			} else if (check_if_expression_is_binary_expression()) {
-				BinaryExpression(expression);
+				BinaryExpression(expression, simplify_if_possible);
 			} else {
-				ShiftExpression(expression);
+				ShiftExpression(expression, simplify_if_possible);
 			}
 		} else if (la->kind == _ident) {
-			Signal(signal);
+			Signal(signal, simplify_if_possible);
 		} else if (la->kind == 33 /* "~" */ || la->kind == 52 /* "!" */) {
-			UnaryExpression(expression);
+			UnaryExpression(expression, simplify_if_possible);
 		} else SynErr(64);
 }
 
-void Parser::Signal(signal_evaluation_result &signal_access) {
+void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_possible) {
 		variable_access::ptr signal;	
 		Expect(_ident);
 		const std::string signal_ident = convert_to_uniform_text_format(t->val);
@@ -523,7 +584,7 @@ void Parser::Signal(signal_evaluation_result &signal_access) {
 		while (la->kind == 18 /* "[" */) {
 			Get();
 			expression_evaluation_result index_expression;	
-			Expression(index_expression);
+			Expression(index_expression, simplify_if_possible);
 			Expect(19 /* "]" */);
 		}
 		if (la->kind == 39 /* "." */) {
@@ -531,10 +592,10 @@ void Parser::Signal(signal_evaluation_result &signal_access) {
 			bool defined_range = false;
 			
 			Get();
-			Number(range_start);
+			Number(range_start, false);
 			if (la->kind == 40 /* ":" */) {
 				Get();
-				Number(range_end);
+				Number(range_end, false);
 				defined_range = true;	
 			}
 			if (!range_start.has_value() || (defined_range && !range_end.has_value())) {
@@ -552,12 +613,12 @@ void Parser::Signal(signal_evaluation_result &signal_access) {
 		}
 }
 
-void Parser::BinaryExpression(expression_evaluation_result &binary_expression) {
+void Parser::BinaryExpression(expression_evaluation_result &binary_expression, bool simplify_if_possible) {
 		expression_evaluation_result binary_expr_lhs;
 		expression_evaluation_result binary_expr_rhs;
 		
 		Expect(5 /* "(" */);
-		Expression(binary_expr_lhs);
+		Expression(binary_expr_lhs, simplify_if_possible);
 		switch (la->kind) {
 		case 6 /* "+" */: {
 			Get();
@@ -629,33 +690,33 @@ void Parser::BinaryExpression(expression_evaluation_result &binary_expression) {
 		}
 		default: SynErr(65); break;
 		}
-		Expression(binary_expr_rhs);
+		Expression(binary_expr_rhs, simplify_if_possible);
 		Expect(10 /* ")" */);
 }
 
-void Parser::ShiftExpression(expression_evaluation_result &shift_expression) {
+void Parser::ShiftExpression(expression_evaluation_result &shift_expression, bool simplify_if_possible) {
 		expression_evaluation_result shift_expression_lhs;
 		std::optional<number::ptr> shift_amount;
 		
 		Expect(5 /* "(" */);
-		Expression(shift_expression_lhs);
+		Expression(shift_expression_lhs, simplify_if_possible);
 		if (la->kind == 53 /* "<<" */) {
 			Get();
 		} else if (la->kind == 54 /* ">>" */) {
 			Get();
 		} else SynErr(66);
-		Number(shift_amount);
+		Number(shift_amount, simplify_if_possible);
 		Expect(10 /* ")" */);
 }
 
-void Parser::UnaryExpression(expression_evaluation_result &unary_expression) {
+void Parser::UnaryExpression(expression_evaluation_result &unary_expression, bool simplify_if_possible) {
 		expression_evaluation_result unary_expression_operand;	
 		if (la->kind == 52 /* "!" */) {
 			Get();
 		} else if (la->kind == 33 /* "~" */) {
 			Get();
 		} else SynErr(67);
-		Expression(unary_expression_operand);
+		Expression(unary_expression_operand, simplify_if_possible);
 }
 
 

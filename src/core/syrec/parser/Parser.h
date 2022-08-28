@@ -91,7 +91,7 @@ public:
 	Token *la;			// lookahead token
 
 typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_evaluation_result;
-	typedef std::optional<std::variant<binary_expression, numeric_expression, shift_expression, variable_expression>> expression_evaluation_result;
+	typedef std::optional<expression::ptr> expression_evaluation_result;
 
 	// Place declarations of objects referenced in this ATG
 	module::vec modules;
@@ -181,7 +181,7 @@ typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_ev
 		}
 		return token->kind == _int || are_token_values_equal(token->val, L"#") || are_token_values_equal(token->val, L"$");
 	}
-
+		
 	[[nodiscard]] bool check_if_expression_is_number(const Token *first_token_of_expression) const {
         bool found_matching_operator;
         const std::vector<std::wstring> matching_tokens = {L"^", L"+", L"-", L"*"};
@@ -231,6 +231,44 @@ typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_ev
 		return token_as_number;
 	}
 
+	[[nodiscard]] static std::optional<unsigned int> map_operation_to_assign_operation(const syrec_operation::operation operation) {
+		std::optional<unsigned int> mapping_result;
+		switch (operation) {
+			case syrec_operation::operation::add_assign:
+				mapping_result.emplace(assign_statement::add);
+				break;
+			case syrec_operation::operation::minus_assign:
+				mapping_result.emplace(assign_statement::subtract);
+				break;
+			case syrec_operation::operation::xor_assign:
+				mapping_result.emplace(assign_statement::exor);
+				break;
+			default:
+				// TODO: GEN_ERROR ?
+				break;
+		}
+		return mapping_result;
+	}
+
+	[[nodiscard]] static std::optional<unsigned int> map_operation_to_unary_operation(const syrec_operation::operation operation) {
+		std::optional<unsigned int> mapping_result;
+		switch (operation) {
+			case syrec_operation::operation::increment_assign:
+				mapping_result.emplace(unary_statement::increment);
+				break;
+			case syrec_operation::operation::decrement_assign:
+				mapping_result.emplace(unary_statement::decrement);
+				break;
+			case syrec_operation::operation::negate_assign:
+				mapping_result.emplace(unary_statement::invert);
+				break;
+			default:
+				// TODO: GEN_ERROR ?
+				break;
+		}
+		return mapping_result;
+	}
+
 /*-------------------------------------------------------------------------*/
 
 
@@ -239,7 +277,7 @@ typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_ev
 	~Parser();
 	void SemErr(const wchar_t* msg);
 
-	void Number(std::optional<number::ptr> &parsed_number );
+	void Number(std::optional<number::ptr> &parsed_number, bool simplify_if_possible );
 	void SyReC();
 	void Module(std::optional<module::ptr> &parsed_module	);
 	void ParameterList(bool &is_valid_module_definition, const module::ptr &module);
@@ -255,11 +293,11 @@ typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_ev
 	void SkipStatement(std::optional<statement::ptr> &statement );
 	void AssignStatement(std::optional<statement::ptr> &statement );
 	void SwapStatement(std::optional<statement::ptr> &statement );
-	void Expression(expression_evaluation_result &expression);
-	void Signal(signal_evaluation_result &signal_access);
-	void BinaryExpression(expression_evaluation_result &binary_expression);
-	void ShiftExpression(expression_evaluation_result &shift_expression);
-	void UnaryExpression(expression_evaluation_result &unary_expression);
+	void Expression(expression_evaluation_result &expression, bool simplify_if_possible);
+	void Signal(signal_evaluation_result &signal_access, bool simplify_if_possible);
+	void BinaryExpression(expression_evaluation_result &binary_expression, bool simplify_if_possible);
+	void ShiftExpression(expression_evaluation_result &shift_expression, bool simplify_if_possible);
+	void UnaryExpression(expression_evaluation_result &unary_expression, bool simplify_if_possible);
 
 	void Parse();
 
