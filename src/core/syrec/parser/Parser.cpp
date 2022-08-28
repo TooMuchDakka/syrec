@@ -89,8 +89,7 @@ bool Parser::WeakSeparator(int n, int syFol, int repFol) {
 	}
 }
 
-void Parser::Number(number::ptr number) {
-		number = nullptr;	
+void Parser::Number(std::optional<number::ptr> &number ) {
 		if (la->kind == _int) {
 			Get();
 		} else if (la->kind == 3 /* "#" */) {
@@ -100,7 +99,7 @@ void Parser::Number(number::ptr number) {
 			Get();
 			Expect(_ident);
 		} else if (la->kind == 5 /* "(" */) {
-			number::ptr lhs_operand, rhs_operand;	
+			std::optional<number::ptr> lhs_operand, rhs_operand;	
 			Get();
 			Number(lhs_operand);
 			if (la->kind == 6 /* "+" */) {
@@ -118,79 +117,89 @@ void Parser::Number(number::ptr number) {
 }
 
 void Parser::SyReC() {
-		module::ptr module = nullptr;	
+		std::optional<module::ptr> module;	
 		Module(module);
-		if (nullptr != module) {
-		current_symbol_table_scope->add_entry(module);
+		if (module.has_value()) {
+		current_symbol_table_scope->add_entry(module.value());
 		}
 		
 		while (la->kind == 11 /* "module" */) {
-			module = nullptr;	
+			module.reset();	
 			Module(module);
-			if (nullptr != module) {
-			if (current_symbol_table_scope->contains(module)) {
+			if (module.has_value()) {
+			const module::ptr well_formed_module = module.value();
+			if (current_symbol_table_scope->contains(well_formed_module)) {
 			// TODO: GEN_ERROR 
 			// TODO: Do not cancel parsing	
 			}
 			else {
-			current_symbol_table_scope->add_entry(module);
+			current_symbol_table_scope->add_entry(well_formed_module);
 			}
 			}
 			
 		}
 }
 
-void Parser::Module(module::ptr &parsed_module) {
+void Parser::Module(std::optional<module::ptr> &parsed_module	) {
 		symbol_table::open_scope(current_symbol_table_scope);
-		std::vector<variable::ptr> locals {};	
+		std::optional<std::vector<variable::ptr>> locals;	
+		bool valid_module_definition = false;
 		
 		Expect(11 /* "module" */);
 		Expect(_ident);
-		const std::string module_name = convert_to_uniform_text_format(t->val);
-		parsed_module = std::make_shared<module>(module(module_name));	
+		const std::string module_name = convert_to_uniform_text_format(t->val);	
+		module::ptr user_defined_module = std::make_shared<module>(module(module_name));
 		
 		Expect(5 /* "(" */);
 		if (la->kind == 13 /* "in" */ || la->kind == 14 /* "out" */ || la->kind == 15 /* "inout" */) {
-			ParameterList(parsed_module);
+			ParameterList(valid_module_definition, user_defined_module);
 		}
 		Expect(10 /* ")" */);
 		while (la->kind == 16 /* "wire" */ || la->kind == 17 /* "signal" */) {
 			SignalList(locals);
-			parsed_module->variables = locals;	
+			valid_module_definition &= locals.has_value();	
 		}
 		StatementList();
-		symbol_table::close_scope(current_symbol_table_scope);	
+		symbol_table::close_scope(current_symbol_table_scope);
+		if (valid_module_definition) {
+		
+		user_defined_module->variables = locals.value_or(std::vector<variable::ptr>{});
+		parsed_module.emplace(user_defined_module);
+		}
+		
 }
 
-void Parser::ParameterList(const module::ptr &module) {
-		variable::ptr parameter = nullptr;	
+void Parser::ParameterList(bool &is_valid_module_definition, const module::ptr &module) {
+		std::optional<variable::ptr> parameter;	
 		Parameter(parameter);
-		if (nullptr != parameter) {
-		module->add_parameter(parameter);
+		is_valid_module_definition = parameter.has_value();
+		if (is_valid_module_definition) {
+		module->add_parameter(parameter.value());
+		current_symbol_table_scope->add_entry(parameter.value());
 		}
 		
 		while (la->kind == 12 /* "," */) {
-			parameter = nullptr;	
+			parameter.reset();	
 			Get();
 			Parameter(parameter);
-			if (nullptr != parameter) {
-			if (current_symbol_table_scope->contains(parameter->name)) {
-			// TODO: GEN_ERROR 
-			// TODO: Do not cancel parsing
+			is_valid_module_definition = parameter.has_value();
+			const variable::ptr well_formed_parameter = parameter.value();
+			if (is_valid_module_definition && !current_symbol_table_scope->contains(well_formed_parameter->name)) {
+			module->add_parameter(well_formed_parameter);
+			current_symbol_table_scope->add_entry(well_formed_parameter);
 			}
 			else {
-			module->add_parameter(parameter);
-			current_symbol_table_scope->add_entry(parameter);
-			}
+			// TODO: GEN_ERROR 
 			}
 			
 		}
 }
 
-void Parser::SignalList(std::vector<variable::ptr> &signals ) {
+void Parser::SignalList(std::optional<std::vector<variable::ptr>> &signals ) {
 		variable::types signal_type = variable::in;
-		variable::ptr variable = nullptr;
+		std::optional<variable::ptr> declared_signal;
 		bool valid_signal_type = true;
+		std::vector<variable::ptr> valid_signal_declarations;
 		
 		if (la->kind == 16 /* "wire" */) {
 			Get();
@@ -205,34 +214,40 @@ void Parser::SignalList(std::vector<variable::ptr> &signals ) {
 		valid_signal_type = false;
 		}
 		
-		SignalDeclaration(signal_type, variable);
-		if (nullptr != variable && valid_signal_type){
-		if (current_symbol_table_scope->contains(variable->name)) {
+		SignalDeclaration(signal_type, declared_signal);
+		if (valid_signal_type && declared_signal.has_value()) {
+		const variable::ptr &valid_signal_declaration = declared_signal.value();
+		if (current_symbol_table_scope->contains(valid_signal_declaration->name)) {
 		// TODO: GEN_ERROR 
 		// TODO: Do not cancel parsing
 		}
 		else {
-		signals.emplace_back(variable);
-		current_symbol_table_scope->add_entry(variable);
+		valid_signal_declarations.emplace_back(valid_signal_declaration);
+		current_symbol_table_scope->add_entry(valid_signal_declaration);
 		}
 		}
 		
 		while (la->kind == 12 /* "," */) {
-			variable = nullptr;					
+			declared_signal.reset();			
 			Get();
-			SignalDeclaration(signal_type, variable);
-			if (nullptr != variable && valid_signal_type){
-			if (current_symbol_table_scope->contains(variable->name)) {
+			SignalDeclaration(signal_type, declared_signal);
+			if (valid_signal_type && declared_signal.has_value()) {
+			const variable::ptr &valid_signal_declaration = declared_signal.value();
+			if (current_symbol_table_scope->contains(valid_signal_declaration->name)) {
 			// TODO: GEN_ERROR 
 			// TODO: Do not cancel parsing
 			}
 			else {
-			signals.emplace_back(variable);
-			current_symbol_table_scope->add_entry(variable);
+			valid_signal_declarations.emplace_back(valid_signal_declaration);
+			current_symbol_table_scope->add_entry(valid_signal_declaration);
 			}
 			}
 			
 		}
+		if (valid_signal_declarations.size()){
+		signals.emplace(valid_signal_declarations);
+		}
+		
 }
 
 void Parser::StatementList() {
@@ -243,7 +258,7 @@ void Parser::StatementList() {
 		}
 }
 
-void Parser::Parameter(variable::ptr &parameter) {
+void Parser::Parameter(std::optional<variable::ptr> &parameter ) {
 		variable::types parameter_type = variable::wire;
 		bool valid_variable_type = true;
 		
@@ -265,12 +280,12 @@ void Parser::Parameter(variable::ptr &parameter) {
 		
 		SignalDeclaration(parameter_type, parameter);
 		if (!valid_variable_type) {
-		parameter = nullptr;
+		parameter.reset();
 		}
 		
 }
 
-void Parser::SignalDeclaration(variable::types variable_type, variable::ptr &declared_signal) {
+void Parser::SignalDeclaration(variable::types variable_type, std::optional<variable::ptr> &declared_signal ) {
 		std::vector<unsigned int> dimensions{};
 		// TODO: Use default bit width
 		unsigned int signal_width = 0;	
@@ -304,10 +319,7 @@ void Parser::SignalDeclaration(variable::types variable_type, variable::ptr &dec
 			Expect(10 /* ")" */);
 		}
 		if (valid_declaration) {
-		declared_signal = std::make_shared<variable>(variable(variable_type, signal_ident, dimensions, signal_width));	
-		}
-		else {
-		declared_signal = nullptr;
+		declared_signal.emplace(std::make_shared<variable>(variable(variable_type, signal_ident, dimensions, signal_width)));
 		}
 		
 }
@@ -347,7 +359,7 @@ void Parser::CallStatement() {
 }
 
 void Parser::ForStatement() {
-		number::ptr number;	
+		std::optional<number::ptr> number;	
 		Expect(23 /* "for" */);
 		if (check_if_loop_iteration_range_start_is_defined()) {
 			if (check_if_loop_variable_is_defined()) {
@@ -427,7 +439,7 @@ void Parser::SwapStatement() {
 
 void Parser::Expression(expression_evaluation_result &expression) {
 		signal_evaluation_result signal;
-		number::ptr number;
+		std::optional<number::ptr> number;
 		
 		if (StartOf(1)) {
 			if (check_if_expression_is_number()) {
@@ -464,8 +476,7 @@ void Parser::Signal(signal_evaluation_result &signal_access) {
 			Expect(19 /* "]" */);
 		}
 		if (la->kind == 39 /* "." */) {
-			number::ptr range_start, range_end;
-			range_start, range_end = nullptr;
+			std::optional<number::ptr> range_start, range_end;
 			bool defined_range = false;
 			
 			Get();
@@ -475,7 +486,7 @@ void Parser::Signal(signal_evaluation_result &signal_access) {
 				Number(range_end);
 				defined_range = true;	
 			}
-			if (nullptr == range_start || (defined_range && nullptr == range_end)) {
+			if (!range_start.has_value() || (defined_range && !range_end.has_value())) {
 			return;
 			}
 			
@@ -573,7 +584,7 @@ void Parser::BinaryExpression(expression_evaluation_result &binary_expression) {
 
 void Parser::ShiftExpression(expression_evaluation_result &shift_expression) {
 		expression_evaluation_result shift_expression_lhs;
-		number::ptr shift_amount;
+		std::optional<number::ptr> shift_amount;
 		
 		Expect(5 /* "(" */);
 		Expression(shift_expression_lhs);

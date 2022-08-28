@@ -223,14 +223,14 @@ typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_ev
 	~Parser();
 	void SemErr(const wchar_t* msg);
 
-	void Number(number::ptr number);
+	void Number(std::optional<number::ptr> &number );
 	void SyReC();
-	void Module(module::ptr &parsed_module);
-	void ParameterList(const module::ptr &module);
-	void SignalList(std::vector<variable::ptr> &signals );
+	void Module(std::optional<module::ptr> &parsed_module	);
+	void ParameterList(bool &is_valid_module_definition, const module::ptr &module);
+	void SignalList(std::optional<std::vector<variable::ptr>> &signals );
 	void StatementList();
-	void Parameter(variable::ptr &parameter);
-	void SignalDeclaration(variable::types variable_type, variable::ptr &declared_signal);
+	void Parameter(std::optional<variable::ptr> &parameter );
+	void SignalDeclaration(variable::types variable_type, std::optional<variable::ptr> &declared_signal );
 	void Statement();
 	void CallStatement();
 	void ForStatement();
