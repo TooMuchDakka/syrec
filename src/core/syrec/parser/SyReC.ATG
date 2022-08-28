@@ -187,7 +187,10 @@ IGNORE cr + lf + tab
 /*-------------------------------------------------------------------------*/
 PRODUCTIONS
 
+
 /*-------------------------------------------------------------------------
+Number production
+
 Since Coco/R does not accept recursive token definitions, 
 we redefine the token 'number as a non-terminal symbol
 -------------------------------------------------------------------------*/
@@ -254,9 +257,14 @@ Module<module>						(.	if (module.has_value()) {
 }
 .
 
+/*-------------------------------------------------------------------------
+Module production
+-------------------------------------------------------------------------*/
+
 Module <. std::optional<module::ptr> &parsed_module	.>			(.	symbol_table::open_scope(current_symbol_table_scope);
 																	std::optional<std::vector<variable::ptr>> locals;	
 																	bool valid_module_definition = false;
+																	statement::vec module_body {};
 																.)	
 =
 "module" ident													(.	const std::string module_name = convert_to_uniform_text_format(t->val);	
@@ -266,14 +274,26 @@ Module <. std::optional<module::ptr> &parsed_module	.>			(.	symbol_table::open_s
 {
 	SignalList<locals>											(.	valid_module_definition &= locals.has_value();	.)
 }														
-StatementList													(.	symbol_table::close_scope(current_symbol_table_scope);
+StatementList<module_body>										(.	symbol_table::close_scope(current_symbol_table_scope);
+																	if (module_body.empty()) {
+																		valid_module_definition = false;
+																		// TODO: GEN_ERROR
+																	}
+
 																	if (valid_module_definition) {
-															
 																		user_defined_module->variables = locals.value_or(std::vector<variable::ptr>{});
+																		for (const auto &statement : module_body) {
+																			user_defined_module->add_statement(statement);
+																		}
 																		parsed_module.emplace(user_defined_module);
 																	}
 																.)
 .
+
+
+/*-------------------------------------------------------------------------
+ParameterList production
+-------------------------------------------------------------------------*/
 
 ParameterList<bool &is_valid_module_definition, const module::ptr &module>			(.	std::optional<variable::ptr> parameter;	.)
 =
@@ -297,6 +317,11 @@ Parameter<parameter>																(.	is_valid_module_definition = parameter.ha
 }															
 .
 
+
+/*-------------------------------------------------------------------------
+Parameter production
+-------------------------------------------------------------------------*/
+
 Parameter<. std::optional<variable::ptr> &parameter .>								(.	variable::types parameter_type = variable::wire;
 																						bool valid_variable_type = true;
 																					.)	
@@ -316,6 +341,10 @@ SignalDeclaration<parameter_type, parameter>										(.	if (!valid_variable_typ
 																						}
 																					.)
 .
+
+/*-------------------------------------------------------------------------
+SignalList production
+-------------------------------------------------------------------------*/
 
 SignalList <. std::optional<std::vector<variable::ptr>> &signals .>	(.	variable::types signal_type = variable::in;
 																		std::optional<variable::ptr> declared_signal;
@@ -363,6 +392,11 @@ SignalDeclaration<signal_type, declared_signal>						(.	if (valid_signal_type &&
 																	.)
 .
 
+
+/*-------------------------------------------------------------------------
+SignalDeclaration production
+-------------------------------------------------------------------------*/
+
 SignalDeclaration<. variable::types variable_type, std::optional<variable::ptr> &declared_signal .>			(.	std::vector<unsigned int> dimensions{};
 																												// TODO: Use default bit width
 																												unsigned int signal_width = 0;	
@@ -399,31 +433,61 @@ ident																										(.	const std::string signal_ident = convert_to_un
 .
 
 /*-------------------------------------------------------------------------
-Statements
+Statement variants
 -------------------------------------------------------------------------*/
 
-StatementList 
+/*-------------------------------------------------------------------------
+StatementList
+-------------------------------------------------------------------------*/
+
+StatementList<. statement::vec &statements .>								(.	std::optional<statement::ptr> user_defined_statement;	.)
 =
-Statement {";" Statement}
+Statement<user_defined_statement>											(.	if (user_defined_statement.has_value()) {
+																					statements.emplace_back(user_defined_statement.value());
+																				}
+																			.)
+{																			(.	user_defined_statement.reset();	.)	
+	";" Statement<user_defined_statement>									(.	if (user_defined_statement.has_value()) {
+																					statements.emplace_back(user_defined_statement.value());
+																				}
+																			.)
+}
 .
 
-Statement
+
+/*-------------------------------------------------------------------------
+Statement production
+-------------------------------------------------------------------------*/
+
+Statement<. std::optional<statement::ptr> &user_defined_statement .>
 =
-CallStatement
-| ForStatement
-| IfStatement
-| UnaryStatement
-| SkipStatement
-| IF (check_if_is_assign_statement()) AssignStatement
-| SwapStatement
+CallStatement<user_defined_statement>
+| ForStatement<user_defined_statement>
+| IfStatement<user_defined_statement>
+| UnaryStatement<user_defined_statement>
+| SkipStatement<user_defined_statement>
+| IF (check_if_is_assign_statement()) AssignStatement<user_defined_statement>
+| SwapStatement<user_defined_statement>
 .
 
-CallStatement
+
+/*-------------------------------------------------------------------------
+CallStatement production
+-------------------------------------------------------------------------*/
+
+CallStatement<. std::optional<statement::ptr> &statement .>
 =
 ("call" | "uncall") ident "(" ident {"," ident} ")"
 .
 
-ForStatement													(.	std::optional<number::ptr> number;	.)
+
+/*-------------------------------------------------------------------------
+ForStatement production
+-------------------------------------------------------------------------*/
+
+ForStatement<. std::optional<statement::ptr> &statement .>								(.	std::optional<number::ptr> number;
+																							statement::vec loop_body{};
+																						.)
 =
 "for" 
 [IF (check_if_loop_iteration_range_start_is_defined()) (
@@ -443,23 +507,42 @@ Number<number>
 Number<number>
 ] 
 "do" 
-StatementList 
+StatementList<loop_body> 
 "rof"
 .
 
-IfStatement															(.	expression_evaluation_result condition;
-																		expression_evaluation_result closing_condition;
-																	.)	
+/*-------------------------------------------------------------------------
+IfStatement production
+-------------------------------------------------------------------------*/
+
+IfStatement<. std::optional<statement::ptr> &statement .>		(.	expression_evaluation_result condition;
+																	expression_evaluation_result closing_condition;
+																	statement::vec true_branch{};
+																	statement::vec false_branch{};
+																.)	
 =
-"if" Expression<condition> "then" StatementList "else" StatementList "fi" Expression<closing_condition>
+"if" Expression<condition> 
+"then" 
+StatementList<true_branch> 
+"else" StatementList<false_branch>
+"fi" Expression<closing_condition>
 .
 
-UnaryStatement														(.	signal_evaluation_result unary_stmt_operand;	.)
+/*-------------------------------------------------------------------------
+UnaryStatement production
+-------------------------------------------------------------------------*/
+
+UnaryStatement<. std::optional<statement::ptr> &statement .>			(.	signal_evaluation_result unary_stmt_operand;	.)
 =
 ("~" | "++" | "--") "=" Signal<unary_stmt_operand>
 .
 
-AssignStatement														(.	signal_evaluation_result assign_stmt_lhs;
+
+/*-------------------------------------------------------------------------
+AssignStatement production
+-------------------------------------------------------------------------*/
+
+AssignStatement<. std::optional<statement::ptr> &statement .>	(.	signal_evaluation_result assign_stmt_lhs;
 																		expression_evaluation_result assign_stmt_rhs;
 																	.)
 =
@@ -468,15 +551,29 @@ Signal<assign_stmt_lhs>
 "=" Expression<assign_stmt_rhs>
 .
 
-SwapStatement														(.	signal_evaluation_result swap_me, swap_there;	.)
+/*-------------------------------------------------------------------------
+SwapStatement production
+-------------------------------------------------------------------------*/
+
+SwapStatement<. std::optional<statement::ptr> &statement .>			(.	signal_evaluation_result swap_me, swap_there;	.)
 =
 Signal<swap_me> "<=>" Signal<swap_there>
 .
 
-SkipStatement
+
+/*-------------------------------------------------------------------------
+SkipStatement production
+-------------------------------------------------------------------------*/
+
+SkipStatement<. std::optional<statement::ptr> &statement .>
 =
 "skip"
 .
+
+
+/*-------------------------------------------------------------------------
+Signal production
+-------------------------------------------------------------------------*/
 
 Signal<signal_evaluation_result &signal_access>					(.	variable_access::ptr signal;	.)				
 =
@@ -516,7 +613,11 @@ ident															(.	const std::string signal_ident = convert_to_uniform_text_
 .
 
 /*-------------------------------------------------------------------------
-Expressions
+Expressions variants
+-------------------------------------------------------------------------*/
+
+/*-------------------------------------------------------------------------
+Expression production
 -------------------------------------------------------------------------*/
 
 Expression<expression_evaluation_result &expression>									(.	signal_evaluation_result signal;
@@ -532,6 +633,10 @@ Expression<expression_evaluation_result &expression>									(.	signal_evaluatio
 	| UnaryExpression<expression>
 .
 
+/*-------------------------------------------------------------------------
+BinaryExpression production
+-------------------------------------------------------------------------*/
+
 BinaryExpression<expression_evaluation_result &binary_expression>						(.	expression_evaluation_result binary_expr_lhs;
 																							expression_evaluation_result binary_expr_rhs;
 																						.)
@@ -542,10 +647,20 @@ BinaryExpression<expression_evaluation_result &binary_expression>						(.	expres
 ")"
 .
 
+
+/*-------------------------------------------------------------------------
+UnaryExpression production
+-------------------------------------------------------------------------*/
+
 UnaryExpression<expression_evaluation_result &unary_expression>							(.	expression_evaluation_result unary_expression_operand;	.)
 =
 ("!" | "~") Expression<unary_expression_operand>
 .
+
+
+/*-------------------------------------------------------------------------
+ShiftExpression production
+-------------------------------------------------------------------------*/
 
 ShiftExpression<expression_evaluation_result &shift_expression>							(.	expression_evaluation_result shift_expression_lhs;
 																							std::optional<number::ptr> shift_amount;

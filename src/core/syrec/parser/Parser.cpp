@@ -170,6 +170,7 @@ void Parser::Module(std::optional<module::ptr> &parsed_module	) {
 		symbol_table::open_scope(current_symbol_table_scope);
 		std::optional<std::vector<variable::ptr>> locals;	
 		bool valid_module_definition = false;
+		statement::vec module_body {};
 		
 		Expect(11 /* "module" */);
 		Expect(_ident);
@@ -185,11 +186,18 @@ void Parser::Module(std::optional<module::ptr> &parsed_module	) {
 			SignalList(locals);
 			valid_module_definition &= locals.has_value();	
 		}
-		StatementList();
+		StatementList(module_body);
 		symbol_table::close_scope(current_symbol_table_scope);
-		if (valid_module_definition) {
+		if (module_body.empty()) {
+		valid_module_definition = false;
+		// TODO: GEN_ERROR
+		}
 		
+		if (valid_module_definition) {
 		user_defined_module->variables = locals.value_or(std::vector<variable::ptr>{});
+		for (const auto &statement : module_body) {
+		user_defined_module->add_statement(statement);
+		}
 		parsed_module.emplace(user_defined_module);
 		}
 		
@@ -276,11 +284,21 @@ void Parser::SignalList(std::optional<std::vector<variable::ptr>> &signals ) {
 		
 }
 
-void Parser::StatementList() {
-		Statement();
+void Parser::StatementList(statement::vec &statements ) {
+		std::optional<statement::ptr> user_defined_statement;	
+		Statement(user_defined_statement);
+		if (user_defined_statement.has_value()) {
+		statements.emplace_back(user_defined_statement.value());
+		}
+		
 		while (la->kind == 20 /* ";" */) {
+			user_defined_statement.reset();	
 			Get();
-			Statement();
+			Statement(user_defined_statement);
+			if (user_defined_statement.has_value()) {
+			statements.emplace_back(user_defined_statement.value());
+			}
+			
 		}
 }
 
@@ -353,25 +371,25 @@ void Parser::SignalDeclaration(variable::types variable_type, std::optional<vari
 		
 }
 
-void Parser::Statement() {
+void Parser::Statement(std::optional<statement::ptr> &user_defined_statement ) {
 		if (la->kind == 21 /* "call" */ || la->kind == 22 /* "uncall" */) {
-			CallStatement();
+			CallStatement(user_defined_statement);
 		} else if (la->kind == 23 /* "for" */) {
-			ForStatement();
+			ForStatement(user_defined_statement);
 		} else if (la->kind == 29 /* "if" */) {
-			IfStatement();
+			IfStatement(user_defined_statement);
 		} else if (la->kind == 33 /* "~" */ || la->kind == 34 /* "++" */ || la->kind == 35 /* "--" */) {
-			UnaryStatement();
+			UnaryStatement(user_defined_statement);
 		} else if (la->kind == 38 /* "skip" */) {
-			SkipStatement();
+			SkipStatement(user_defined_statement);
 		} else if (check_if_is_assign_statement()) {
-			AssignStatement();
+			AssignStatement(user_defined_statement);
 		} else if (la->kind == _ident) {
-			SwapStatement();
+			SwapStatement(user_defined_statement);
 		} else SynErr(60);
 }
 
-void Parser::CallStatement() {
+void Parser::CallStatement(std::optional<statement::ptr> &statement ) {
 		if (la->kind == 21 /* "call" */) {
 			Get();
 		} else if (la->kind == 22 /* "uncall" */) {
@@ -387,8 +405,10 @@ void Parser::CallStatement() {
 		Expect(10 /* ")" */);
 }
 
-void Parser::ForStatement() {
-		std::optional<number::ptr> number;	
+void Parser::ForStatement(std::optional<statement::ptr> &statement ) {
+		std::optional<number::ptr> number;
+		statement::vec loop_body{};
+		
 		Expect(23 /* "for" */);
 		if (check_if_loop_iteration_range_start_is_defined()) {
 			if (check_if_loop_variable_is_defined()) {
@@ -408,25 +428,27 @@ void Parser::ForStatement() {
 			Number(number);
 		}
 		Expect(27 /* "do" */);
-		StatementList();
+		StatementList(loop_body);
 		Expect(28 /* "rof" */);
 }
 
-void Parser::IfStatement() {
+void Parser::IfStatement(std::optional<statement::ptr> &statement ) {
 		expression_evaluation_result condition;
 		expression_evaluation_result closing_condition;
+		statement::vec true_branch{};
+		statement::vec false_branch{};
 		
 		Expect(29 /* "if" */);
 		Expression(condition);
 		Expect(30 /* "then" */);
-		StatementList();
+		StatementList(true_branch);
 		Expect(31 /* "else" */);
-		StatementList();
+		StatementList(false_branch);
 		Expect(32 /* "fi" */);
 		Expression(closing_condition);
 }
 
-void Parser::UnaryStatement() {
+void Parser::UnaryStatement(std::optional<statement::ptr> &statement ) {
 		signal_evaluation_result unary_stmt_operand;	
 		if (la->kind == 33 /* "~" */) {
 			Get();
@@ -439,11 +461,11 @@ void Parser::UnaryStatement() {
 		Signal(unary_stmt_operand);
 }
 
-void Parser::SkipStatement() {
+void Parser::SkipStatement(std::optional<statement::ptr> &statement ) {
 		Expect(38 /* "skip" */);
 }
 
-void Parser::AssignStatement() {
+void Parser::AssignStatement(std::optional<statement::ptr> &statement ) {
 		signal_evaluation_result assign_stmt_lhs;
 		expression_evaluation_result assign_stmt_rhs;
 		
@@ -459,7 +481,7 @@ void Parser::AssignStatement() {
 		Expression(assign_stmt_rhs);
 }
 
-void Parser::SwapStatement() {
+void Parser::SwapStatement(std::optional<statement::ptr> &statement ) {
 		signal_evaluation_result swap_me, swap_there;	
 		Signal(swap_me);
 		Expect(37 /* "<=>" */);
