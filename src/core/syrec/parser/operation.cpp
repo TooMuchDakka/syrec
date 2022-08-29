@@ -1,14 +1,13 @@
 #include "core/syrec/parser/operation.hpp"
 
-namespace syrec {
+namespace syrec_operation {
 
-    std::optional<unsigned int> syrec_operation::apply(operation operation, const number::ptr &left_operand, const number::ptr &right_operand) {
-        std::optional<unsigned int> result;
-        return result;
+    static unsigned int apply(operation operation, unsigned int left_operand_value, unsigned int right_operand_value)
+    {
+        return 0;
     }
 
-    std::optional<unsigned int> syrec_operation::apply(operation operation, const number::ptr &left_operand) {
-        std::optional<unsigned int> result;
-        return result;
+    static unsigned int         apply(operation operation, unsigned int left_operand_value) {
+        return 0;
     }
 }

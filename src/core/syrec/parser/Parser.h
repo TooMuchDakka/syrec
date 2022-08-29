@@ -324,6 +324,36 @@ struct expression_or_constant {
 		return constant_value;
 	}
 
+	// TODO: Generate error/s in case of exceptions
+	[[nodiscard]] static std::optional<unsigned int> apply_unary_operation(const syrec_operation::operation operation, const number::ptr &left_operand) {
+		std::optional<unsigned int> operation_result;
+		try {
+			operation_result.emplace(syrec_operation::apply(operation, left_operand->evaluate({})));
+		}
+		catch (std::overflow_error &err) {
+		
+		}
+		catch(std::invalid_argument &err) {
+		
+		}
+        return operation_result;
+	}
+
+	// TODO: Generate error/s in case of exceptions
+	[[nodiscard]] static std::optional<unsigned int> apply_binary_operation(const syrec_operation::operation operation, const number::ptr &left_operand, const number::ptr &right_operand) {
+		std::optional<unsigned int> operation_result;
+		try {
+			operation_result.emplace(syrec_operation::apply(operation, left_operand->evaluate({}), right_operand->evaluate({})));
+		}
+		catch (std::overflow_error &err) {
+		
+		}
+		catch(std::invalid_argument &err) {
+		
+		}
+        return operation_result;
+	}
+
 /*-------------------------------------------------------------------------*/
 
 

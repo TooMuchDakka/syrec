@@ -31,6 +31,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include "Parser.h"
 #include "Scanner.h"
 
+
 namespace syrec {
 
 
@@ -127,13 +128,10 @@ void Parser::Number(std::optional<number::ptr> &parsed_number, bool simplify_if_
 			} else SynErr(56);
 			Number(rhs_operand, simplify_if_possible);
 			if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
-			const std::optional<unsigned int> op_result = syrec_operation::apply(op.value(), lhs_operand.value(), rhs_operand.value());
+			const std::optional<unsigned int> op_result = apply_binary_operation(op.value(), lhs_operand.value(), rhs_operand.value());
 			if (op_result.has_value()) {
 			const number::ptr result = std::make_shared<number>(number(op_result.value())); 
 			parsed_number.emplace(result);
-			}
-			else {
-			// TODO: GEN_ERROR
 			}
 			}
 			
