@@ -19,9 +19,9 @@ namespace syrec {
 
         ~symbol_table() = default;
 
-        bool                              contains(const std::string &literal);
-        bool                              contains(const module::ptr& module);
-        [[nodiscard]] variable::ptr get_variable(const std::string &literal);
+        bool                              contains(const std::string &literal) const;
+        bool                              contains(const module::ptr& module) const;
+        [[nodiscard]] std::optional<variable::ptr> get_variable(const std::string &literal) const;
         bool                              add_entry(const variable::ptr& local_entry);
         bool                              add_entry(const module::ptr& module);                     
 

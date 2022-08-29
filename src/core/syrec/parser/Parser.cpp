@@ -31,7 +31,6 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include "Parser.h"
 #include "Scanner.h"
 
-
 namespace syrec {
 
 
@@ -457,8 +456,8 @@ void Parser::IfStatement(std::optional<statement::ptr> &statement ) {
 		if_statement::ptr stmt_pointer = std::make_shared<if_statement>(if_statement());
 		if_statement      reference_stmt = dynamic_cast<if_statement&>(*stmt_pointer);
 		
-		reference_stmt.condition = condition.value();
-		reference_stmt.fi_condition = closing_condition.value();
+		reference_stmt.condition = condition.value().convert_to_expression();
+		reference_stmt.fi_condition = closing_condition.value().convert_to_expression();
 		reference_stmt.then_statements = true_branch;
 		reference_stmt.else_statements = false_branch;
 		
@@ -525,7 +524,7 @@ void Parser::AssignStatement(std::optional<statement::ptr> &statement ) {
 		if (mapped_operation.has_value()) {
 		statement.emplace(std::make_shared<assign_statement>(assign_statement(assigned_to_obj,
 		mapped_operation.value(),
-		assign_stmt_rhs.value())));
+		assign_stmt_rhs.value().convert_to_expression())));
 		}
 		
 }
@@ -569,22 +568,52 @@ void Parser::Expression(expression_evaluation_result &expression, bool simplify_
 }
 
 void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_possible) {
-		variable_access::ptr signal;	
+		std::optional<variable::ptr> signal;	
+		variable_access::ptr declared_signal_access;
+		bool valid_signal_access = true;
+		// TODO: Using global zero_based indexing flag to initialize default value
+		std::size_t dimension_index = 0;
+		
 		Expect(_ident);
 		const std::string signal_ident = convert_to_uniform_text_format(t->val);
-		if (!current_symbol_table_scope->contains(signal_ident)) {
-		// TODO: GEN_ERROR
+		if (check_ident_was_declared(signal_ident)) {
+		signal.emplace(current_symbol_table_scope->get_variable(signal_ident).value());
+		declared_signal_access = std::make_shared<variable_access>(variable_access());
+		declared_signal_access->set_var(signal.value());
 		}
 		else {
-		signal.reset(new variable_access());
-		// TODO: Set with variable from symbol table
-		signal->set_var({});
+		valid_signal_access = false;
 		}
 		
 		while (la->kind == 18 /* "[" */) {
 			Get();
 			expression_evaluation_result index_expression;	
 			Expression(index_expression, simplify_if_possible);
+			valid_signal_access &= index_expression.has_value();
+			if (signal.has_value() && index_expression.has_value()) {
+			const std::optional<unsigned int> &optional_dimension_access_value = get_value_if_expression_is_constant(index_expression);
+			
+			if (optional_dimension_access_value.has_value()) {
+			const unsigned int constant_dimension_access_value = optional_dimension_access_value.value();
+			
+			// TODO: Using global zero_based indexing flag
+			if (!range_check::is_valid_dimension_access(signal.value(), dimension_index, constant_dimension_access_value, true)) {
+			valid_signal_access = false;
+			
+			// TODO: Using global zero_based indexing flag
+			const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_dimension_access_range(signal.value(), true);
+			// TODO: GEN_ERROR
+			}
+			else {
+			declared_signal_access->indexes.emplace_back(index_expression.value().convert_to_expression());
+			}
+			}
+			else {
+			declared_signal_access->indexes.emplace_back(index_expression.value().get_expression());
+			}
+			}
+			dimension_index++;
+			
 			Expect(19 /* "]" */);
 		}
 		if (la->kind == 39 /* "." */) {
@@ -598,19 +627,50 @@ void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_po
 				Number(range_end, false);
 				defined_range = true;	
 			}
-			if (!range_start.has_value() || (defined_range && !range_end.has_value())) {
-			return;
-			}
+			valid_signal_access &= range_start.has_value() && (defined_range ? range_end.has_value() : true);
+			if (valid_signal_access) {
+			const variable::ptr &accessed_variable = signal.value();
 			
-			bool isBitIndex = range_end.has_value();
-			if (isBitIndex) {
-			// TODO:
+			const bool is_bit_access = !range_end.has_value();
+			const number::ptr &bit_or_range_access_start = range_start.value();
+			const number::ptr &bit_or_range_access_end = is_bit_access ? bit_or_range_access_start : range_end.value();
+			
+			if (is_bit_access) {
+			const unsigned int bit_access_value = range_start.value()->evaluate({});
+			
+			// TODO: Check bitwidth is within range [0, bitwidth - 1]
+			// TODO: Using global zero_based indexing flag
+			if (!range_check::is_valid_bit_access(accessed_variable, bit_access_value, true)) {
+			valid_signal_access = false;
+			// TODO: GEN_ERROR
+			// TODO: Using global zero_based indexing flag
+			const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_bit_access_range(accessed_variable, true);
+			}
 			}
 			else {
-			// TODO:
+			// TODO: Check user defined range is within [0, bitwidth - 1]
+			// TODO: Using global zero_based indexing flag
+			if (!range_check::is_valid_range_access(accessed_variable, 
+											range_start.value()->evaluate({}),
+											range_end.value()->evaluate({}),
+											true)){
+			valid_signal_access = false;
+			// TODO: GEN_ERROR
+			// TODO: Using global zero_based indexing flag
+			const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_range_access_range(accessed_variable, true);
+			}
+			}
+			
+			if (valid_signal_access){
+			declared_signal_access->range.emplace(std::pair<number::ptr, number::ptr>(bit_or_range_access_start, bit_or_range_access_end));
+			}
 			}
 			
 		}
+		if (valid_signal_access) {
+		signal_access.emplace(declared_signal_access);
+		}
+		
 }
 
 void Parser::BinaryExpression(expression_evaluation_result &binary_expression, bool simplify_if_possible) {

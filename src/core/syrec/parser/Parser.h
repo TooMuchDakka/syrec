@@ -41,6 +41,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include "core/syrec/module.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_error_message_generator.hpp"
+#include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/text_utils.hpp"
 
@@ -90,8 +91,46 @@ public:
 	Token *t;			// last recognized token
 	Token *la;			// lookahead token
 
-typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_evaluation_result;
-	typedef std::optional<expression::ptr> expression_evaluation_result;
+struct expression_or_constant {
+		public:
+			expression_or_constant(const unsigned int constant_value) : variants(constant_value)
+			{
+			}
+
+			expression_or_constant(const expression::ptr &expression) : variants(expression) 
+			{
+			}
+				
+			[[nodiscard]] bool is_constant() const {
+				return std::holds_alternative<unsigned int>(variants);
+			}
+
+			[[nodiscard]] unsigned int get_constant_value() const {
+				return std::get<unsigned int>(variants);
+			}
+
+			[[nodiscard]] expression::ptr get_expression() const {
+				return std::get<expression::ptr>(variants);
+			}
+
+			[[nodiscard]] expression::ptr convert_to_expression() const {
+				if (is_constant()) {
+					const number::ptr &constant_value_wrapper = std::make_shared<number>(get_constant_value());
+					// TODO: Fix calculation of bitwidth for constant value
+					const expression::ptr expression_for_constant = std::make_shared<numeric_expression>(constant_value_wrapper, 0);
+					return expression_for_constant;
+				}
+				else {
+					return get_expression();	
+				}
+			}
+			
+		private:
+			std::variant<expression::ptr, unsigned int> variants;
+	};
+
+	typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_evaluation_result;
+	typedef std::optional<expression_or_constant> expression_evaluation_result;
 
 	// Place declarations of objects referenced in this ATG
 	module::vec modules;
@@ -267,6 +306,22 @@ typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_ev
 				break;
 		}
 		return mapping_result;
+	}
+
+	bool check_ident_was_declared(const std::string &ident) const {
+		if (!current_symbol_table_scope->contains(ident)) {
+			// TOOD: GEN_ERROR
+			return false;
+		}
+		return true;
+	}
+
+	[[nodiscard]] static std::optional<unsigned int> get_value_if_expression_is_constant(const expression_evaluation_result &expression){
+		std::optional<unsigned int> constant_value;
+		if (expression.has_value() && expression.value().is_constant()) {
+			constant_value.emplace(expression.value().get_constant_value());
+		}
+		return constant_value;
 	}
 
 /*-------------------------------------------------------------------------*/

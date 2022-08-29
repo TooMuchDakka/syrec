@@ -3,11 +3,11 @@
 #include <functional>
 
 namespace syrec {
-    bool                              symbol_table::contains(const std::string& literal) {
+    bool                              symbol_table::contains(const std::string& literal) const {
         return this->locals.find(literal) != this->locals.end() || (nullptr != outer && outer->contains(literal));
     }
 
-    bool                              symbol_table::contains(const module::ptr& module) {
+    bool                              symbol_table::contains(const module::ptr& module) const {
         if (nullptr == module) {
             return false;
         }
@@ -26,15 +26,16 @@ namespace syrec {
         return found_module_matching_signature || (nullptr != outer && outer->contains(module));
     }
 
-    [[nodiscard]] variable::ptr symbol_table::get_variable(const std::string& literal) {
+    [[nodiscard]] std::optional<variable::ptr> symbol_table::get_variable(const std::string& literal) const {
+        std::optional<variable::ptr> found_entry;
 
         if (contains(literal)) {
-            return this->locals.find(literal)->second;
-        } else if (nullptr != outer) {
-            return outer->get_variable(literal);
-        } else {
-            return nullptr;
+            found_entry.emplace(this->locals.find(literal)->second);
         }
+        else if (nullptr != outer) {
+            return outer->get_variable(literal);
+        }
+        return found_entry;
     }
 
     bool                              symbol_table::add_entry(const variable::ptr& local_entry) {
