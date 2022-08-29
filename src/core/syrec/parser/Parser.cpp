@@ -671,84 +671,111 @@ void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_po
 		
 }
 
-void Parser::BinaryExpression(expression_evaluation_result &binary_expression, bool simplify_if_possible) {
+void Parser::BinaryExpression(expression_evaluation_result &user_defined_binary_expression, bool simplify_if_possible) {
 		expression_evaluation_result binary_expr_lhs;
 		expression_evaluation_result binary_expr_rhs;
+		std::optional<syrec_operation::operation> binary_operation;
 		
 		Expect(5 /* "(" */);
 		Expression(binary_expr_lhs, simplify_if_possible);
 		switch (la->kind) {
 		case 6 /* "+" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::addition);	
 			break;
 		}
 		case 7 /* "-" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::subtraction);	
 			break;
 		}
 		case 36 /* "^" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::bitwise_xor);	
 			break;
 		}
 		case 8 /* "*" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::multiplication);	
 			break;
 		}
 		case 9 /* "/" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::division);	
 			break;
 		}
 		case 41 /* "%" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::modulo);	
 			break;
 		}
 		case 42 /* "*>" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::upper_bits_multiplication);	
 			break;
 		}
 		case 43 /* "&&" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::logical_and);	
 			break;
 		}
 		case 44 /* "||" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::logical_or);	
 			break;
 		}
 		case 45 /* "&" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::bitwise_and);	
 			break;
 		}
 		case 46 /* "|" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::bitwise_or);	
 			break;
 		}
 		case 47 /* "<" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::less_than);	
 			break;
 		}
 		case 48 /* ">" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::greater_than);	
 			break;
 		}
 		case 24 /* "=" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::equals);	
 			break;
 		}
 		case 49 /* "!=" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::not_equals);	
 			break;
 		}
 		case 50 /* "<=" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::less_equals);	
 			break;
 		}
 		case 51 /* ">=" */: {
 			Get();
+			binary_operation.emplace(syrec_operation::operation::greater_equals);	
 			break;
 		}
 		default: SynErr(65); break;
 		}
 		Expression(binary_expr_rhs, simplify_if_possible);
+		if (binary_expr_lhs.has_value() && binary_operation.has_value() && binary_expr_rhs.has_value()) {
+		const std::optional<unsigned int> mapped_operation = map_operation_to_binary_operation(binary_operation.value());
+		if (mapped_operation.has_value()) {
+		user_defined_binary_expression.emplace(std::make_shared<binary_expression>(binary_expression(binary_expr_lhs.value().get_expression(),
+		mapped_operation.value(),
+		binary_expr_rhs.value().get_expression())));
+		}
+		}
+		
 		Expect(10 /* ")" */);
 }
 

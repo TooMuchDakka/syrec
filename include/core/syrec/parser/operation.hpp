@@ -3,11 +3,26 @@
 
 namespace syrec_operation {
     enum class operation {
-        // Number operations
+        // Binary expression operations
+        // BEGIN: Number operations
         addition,
         subtraction,
         multiplication,
-        division ,
+        division,
+        // END: Number operations
+        modulo,
+        upper_bits_multiplication,
+        bitwise_xor,
+        logical_and,
+        logical_or,
+        bitwise_and,
+        bitwise_or,
+        less_than,
+        greater_than,
+        equals,
+        not_equals,
+        less_equals,
+        greater_equals,
         // Unary statement operations
         increment_assign,
         decrement_assign,

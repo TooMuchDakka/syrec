@@ -324,6 +324,67 @@ struct expression_or_constant {
 		return mapping_result;
 	}
 
+	[[nodiscard]] static std::optional<unsigned int> map_operation_to_binary_operation(const syrec_operation::operation operation) {
+		std::optional<unsigned int> mapping_result;
+		switch (operation) {
+			case syrec_operation::operation::addition:
+				mapping_result.emplace(binary_expression::add);
+				break;
+			case syrec_operation::operation::subtraction:
+				mapping_result.emplace(binary_expression::subtract);
+				break;
+				case syrec_operation::operation::multiplication:
+				mapping_result.emplace(binary_expression::multiply);
+				break;		
+			case syrec_operation::operation::division:
+				mapping_result.emplace(binary_expression::divide);
+				break;			
+			case syrec_operation::operation::modulo:
+				mapping_result.emplace(binary_expression::modulo);
+				break;		
+			case syrec_operation::operation::upper_bits_multiplication:
+				mapping_result.emplace(binary_expression::frac_divide);
+				break;		
+			case syrec_operation::operation::bitwise_xor:
+				mapping_result.emplace(binary_expression::exor);
+				break;		
+			case syrec_operation::operation::logical_and:
+				mapping_result.emplace(binary_expression::logical_and);
+				break;		
+			case syrec_operation::operation::logical_or:
+				mapping_result.emplace(binary_expression::logical_or);
+				break;		
+			case syrec_operation::operation::bitwise_and:
+				mapping_result.emplace(binary_expression::bitwise_and);
+				break;	
+			case syrec_operation::operation::bitwise_or:
+				mapping_result.emplace(binary_expression::bitwise_or);
+				break;	
+			case syrec_operation::operation::less_than:
+				mapping_result.emplace(binary_expression::less_than);
+				break;	
+			case syrec_operation::operation::greater_than:
+				mapping_result.emplace(binary_expression::greater_than);
+				break;	
+			case syrec_operation::operation::equals:
+				mapping_result.emplace(binary_expression::equals);
+				break;		
+			case syrec_operation::operation::not_equals:
+				mapping_result.emplace(binary_expression::not_equals);
+				break;		
+			case syrec_operation::operation::less_equals:
+				mapping_result.emplace(binary_expression::less_equals);
+				break;		
+			case syrec_operation::operation::greater_equals:
+				mapping_result.emplace(binary_expression::greater_equals);
+				break;
+			default:
+				// TODO: GEN_ERROR ?
+				break;
+		}
+		return mapping_result;
+	}
+
 	bool check_ident_was_declared(const std::string &ident) const {
 		if (!current_symbol_table_scope->contains(ident)) {
 			// TOOD: GEN_ERROR
@@ -396,7 +457,7 @@ struct expression_or_constant {
 	void SwapStatement(std::optional<statement::ptr> &statement );
 	void Expression(expression_evaluation_result &expression, bool simplify_if_possible);
 	void Signal(signal_evaluation_result &signal_access, bool simplify_if_possible);
-	void BinaryExpression(expression_evaluation_result &binary_expression, bool simplify_if_possible);
+	void BinaryExpression(expression_evaluation_result &user_defined_binary_expression, bool simplify_if_possible);
 	void ShiftExpression(expression_evaluation_result &user_defined_shift_expression, bool simplify_if_possible);
 	void UnaryExpression(expression_evaluation_result &unary_expression, bool simplify_if_possible);
 

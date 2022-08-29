@@ -259,6 +259,67 @@ COMPILER SyReC
 		return mapping_result;
 	}
 
+	[[nodiscard]] static std::optional<unsigned int> map_operation_to_binary_operation(const syrec_operation::operation operation) {
+		std::optional<unsigned int> mapping_result;
+		switch (operation) {
+			case syrec_operation::operation::addition:
+				mapping_result.emplace(binary_expression::add);
+				break;
+			case syrec_operation::operation::subtraction:
+				mapping_result.emplace(binary_expression::subtract);
+				break;
+				case syrec_operation::operation::multiplication:
+				mapping_result.emplace(binary_expression::multiply);
+				break;		
+			case syrec_operation::operation::division:
+				mapping_result.emplace(binary_expression::divide);
+				break;			
+			case syrec_operation::operation::modulo:
+				mapping_result.emplace(binary_expression::modulo);
+				break;		
+			case syrec_operation::operation::upper_bits_multiplication:
+				mapping_result.emplace(binary_expression::frac_divide);
+				break;		
+			case syrec_operation::operation::bitwise_xor:
+				mapping_result.emplace(binary_expression::exor);
+				break;		
+			case syrec_operation::operation::logical_and:
+				mapping_result.emplace(binary_expression::logical_and);
+				break;		
+			case syrec_operation::operation::logical_or:
+				mapping_result.emplace(binary_expression::logical_or);
+				break;		
+			case syrec_operation::operation::bitwise_and:
+				mapping_result.emplace(binary_expression::bitwise_and);
+				break;	
+			case syrec_operation::operation::bitwise_or:
+				mapping_result.emplace(binary_expression::bitwise_or);
+				break;	
+			case syrec_operation::operation::less_than:
+				mapping_result.emplace(binary_expression::less_than);
+				break;	
+			case syrec_operation::operation::greater_than:
+				mapping_result.emplace(binary_expression::greater_than);
+				break;	
+			case syrec_operation::operation::equals:
+				mapping_result.emplace(binary_expression::equals);
+				break;		
+			case syrec_operation::operation::not_equals:
+				mapping_result.emplace(binary_expression::not_equals);
+				break;		
+			case syrec_operation::operation::less_equals:
+				mapping_result.emplace(binary_expression::less_equals);
+				break;		
+			case syrec_operation::operation::greater_equals:
+				mapping_result.emplace(binary_expression::greater_equals);
+				break;
+			default:
+				// TODO: GEN_ERROR ?
+				break;
+		}
+		return mapping_result;
+	}
+
 	bool check_ident_was_declared(const std::string &ident) const {
 		if (!current_symbol_table_scope->contains(ident)) {
 			// TOOD: GEN_ERROR
@@ -893,13 +954,40 @@ Expression<expression_evaluation_result &expression, bool simplify_if_possible>	
 BinaryExpression production
 -------------------------------------------------------------------------*/
 
-BinaryExpression<expression_evaluation_result &binary_expression, bool simplify_if_possible>						(.	expression_evaluation_result binary_expr_lhs;
+BinaryExpression<expression_evaluation_result &user_defined_binary_expression, bool simplify_if_possible>			(.	expression_evaluation_result binary_expr_lhs;
 																														expression_evaluation_result binary_expr_rhs;
+																														std::optional<syrec_operation::operation> binary_operation;
 																													.)	
 =
 "(" Expression<binary_expr_lhs, simplify_if_possible> 
-	("+" | "-" | "^" | "*" | "/" | "%" | "*>" | "&&" | "||" | "&" | "|" | "<" | ">" | "=" | "!=" | "<=" | ">=") 
-	Expression<binary_expr_rhs, simplify_if_possible>
+	(
+		"+"																											(.	binary_operation.emplace(syrec_operation::operation::addition);	.)
+		| "-"																										(.	binary_operation.emplace(syrec_operation::operation::subtraction);	.)
+		| "^"																										(.	binary_operation.emplace(syrec_operation::operation::bitwise_xor);	.)
+		| "*"																										(.	binary_operation.emplace(syrec_operation::operation::multiplication);	.)
+		| "/"																										(.	binary_operation.emplace(syrec_operation::operation::division);	.)
+		| "%"																										(.	binary_operation.emplace(syrec_operation::operation::modulo);	.)
+		| "*>"																										(.	binary_operation.emplace(syrec_operation::operation::upper_bits_multiplication);	.)
+		| "&&"																										(.	binary_operation.emplace(syrec_operation::operation::logical_and);	.)
+		| "||"																										(.	binary_operation.emplace(syrec_operation::operation::logical_or);	.)
+		| "&"																										(.	binary_operation.emplace(syrec_operation::operation::bitwise_and);	.)
+		| "|"																										(.	binary_operation.emplace(syrec_operation::operation::bitwise_or);	.)
+		| "<"																										(.	binary_operation.emplace(syrec_operation::operation::less_than);	.)
+		| ">"																										(.	binary_operation.emplace(syrec_operation::operation::greater_than);	.)
+		| "="																										(.	binary_operation.emplace(syrec_operation::operation::equals);	.)
+		| "!="																										(.	binary_operation.emplace(syrec_operation::operation::not_equals);	.)
+		| "<="																										(.	binary_operation.emplace(syrec_operation::operation::less_equals);	.)
+		| ">="																										(.	binary_operation.emplace(syrec_operation::operation::greater_equals);	.)
+	) 
+	Expression<binary_expr_rhs, simplify_if_possible>																(.	if (binary_expr_lhs.has_value() && binary_operation.has_value() && binary_expr_rhs.has_value()) {
+																															const std::optional<unsigned int> mapped_operation = map_operation_to_binary_operation(binary_operation.value());
+																															if (mapped_operation.has_value()) {
+																																user_defined_binary_expression.emplace(std::make_shared<binary_expression>(binary_expression(binary_expr_lhs.value().get_expression(),
+																																						mapped_operation.value(),
+																																						binary_expr_rhs.value().get_expression())));
+																															}
+																														}
+																													.)
 ")"
 .
 
