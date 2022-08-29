@@ -387,19 +387,59 @@ void Parser::Statement(std::optional<statement::ptr> &user_defined_statement ) {
 }
 
 void Parser::CallStatement(std::optional<statement::ptr> &statement ) {
+		std::optional<bool> is_call_statement;
+		std::vector<std::string> callee_arguments {};
+		bool valid_call_operation = true;
+		
 		if (la->kind == 21 /* "call" */) {
 			Get();
+			is_call_statement.emplace(true);	
 		} else if (la->kind == 22 /* "uncall" */) {
 			Get();
+			is_call_statement.emplace(false);	
 		} else SynErr(61);
+		valid_call_operation = is_call_statement.value();	
 		Expect(_ident);
+		const std::string method_ident = convert_to_uniform_text_format(t->val); 
 		Expect(5 /* "(" */);
 		Expect(_ident);
+		std::string variable_ident = convert_to_uniform_text_format(t->val);
+		if (check_ident_was_declared(variable_ident)) {
+		callee_arguments.emplace_back(variable_ident);
+		}
+		else {
+		valid_call_operation = false;
+		}
+		
 		while (la->kind == 12 /* "," */) {
 			Get();
 			Expect(_ident);
+			variable_ident = convert_to_uniform_text_format(t->val);
+			if (check_ident_was_declared(variable_ident)) {
+			callee_arguments.emplace_back(variable_ident);
+			}
+			else {
+			valid_call_operation = false;
+			}
+			
 		}
 		Expect(10 /* ")" */);
+		if (!valid_call_operation) {
+		return;		
+		}
+		const std::optional<module::ptr> module = current_symbol_table_scope->get_module(method_ident, callee_arguments.size());
+		if (!module.has_value()) {
+		// TODO: GEN_ERROR
+		}
+		else {
+		if (is_call_statement.value()) {
+		statement.emplace(std::make_shared<call_statement>(call_statement(module.value(), callee_arguments)));
+		}
+		else {
+		statement.emplace(std::make_shared<uncall_statement>(uncall_statement(module.value(), callee_arguments)));
+		}
+		}
+		
 }
 
 void Parser::ForStatement(std::optional<statement::ptr> &statement ) {

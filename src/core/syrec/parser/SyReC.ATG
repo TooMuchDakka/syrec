@@ -672,9 +672,51 @@ CallStatement<user_defined_statement>
 CallStatement production
 -------------------------------------------------------------------------*/
 
-CallStatement<. std::optional<statement::ptr> &statement .>
+CallStatement<. std::optional<statement::ptr> &statement .>							(.	std::optional<bool> is_call_statement;
+																						std::vector<std::string> callee_arguments {};
+																						bool valid_call_operation = true;
+																					.)
 =
-("call" | "uncall") ident "(" ident {"," ident} ")"
+(
+	"call"																			(.	is_call_statement.emplace(true);	.)
+	| "uncall"																		(.	is_call_statement.emplace(false);	.)
+)																					(.	valid_call_operation = is_call_statement.value();	.)
+ident																				(.	const std::string method_ident = convert_to_uniform_text_format(t->val); .)
+"(" 
+	ident																			(.	std::string variable_ident = convert_to_uniform_text_format(t->val);
+																						if (check_ident_was_declared(variable_ident)) {
+																							callee_arguments.emplace_back(variable_ident);
+																						}
+																						else {
+																							valid_call_operation = false;
+																						}
+																					.)
+	{
+		"," ident																	(.	variable_ident = convert_to_uniform_text_format(t->val);
+																						if (check_ident_was_declared(variable_ident)) {
+																							callee_arguments.emplace_back(variable_ident);
+																						}
+																						else {
+																							valid_call_operation = false;
+																						}
+																					.)
+	}																
+")"																					(.	if (!valid_call_operation) {
+																							return;		
+																						}
+																						const std::optional<module::ptr> module = current_symbol_table_scope->get_module(method_ident, callee_arguments.size());
+																						if (!module.has_value()) {
+																							// TODO: GEN_ERROR
+																						}
+																						else {
+																							if (is_call_statement.value()) {
+																								statement.emplace(std::make_shared<call_statement>(call_statement(module.value(), callee_arguments)));
+																							}
+																							else {
+																								statement.emplace(std::make_shared<uncall_statement>(uncall_statement(module.value(), callee_arguments)));
+																							}
+																						}
+																					.)
 .
 
 

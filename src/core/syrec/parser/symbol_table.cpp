@@ -38,6 +38,28 @@ namespace syrec {
         return found_entry;
     }
 
+    [[nodiscard]] std::optional<module::ptr> symbol_table::get_module(const std::string& module_name, const std::size_t number_of_user_supplied_arguments) const {
+        std::optional<module::ptr> found_module;
+
+        const auto module_search_result = this->modules.find(module_name);
+        if (this->modules.find(module_name) != this->modules.end()) {
+            const std::vector<module::ptr> modules_with_matching_name = module_search_result->second;
+            bool                           found_module_matching_signature = false;
+
+            for (size_t i = 0; i < modules_with_matching_name.size() && !found_module_matching_signature; i++) {
+                if (modules_with_matching_name.at(i)->parameters.size() == number_of_user_supplied_arguments) {
+                    found_module_matching_signature = true;
+                    found_module.emplace((modules_with_matching_name.at(i)));
+                }    
+            }
+            return found_module;
+        } else if (nullptr != outer) {
+            return outer->get_module(module_name, number_of_user_supplied_arguments);
+        } else {
+            return found_module;
+        }
+    }
+
     bool                              symbol_table::add_entry(const variable::ptr& local_entry) {
         if (nullptr == local_entry || contains(local_entry->name)) {
             return false;

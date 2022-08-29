@@ -22,6 +22,7 @@ namespace syrec {
         bool                              contains(const std::string &literal) const;
         bool                              contains(const module::ptr& module) const;
         [[nodiscard]] std::optional<variable::ptr> get_variable(const std::string &literal) const;
+        [[nodiscard]] std::optional<module::ptr>   get_module(const std::string& module_name, std::size_t number_of_user_supplied_arguments) const;
         bool                              add_entry(const variable::ptr& local_entry);
         bool                              add_entry(const module::ptr& module);                     
 
