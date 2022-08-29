@@ -752,29 +752,67 @@ void Parser::BinaryExpression(expression_evaluation_result &binary_expression, b
 		Expect(10 /* ")" */);
 }
 
-void Parser::ShiftExpression(expression_evaluation_result &shift_expression, bool simplify_if_possible) {
+void Parser::ShiftExpression(expression_evaluation_result &user_defined_shift_expression, bool simplify_if_possible) {
 		expression_evaluation_result shift_expression_lhs;
 		std::optional<number::ptr> shift_amount;
+		std::optional<syrec_operation::operation> shift_operation;
 		
 		Expect(5 /* "(" */);
 		Expression(shift_expression_lhs, simplify_if_possible);
 		if (la->kind == 53 /* "<<" */) {
 			Get();
+			shift_operation.emplace(syrec_operation::operation::shift_left);	
 		} else if (la->kind == 54 /* ">>" */) {
 			Get();
+			shift_operation.emplace(syrec_operation::operation::shift_right);	
 		} else SynErr(66);
 		Number(shift_amount, simplify_if_possible);
+		if (shift_expression_lhs.has_value() && shift_operation.has_value() && shift_amount.has_value()) {
+		const std::optional<unsigned int> mapped_shift_operation = map_operation_to_shift_operation(shift_operation.value());
+		const unsigned int shift_amount_value = shift_amount.value()->evaluate({});
+		const unsigned int operand_bit_size = shift_expression_lhs.value().get_expression()->bitwidth();
+		
+		if (simplify_if_possible && !shift_amount_value) {
+		// TODO: Create skip statement 
+		user_defined_shift_expression = shift_expression_lhs;
+		}
+		else if (simplify_if_possible && shift_expression_lhs.value().is_constant()) {
+		const unsigned int shift_operand_lhs_value = shift_expression_lhs.value().get_constant_value();
+		const std::optional<unsigned int> shift_application_result = syrec_operation::apply(shift_operation.value(), shift_operand_lhs_value);
+		
+		if (shift_application_result.has_value()) {
+		user_defined_shift_expression.emplace(expression_or_constant(shift_application_result.value()));
+		}
+		}
+		else {
+		const expression::ptr lhs_operand_expression = shift_expression_lhs.value().get_expression();
+		user_defined_shift_expression.emplace(std::make_shared<shift_expression>(lhs_operand_expression,
+		mapped_shift_operation.value(),
+		shift_amount.value()));
+		}
+		}
+		
 		Expect(10 /* ")" */);
 }
 
 void Parser::UnaryExpression(expression_evaluation_result &unary_expression, bool simplify_if_possible) {
-		expression_evaluation_result unary_expression_operand;	
+		expression_evaluation_result unary_expression_operand;
+		std::optional<syrec_operation::operation> unary_operation;
+		
 		if (la->kind == 52 /* "!" */) {
 			Get();
+			unary_operation.emplace(syrec_operation::operation::logical_negation);	
 		} else if (la->kind == 33 /* "~" */) {
 			Get();
+			unary_operation.emplace(syrec_operation::operation::bitwise_negation);	
 		} else SynErr(67);
 		Expression(unary_expression_operand, simplify_if_possible);
+		if (unary_operation.has_value() && unary_expression_operand.has_value()){
+		// TODO:
+		}
+		
+		// TODO: Notify user (i.e. via error) that reference parser currently does not support unary statements - we will ignore them for now
+		
 }
 
 

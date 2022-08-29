@@ -3,18 +3,25 @@
 
 namespace syrec_operation {
     enum class operation {
+        // Number operations
         addition,
         subtraction,
         multiplication,
         division ,
-
+        // Unary statement operations
         increment_assign,
         decrement_assign,
         negate_assign,
-
+        //Assign statement operations
         add_assign,
         minus_assign,
-        xor_assign
+        xor_assign,
+        // Unary expression operations
+        bitwise_negation,
+        logical_negation,
+        // Shift expression operations
+        shift_left,
+        shift_right
     };
 
     /**

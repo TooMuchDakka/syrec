@@ -308,6 +308,22 @@ struct expression_or_constant {
 		return mapping_result;
 	}
 
+	[[nodiscard]] static std::optional<unsigned int> map_operation_to_shift_operation(const syrec_operation::operation operation) {
+		std::optional<unsigned int> mapping_result;
+		switch (operation) {
+			case syrec_operation::operation::shift_left:
+				mapping_result.emplace(shift_expression::left);
+				break;
+			case syrec_operation::operation::shift_right:
+				mapping_result.emplace(shift_expression::right);
+				break;
+			default:
+				// TODO: GEN_ERROR ?
+				break;
+		}
+		return mapping_result;
+	}
+
 	bool check_ident_was_declared(const std::string &ident) const {
 		if (!current_symbol_table_scope->contains(ident)) {
 			// TOOD: GEN_ERROR
@@ -381,7 +397,7 @@ struct expression_or_constant {
 	void Expression(expression_evaluation_result &expression, bool simplify_if_possible);
 	void Signal(signal_evaluation_result &signal_access, bool simplify_if_possible);
 	void BinaryExpression(expression_evaluation_result &binary_expression, bool simplify_if_possible);
-	void ShiftExpression(expression_evaluation_result &shift_expression, bool simplify_if_possible);
+	void ShiftExpression(expression_evaluation_result &user_defined_shift_expression, bool simplify_if_possible);
 	void UnaryExpression(expression_evaluation_result &unary_expression, bool simplify_if_possible);
 
 	void Parse();
