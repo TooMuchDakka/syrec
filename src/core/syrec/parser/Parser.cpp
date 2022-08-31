@@ -30,7 +30,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include <wchar.h>
 #include "Parser.h"
 #include "Scanner.h"
-
+#include "core/syrec/parser/range_check.hpp"
 
 namespace syrec {
 
@@ -97,16 +97,35 @@ void Parser::Number(std::optional<number::ptr> &parsed_number, bool simplify_if_
 			const number::ptr result = std::make_shared<number>(number(conversion_result.value())); 
 			parsed_number.emplace(result);
 			}
-			else {
-			// TODO: GEN_ERROR
-			}
 			
 		} else if (la->kind == 3 /* "#" */) {
 			Get();
 			Expect(_ident);
+			const std::string signal_ident = convert_to_uniform_text_format(t->val);
+			if (check_ident_was_declared(signal_ident)) {
+			const std::optional<variable::ptr> &signal_table_entry = current_symbol_table_scope->get_variable(signal_ident);
+			if (signal_table_entry.has_value()) {
+                parsed_number.emplace(std::make_shared<number>(number(signal_table_entry.value()->bitwidth)));
+			}
+			else {
+			// TODO: GEN_ERROR, this should not happen but check anyways
+			}
+			}
+			
 		} else if (la->kind == 4 /* "$" */) {
 			Get();
 			Expect(_ident);
+			const std::string signal_ident = convert_to_uniform_text_format(t->val);
+			if (check_ident_was_declared(signal_ident)) {
+			const std::optional<variable::ptr> &signal_table_entry = current_symbol_table_scope->get_variable(signal_ident);
+			if (signal_table_entry.has_value()) {
+			parsed_number.emplace(std::make_shared<number>(number(signal_ident)));
+			}
+			else {
+			// TODO: GEN_ERROR, this should not happen but check anyways
+			}
+			}
+			
 		} else if (la->kind == 5 /* "(" */) {
 			std::optional<number::ptr> lhs_operand, rhs_operand;  
 			std::optional<syrec_operation::operation> op;
@@ -639,7 +658,7 @@ void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_po
 			valid_signal_access = false;
 			
 			// TODO: Using global zero_based indexing flag
-			const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_dimension_access_range(signal.value(), true);
+			const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_dimension_access_range(signal.value(), dimension_index, true).value();
 			// TODO: GEN_ERROR
 			}
 			else {
@@ -670,15 +689,13 @@ void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_po
 			const variable::ptr &accessed_variable = signal.value();
 			
 			const bool is_bit_access = !range_end.has_value();
-			const number::ptr &bit_or_range_access_start = range_start.value();
-			const number::ptr &bit_or_range_access_end = is_bit_access ? bit_or_range_access_start : range_end.value();
+			const std::pair<number::ptr, number::ptr> range(range_start.value(), is_bit_access ? range_start.value() : range_end.value());
+			const std::pair<std::size_t, std::size_t> range_values(range.first->evaluate({}), range.second->evaluate({}));
 			
 			if (is_bit_access) {
-			const unsigned int bit_access_value = range_start.value()->evaluate({});
-			
 			// TODO: Check bitwidth is within range [0, bitwidth - 1]
 			// TODO: Using global zero_based indexing flag
-			if (!range_check::is_valid_bit_access(accessed_variable, bit_access_value, true)) {
+			if (!range_check::is_valid_bit_access(accessed_variable, range_values.first, true)) {
 			valid_signal_access = false;
 			// TODO: GEN_ERROR
 			// TODO: Using global zero_based indexing flag
@@ -688,10 +705,7 @@ void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_po
 			else {
 			// TODO: Check user defined range is within [0, bitwidth - 1]
 			// TODO: Using global zero_based indexing flag
-			if (!range_check::is_valid_range_access(accessed_variable, 
-											range_start.value()->evaluate({}),
-											range_end.value()->evaluate({}),
-											true)){
+			if (!range_check::is_valid_range_access(accessed_variable, range_values, true)){
 			valid_signal_access = false;
 			// TODO: GEN_ERROR
 			// TODO: Using global zero_based indexing flag
@@ -700,7 +714,7 @@ void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_po
 			}
 			
 			if (valid_signal_access){
-			declared_signal_access->range.emplace(std::pair<number::ptr, number::ptr>(bit_or_range_access_start, bit_or_range_access_end));
+			declared_signal_access->range.emplace(range);
 			}
 			}
 			

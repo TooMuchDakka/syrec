@@ -9,6 +9,7 @@
 namespace syrec {
     class symbol_table {
     public:
+
         typedef std::shared_ptr<symbol_table> ptr;
 
         symbol_table() {
