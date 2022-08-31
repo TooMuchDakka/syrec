@@ -45,6 +45,7 @@ namespace syrec {
             if (parser.errors->count) {
                 return "Error while parsing input circuit from file @" + filename;
             } else {
+                this->modules_vec = parser.modules;
                 return {};
             }
         } else {

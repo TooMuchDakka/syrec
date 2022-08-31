@@ -454,6 +454,7 @@ SyReC										(.	std::optional<module::ptr> module;	.)
 =
 Module<module>								(.	if (module.has_value()) {
 													current_symbol_table_scope->add_entry(module.value());
+													this->modules.emplace_back(module.value());
 												}
 											.)
 {											(.	module.reset();	.)
@@ -465,6 +466,7 @@ Module<module>								(.	if (module.has_value()) {
 													}
 													else {
 														current_symbol_table_scope->add_entry(well_formed_module);
+														this->modules.emplace_back(module.value());
 													}
 												}
 											.)
@@ -519,13 +521,16 @@ Parameter<parameter>																(.	is_valid_module_definition = parameter.ha
 																					.)
 {																					(.	parameter.reset();	.)
 	"," Parameter<parameter>														(.	is_valid_module_definition = parameter.has_value();
-																						const variable::ptr well_formed_parameter = parameter.value();
-																						if (is_valid_module_definition && !current_symbol_table_scope->contains(well_formed_parameter->name)) {
-																							module->add_parameter(well_formed_parameter);
-																							current_symbol_table_scope->add_entry(well_formed_parameter);
-																						}
-																						else {
-																							// TODO: GEN_ERROR 
+																						if (is_valid_module_definition) {	
+																							const variable::ptr &well_formed_parameter = parameter.value();
+																							if (!current_symbol_table_scope->contains(well_formed_parameter->name)) {
+																								module->add_parameter(well_formed_parameter);
+																								current_symbol_table_scope->add_entry(well_formed_parameter);
+																							}
+																							else {
+																								is_valid_module_definition = false;
+																								// TODO: GEN_ERROR 
+																							}
 																						}
 																					.)
 }															
@@ -628,7 +633,10 @@ ident																										(.	const std::string signal_ident = convert_to_un
 																													dimensions.emplace_back(dimension.value());	
 																												}
 																											.)
-"]"} 
+"]"}																									(.	if (valid_declaration && dimensions.empty()) {
+																												dimensions.emplace_back(1);
+																											}
+																										.)
 ["(" 
 	int																									(.	const std::optional<unsigned int> user_defined_signal_width = convert_token_value_to_number(*t);
 																											if (!user_defined_signal_width.has_value()) {
@@ -790,15 +798,12 @@ StatementList<true_branch>
 																		return;
 																	}
 															
-																	if_statement::ptr stmt_pointer = std::make_shared<if_statement>(if_statement());
-																	if_statement      reference_stmt = dynamic_cast<if_statement&>(*stmt_pointer);
-
-																	reference_stmt.condition = condition.value().convert_to_expression();
-																	reference_stmt.fi_condition = closing_condition.value().convert_to_expression();
-																	reference_stmt.then_statements = true_branch;
-																	reference_stmt.else_statements = false_branch;
-
-																	statement.emplace(stmt_pointer);
+																	const std::shared_ptr<if_statement> &conditional = std::make_shared<if_statement>(if_statement());
+																	conditional->condition = condition.value().convert_to_expression();
+																	conditional->fi_condition = closing_condition.value().convert_to_expression();
+																	conditional->then_statements                    = true_branch;
+																	conditional->else_statements                    = false_branch;
+																	statement.emplace(conditional);
 																.)
 .
 
@@ -843,7 +848,7 @@ Signal<assign_stmt_lhs, false>
 	| "+"														(.		assign_operation.emplace(syrec_operation::operation::add_assign);	.)
 	| "-"														(.		assign_operation.emplace(syrec_operation::operation::minus_assign);	.)
 )					
-"=" Expression<assign_stmt_rhs, false>							(.		if (!assign_stmt_lhs.has_value() || std::holds_alternative<variable_access::ptr>(assign_stmt_lhs.value()) || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
+"=" Expression<assign_stmt_rhs, false>							(.		if (!assign_stmt_lhs.has_value() || !std::holds_alternative<variable_access::ptr>(assign_stmt_lhs.value()) || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
 																			return;
 																		}
 																		const variable_access::ptr assigned_to_obj = std::get<variable_access::ptr>(assign_stmt_lhs.value());
@@ -991,17 +996,30 @@ Expressions variants
 Expression production
 -------------------------------------------------------------------------*/
 
-Expression<expression_evaluation_result &expression, bool simplify_if_possible>			(.	signal_evaluation_result signal;
-																							std::optional<number::ptr> number;
-																						.)
+Expression<expression_evaluation_result &user_defined_expression, bool simplify_if_possible>	(.	signal_evaluation_result signal;
+																									std::optional<number::ptr> number;
+																								.)
 =
 (
-	IF (check_if_expression_is_number()) Number<number, simplify_if_possible>									
-	| IF (check_if_expression_is_binary_expression()) BinaryExpression<expression, simplify_if_possible>
-	| ShiftExpression<expression, simplify_if_possible>
+	IF (check_if_expression_is_number()) Number<number, simplify_if_possible>					(.	if (number.has_value()) {
+																										user_defined_expression.emplace(std::make_shared<numeric_expression>(numeric_expression(number.value(), 0)));
+																									}
+																								.)
+	| IF (check_if_expression_is_binary_expression()) BinaryExpression<user_defined_expression, simplify_if_possible>
+	| ShiftExpression<user_defined_expression, simplify_if_possible>
 )
-	| Signal<signal, simplify_if_possible>					
-	| UnaryExpression<expression, simplify_if_possible>
+	| Signal<signal, simplify_if_possible>														(.	if (signal.has_value()) {
+																										if (std::holds_alternative<variable_access::ptr>(signal.value())) {
+																											const variable_access::ptr &var_access = std::get<variable_access::ptr>(signal.value());
+																											user_defined_expression.emplace(std::make_shared<variable_expression>(variable_expression(var_access)));
+																										}
+																										else if (std::holds_alternative<number::ptr>(signal.value())){
+																											const number::ptr &number_signal = std::get<number::ptr>(signal.value());
+																											user_defined_expression.emplace(std::make_shared<numeric_expression>(numeric_expression(number_signal, 0)));
+																										}
+																									}
+																								.)
+	| UnaryExpression<user_defined_expression, simplify_if_possible>
 .
 
 /*-------------------------------------------------------------------------
@@ -1033,7 +1051,8 @@ BinaryExpression<expression_evaluation_result &user_defined_binary_expression, b
 		| "<="																										(.	binary_operation.emplace(syrec_operation::operation::less_equals);	.)
 		| ">="																										(.	binary_operation.emplace(syrec_operation::operation::greater_equals);	.)
 	) 
-	Expression<binary_expr_rhs, simplify_if_possible>																(.	if (binary_expr_lhs.has_value() && binary_operation.has_value() && binary_expr_rhs.has_value()) {
+	Expression<binary_expr_rhs, simplify_if_possible>																
+")"																													(.	if (binary_expr_lhs.has_value() && binary_operation.has_value() && binary_expr_rhs.has_value()) {
 																															const std::optional<unsigned int> mapped_operation = map_operation_to_binary_operation(binary_operation.value());
 																															if (mapped_operation.has_value()) {
 																																user_defined_binary_expression.emplace(std::make_shared<binary_expression>(binary_expression(binary_expr_lhs.value().get_expression(),
@@ -1042,7 +1061,6 @@ BinaryExpression<expression_evaluation_result &user_defined_binary_expression, b
 																															}
 																														}
 																													.)
-")"
 .
 
 

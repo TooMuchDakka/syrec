@@ -455,7 +455,7 @@ struct expression_or_constant {
 	void SkipStatement(std::optional<statement::ptr> &statement );
 	void AssignStatement(std::optional<statement::ptr> &statement );
 	void SwapStatement(std::optional<statement::ptr> &statement );
-	void Expression(expression_evaluation_result &expression, bool simplify_if_possible);
+	void Expression(expression_evaluation_result &user_defined_expression, bool simplify_if_possible);
 	void Signal(signal_evaluation_result &signal_access, bool simplify_if_possible);
 	void BinaryExpression(expression_evaluation_result &user_defined_binary_expression, bool simplify_if_possible);
 	void ShiftExpression(expression_evaluation_result &user_defined_shift_expression, bool simplify_if_possible);

@@ -30,7 +30,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include <wchar.h>
 #include "Parser.h"
 #include "Scanner.h"
-#include "core/syrec/parser/range_check.hpp"
+
 
 namespace syrec {
 
@@ -105,7 +105,7 @@ void Parser::Number(std::optional<number::ptr> &parsed_number, bool simplify_if_
 			if (check_ident_was_declared(signal_ident)) {
 			const std::optional<variable::ptr> &signal_table_entry = current_symbol_table_scope->get_variable(signal_ident);
 			if (signal_table_entry.has_value()) {
-                parsed_number.emplace(std::make_shared<number>(number(signal_table_entry.value()->bitwidth)));
+			parsed_number.emplace(std::make_shared<number>(number(signal_table_entry.value()->bitwidth)));
 			}
 			else {
 			// TODO: GEN_ERROR, this should not happen but check anyways
@@ -163,6 +163,7 @@ void Parser::SyReC() {
 		Module(module);
 		if (module.has_value()) {
 		current_symbol_table_scope->add_entry(module.value());
+		this->modules.emplace_back(module.value());
 		}
 		
 		while (la->kind == 11 /* "module" */) {
@@ -176,6 +177,7 @@ void Parser::SyReC() {
 			}
 			else {
 			current_symbol_table_scope->add_entry(well_formed_module);
+			this->modules.emplace_back(module.value());
 			}
 			}
 			
@@ -233,13 +235,16 @@ void Parser::ParameterList(bool &is_valid_module_definition, const module::ptr &
 			Get();
 			Parameter(parameter);
 			is_valid_module_definition = parameter.has_value();
-			const variable::ptr well_formed_parameter = parameter.value();
-			if (is_valid_module_definition && !current_symbol_table_scope->contains(well_formed_parameter->name)) {
+			if (is_valid_module_definition) {	
+			const variable::ptr &well_formed_parameter = parameter.value();
+			if (!current_symbol_table_scope->contains(well_formed_parameter->name)) {
 			module->add_parameter(well_formed_parameter);
 			current_symbol_table_scope->add_entry(well_formed_parameter);
 			}
 			else {
+			is_valid_module_definition = false;
 			// TODO: GEN_ERROR 
+			}
 			}
 			
 		}
@@ -367,6 +372,10 @@ void Parser::SignalDeclaration(variable::types variable_type, std::optional<vari
 			
 			Expect(19 /* "]" */);
 		}
+		if (valid_declaration && dimensions.empty()) {
+		dimensions.emplace_back(1);
+		}
+		
 		if (la->kind == 5 /* "(" */) {
 			Get();
 			Expect(_int);
@@ -510,15 +519,12 @@ void Parser::IfStatement(std::optional<statement::ptr> &statement ) {
 		return;
 		}
 		
-		if_statement::ptr stmt_pointer = std::make_shared<if_statement>(if_statement());
-		if_statement      reference_stmt = dynamic_cast<if_statement&>(*stmt_pointer);
-		
-		reference_stmt.condition = condition.value().convert_to_expression();
-		reference_stmt.fi_condition = closing_condition.value().convert_to_expression();
-		reference_stmt.then_statements = true_branch;
-		reference_stmt.else_statements = false_branch;
-		
-		statement.emplace(stmt_pointer);
+		const std::shared_ptr<if_statement> &conditional = std::make_shared<if_statement>(if_statement());
+		conditional->condition = condition.value().convert_to_expression();
+		conditional->fi_condition = closing_condition.value().convert_to_expression();
+		conditional->then_statements                    = true_branch;
+		conditional->else_statements                    = false_branch;
+		statement.emplace(conditional);
 		
 }
 
@@ -573,7 +579,7 @@ void Parser::AssignStatement(std::optional<statement::ptr> &statement ) {
 		} else SynErr(63);
 		Expect(24 /* "=" */);
 		Expression(assign_stmt_rhs, false);
-		if (!assign_stmt_lhs.has_value() || std::holds_alternative<variable_access::ptr>(assign_stmt_lhs.value()) || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
+		if (!assign_stmt_lhs.has_value() || !std::holds_alternative<variable_access::ptr>(assign_stmt_lhs.value()) || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
 		return;
 		}
 		const variable_access::ptr assigned_to_obj = std::get<variable_access::ptr>(assign_stmt_lhs.value());
@@ -605,22 +611,37 @@ void Parser::SwapStatement(std::optional<statement::ptr> &statement ) {
 		
 }
 
-void Parser::Expression(expression_evaluation_result &expression, bool simplify_if_possible) {
+void Parser::Expression(expression_evaluation_result &user_defined_expression, bool simplify_if_possible) {
 		signal_evaluation_result signal;
 		std::optional<number::ptr> number;
 		
 		if (StartOf(1)) {
 			if (check_if_expression_is_number()) {
 				Number(number, simplify_if_possible);
+				if (number.has_value()) {
+				user_defined_expression.emplace(std::make_shared<numeric_expression>(numeric_expression(number.value(), 0)));
+				}
+				
 			} else if (check_if_expression_is_binary_expression()) {
-				BinaryExpression(expression, simplify_if_possible);
+				BinaryExpression(user_defined_expression, simplify_if_possible);
 			} else {
-				ShiftExpression(expression, simplify_if_possible);
+				ShiftExpression(user_defined_expression, simplify_if_possible);
 			}
 		} else if (la->kind == _ident) {
 			Signal(signal, simplify_if_possible);
+			if (signal.has_value()) {
+			if (std::holds_alternative<variable_access::ptr>(signal.value())) {
+			const variable_access::ptr &var_access = std::get<variable_access::ptr>(signal.value());
+			user_defined_expression.emplace(std::make_shared<variable_expression>(variable_expression(var_access)));
+			}
+			else if (std::holds_alternative<number::ptr>(signal.value())){
+			const number::ptr &number_signal = std::get<number::ptr>(signal.value());
+			user_defined_expression.emplace(std::make_shared<numeric_expression>(numeric_expression(number_signal, 0)));
+			}
+			}
+			
 		} else if (la->kind == 33 /* "~" */ || la->kind == 52 /* "!" */) {
-			UnaryExpression(expression, simplify_if_possible);
+			UnaryExpression(user_defined_expression, simplify_if_possible);
 		} else SynErr(64);
 }
 
@@ -821,16 +842,16 @@ void Parser::BinaryExpression(expression_evaluation_result &user_defined_binary_
 		default: SynErr(65); break;
 		}
 		Expression(binary_expr_rhs, simplify_if_possible);
+		Expect(10 /* ")" */);
 		if (binary_expr_lhs.has_value() && binary_operation.has_value() && binary_expr_rhs.has_value()) {
 		const std::optional<unsigned int> mapped_operation = map_operation_to_binary_operation(binary_operation.value());
 		if (mapped_operation.has_value()) {
 		user_defined_binary_expression.emplace(std::make_shared<binary_expression>(binary_expression(binary_expr_lhs.value().get_expression(),
-		mapped_operation.value(),
-		binary_expr_rhs.value().get_expression())));
+				mapped_operation.value(),
+				binary_expr_rhs.value().get_expression())));
 		}
 		}
 		
-		Expect(10 /* ")" */);
 }
 
 void Parser::ShiftExpression(expression_evaluation_result &user_defined_shift_expression, bool simplify_if_possible) {
