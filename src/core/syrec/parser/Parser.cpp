@@ -418,6 +418,8 @@ void Parser::CallStatement(std::optional<statement::ptr> &statement ) {
 		std::optional<bool> is_call_statement;
 		std::vector<std::string> callee_arguments {};
 		bool valid_call_operation = true;
+		std::vector<std::string_view> formal_method_parameters {};
+		std::size_t num_actual_parameters = 0;
 		
 		if (la->kind == 21 /* "call" */) {
 			Get();
@@ -426,45 +428,82 @@ void Parser::CallStatement(std::optional<statement::ptr> &statement ) {
 			Get();
 			is_call_statement.emplace(false);	
 		} else SynErr(61);
-		valid_call_operation = is_call_statement.value();	
+		valid_call_operation = is_call_statement.has_value();	
 		Expect(_ident);
-		const std::string method_ident = convert_to_uniform_text_format(t->val); 
+		const std::string method_ident = convert_to_uniform_text_format(t->val);
+		method_call_guess::ptr guess_for_method = std::make_shared<method_call_guess>(method_call_guess(current_symbol_table_scope, method_ident));
+		if (!guess_for_method->matches_some_options()) {
+		// TODO: GEN_ERROR method not found
+		valid_call_operation = false;
+		}
+		
 		Expect(5 /* "(" */);
 		Expect(_ident);
 		std::string variable_ident = convert_to_uniform_text_format(t->val);
 		if (check_ident_was_declared(variable_ident)) {
+		try {
+		guess_for_method->refine(variable_ident);
+		valid_call_operation &= guess_for_method->matches_some_options();
+		if (valid_call_operation) {
 		callee_arguments.emplace_back(variable_ident);
 		}
-		else {
+		}
+		catch (std::invalid_argument &ex) {
+		// TODO: GEN_ERROR
 		valid_call_operation = false;
 		}
+		}
+		else {
+		// TODO: GEN_ERROR
+		}
+		num_actual_parameters++;
 		
 		while (la->kind == 12 /* "," */) {
 			Get();
 			Expect(_ident);
 			variable_ident = convert_to_uniform_text_format(t->val);
 			if (check_ident_was_declared(variable_ident)) {
+			try {
+			guess_for_method->refine(variable_ident);
+			valid_call_operation &= guess_for_method->matches_some_options();
+			if (valid_call_operation) {
+			const variable::ptr actual_parameter_symbol_entry = std::get<variable::ptr>(current_symbol_table_scope->get_variable(variable_ident).value());
 			callee_arguments.emplace_back(variable_ident);
 			}
-			else {
+			}
+			catch (std::invalid_argument &ex) {
+			// TODO: GEN_ERROR
 			valid_call_operation = false;
 			}
+			}
+			else {
+			// TODO: GEN_ERROR
+			}
+			num_actual_parameters++;
 			
 		}
 		Expect(10 /* ")" */);
 		if (!valid_call_operation) {
 		return;		
 		}
-		const std::optional<module::ptr> module = current_symbol_table_scope->get_module(method_ident, callee_arguments.size());
-		if (!module.has_value()) {
+		if (!guess_for_method->matches_some_options()) {
 		// TODO: GEN_ERROR
+		return;
+		}
+		
+		const std::optional<module::ptr> possible_match_for_guess = guess_for_method->get_remaining_guess();
+		if (!possible_match_for_guess.has_value()) {
+		// TODO: GEN_ERROR
+		return;
 		}
 		else {
+		const module::ptr &matching_module = possible_match_for_guess.value();
+		
 		if (is_call_statement.value()) {
-		statement.emplace(std::make_shared<call_statement>(call_statement(module.value(), callee_arguments)));
+		statement.emplace(std::make_shared<call_statement>(call_statement(matching_module, callee_arguments)));
 		}
 		else {
-		statement.emplace(std::make_shared<uncall_statement>(uncall_statement(module.value(), callee_arguments)));
+		statement.emplace(std::make_shared<uncall_statement>(uncall_statement(matching_module, callee_arguments)));
 		}
 		}
 		

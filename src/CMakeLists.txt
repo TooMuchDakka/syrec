@@ -8,7 +8,8 @@ add_library(${PROJECT_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/program.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/variable.cpp
-
+			
+			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/method_call_guess.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/operation.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Parser.h
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Parser.cpp
@@ -21,6 +22,7 @@ add_library(${PROJECT_NAME}
 
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
+			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/method_call_guess.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/operation.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_error_message_generator.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/range_check.hpp

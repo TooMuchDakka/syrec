@@ -38,7 +38,8 @@ namespace syrec {
         return found_entry;
     }
 
-    [[nodiscard]] std::optional<module::ptr> symbol_table::get_module(const std::string& module_name, const std::size_t number_of_user_supplied_arguments) const {
+    [[nodiscard]] std::optional<std::vector<module::ptr>> symbol_table::get_matching_modules_for_name(const std::string& module_name) const {
+        /*
         std::optional<module::ptr> found_module;
 
         const auto module_search_result = this->modules.find(module_name);
@@ -58,6 +59,14 @@ namespace syrec {
         } else {
             return found_module;
         }
+        */
+        std::optional<std::vector<module::ptr>> found_modules;
+        if (this->modules.find(module_name) != this->modules.end()) {
+            found_modules.emplace(this->modules.find(module_name)->second);
+        } else if (nullptr != outer) {
+            found_modules = outer->get_matching_modules_for_name(module_name);
+        }
+        return found_modules;
     }
 
     bool                              symbol_table::add_entry(const variable::ptr& local_entry) {
@@ -114,16 +123,16 @@ namespace syrec {
         for (size_t param_idx = 0; param_idx < module->parameters.size() && signatures_match; param_idx++) {
             const variable::ptr &parameter_first_module = module->parameters.at(param_idx);
             const variable::ptr &parameter_other_module = other_module->parameters.at(param_idx);
-            signatures_match                             = are_parameters_equal(parameter_first_module, parameter_other_module);
+            signatures_match                             = parameter_first_module->name == parameter_other_module->name
+                && can_assign_to(parameter_first_module, parameter_other_module, true);
         }
         return signatures_match;
     }
     
-    [[nodiscard]] bool symbol_table::are_parameters_equal(const variable::ptr& parameter_one, const variable::ptr& parameter_two) {
-        return parameter_one->type == parameter_two->type
-            && parameter_one->name == parameter_two->name
-            && parameter_one->dimensions == parameter_two->dimensions
-            && parameter_one->bitwidth == parameter_two->bitwidth;
+    [[nodiscard]] bool symbol_table::can_assign_to(const variable::ptr& formal_parameter, const variable::ptr& actual_parameter, const bool parameter_types_must_match) {
+        return (parameter_types_must_match ? formal_parameter->type == actual_parameter->type : true) 
+            && formal_parameter->dimensions == actual_parameter->dimensions
+            && formal_parameter->bitwidth == actual_parameter->bitwidth;
     
     }
 }

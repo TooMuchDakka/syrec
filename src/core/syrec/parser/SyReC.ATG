@@ -18,6 +18,7 @@ $namespace=syrec
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/method_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_error_message_generator.hpp"
 #include "core/syrec/parser/range_check.hpp"
@@ -663,6 +664,7 @@ Statement variants
 StatementList
 -------------------------------------------------------------------------*/
 
+// TODO: Add check that every call statement has its matching counterpart, no uncall can be made before its corresponding call was called
 StatementList<. statement::vec &statements .>								(.	std::optional<statement::ptr> user_defined_statement;	.)
 =
 Statement<user_defined_statement>											(.	if (user_defined_statement.has_value()) {
@@ -698,48 +700,88 @@ CallStatement<user_defined_statement>
 CallStatement production
 -------------------------------------------------------------------------*/
 
+// TODO: Are aliases between the formal and actual parameters necessary (i.e. in a call statement should the parameter be replaced with the actual value)
 CallStatement<. std::optional<statement::ptr> &statement .>							(.	std::optional<bool> is_call_statement;
 																						std::vector<std::string> callee_arguments {};
 																						bool valid_call_operation = true;
+																						std::vector<std::string_view> formal_method_parameters {};
+																						std::size_t num_actual_parameters = 0;
 																					.)
 =
 (
 	"call"																			(.	is_call_statement.emplace(true);	.)
 	| "uncall"																		(.	is_call_statement.emplace(false);	.)
-)																					(.	valid_call_operation = is_call_statement.value();	.)
-ident																				(.	const std::string method_ident = convert_to_uniform_text_format(t->val); .)
+)																					(.	valid_call_operation = is_call_statement.has_value();	.)
+ident																				(.	const std::string method_ident = convert_to_uniform_text_format(t->val);
+																						method_call_guess::ptr guess_for_method = std::make_shared<method_call_guess>(method_call_guess(current_symbol_table_scope, method_ident));
+																						if (!guess_for_method->matches_some_options()) {
+																							// TODO: GEN_ERROR method not found
+																							valid_call_operation = false;
+																						}
+																					.)
 "(" 
 	ident																			(.	std::string variable_ident = convert_to_uniform_text_format(t->val);
 																						if (check_ident_was_declared(variable_ident)) {
-																							callee_arguments.emplace_back(variable_ident);
+																							try {
+																								guess_for_method->refine(variable_ident);
+																								valid_call_operation &= guess_for_method->matches_some_options();
+																								if (valid_call_operation) {
+																									callee_arguments.emplace_back(variable_ident);
+																								}
+																							}
+																							catch (std::invalid_argument &ex) {
+																								// TODO: GEN_ERROR
+																								valid_call_operation = false;
+																							}
 																						}
 																						else {
-																							valid_call_operation = false;
+																							// TODO: GEN_ERROR
 																						}
+																						num_actual_parameters++;
 																					.)
 	{
 		"," ident																	(.	variable_ident = convert_to_uniform_text_format(t->val);
 																						if (check_ident_was_declared(variable_ident)) {
-																							callee_arguments.emplace_back(variable_ident);
+																							try {
+																								guess_for_method->refine(variable_ident);
+																								valid_call_operation &= guess_for_method->matches_some_options();
+																								if (valid_call_operation) {
+																									const variable::ptr actual_parameter_symbol_entry = std::get<variable::ptr>(current_symbol_table_scope->get_variable(variable_ident).value());
+																									callee_arguments.emplace_back(variable_ident);
+																								}
+																							}
+																							catch (std::invalid_argument &ex) {
+																								// TODO: GEN_ERROR
+																								valid_call_operation = false;
+																							}
 																						}
 																						else {
-																							valid_call_operation = false;
+																							// TODO: GEN_ERROR
 																						}
+																						num_actual_parameters++;
 																					.)
 	}																
 ")"																					(.	if (!valid_call_operation) {
 																							return;		
 																						}
-																						const std::optional<module::ptr> module = current_symbol_table_scope->get_module(method_ident, callee_arguments.size());
-																						if (!module.has_value()) {
+																						if (!guess_for_method->matches_some_options()) {
 																							// TODO: GEN_ERROR
+																							return;
+																						}
+
+																						const std::optional<module::ptr> possible_match_for_guess = guess_for_method->get_remaining_guess();
+																						if (!possible_match_for_guess.has_value()) {
+																							// TODO: GEN_ERROR
+																							return;
 																						}
 																						else {
+																							const module::ptr &matching_module = possible_match_for_guess.value();
+
 																							if (is_call_statement.value()) {
-																								statement.emplace(std::make_shared<call_statement>(call_statement(module.value(), callee_arguments)));
+																								statement.emplace(std::make_shared<call_statement>(call_statement(matching_module, callee_arguments)));
 																							}
 																							else {
-																								statement.emplace(std::make_shared<uncall_statement>(uncall_statement(module.value(), callee_arguments)));
+																								statement.emplace(std::make_shared<uncall_statement>(uncall_statement(matching_module, callee_arguments)));
 																							}
 																						}
 																					.)

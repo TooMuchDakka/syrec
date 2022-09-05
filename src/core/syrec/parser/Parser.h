@@ -39,6 +39,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/method_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_error_message_generator.hpp"
 #include "core/syrec/parser/range_check.hpp"
