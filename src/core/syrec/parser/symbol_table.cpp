@@ -26,10 +26,10 @@ namespace syrec {
         return found_module_matching_signature || (nullptr != outer && outer->contains(module));
     }
 
-    [[nodiscard]] std::optional<variable::ptr> symbol_table::get_variable(const std::string& literal) const {
-        std::optional<variable::ptr> found_entry;
+    [[nodiscard]] std::optional<std::variant<variable::ptr, number::ptr>> symbol_table::get_variable(const std::string& literal) const {
+        std::optional<std::variant<variable::ptr, number::ptr>> found_entry;
 
-        if (contains(literal)) {
+        if (this->locals.find(literal) != this->locals.end()) {
             found_entry.emplace(this->locals.find(literal)->second);
         }
         else if (nullptr != outer) {
@@ -65,7 +65,19 @@ namespace syrec {
             return false;
         }
 
-        const std::pair new_local_entry(local_entry->name, local_entry);
+        const std::variant<variable::ptr, number::ptr> local_entry_value (local_entry);
+        const std::pair new_local_entry(local_entry->name, local_entry_value);
+        locals.insert(new_local_entry);
+        return true;
+    }
+
+    bool symbol_table::add_entry(const number::ptr& local_entry) {
+        if (nullptr == local_entry || !local_entry->is_loop_variable() || contains(local_entry->variable_name())) {
+            return false;
+        }
+
+        const std::variant<variable::ptr, number::ptr> local_entry_value(local_entry);
+        const std::pair                                new_local_entry(local_entry->variable_name(), local_entry_value);
         locals.insert(new_local_entry);
         return true;
     }

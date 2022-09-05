@@ -22,16 +22,17 @@ namespace syrec {
 
         bool                              contains(const std::string &literal) const;
         bool                              contains(const module::ptr& module) const;
-        [[nodiscard]] std::optional<variable::ptr> get_variable(const std::string &literal) const;
+        [[nodiscard]] std::optional<std::variant<variable::ptr, number::ptr>> get_variable(const std::string &literal) const;
         [[nodiscard]] std::optional<module::ptr>   get_module(const std::string& module_name, std::size_t number_of_user_supplied_arguments) const;
         bool                              add_entry(const variable::ptr& local_entry);
+        bool                              add_entry(const number::ptr& local_entry);
         bool                              add_entry(const module::ptr& module);                     
 
         static void open_scope(symbol_table::ptr &current_scope);
         static void close_scope(symbol_table::ptr &current_scope);
 
     private:
-        std::map<std::string, variable::ptr> locals;
+        std::map<std::string, std::variant<variable::ptr, number::ptr>> locals;
         std::map<std::string, std::vector<module::ptr>> modules; 
         symbol_table::ptr      outer;
 

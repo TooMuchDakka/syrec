@@ -103,9 +103,9 @@ void Parser::Number(std::optional<number::ptr> &parsed_number, bool simplify_if_
 			Expect(_ident);
 			const std::string signal_ident = convert_to_uniform_text_format(t->val);
 			if (check_ident_was_declared(signal_ident)) {
-			const std::optional<variable::ptr> &signal_table_entry = current_symbol_table_scope->get_variable(signal_ident);
-			if (signal_table_entry.has_value()) {
-			parsed_number.emplace(std::make_shared<number>(number(signal_table_entry.value()->bitwidth)));
+			const auto &symbol_table_entry = current_symbol_table_scope->get_variable(signal_ident);
+			if (symbol_table_entry.has_value() && std::holds_alternative<variable::ptr>(symbol_table_entry.value())) {
+			parsed_number.emplace(std::make_shared<number>(number(std::get<variable::ptr>(symbol_table_entry.value())->bitwidth)));
 			}
 			else {
 			// TODO: GEN_ERROR, this should not happen but check anyways
@@ -115,11 +115,11 @@ void Parser::Number(std::optional<number::ptr> &parsed_number, bool simplify_if_
 		} else if (la->kind == 4 /* "$" */) {
 			Get();
 			Expect(_ident);
-			const std::string signal_ident = convert_to_uniform_text_format(t->val);
+			const std::string signal_ident = "$" + convert_to_uniform_text_format(t->val);
 			if (check_ident_was_declared(signal_ident)) {
-			const std::optional<variable::ptr> &signal_table_entry = current_symbol_table_scope->get_variable(signal_ident);
-			if (signal_table_entry.has_value()) {
-			parsed_number.emplace(std::make_shared<number>(number(signal_ident)));
+			const auto &symbol_table_entry = current_symbol_table_scope->get_variable(signal_ident);
+			if (symbol_table_entry.has_value() && std::holds_alternative<number::ptr>(symbol_table_entry.value())) {
+			parsed_number.emplace(std::get<number::ptr>(symbol_table_entry.value()));
 			}
 			else {
 			// TODO: GEN_ERROR, this should not happen but check anyways
@@ -471,30 +471,104 @@ void Parser::CallStatement(std::optional<statement::ptr> &statement ) {
 }
 
 void Parser::ForStatement(std::optional<statement::ptr> &statement ) {
-		std::optional<number::ptr> number;
+		std::optional<std::string> loop_variable_ident;
+		std::optional<number::ptr> iteration_range_start;
+		std::optional<number::ptr> iteration_range_end;
+		std::optional<number::ptr> custom_step_size;
+		bool negative_step_size = false;
 		statement::vec loop_body{};
+		bool explicit_range_start_defined = false;
+		bool explicit_step_size_defined = false;
 		
 		Expect(23 /* "for" */);
 		if (check_if_loop_iteration_range_start_is_defined()) {
 			if (check_if_loop_variable_is_defined()) {
 				Expect(4 /* "$" */);
 				Expect(_ident);
+				const std::string &loop_var_ident = "$" + convert_to_uniform_text_format(t->val);
+				if (!check_ident_was_declared(loop_var_ident)) {
+				loop_variable_ident.emplace(convert_to_uniform_text_format(t->val));
+				symbol_table::open_scope(current_symbol_table_scope);
+				const number::ptr loop_variable_entry = std::make_shared<number>(number(loop_var_ident));
+				current_symbol_table_scope->add_entry(loop_variable_entry);
+				}
+				
 				Expect(24 /* "=" */);
 			}
-			Number(number, false);
+			Number(iteration_range_start, false);
+			explicit_range_start_defined = true;	
 			Expect(25 /* "to" */);
 		}
-		Number(number, false);
+		Number(iteration_range_end, false);
+		if (!explicit_range_start_defined){
+		iteration_range_start = iteration_range_end;
+		}
+		
 		if (la->kind == 26 /* "step" */) {
 			Get();
+			explicit_step_size_defined = true;	
 			if (la->kind == 7 /* "-" */) {
 				Get();
+				negative_step_size = true;	
 			}
-			Number(number, false);
+			Number(custom_step_size, false);
+			if (custom_step_size.has_value() && !custom_step_size.value()->evaluate({})) {
+			// TODO: GEN_ERROR step size cannot be zero ?
+			}
+			
 		}
+		if (!explicit_step_size_defined) {
+		custom_step_size.emplace(std::make_shared<number>(number(1)));
+		}
+		
+		bool valid_loop_header = loop_variable_ident.has_value() 
+						&& (explicit_range_start_defined ? iteration_range_start.has_value() : true)
+						&& iteration_range_end.has_value()
+						&& (explicit_step_size_defined ? custom_step_size.has_value() : true);
+		if (valid_loop_header) {
+		const unsigned int iteration_range_start_value = iteration_range_start.value()->evaluate({});
+		const unsigned int iteration_range_end_value = iteration_range_end.value()->evaluate({});
+		const unsigned int step_size = custom_step_size.value()->evaluate({});
+		
+		unsigned int num_iterations;
+		if ((negative_step_size && iteration_range_end_value > iteration_range_start_value)
+		|| (!negative_step_size && iteration_range_start_value > iteration_range_end_value)
+		|| !step_size) {
+		// TODO: Either generate error or warning
+		num_iterations = 0;	
+		valid_loop_header = false;
+		}
+		else {
+		num_iterations = negative_step_size 
+		? (iteration_range_start_value - iteration_range_end_value)
+		: (iteration_range_end_value - iteration_range_start_value);
+		num_iterations = (num_iterations + 1) / step_size;
+		}
+		}
+		
 		Expect(27 /* "do" */);
 		StatementList(loop_body);
+		if (loop_body.empty()) {
+		// TODO: GEN_ERROR
+		}
+		
 		Expect(28 /* "rof" */);
+		if (loop_variable_ident.has_value()) {
+		symbol_table::close_scope(current_symbol_table_scope);
+		}
+		
+		// TODO: If a statement must be generated, one could create a skip statement instead of simply returning 
+		if (!valid_loop_header || loop_body.empty()) {
+		return;
+		}
+		
+		const std::shared_ptr<for_statement> loop_statement = std::make_shared<for_statement>(for_statement());
+		loop_statement->loop_variable = loop_variable_ident.value();
+		loop_statement->range = std::pair(iteration_range_start.value(), iteration_range_end.value());
+		loop_statement->step = custom_step_size.value();
+		loop_statement->statements = loop_body;
+		statement.emplace(loop_statement);
+		
 }
 
 void Parser::IfStatement(std::optional<statement::ptr> &statement ) {
@@ -582,6 +656,7 @@ void Parser::AssignStatement(std::optional<statement::ptr> &statement ) {
 		if (!assign_stmt_lhs.has_value() || !std::holds_alternative<variable_access::ptr>(assign_stmt_lhs.value()) || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
 		return;
 		}
+		// TODO: To not break reversability of operation, check that expression does not contain the assigned to signal 
 		const variable_access::ptr assigned_to_obj = std::get<variable_access::ptr>(assign_stmt_lhs.value());
 		const std::optional<unsigned int> mapped_operation = map_operation_to_assign_operation(assign_operation.value());
 		if (mapped_operation.has_value()) {
@@ -655,9 +730,15 @@ void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_po
 		Expect(_ident);
 		const std::string signal_ident = convert_to_uniform_text_format(t->val);
 		if (check_ident_was_declared(signal_ident)) {
-		signal.emplace(current_symbol_table_scope->get_variable(signal_ident).value());
+		const auto symbol_table_entry = current_symbol_table_scope->get_variable(signal_ident).value();
+		if (std::holds_alternative<variable::ptr>(symbol_table_entry)) {
+		signal.emplace(std::get<variable::ptr>(symbol_table_entry));
 		declared_signal_access = std::make_shared<variable_access>(variable_access());
 		declared_signal_access->set_var(signal.value());
+		}
+		else {
+		valid_signal_access = false;
+		}
 		}
 		else {
 		valid_signal_access = false;
