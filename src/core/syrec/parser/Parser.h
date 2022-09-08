@@ -99,6 +99,7 @@ struct expression_or_constant {
 			{
 			}
 
+			// TODO: Add loop variable mapping lookup as constructor parameter
 			explicit expression_or_constant(const expression::ptr &expression)
 			{
                 syrec::expression* referenced_expression = expression.get();
@@ -152,6 +153,8 @@ struct expression_or_constant {
 	module::vec modules;
 	parser_error_message_generator error_message_generator;
 	symbol_table::ptr current_symbol_table_scope;
+
+	number::loop_variable_mapping loop_variable_mapping_lookup;
 
 	// This method will be called by the contructor if it exits.
 	// This support is specific to the C++ version of Coco/R.
@@ -418,10 +421,10 @@ struct expression_or_constant {
 	}
 
 	// TODO: Generate error/s in case of exceptions
-	[[nodiscard]] static std::optional<unsigned int> apply_unary_operation(const syrec_operation::operation operation, const number::ptr &left_operand) {
+	[[nodiscard]] std::optional<unsigned int> apply_unary_operation(const syrec_operation::operation operation, const number::ptr &left_operand) const {
 		std::optional<unsigned int> operation_result;
 		try {
-			operation_result.emplace(syrec_operation::apply(operation, left_operand->evaluate({})));
+			operation_result.emplace(syrec_operation::apply(operation, left_operand->evaluate(loop_variable_mapping_lookup)));
 		}
 		catch (std::overflow_error &err) {
 		
@@ -445,6 +448,23 @@ struct expression_or_constant {
 		
 		}
         return operation_result;
+	}
+
+	[[nodiscard]] std::optional<unsigned int> evaluate_number_container_to_constant(const number::ptr &number_container) {
+		std::optional<unsigned int> value_of_number_container;
+		if (number_container->is_loop_variable()) {
+			const std::string &loop_variable_name = number_container->variable_name();
+			if (loop_variable_mapping_lookup.find(loop_variable_name) == loop_variable_mapping_lookup.end()) {
+				// TODO: GEN_ERROR
+			}
+			else {
+				value_of_number_container.emplace(number_container->evaluate(loop_variable_mapping_lookup));
+			}
+		}
+		else {
+			value_of_number_container.emplace(number_container->evaluate(loop_variable_mapping_lookup));
+		}
+		return value_of_number_container;
 	}
 
 /*-------------------------------------------------------------------------*/

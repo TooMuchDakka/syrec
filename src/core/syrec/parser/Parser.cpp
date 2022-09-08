@@ -115,7 +115,7 @@ void Parser::Number(std::optional<number::ptr> &parsed_number, bool simplify_if_
 		} else if (la->kind == 4 /* "$" */) {
 			Get();
 			Expect(_ident);
-			const std::string signal_ident = "$" + convert_to_uniform_text_format(t->val);
+			const std::string signal_ident = convert_to_uniform_text_format(t->val);
 			if (check_ident_was_declared(signal_ident)) {
 			const auto &symbol_table_entry = current_symbol_table_scope->get_variable(signal_ident);
 			if (symbol_table_entry.has_value() && std::holds_alternative<number::ptr>(symbol_table_entry.value())) {
@@ -147,12 +147,17 @@ void Parser::Number(std::optional<number::ptr> &parsed_number, bool simplify_if_
 			} else SynErr(56);
 			Number(rhs_operand, simplify_if_possible);
 			if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
+			const std::optional<unsigned int> lhs_value = evaluate_number_container_to_constant(lhs_operand.value());
+			const std::optional<unsigned int> rhs_value = evaluate_number_container_to_constant(rhs_operand.value());
+			
+			if (lhs_value.has_value() && rhs_value.has_value()) {
 			const std::optional<unsigned int> op_result = apply_binary_operation(op.value(),
-			lhs_operand.value()->evaluate({}),
-			rhs_operand.value()->evaluate({}));
+			lhs_operand.value()->evaluate(loop_variable_mapping_lookup),
+			rhs_operand.value()->evaluate(loop_variable_mapping_lookup));
 			if (op_result.has_value()) {
 			const number::ptr result = std::make_shared<number>(number(op_result.value())); 
 			parsed_number.emplace(result);
+			}
 			}
 			}
 			
@@ -522,7 +527,7 @@ void Parser::ForStatement(std::optional<statement::ptr> &statement ) {
 			if (check_if_loop_variable_is_defined()) {
 				Expect(4 /* "$" */);
 				Expect(_ident);
-				const std::string &loop_var_ident = "$" + convert_to_uniform_text_format(t->val);
+				const std::string &loop_var_ident = convert_to_uniform_text_format(t->val);
 				if (!check_ident_was_declared(loop_var_ident)) {
 				loop_variable_ident.emplace(convert_to_uniform_text_format(t->val));
 				symbol_table::open_scope(current_symbol_table_scope);
@@ -1016,35 +1021,29 @@ void Parser::ShiftExpression(expression_evaluation_result &user_defined_shift_ex
 		Number(shift_amount, simplify_if_possible);
 		if (shift_expression_lhs.has_value() && shift_operation.has_value() && shift_amount.has_value()) {
 		const std::optional<unsigned int> mapped_shift_operation = map_operation_to_shift_operation(shift_operation.value());
+		const expression::ptr lhs_operand_expression = shift_expression_lhs.value().convert_to_expression(bitwidth);
 		
-		/*
-		const unsigned int shift_amount_value = shift_amount.value()->evaluate({});
-		const unsigned int operand_bit_size = shift_expression_lhs.value().get_expression()->bitwidth();
-		
-		if (simplify_if_possible && !shift_amount_value) {
-		// TODO: Create skip statement 
-		user_defined_shift_expression = shift_expression_lhs;
-		}
-		else if (simplify_if_possible && shift_expression_lhs.value().is_constant()) {
+		// One could replace the shift statement with a skip statement if the shift amount is zero 
+		const std::optional<unsigned int> shift_amount_value_evaluated = evaluate_number_container_to_constant(shift_amount.value());
+		if (shift_amount_value_evaluated.has_value() && shift_expression_lhs.value().is_constant()) {
 		const unsigned int shift_operand_lhs_value = shift_expression_lhs.value().get_constant_value();
-		const std::optional<unsigned int> shift_application_result = syrec_operation::apply(shift_operation.value(), shift_operand_lhs_value);
+            const std::optional<unsigned int> shift_application_result = syrec_operation::apply(shift_operation.value(), shift_operand_lhs_value,
+                                                                                                shift_amount_value_evaluated.value());
 		
 		if (shift_application_result.has_value()) {
 		user_defined_shift_expression.emplace(expression_or_constant(shift_application_result.value()));
 		}
+		else {
+		// TODO: GEN_ERROR
+		return;
+		}
 		}
 		else {
-		const expression::ptr lhs_operand_expression = shift_expression_lhs.value().get_expression();
-		user_defined_shift_expression.emplace(std::make_shared<shift_expression>(lhs_operand_expression,
-		mapped_shift_operation.value(),
-		shift_amount.value()));
-		}
-		*/
-		
 		const expression::ptr lhs_operand_expression = shift_expression_lhs.value().convert_to_expression(bitwidth);
 		user_defined_shift_expression.emplace(std::make_shared<shift_expression>(lhs_operand_expression,
 		mapped_shift_operation.value(),
 		shift_amount.value()));
+		}
 		}
 		
 		Expect(10 /* ")" */);
