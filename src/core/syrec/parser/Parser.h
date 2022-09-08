@@ -30,6 +30,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #if !defined(syrec_COCO_PARSER_H__)
 #define syrec_COCO_PARSER_H__
 
+#include <algorithm>
 #include <cwchar>
 #include <optional>
 #include <set>
@@ -94,39 +95,53 @@ public:
 
 struct expression_or_constant {
 		public:
-			expression_or_constant(const unsigned int constant_value) : variants(constant_value)
+            explicit expression_or_constant(const unsigned int constant_value) : constant_value(constant_value) ,variants(constant_value)
 			{
 			}
 
-			expression_or_constant(const expression::ptr &expression) : variants(expression) 
+			explicit expression_or_constant(const expression::ptr &expression)
 			{
+                syrec::expression* referenced_expression = expression.get();
+                const numeric_expression* constant_expression = dynamic_cast<numeric_expression*>(referenced_expression);
+                if (nullptr != constant_expression && constant_expression->value->is_constant()) {
+                    constant_value.emplace(constant_expression->value->evaluate({}));
+					variants.emplace<unsigned int>(constant_value.value());
+                }
+				else {
+					variants.emplace<expression::ptr>(expression);
+				}
 			}
 				
 			[[nodiscard]] bool is_constant() const {
-				return std::holds_alternative<unsigned int>(variants);
+                return constant_value.has_value();
 			}
 
 			[[nodiscard]] unsigned int get_constant_value() const {
-				return std::get<unsigned int>(variants);
+                if (!is_constant()) {
+                    throw std::logic_error("TODO x");
+                }
+                return constant_value.value();
 			}
 
 			[[nodiscard]] expression::ptr get_expression() const {
+                if (is_constant()) {
+                    throw std::logic_error("TODO a");
+                }
 				return std::get<expression::ptr>(variants);
 			}
 
-			[[nodiscard]] expression::ptr convert_to_expression() const {
+			[[nodiscard]] expression::ptr convert_to_expression(const unsigned int bitwidth) const {
 				if (is_constant()) {
 					const number::ptr &constant_value_wrapper = std::make_shared<number>(get_constant_value());
-					// TODO: Fix calculation of bitwidth for constant value
-					const expression::ptr expression_for_constant = std::make_shared<numeric_expression>(constant_value_wrapper, 0);
-					return expression_for_constant;
+					return std::make_shared<numeric_expression>(constant_value_wrapper, bitwidth);
 				}
 				else {
-					return get_expression();	
+					return std::get<expression::ptr>(variants);	
 				}
 			}
 			
 		private:
+            std::optional<unsigned int> constant_value;
 			std::variant<expression::ptr, unsigned int> variants;
 	};
 
@@ -418,10 +433,10 @@ struct expression_or_constant {
 	}
 
 	// TODO: Generate error/s in case of exceptions
-	[[nodiscard]] static std::optional<unsigned int> apply_binary_operation(const syrec_operation::operation operation, const number::ptr &left_operand, const number::ptr &right_operand) {
+	[[nodiscard]] static std::optional<unsigned int> apply_binary_operation(const syrec_operation::operation operation, const unsigned int &left_operand, const unsigned int &right_operand) {
 		std::optional<unsigned int> operation_result;
 		try {
-			operation_result.emplace(syrec_operation::apply(operation, left_operand->evaluate({}), right_operand->evaluate({})));
+			operation_result.emplace(syrec_operation::apply(operation, left_operand, right_operand));
 		}
 		catch (std::overflow_error &err) {
 		
@@ -456,11 +471,11 @@ struct expression_or_constant {
 	void SkipStatement(std::optional<statement::ptr> &statement );
 	void AssignStatement(std::optional<statement::ptr> &statement );
 	void SwapStatement(std::optional<statement::ptr> &statement );
-	void Expression(expression_evaluation_result &user_defined_expression, bool simplify_if_possible);
+	void Expression(expression_evaluation_result &user_defined_expression, unsigned int bitwidth, bool simplify_if_possible);
 	void Signal(signal_evaluation_result &signal_access, bool simplify_if_possible);
-	void BinaryExpression(expression_evaluation_result &user_defined_binary_expression, bool simplify_if_possible);
-	void ShiftExpression(expression_evaluation_result &user_defined_shift_expression, bool simplify_if_possible);
-	void UnaryExpression(expression_evaluation_result &unary_expression, bool simplify_if_possible);
+	void BinaryExpression(expression_evaluation_result &user_defined_binary_expression, unsigned int bitwidth, bool simplify_if_possible);
+	void ShiftExpression(expression_evaluation_result &user_defined_shift_expression, unsigned int bitwidth, bool simplify_if_possible);
+	void UnaryExpression(expression_evaluation_result &unary_expression, unsigned int bitwidth, bool simplify_if_possible);
 
 	void Parse();
 

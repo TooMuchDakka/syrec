@@ -9,6 +9,7 @@ $namespace=syrec
 /*-- $checkEOF=false --*/
 
 // Place includes here
+#include <algorithm>
 #include <cwchar>
 #include <optional>
 #include <set>
@@ -29,39 +30,53 @@ COMPILER SyReC
 
 	struct expression_or_constant {
 		public:
-			expression_or_constant(const unsigned int constant_value) : variants(constant_value)
+            explicit expression_or_constant(const unsigned int constant_value) : constant_value(constant_value) ,variants(constant_value)
 			{
 			}
 
-			expression_or_constant(const expression::ptr &expression) : variants(expression) 
+			explicit expression_or_constant(const expression::ptr &expression)
 			{
+                syrec::expression* referenced_expression = expression.get();
+                const numeric_expression* constant_expression = dynamic_cast<numeric_expression*>(referenced_expression);
+                if (nullptr != constant_expression && constant_expression->value->is_constant()) {
+                    constant_value.emplace(constant_expression->value->evaluate({}));
+					variants.emplace<unsigned int>(constant_value.value());
+                }
+				else {
+					variants.emplace<expression::ptr>(expression);
+				}
 			}
 				
 			[[nodiscard]] bool is_constant() const {
-				return std::holds_alternative<unsigned int>(variants);
+                return constant_value.has_value();
 			}
 
 			[[nodiscard]] unsigned int get_constant_value() const {
-				return std::get<unsigned int>(variants);
+                if (!is_constant()) {
+                    throw std::logic_error("TODO x");
+                }
+                return constant_value.value();
 			}
 
 			[[nodiscard]] expression::ptr get_expression() const {
+                if (is_constant()) {
+                    throw std::logic_error("TODO a");
+                }
 				return std::get<expression::ptr>(variants);
 			}
 
-			[[nodiscard]] expression::ptr convert_to_expression() const {
+			[[nodiscard]] expression::ptr convert_to_expression(const unsigned int bitwidth) const {
 				if (is_constant()) {
 					const number::ptr &constant_value_wrapper = std::make_shared<number>(get_constant_value());
-					// TODO: Fix calculation of bitwidth for constant value
-					const expression::ptr expression_for_constant = std::make_shared<numeric_expression>(constant_value_wrapper, 0);
-					return expression_for_constant;
+					return std::make_shared<numeric_expression>(constant_value_wrapper, bitwidth);
 				}
 				else {
-					return get_expression();	
+					return std::get<expression::ptr>(variants);	
 				}
 			}
 			
 		private:
+            std::optional<unsigned int> constant_value;
 			std::variant<expression::ptr, unsigned int> variants;
 	};
 
@@ -353,10 +368,10 @@ COMPILER SyReC
 	}
 
 	// TODO: Generate error/s in case of exceptions
-	[[nodiscard]] static std::optional<unsigned int> apply_binary_operation(const syrec_operation::operation operation, const number::ptr &left_operand, const number::ptr &right_operand) {
+	[[nodiscard]] static std::optional<unsigned int> apply_binary_operation(const syrec_operation::operation operation, const unsigned int &left_operand, const unsigned int &right_operand) {
 		std::optional<unsigned int> operation_result;
 		try {
-			operation_result.emplace(syrec_operation::apply(operation, left_operand->evaluate({}), right_operand->evaluate({})));
+			operation_result.emplace(syrec_operation::apply(operation, left_operand, right_operand));
 		}
 		catch (std::overflow_error &err) {
 		
@@ -437,7 +452,9 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 		|'/'																(.	op.emplace(syrec_operation::operation::division);		.)
 		) 
 		Number<rhs_operand, simplify_if_possible>							(.	if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
-																					const std::optional<unsigned int> op_result = apply_binary_operation(op.value(), lhs_operand.value(), rhs_operand.value());
+																					const std::optional<unsigned int> op_result = apply_binary_operation(op.value(),
+																																						lhs_operand.value()->evaluate({}),
+																																						rhs_operand.value()->evaluate({}));
 																					if (op_result.has_value()) {
 																						const number::ptr result = std::make_shared<number>(number(op_result.value())); 
 																						parsed_number.emplace(result);
@@ -635,10 +652,7 @@ ident																										(.	const std::string signal_ident = convert_to_un
 																													dimensions.emplace_back(dimension.value());	
 																												}
 																											.)
-"]"}																									(.	if (valid_declaration && dimensions.empty()) {
-																												dimensions.emplace_back(1);
-																											}
-																										.)
+"]"}																									
 ["(" 
 	int																									(.	const std::optional<unsigned int> user_defined_signal_width = convert_token_value_to_number(*t);
 																											if (!user_defined_signal_width.has_value()) {
@@ -894,11 +908,11 @@ IfStatement<. std::optional<statement::ptr> &statement .>		(.	expression_evaluat
 																	statement::vec false_branch{};
 																.)	
 =
-"if" Expression<condition, false> 
+"if" Expression<condition, 1u, false> 
 "then" 
 StatementList<true_branch> 
 "else" StatementList<false_branch>
-"fi" Expression<closing_condition, false>						(.	// TODO: Add check that condition and closing_condition match
+"fi" Expression<closing_condition, 1u, false>					(.	// TODO: Add check that condition and closing_condition match
 																	const bool conditional_well_formed = condition.has_value() 
 																		&& closing_condition.has_value()
 																		&& !true_branch.empty()
@@ -908,8 +922,8 @@ StatementList<true_branch>
 																	}
 															
 																	const std::shared_ptr<if_statement> &conditional = std::make_shared<if_statement>(if_statement());
-																	conditional->condition = condition.value().convert_to_expression();
-																	conditional->fi_condition = closing_condition.value().convert_to_expression();
+																	conditional->condition = condition.value().convert_to_expression(1u);
+																	conditional->fi_condition = closing_condition.value().convert_to_expression(1u);
 																	conditional->then_statements                    = true_branch;
 																	conditional->else_statements                    = false_branch;
 																	statement.emplace(conditional);
@@ -949,24 +963,30 @@ AssignStatement production
 AssignStatement<. std::optional<statement::ptr> &statement .>	(.		signal_evaluation_result assign_stmt_lhs;
 																		expression_evaluation_result assign_stmt_rhs;
 																		std::optional<syrec_operation::operation> assign_operation;
+																		unsigned int expression_bitwidth = 1u;
+
+																		std::optional<variable_access::ptr> assigned_to_obj;
 																.)
 =
-Signal<assign_stmt_lhs, false> 
+Signal<assign_stmt_lhs, false>									(.		if (assign_stmt_lhs.has_value() && std::holds_alternative<variable_access::ptr>(assign_stmt_lhs.value())) {
+																			assigned_to_obj.emplace(std::get<variable_access::ptr>(assign_stmt_lhs.value()));
+																			expression_bitwidth = assigned_to_obj.value()->bitwidth();
+																		}
+																.)
 (
 	"^"															(.		assign_operation.emplace(syrec_operation::operation::xor_assign);	.)
 	| "+"														(.		assign_operation.emplace(syrec_operation::operation::add_assign);	.)
 	| "-"														(.		assign_operation.emplace(syrec_operation::operation::minus_assign);	.)
 )					
-"=" Expression<assign_stmt_rhs, false>							(.		if (!assign_stmt_lhs.has_value() || !std::holds_alternative<variable_access::ptr>(assign_stmt_lhs.value()) || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
+"=" Expression<assign_stmt_rhs, expression_bitwidth, false>		(.		if (!assigned_to_obj.has_value() || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
 																			return;
 																		}
 																		// TODO: To not break reversability of operation, check that expression does not contain the assigned to signal 
-																		const variable_access::ptr assigned_to_obj = std::get<variable_access::ptr>(assign_stmt_lhs.value());
 																		const std::optional<unsigned int> mapped_operation = map_operation_to_assign_operation(assign_operation.value());
 																		if (mapped_operation.has_value()) {
-																			statement.emplace(std::make_shared<assign_statement>(assign_statement(assigned_to_obj,
+																			statement.emplace(std::make_shared<assign_statement>(assign_statement(assigned_to_obj.value(),
 																																				mapped_operation.value(),
-																																				assign_stmt_rhs.value().convert_to_expression())));
+																																				assign_stmt_rhs.value().convert_to_expression(expression_bitwidth))));
 																		}
 																.)		
 .
@@ -1007,101 +1027,103 @@ SkipStatement<. std::optional<statement::ptr> &statement .>
 Signal production
 -------------------------------------------------------------------------*/
 
-Signal<signal_evaluation_result &signal_access, bool simplify_if_possible>	(.	std::optional<variable::ptr> signal;	
-																				variable_access::ptr declared_signal_access;
-																				bool valid_signal_access = true;
-																				// TODO: Using global zero_based indexing flag to initialize default value
-																				std::size_t dimension_index = 0;
-																			.)				
+Signal<signal_evaluation_result &signal_access, bool simplify_if_possible>			(.	std::optional<variable::ptr> signal;	
+																						variable_access::ptr declared_signal_access;
+																						bool valid_signal_access = true;
+																						// TODO: Using global zero_based indexing flag to initialize default value
+																						std::size_t dimension_index = 0;
+																						unsigned int index_expression_bitwidth = 1u;
+																					.)				
 =
-ident																		(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);
-																				if (check_ident_was_declared(signal_ident)) {
-																					const auto symbol_table_entry = current_symbol_table_scope->get_variable(signal_ident).value();
-																					if (std::holds_alternative<variable::ptr>(symbol_table_entry)) {
-																						signal.emplace(std::get<variable::ptr>(symbol_table_entry));
-																						declared_signal_access = std::make_shared<variable_access>(variable_access());
-																						declared_signal_access->set_var(signal.value());
-																					}
-																					else {
-																						valid_signal_access = false;
-																					}
-																				}
-																				else {
-																					valid_signal_access = false;
-																				}
-																			.)
-{"["																		(.	expression_evaluation_result index_expression;	.)
-	Expression<index_expression, simplify_if_possible>						(.	valid_signal_access &= index_expression.has_value();
-																				if (signal.has_value() && index_expression.has_value()) {
-																					const std::optional<unsigned int> &optional_dimension_access_value = get_value_if_expression_is_constant(index_expression);
-
-																					if (optional_dimension_access_value.has_value()) {
-																						const unsigned int constant_dimension_access_value = optional_dimension_access_value.value();
-
-																						// TODO: Using global zero_based indexing flag
-																						if (!range_check::is_valid_dimension_access(signal.value(), dimension_index, constant_dimension_access_value, true)) {
-																							valid_signal_access = false;
-
-																							// TODO: Using global zero_based indexing flag
-																							const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_dimension_access_range(signal.value(), dimension_index, true).value();
-																							// TODO: GEN_ERROR
+	ident																			(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);
+																						if (check_ident_was_declared(signal_ident)) {
+																							const auto symbol_table_entry = current_symbol_table_scope->get_variable(signal_ident).value();
+																							if (std::holds_alternative<variable::ptr>(symbol_table_entry)) {
+																								signal.emplace(std::get<variable::ptr>(symbol_table_entry));
+																								declared_signal_access = std::make_shared<variable_access>(variable_access());
+																								declared_signal_access->set_var(signal.value());
+																								index_expression_bitwidth = signal.value()->bitwidth;
+																							}
+																							else {
+																								valid_signal_access = false;
+																							}
 																						}
 																						else {
-																							declared_signal_access->indexes.emplace_back(index_expression.value().convert_to_expression());
+																							valid_signal_access = false;
 																						}
-																					}
-																					else {
-																						declared_signal_access->indexes.emplace_back(index_expression.value().get_expression());
-																					}
-																				}
-																				dimension_index++;
-																			.)
+																					.)
+{"["																				(.	expression_evaluation_result index_expression;	.)
+	Expression<index_expression, index_expression_bitwidth, simplify_if_possible>	(.	valid_signal_access &= index_expression.has_value();
+																						if (signal.has_value() && index_expression.has_value()) {
+																							const std::optional<unsigned int> &optional_dimension_access_value = get_value_if_expression_is_constant(index_expression);
+
+																							if (optional_dimension_access_value.has_value()) {
+																								const unsigned int constant_dimension_access_value = optional_dimension_access_value.value();
+
+																								// TODO: Using global zero_based indexing flag
+																								if (!range_check::is_valid_dimension_access(signal.value(), dimension_index, constant_dimension_access_value, true)) {
+																									valid_signal_access = false;
+
+																									// TODO: Using global zero_based indexing flag
+																									const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_dimension_access_range(signal.value(), dimension_index, true).value();
+																									// TODO: GEN_ERROR
+																								}
+																								else {
+																									declared_signal_access->indexes.emplace_back(index_expression.value().convert_to_expression(index_expression_bitwidth));
+																								}
+																							}
+																							else {
+																								declared_signal_access->indexes.emplace_back(index_expression.value().get_expression());
+																							}
+																						}
+																						dimension_index++;
+																					.)
 "]"
 } 
-[																			(.	std::optional<number::ptr> range_start, range_end;
-																				bool defined_range = false;
-																			.)
+[																					(.	std::optional<number::ptr> range_start, range_end;
+																						bool defined_range = false;
+																					.)
 	"." Number<range_start, false>									
 	[
-		":" Number<range_end, false>										(.	defined_range = true;	.)
-	]																		(.	valid_signal_access &= range_start.has_value() && (defined_range ? range_end.has_value() : true);
-																				if (valid_signal_access) {
-																					const variable::ptr &accessed_variable = signal.value();
+		":" Number<range_end, false>											(.	defined_range = true;	.)
+	]																			(.	valid_signal_access &= range_start.has_value() && (defined_range ? range_end.has_value() : true);
+																					if (valid_signal_access) {
+																						const variable::ptr &accessed_variable = signal.value();
 
-																					const bool is_bit_access = !range_end.has_value();
-																					const std::pair<number::ptr, number::ptr> range(range_start.value(), is_bit_access ? range_start.value() : range_end.value());
-																					const std::pair<std::size_t, std::size_t> range_values(range.first->evaluate({}), range.second->evaluate({}));
+																						const bool is_bit_access = !range_end.has_value();
+																						const std::pair<number::ptr, number::ptr> range(range_start.value(), is_bit_access ? range_start.value() : range_end.value());
+																						const std::pair<std::size_t, std::size_t> range_values(range.first->evaluate({}), range.second->evaluate({}));
 																					
-																					if (is_bit_access) {
-																						// TODO: Check bitwidth is within range [0, bitwidth - 1]
-																						// TODO: Using global zero_based indexing flag
-																						if (!range_check::is_valid_bit_access(accessed_variable, range_values.first, true)) {
-																							valid_signal_access = false;
-																							// TODO: GEN_ERROR
+																						if (is_bit_access) {
+																							// TODO: Check bitwidth is within range [0, bitwidth - 1]
 																							// TODO: Using global zero_based indexing flag
-																							const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_bit_access_range(accessed_variable, true);
+																							if (!range_check::is_valid_bit_access(accessed_variable, range_values.first, true)) {
+																								valid_signal_access = false;
+																								// TODO: GEN_ERROR
+																								// TODO: Using global zero_based indexing flag
+																								const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_bit_access_range(accessed_variable, true);
+																							}
 																						}
-																					}
-																					else {
-																						// TODO: Check user defined range is within [0, bitwidth - 1]
-																						// TODO: Using global zero_based indexing flag
-																						if (!range_check::is_valid_range_access(accessed_variable, range_values, true)){
-																							valid_signal_access = false;
-																							// TODO: GEN_ERROR
+																						else {
+																							// TODO: Check user defined range is within [0, bitwidth - 1]
 																							// TODO: Using global zero_based indexing flag
-																							const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_range_access_range(accessed_variable, true);
+																							if (!range_check::is_valid_range_access(accessed_variable, range_values, true)){
+																								valid_signal_access = false;
+																								// TODO: GEN_ERROR
+																								// TODO: Using global zero_based indexing flag
+																								const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_range_access_range(accessed_variable, true);
+																							}
 																						}
-																					}
 
-																					if (valid_signal_access){
-																						declared_signal_access->range.emplace(range);
+																						if (valid_signal_access){
+																							declared_signal_access->range.emplace(range);
+																						}
 																					}
-																				}
-																			.)
-]																			(.	if (valid_signal_access) {
-																					signal_access.emplace(declared_signal_access);
-																				}
-																			.)
+																				.)
+]																				(.	if (valid_signal_access) {
+																						signal_access.emplace(declared_signal_access);
+																					}
+																				.)
 .
 
 /*-------------------------------------------------------------------------
@@ -1112,42 +1134,46 @@ Expressions variants
 Expression production
 -------------------------------------------------------------------------*/
 
-Expression<expression_evaluation_result &user_defined_expression, bool simplify_if_possible>	(.	signal_evaluation_result signal;
-																									std::optional<number::ptr> number;
-																								.)
+Expression<expression_evaluation_result &user_defined_expression, unsigned int bitwidth, bool simplify_if_possible>	(.	signal_evaluation_result signal;
+																														std::optional<number::ptr> number;
+																													.)
 =
 (
-	IF (check_if_expression_is_number()) Number<number, simplify_if_possible>					(.	if (number.has_value()) {
-																										user_defined_expression.emplace(std::make_shared<numeric_expression>(numeric_expression(number.value(), 0)));
-																									}
-																								.)
-	| IF (check_if_expression_is_binary_expression()) BinaryExpression<user_defined_expression, simplify_if_possible>
-	| ShiftExpression<user_defined_expression, simplify_if_possible>
+	IF (check_if_expression_is_number()) Number<number, simplify_if_possible>										(.	if (number.has_value()) {
+																															user_defined_expression.emplace(std::make_shared<numeric_expression>(numeric_expression(number.value(), bitwidth)));
+																														}
+																													.)
+	| IF (check_if_expression_is_binary_expression()) BinaryExpression<user_defined_expression, bitwidth, simplify_if_possible>
+	| ShiftExpression<user_defined_expression, bitwidth, simplify_if_possible>
 )
-	| Signal<signal, simplify_if_possible>														(.	if (signal.has_value()) {
-																										if (std::holds_alternative<variable_access::ptr>(signal.value())) {
-																											const variable_access::ptr &var_access = std::get<variable_access::ptr>(signal.value());
-																											user_defined_expression.emplace(std::make_shared<variable_expression>(variable_expression(var_access)));
-																										}
-																										else if (std::holds_alternative<number::ptr>(signal.value())){
-																											const number::ptr &number_signal = std::get<number::ptr>(signal.value());
-																											user_defined_expression.emplace(std::make_shared<numeric_expression>(numeric_expression(number_signal, 0)));
-																										}
-																									}
-																								.)
-	| UnaryExpression<user_defined_expression, simplify_if_possible>
+	| Signal<signal, simplify_if_possible>																			(.	if (signal.has_value()) {
+																															if (std::holds_alternative<variable_access::ptr>(signal.value())) {
+																																const variable_access::ptr &var_access = std::get<variable_access::ptr>(signal.value());
+																																user_defined_expression.emplace(std::make_shared<variable_expression>(variable_expression(var_access)));
+																															}
+																															else if (std::holds_alternative<number::ptr>(signal.value())){
+																																const number::ptr &number_signal = std::get<number::ptr>(signal.value());
+																																user_defined_expression.emplace(std::make_shared<numeric_expression>(numeric_expression(number_signal, bitwidth)));
+																															}
+																														}
+																													.)
+	| UnaryExpression<user_defined_expression, bitwidth, simplify_if_possible>
 .
 
 /*-------------------------------------------------------------------------
 BinaryExpression production
 -------------------------------------------------------------------------*/
 
-BinaryExpression<expression_evaluation_result &user_defined_binary_expression, bool simplify_if_possible>			(.	expression_evaluation_result binary_expr_lhs;
-																														expression_evaluation_result binary_expr_rhs;
-																														std::optional<syrec_operation::operation> binary_operation;
-																													.)	
+BinaryExpression<expression_evaluation_result &user_defined_binary_expression, unsigned int bitwidth, bool simplify_if_possible>	(.	expression_evaluation_result binary_expr_lhs;
+																																		expression_evaluation_result binary_expr_rhs;
+																																		std::optional<syrec_operation::operation> binary_operation;
+																																		unsigned int operands_bitwidth = 0u;
+																																	.)	
 =
-"(" Expression<binary_expr_lhs, simplify_if_possible> 
+"(" Expression<binary_expr_lhs, bitwidth, simplify_if_possible>																		(.	if (binary_expr_lhs.has_value()) {
+																																			operands_bitwidth = std::max(binary_expr_lhs->convert_to_expression(bitwidth)->bitwidth(), bitwidth);
+																																		}
+																																	.)
 	(
 		"+"																											(.	binary_operation.emplace(syrec_operation::operation::addition);	.)
 		| "-"																										(.	binary_operation.emplace(syrec_operation::operation::subtraction);	.)
@@ -1167,13 +1193,27 @@ BinaryExpression<expression_evaluation_result &user_defined_binary_expression, b
 		| "<="																										(.	binary_operation.emplace(syrec_operation::operation::less_equals);	.)
 		| ">="																										(.	binary_operation.emplace(syrec_operation::operation::greater_equals);	.)
 	) 
-	Expression<binary_expr_rhs, simplify_if_possible>																
-")"																													(.	if (binary_expr_lhs.has_value() && binary_operation.has_value() && binary_expr_rhs.has_value()) {
+	Expression<binary_expr_rhs, operands_bitwidth, simplify_if_possible>																
+")"																													(.	
+																														if (binary_expr_lhs.has_value() && binary_operation.has_value() && binary_expr_rhs.has_value()) {
 																															const std::optional<unsigned int> mapped_operation = map_operation_to_binary_operation(binary_operation.value());
 																															if (mapped_operation.has_value()) {
-																																user_defined_binary_expression.emplace(std::make_shared<binary_expression>(binary_expression(binary_expr_lhs.value().get_expression(),
+																																if (binary_expr_lhs->is_constant() && binary_expr_rhs->is_constant()) {
+																																	const unsigned int binary_expr_lhs_value = binary_expr_lhs->get_constant_value();
+																																	const unsigned int binary_expr_rhs_value = binary_expr_rhs->get_constant_value();
+																																	const std::optional<unsigned int> evaluation_result = apply_binary_operation(binary_operation.value(),
+																																													binary_expr_lhs_value, binary_expr_rhs_value);
+																																	if (evaluation_result.has_value()) {
+																																		user_defined_binary_expression.emplace(evaluation_result.value());
+																																	}
+																																}
+																																else {
+																																	const expression::ptr lhs_operand = binary_expr_lhs->convert_to_expression(operands_bitwidth);
+																																	const expression::ptr rhs_operand = binary_expr_rhs->convert_to_expression(operands_bitwidth);
+																																	user_defined_binary_expression.emplace(std::make_shared<binary_expression>(binary_expression(lhs_operand,
 																																						mapped_operation.value(),
-																																						binary_expr_rhs.value().get_expression())));
+																																						rhs_operand)));
+																																}
 																															}
 																														}
 																													.)
@@ -1184,7 +1224,7 @@ BinaryExpression<expression_evaluation_result &user_defined_binary_expression, b
 UnaryExpression production
 -------------------------------------------------------------------------*/
 
-UnaryExpression<expression_evaluation_result &unary_expression, bool simplify_if_possible>							(.	expression_evaluation_result unary_expression_operand;
+UnaryExpression<expression_evaluation_result &unary_expression, unsigned int bitwidth, bool simplify_if_possible>	(.	expression_evaluation_result unary_expression_operand;
 																														std::optional<syrec_operation::operation> unary_operation;
 																													.)
 =
@@ -1192,7 +1232,7 @@ UnaryExpression<expression_evaluation_result &unary_expression, bool simplify_if
 	"!"																												(.	unary_operation.emplace(syrec_operation::operation::logical_negation);	.)
 	| "~"																											(.	unary_operation.emplace(syrec_operation::operation::bitwise_negation);	.)
 )		
-Expression<unary_expression_operand, simplify_if_possible>															(.	if (unary_operation.has_value() && unary_expression_operand.has_value()){
+Expression<unary_expression_operand, bitwidth, simplify_if_possible>												(.	if (unary_operation.has_value() && unary_expression_operand.has_value()){
 																															// TODO:
 																														}
 
@@ -1205,40 +1245,48 @@ Expression<unary_expression_operand, simplify_if_possible>															(.	if (
 ShiftExpression production
 -------------------------------------------------------------------------*/
 
-ShiftExpression<expression_evaluation_result &user_defined_shift_expression, bool simplify_if_possible>	(.	expression_evaluation_result shift_expression_lhs;
-																											std::optional<number::ptr> shift_amount;
-																											std::optional<syrec_operation::operation> shift_operation;
-																										.)
+ShiftExpression<expression_evaluation_result &user_defined_shift_expression, unsigned int bitwidth, bool simplify_if_possible>	(.	expression_evaluation_result shift_expression_lhs;
+																																	std::optional<number::ptr> shift_amount;
+																																	std::optional<syrec_operation::operation> shift_operation;
+																																.)
 =
-"(" Expression<shift_expression_lhs, simplify_if_possible> 
+"(" Expression<shift_expression_lhs, bitwidth, simplify_if_possible> 
 (
-	"<<"																								(.	shift_operation.emplace(syrec_operation::operation::shift_left);	.)
-	| ">>"																								(.	shift_operation.emplace(syrec_operation::operation::shift_right);	.)
-) Number<shift_amount, simplify_if_possible>															(.	if (shift_expression_lhs.has_value() && shift_operation.has_value() && shift_amount.has_value()) {
-																												const std::optional<unsigned int> mapped_shift_operation = map_operation_to_shift_operation(shift_operation.value());
-																												const unsigned int shift_amount_value = shift_amount.value()->evaluate({});
-																												const unsigned int operand_bit_size = shift_expression_lhs.value().get_expression()->bitwidth();
+	"<<"																														(.	shift_operation.emplace(syrec_operation::operation::shift_left);	.)
+	| ">>"																														(.	shift_operation.emplace(syrec_operation::operation::shift_right);	.)
+) Number<shift_amount, simplify_if_possible>																					(.	if (shift_expression_lhs.has_value() && shift_operation.has_value() && shift_amount.has_value()) {
+																																		const std::optional<unsigned int> mapped_shift_operation = map_operation_to_shift_operation(shift_operation.value());
+																																		
+																																		/*
+																																		const unsigned int shift_amount_value = shift_amount.value()->evaluate({});
+																																		const unsigned int operand_bit_size = shift_expression_lhs.value().get_expression()->bitwidth();
 
-																												if (simplify_if_possible && !shift_amount_value) {
-																													// TODO: Create skip statement 
-																													user_defined_shift_expression = shift_expression_lhs;
-																												}
-																												else if (simplify_if_possible && shift_expression_lhs.value().is_constant()) {
-																													const unsigned int shift_operand_lhs_value = shift_expression_lhs.value().get_constant_value();
-																													const std::optional<unsigned int> shift_application_result = syrec_operation::apply(shift_operation.value(), shift_operand_lhs_value);
+																																		if (simplify_if_possible && !shift_amount_value) {
+																																			// TODO: Create skip statement 
+																																			user_defined_shift_expression = shift_expression_lhs;
+																																		}
+																																		else if (simplify_if_possible && shift_expression_lhs.value().is_constant()) {
+																																			const unsigned int shift_operand_lhs_value = shift_expression_lhs.value().get_constant_value();
+																																			const std::optional<unsigned int> shift_application_result = syrec_operation::apply(shift_operation.value(), shift_operand_lhs_value);
 																															
-																													if (shift_application_result.has_value()) {
-																														user_defined_shift_expression.emplace(expression_or_constant(shift_application_result.value()));
-																													}
-																												}
-																												else {
-																													const expression::ptr lhs_operand_expression = shift_expression_lhs.value().get_expression();
-																													user_defined_shift_expression.emplace(std::make_shared<shift_expression>(lhs_operand_expression,
-																																												mapped_shift_operation.value(),
-																																												shift_amount.value()));
-																												}
-																											}
-																										.)
+																																			if (shift_application_result.has_value()) {
+																																				user_defined_shift_expression.emplace(expression_or_constant(shift_application_result.value()));
+																																			}
+																																		}
+																																		else {
+																																			const expression::ptr lhs_operand_expression = shift_expression_lhs.value().get_expression();
+																																			user_defined_shift_expression.emplace(std::make_shared<shift_expression>(lhs_operand_expression,
+																																																		mapped_shift_operation.value(),
+																																																		shift_amount.value()));
+																																		}
+																																		*/
+																																		
+																																		const expression::ptr lhs_operand_expression = shift_expression_lhs.value().convert_to_expression(bitwidth);
+																																		user_defined_shift_expression.emplace(std::make_shared<shift_expression>(lhs_operand_expression,
+																																																	mapped_shift_operation.value(),
+																																																	shift_amount.value()));
+																																	}
+																																.)
 ")"
 .
 

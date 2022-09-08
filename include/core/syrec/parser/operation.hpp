@@ -45,7 +45,7 @@ namespace syrec_operation {
      * @throws std::overflow_error
      * @throws std::invalid_argument
      **/
-    [[nodiscard]] unsigned int                apply(operation operation, unsigned int left_operand_value, unsigned int right_operand_value);
+    [[nodiscard]] unsigned int                apply(const operation operation, const unsigned int left_operand_value, const unsigned int right_operand_value);
 
     /**
      * TODO: Add documentation
@@ -53,7 +53,7 @@ namespace syrec_operation {
      * @throws std::overflow_error
      * @throws std::invalid_argument
      **/
-    [[nodiscard]] unsigned int apply(operation operation, unsigned int left_operand_value);
+    [[nodiscard]] unsigned int apply(const operation operation, const unsigned int left_operand_value);
 };
 
 #endif
