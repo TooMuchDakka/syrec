@@ -3,6 +3,3 @@
 	url = https://github.com/cda-tum/qfr
 	branch = main
 	shallow = true
-[submodule "extern/CocoR-CPP"]
-	path = extern/CocoR-CPP
-	url = https://github.com/SSW-CocoR/CocoR-CPP
