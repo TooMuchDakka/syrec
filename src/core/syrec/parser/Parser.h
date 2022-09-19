@@ -492,7 +492,7 @@ struct expression_or_constant {
 	void AssignStatement(std::optional<Statement::ptr> &statement );
 	void SwapStatement(std::optional<Statement::ptr> &statement );
 	void Expression(expression_evaluation_result &user_defined_expression, unsigned int bitwidth, bool simplify_if_possible);
-	void Signal(signal_evaluation_result &signal_access, bool simplify_if_possible);
+	void Signal(signal_evaluation_result &signalAccess, bool simplifyIfPossible);
 	void BinaryExpression(expression_evaluation_result &user_defined_binary_expression, unsigned int bitwidth, bool simplify_if_possible);
 	void ShiftExpression(expression_evaluation_result &user_defined_shift_expression, unsigned int bitwidth, bool simplify_if_possible);
 	void UnaryExpression(expression_evaluation_result &unary_expression, unsigned int bitwidth, bool simplify_if_possible);

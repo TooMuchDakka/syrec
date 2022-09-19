@@ -769,111 +769,97 @@ void Parser::Expression(expression_evaluation_result &user_defined_expression, u
 		} else SynErr(64);
 }
 
-void Parser::Signal(signal_evaluation_result &signal_access, bool simplify_if_possible) {
-		std::optional<Variable::ptr> signal;	
-		VariableAccess::ptr declared_signal_access;
-		bool valid_signal_access = true;
+void Parser::Signal(signal_evaluation_result &signalAccess, bool simplifyIfPossible) {
+		std::optional<VariableAccess::ptr> accessedSignal;
+		const unsigned int defaultIndexExpressionBitwidth = 1u;
+		unsigned int indexExpressionBitwidth = defaultIndexExpressionBitwidth;
+		
 		// TODO: Using global zero_based indexing flag to initialize default value
-		std::size_t dimension_index = 0;
-		unsigned int index_expression_bitwidth = 1u;
+		std::size_t accessedDimensionIdx = 0;
 		
 		Expect(_ident);
-		const std::string signal_ident = convert_to_uniform_text_format(t->val);
-		if (check_ident_was_declared(signal_ident)) {
-		const auto symbol_table_entry = current_symbol_table_scope->get_variable(signal_ident).value();
-		if (std::holds_alternative<Variable::ptr>(symbol_table_entry)) {
-		signal.emplace(std::get<Variable::ptr>(symbol_table_entry));
-		declared_signal_access = std::make_shared<VariableAccess>(VariableAccess());
-		declared_signal_access->setVar(signal.value());
-		index_expression_bitwidth = signal.value()->bitwidth;
-		}
-		else {
-		valid_signal_access = false;
+		const std::string signalIdent = convert_to_uniform_text_format(t->val);
+		if (check_ident_was_declared(signalIdent)) {
+		const auto symbolTableEntryForSignal = current_symbol_table_scope->get_variable(signalIdent);
+		if (symbolTableEntryForSignal.has_value() && std::holds_alternative<Variable::ptr>(symbolTableEntryForSignal.value())) {
+		const VariableAccess::ptr container = std::make_shared<VariableAccess>(VariableAccess());
+		container->setVar(std::get<Variable::ptr>(symbolTableEntryForSignal.value()));
+		accessedSignal.emplace(container);
+		indexExpressionBitwidth = accessedSignal.value()->bitwidth();
 		}
 		}
-		else {
-		valid_signal_access = false;
-		}
+		bool isValidSignalAccess = accessedSignal.has_value();
+		bool indexExpressionsSemanticallyOk = isValidSignalAccess;
 		
 		while (la->kind == 18 /* "[" */) {
 			Get();
-			expression_evaluation_result index_expression;	
-			Expression(index_expression, index_expression_bitwidth, simplify_if_possible);
-			valid_signal_access &= index_expression.has_value();
-			if (signal.has_value() && index_expression.has_value()) {
-			const std::optional<unsigned int> &optional_dimension_access_value = get_value_if_expression_is_constant(index_expression);
+			expression_evaluation_result dimensionExpression; 
+			Expression(dimensionExpression, indexExpressionBitwidth, simplifyIfPossible);
+			indexExpressionsSemanticallyOk &= dimensionExpression.has_value();
 			
-			if (optional_dimension_access_value.has_value()) {
-			const unsigned int constant_dimension_access_value = optional_dimension_access_value.value();
+			if (indexExpressionsSemanticallyOk) {
+			const std::optional<unsigned int> &constantValueForAccessedDimension = get_value_if_expression_is_constant(dimensionExpression);
+			if (constantValueForAccessedDimension.has_value()) {
+			// TODO: Using global flag indicating zero_based indexing or not
+			indexExpressionsSemanticallyOk = range_check::isValidDimensionAccess(accessedSignal.value()->getVar(), constantValueForAccessedDimension.value(), true);
 			
-			// TODO: Using global zero_based indexing flag
-			if (!range_check::is_valid_dimension_access(signal.value(), dimension_index, constant_dimension_access_value, true)) {
-			valid_signal_access = false;
-			
-			// TODO: Using global zero_based indexing flag
-			const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_dimension_access_range(signal.value(), dimension_index, true).value();
+			if (!indexExpressionsSemanticallyOk) {
+			// TODO: Using global flag indicating zero_based indexing or not
+			const range_check::IndexAccessRangeConstraint constraintForCurrentDimension = range_check::getConstraintsForValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, true).value();
 			// TODO: GEN_ERROR
 			}
-			else {
-			declared_signal_access->indexes.emplace_back(index_expression.value().convert_to_expression(index_expression_bitwidth));
+			}
+			
+			if (indexExpressionsSemanticallyOk) {
+			accessedSignal.value()->indexes.emplace_back(dimensionExpression.value().convert_to_expression(indexExpressionBitwidth));
 			}
 			}
-			else {
-			declared_signal_access->indexes.emplace_back(index_expression.value().get_expression());
-			}
-			}
-			dimension_index++;
+			accessedDimensionIdx++;
 			
 			Expect(19 /* "]" */);
 		}
+		isValidSignalAccess = indexExpressionsSemanticallyOk;	
 		if (la->kind == 39 /* "." */) {
-			std::optional<Number::ptr> range_start, range_end;
-			bool defined_range = false;
+			std::optional<Number::ptr> bitRangeStart;
+			std::optional<Number::ptr> bitRangeEnd;
+			bool rangeExplicitlyDefined = false;
 			
 			Get();
-			Number(range_start, false);
+			Number(bitRangeStart, false);
 			if (la->kind == 40 /* ":" */) {
 				Get();
-				Number(range_end, false);
-				defined_range = true;	
+				Number(bitRangeEnd, false);
+				rangeExplicitlyDefined = true;	
 			}
-			valid_signal_access &= range_start.has_value() && (defined_range ? range_end.has_value() : true);
-			if (valid_signal_access) {
-			const Variable::ptr &accessed_variable = signal.value();
+			isValidSignalAccess &= bitRangeStart.has_value() && (rangeExplicitlyDefined ? bitRangeEnd.has_value() : true);
+			if (isValidSignalAccess) {
+			const std::pair<Number::ptr, Number::ptr> bitRange(bitRangeStart.value(), rangeExplicitlyDefined ? bitRangeEnd.value() : bitRangeStart.value());
+			const std::pair<std::size_t, std::size_t> bitRangeEvaluated(bitRange.first->evaluate({}), bitRange.second->evaluate({}));
 			
-			const bool is_bit_access = !range_end.has_value();
-			const std::pair<Number::ptr, Number::ptr> range(range_start.value(), is_bit_access ? range_start.value() : range_end.value());
-			const std::pair<std::size_t, std::size_t> range_values(range.first->evaluate({}), range.second->evaluate({}));
-			
-			if (is_bit_access) {
-			// TODO: Check bitwidth is within range [0, bitwidth - 1]
+			const Variable::ptr &accessedVariable = accessedSignal.value()->getVar();
+			if (rangeExplicitlyDefined) {
 			// TODO: Using global zero_based indexing flag
-			if (!range_check::is_valid_bit_access(accessed_variable, range_values.first, true)) {
-			valid_signal_access = false;
+			if (!range_check::isValidBitRangeAccess(accessedVariable, bitRangeEvaluated, true)){
+			isValidSignalAccess = false;
 			// TODO: GEN_ERROR
-			// TODO: Using global zero_based indexing flag
-			const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_bit_access_range(accessed_variable, true);
 			}
 			}
 			else {
-			// TODO: Check user defined range is within [0, bitwidth - 1]
-			// TODO: Using global zero_based indexing flag
-			if (!range_check::is_valid_range_access(accessed_variable, range_values, true)){
-			valid_signal_access = false;
+			// TODO: Using global zero_based indexing flag	
+			if (!range_check::isValidBitAccess(accessedVariable, bitRangeEvaluated.first, true)){
+			isValidSignalAccess = false;
 			// TODO: GEN_ERROR
-			// TODO: Using global zero_based indexing flag
-			const range_check::valid_index_access_range valid_dimension_access_range = range_check::get_valid_range_access_range(accessed_variable, true);
 			}
 			}
 			
-			if (valid_signal_access){
-			declared_signal_access->range.emplace(range);
+			if (isValidSignalAccess) {
+			accessedSignal.value()->range.emplace(bitRange);
 			}
 			}
 			
 		}
-		if (valid_signal_access) {
-		signal_access.emplace(declared_signal_access);
+		if (isValidSignalAccess) {
+		signalAccess.emplace(accessedSignal.value());
 		}
 		
 }
