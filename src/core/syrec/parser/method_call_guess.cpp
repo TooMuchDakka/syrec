@@ -7,8 +7,8 @@ namespace syrec {
 
         if (!methods_matching_signature.empty() && this->symbol_table_scope->contains(parameter)) {
             const auto parameter_symbol_table_entry = this->symbol_table_scope->get_variable(parameter).value();
-            if (std::holds_alternative<variable::ptr>(parameter_symbol_table_entry)) {
-                const variable::ptr parameter_entry = std::get<variable::ptr>(parameter_symbol_table_entry);
+            if (std::holds_alternative<Variable::ptr>(parameter_symbol_table_entry)) {
+                const Variable::ptr parameter_entry = std::get<Variable::ptr>(parameter_symbol_table_entry);
 
                 discard_guesses_with_less_parameters(this->formal_parameter_idx + 1);
                 discard_not_matching_alternatives(parameter_entry);
@@ -32,26 +32,26 @@ namespace syrec {
                 std::remove_if(
                     methods_matching_signature.begin(),
                     methods_matching_signature.end(),
-                        [num_formal_parameters](const module::ptr& module) { return module->parameters.size() < num_formal_parameters; }
+                        [num_formal_parameters](const Module::ptr& module) { return module->parameters.size() < num_formal_parameters; }
                 ),
                 methods_matching_signature.end());
     }
 
-    void method_call_guess::discard_not_matching_alternatives(const variable::ptr& actual_parameter) {
+    void method_call_guess::discard_not_matching_alternatives(const Variable::ptr& actual_parameter) {
         const std::size_t formal_parameter_idx = this->formal_parameter_idx;
         methods_matching_signature.erase(
                 std::remove_if(
                         methods_matching_signature.begin(),
                         methods_matching_signature.end(),
-                        [formal_parameter_idx, actual_parameter](const module::ptr& module) {
-                            const variable::ptr &formal_parameter = module->parameters.at(formal_parameter_idx);
+                        [formal_parameter_idx, actual_parameter](const Module::ptr& module) {
+                            const Variable::ptr &formal_parameter = module->parameters.at(formal_parameter_idx);
                             return !symbol_table::can_assign_to(formal_parameter, actual_parameter, false);
                         }),
                 methods_matching_signature.end());
     }
 
-    std::optional<module::ptr> method_call_guess::get_remaining_guess() const {
-        std::optional<module::ptr> matching_guess;
+    std::optional<Module::ptr> method_call_guess::get_remaining_guess() const {
+        std::optional<Module::ptr> matching_guess;
         if (methods_matching_signature.size() == 1) {
             matching_guess.emplace(methods_matching_signature.at(0));
         }

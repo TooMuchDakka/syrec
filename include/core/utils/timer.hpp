@@ -1,14 +1,8 @@
-/**
-* @file timer.hpp
-*
-* @brief A generic way for measuring time
-*/
-
-#ifndef TIMER_HPP
-#define TIMER_HPP
+#pragma once
 
 #include "core/properties.hpp"
 
+#include <cassert>
 #include <chrono>
 #include <iostream>
 #include <utility>
@@ -22,21 +16,21 @@ namespace syrec {
   * after the time was measured and is thus similar to the
   * reference_timer.
   */
-    struct properties_timer {
+    struct PropertiesTimer {
         /**
     * @brief Default constructor
     *
     * Available for delayed starting of the timer.
     */
-        properties_timer() = default;
+        PropertiesTimer() = default;
 
         /**
     * @brief Default constructor
     *
     * @param _statistics A smart pointer to a statistics properties object. Can be empty.
     */
-        explicit properties_timer(properties::ptr _statistics):
-            statistics(std::move(_statistics)) {}
+        explicit PropertiesTimer(Properties::ptr statistics):
+            statistics(std::move(statistics)) {}
 
         /**
     * @brief Saves the run-time to the \b runtime field of the statistics variable
@@ -50,7 +44,7 @@ namespace syrec {
         }
 
     private:
-        properties::ptr statistics;
+        Properties::ptr statistics;
     };
 
     /**
@@ -58,7 +52,7 @@ namespace syrec {
   */
 
     template<typename Outputter>
-    class timer {
+    class Timer {
     public:
         /**
     * @brief Constructor which does not start measuring the time
@@ -66,9 +60,7 @@ namespace syrec {
     * When delayed starting should be done (using start(const Outputter&)) this
     * constructor has to be used.
     */
-        timer():
-            started(false) {
-        }
+        Timer() = default;
 
         /**
     * @brief function which starts measuring the time
@@ -95,9 +87,7 @@ namespace syrec {
     private:
         decltype(std::chrono::steady_clock::now()) begin;
         Outputter                                  p; // NOTE: has to be copy
-        bool                                       started;
+        bool                                       started = false;
     };
 
 } // namespace syrec
-
-#endif

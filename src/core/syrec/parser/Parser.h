@@ -103,8 +103,8 @@ struct expression_or_constant {
 			explicit expression_or_constant(const expression::ptr &expression)
 			{
                 syrec::expression* referenced_expression = expression.get();
-                const numeric_expression* constant_expression = dynamic_cast<numeric_expression*>(referenced_expression);
-                if (nullptr != constant_expression && constant_expression->value->is_constant()) {
+                const NumericExpression* constant_expression = dynamic_cast<NumericExpression*>(referenced_expression);
+                if (nullptr != constant_expression && constant_expression->value->isConstant()) {
                     constant_value.emplace(constant_expression->value->evaluate({}));
 					variants.emplace<unsigned int>(constant_value.value());
                 }
@@ -133,8 +133,8 @@ struct expression_or_constant {
 
 			[[nodiscard]] expression::ptr convert_to_expression(const unsigned int bitwidth) const {
 				if (is_constant()) {
-					const number::ptr &constant_value_wrapper = std::make_shared<number>(get_constant_value());
-					return std::make_shared<numeric_expression>(constant_value_wrapper, bitwidth);
+					const Number::ptr &constant_value_wrapper = std::make_shared<syrec::Number>(get_constant_value());
+					return std::make_shared<NumericExpression>(constant_value_wrapper, bitwidth);
 				}
 				else {
 					return std::get<expression::ptr>(variants);	
@@ -146,15 +146,15 @@ struct expression_or_constant {
 			std::variant<expression::ptr, unsigned int> variants;
 	};
 
-	typedef std::optional<std::variant<variable_access::ptr, number::ptr>> signal_evaluation_result;
+	typedef std::optional<std::variant<VariableAccess::ptr, Number::ptr>> signal_evaluation_result;
 	typedef std::optional<expression_or_constant> expression_evaluation_result;
 
 	// Place declarations of objects referenced in this ATG
-	module::vec modules;
+	Module::vec modules;
 	parser_error_message_generator error_message_generator;
 	symbol_table::ptr current_symbol_table_scope;
 
-	number::loop_variable_mapping loop_variable_mapping_lookup;
+	Number::loop_variable_mapping loop_variable_mapping_lookup;
 
 	// This method will be called by the contructor if it exits.
 	// This support is specific to the C++ version of Coco/R.
@@ -293,13 +293,13 @@ struct expression_or_constant {
 		std::optional<unsigned int> mapping_result;
 		switch (operation) {
 			case syrec_operation::operation::add_assign:
-				mapping_result.emplace(assign_statement::add);
+				mapping_result.emplace(AssignStatement::Add);
 				break;
 			case syrec_operation::operation::minus_assign:
-				mapping_result.emplace(assign_statement::subtract);
+				mapping_result.emplace(AssignStatement::Subtract);
 				break;
 			case syrec_operation::operation::xor_assign:
-				mapping_result.emplace(assign_statement::exor);
+				mapping_result.emplace(AssignStatement::Exor);
 				break;
 			default:
 				// TODO: GEN_ERROR ?
@@ -312,13 +312,13 @@ struct expression_or_constant {
 		std::optional<unsigned int> mapping_result;
 		switch (operation) {
 			case syrec_operation::operation::increment_assign:
-				mapping_result.emplace(unary_statement::increment);
+				mapping_result.emplace(UnaryStatement::Increment);
 				break;
 			case syrec_operation::operation::decrement_assign:
-				mapping_result.emplace(unary_statement::decrement);
+				mapping_result.emplace(UnaryStatement::Decrement);
 				break;
 			case syrec_operation::operation::negate_assign:
-				mapping_result.emplace(unary_statement::invert);
+				mapping_result.emplace(UnaryStatement::Invert);
 				break;
 			default:
 				// TODO: GEN_ERROR ?
@@ -331,10 +331,10 @@ struct expression_or_constant {
 		std::optional<unsigned int> mapping_result;
 		switch (operation) {
 			case syrec_operation::operation::shift_left:
-				mapping_result.emplace(shift_expression::left);
+				mapping_result.emplace(ShiftExpression::Left);
 				break;
 			case syrec_operation::operation::shift_right:
-				mapping_result.emplace(shift_expression::right);
+				mapping_result.emplace(ShiftExpression::Right);
 				break;
 			default:
 				// TODO: GEN_ERROR ?
@@ -347,55 +347,55 @@ struct expression_or_constant {
 		std::optional<unsigned int> mapping_result;
 		switch (operation) {
 			case syrec_operation::operation::addition:
-				mapping_result.emplace(binary_expression::add);
+				mapping_result.emplace(BinaryExpression::Add);
 				break;
 			case syrec_operation::operation::subtraction:
-				mapping_result.emplace(binary_expression::subtract);
+				mapping_result.emplace(BinaryExpression::Subtract);
 				break;
 				case syrec_operation::operation::multiplication:
-				mapping_result.emplace(binary_expression::multiply);
+				mapping_result.emplace(BinaryExpression::Multiply);
 				break;		
 			case syrec_operation::operation::division:
-				mapping_result.emplace(binary_expression::divide);
+				mapping_result.emplace(BinaryExpression::Divide);
 				break;			
 			case syrec_operation::operation::modulo:
-				mapping_result.emplace(binary_expression::modulo);
+				mapping_result.emplace(BinaryExpression::Modulo);
 				break;		
 			case syrec_operation::operation::upper_bits_multiplication:
-				mapping_result.emplace(binary_expression::frac_divide);
+				mapping_result.emplace(BinaryExpression::FracDivide);
 				break;		
 			case syrec_operation::operation::bitwise_xor:
-				mapping_result.emplace(binary_expression::exor);
+				mapping_result.emplace(BinaryExpression::Exor);
 				break;		
 			case syrec_operation::operation::logical_and:
-				mapping_result.emplace(binary_expression::logical_and);
+				mapping_result.emplace(BinaryExpression::LogicalAnd);
 				break;		
 			case syrec_operation::operation::logical_or:
-				mapping_result.emplace(binary_expression::logical_or);
+				mapping_result.emplace(BinaryExpression::LogicalOr);
 				break;		
 			case syrec_operation::operation::bitwise_and:
-				mapping_result.emplace(binary_expression::bitwise_and);
+				mapping_result.emplace(BinaryExpression::BitwiseAnd);
 				break;	
 			case syrec_operation::operation::bitwise_or:
-				mapping_result.emplace(binary_expression::bitwise_or);
+				mapping_result.emplace(BinaryExpression::BitwiseOr);
 				break;	
 			case syrec_operation::operation::less_than:
-				mapping_result.emplace(binary_expression::less_than);
+				mapping_result.emplace(BinaryExpression::LessThan);
 				break;	
 			case syrec_operation::operation::greater_than:
-				mapping_result.emplace(binary_expression::greater_than);
+				mapping_result.emplace(BinaryExpression::GreaterThan);
 				break;	
 			case syrec_operation::operation::equals:
-				mapping_result.emplace(binary_expression::equals);
+				mapping_result.emplace(BinaryExpression::Equals);
 				break;		
 			case syrec_operation::operation::not_equals:
-				mapping_result.emplace(binary_expression::not_equals);
+				mapping_result.emplace(BinaryExpression::NotEquals);
 				break;		
 			case syrec_operation::operation::less_equals:
-				mapping_result.emplace(binary_expression::less_equals);
+				mapping_result.emplace(BinaryExpression::LessEquals);
 				break;		
 			case syrec_operation::operation::greater_equals:
-				mapping_result.emplace(binary_expression::greater_equals);
+				mapping_result.emplace(BinaryExpression::GreaterEquals);
 				break;
 			default:
 				// TODO: GEN_ERROR ?
@@ -421,7 +421,7 @@ struct expression_or_constant {
 	}
 
 	// TODO: Generate error/s in case of exceptions
-	[[nodiscard]] std::optional<unsigned int> apply_unary_operation(const syrec_operation::operation operation, const number::ptr &left_operand) const {
+	[[nodiscard]] std::optional<unsigned int> apply_unary_operation(const syrec_operation::operation operation, const Number::ptr &left_operand) const {
 		std::optional<unsigned int> operation_result;
 		try {
 			operation_result.emplace(syrec_operation::apply(operation, left_operand->evaluate(loop_variable_mapping_lookup)));
@@ -450,10 +450,10 @@ struct expression_or_constant {
         return operation_result;
 	}
 
-	[[nodiscard]] std::optional<unsigned int> evaluate_number_container_to_constant(const number::ptr &number_container) {
+	[[nodiscard]] std::optional<unsigned int> evaluate_number_container_to_constant(const Number::ptr &number_container) const {
 		std::optional<unsigned int> value_of_number_container;
-		if (number_container->is_loop_variable()) {
-			const std::string &loop_variable_name = number_container->variable_name();
+		if (number_container->isLoopVariable()) {
+			const std::string &loop_variable_name = number_container->variableName();
 			if (loop_variable_mapping_lookup.find(loop_variable_name) == loop_variable_mapping_lookup.end()) {
 				// TODO: GEN_ERROR
 			}
@@ -475,22 +475,22 @@ struct expression_or_constant {
 	~Parser();
 	void SemErr(const wchar_t* msg);
 
-	void Number(std::optional<number::ptr> &parsed_number, bool simplify_if_possible );
+	void Number(std::optional<Number::ptr> &parsed_number, bool simplify_if_possible );
 	void SyReC();
-	void Module(std::optional<module::ptr> &parsed_module	);
-	void ParameterList(bool &is_valid_module_definition, const module::ptr &module);
-	void SignalList(std::optional<std::vector<variable::ptr>> &signals );
-	void StatementList(statement::vec &statements );
-	void Parameter(std::optional<variable::ptr> &parameter );
-	void SignalDeclaration(variable::types variable_type, std::optional<variable::ptr> &declared_signal );
-	void Statement(std::optional<statement::ptr> &user_defined_statement );
-	void CallStatement(std::optional<statement::ptr> &statement );
-	void ForStatement(std::optional<statement::ptr> &statement );
-	void IfStatement(std::optional<statement::ptr> &statement );
-	void UnaryStatement(std::optional<statement::ptr> &statement );
-	void SkipStatement(std::optional<statement::ptr> &statement );
-	void AssignStatement(std::optional<statement::ptr> &statement );
-	void SwapStatement(std::optional<statement::ptr> &statement );
+	void Module(std::optional<Module::ptr> &parsed_module	);
+	void ParameterList(bool &is_valid_module_definition, const Module::ptr &module);
+	void SignalList(std::optional<std::vector<Variable::ptr>> &signals );
+	void StatementList(Statement::vec &statements );
+	void Parameter(std::optional<Variable::ptr> &parameter );
+	void SignalDeclaration(Variable::Types variable_type, std::optional<Variable::ptr> &declared_signal );
+	void Statement(std::optional<Statement::ptr> &user_defined_statement );
+	void CallStatement(std::optional<Statement::ptr> &statement );
+	void ForStatement(std::optional<Statement::ptr> &statement );
+	void IfStatement(std::optional<Statement::ptr> &statement );
+	void UnaryStatement(std::optional<Statement::ptr> &statement );
+	void SkipStatement(std::optional<Statement::ptr> &statement );
+	void AssignStatement(std::optional<Statement::ptr> &statement );
+	void SwapStatement(std::optional<Statement::ptr> &statement );
 	void Expression(expression_evaluation_result &user_defined_expression, unsigned int bitwidth, bool simplify_if_possible);
 	void Signal(signal_evaluation_result &signal_access, bool simplify_if_possible);
 	void BinaryExpression(expression_evaluation_result &user_defined_binary_expression, unsigned int bitwidth, bool simplify_if_possible);

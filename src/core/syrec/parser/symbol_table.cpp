@@ -7,7 +7,7 @@ namespace syrec {
         return this->locals.find(literal) != this->locals.end() || (nullptr != outer && outer->contains(literal));
     }
 
-    bool                              symbol_table::contains(const module::ptr& module) const {
+    bool                              symbol_table::contains(const Module::ptr& module) const {
         if (nullptr == module) {
             return false;
         }
@@ -15,7 +15,7 @@ namespace syrec {
         bool       found_module_matching_signature = false;
         const auto module_search_result = this->modules.find(module->name);
         if (module_search_result != this->modules.end()) {
-            const std::vector<module::ptr> modules_with_matching_name = module_search_result->second;
+            const std::vector<Module::ptr> modules_with_matching_name = module_search_result->second;
 
             // TODO: Could replace with std::find_if(...)
             for (size_t i = 0; i < modules_with_matching_name.size() && !found_module_matching_signature; i++) {
@@ -26,8 +26,8 @@ namespace syrec {
         return found_module_matching_signature || (nullptr != outer && outer->contains(module));
     }
 
-    [[nodiscard]] std::optional<std::variant<variable::ptr, number::ptr>> symbol_table::get_variable(const std::string& literal) const {
-        std::optional<std::variant<variable::ptr, number::ptr>> found_entry;
+    [[nodiscard]] std::optional<std::variant<Variable::ptr, Number::ptr>> symbol_table::get_variable(const std::string& literal) const {
+        std::optional<std::variant<Variable::ptr, Number::ptr>> found_entry;
 
         if (this->locals.find(literal) != this->locals.end()) {
             found_entry.emplace(this->locals.find(literal)->second);
@@ -38,7 +38,7 @@ namespace syrec {
         return found_entry;
     }
 
-    [[nodiscard]] std::optional<std::vector<module::ptr>> symbol_table::get_matching_modules_for_name(const std::string& module_name) const {
+    [[nodiscard]] std::optional<std::vector<Module::ptr>> symbol_table::get_matching_modules_for_name(const std::string& module_name) const {
         /*
         std::optional<module::ptr> found_module;
 
@@ -60,7 +60,7 @@ namespace syrec {
             return found_module;
         }
         */
-        std::optional<std::vector<module::ptr>> found_modules;
+        std::optional<std::vector<Module::ptr>> found_modules;
         if (this->modules.find(module_name) != this->modules.end()) {
             found_modules.emplace(this->modules.find(module_name)->second);
         } else if (nullptr != outer) {
@@ -69,38 +69,38 @@ namespace syrec {
         return found_modules;
     }
 
-    bool                              symbol_table::add_entry(const variable::ptr& local_entry) {
+    bool                              symbol_table::add_entry(const Variable::ptr& local_entry) {
         if (nullptr == local_entry || contains(local_entry->name)) {
             return false;
         }
 
-        const std::variant<variable::ptr, number::ptr> local_entry_value (local_entry);
+        const std::variant<Variable::ptr, Number::ptr> local_entry_value (local_entry);
         const std::pair new_local_entry(local_entry->name, local_entry_value);
         locals.insert(new_local_entry);
         return true;
     }
 
-    bool symbol_table::add_entry(const number::ptr& local_entry) {
-        if (nullptr == local_entry || !local_entry->is_loop_variable() || contains(local_entry->variable_name())) {
+    bool symbol_table::add_entry(const Number::ptr& local_entry) {
+        if (nullptr == local_entry || !local_entry->isLoopVariable() || contains(local_entry->variableName())) {
             return false;
         }
 
-        const std::variant<variable::ptr, number::ptr> local_entry_value(local_entry);
-        const std::pair                                new_local_entry(local_entry->variable_name(), local_entry_value);
+        const std::variant<Variable::ptr, Number::ptr> local_entry_value(local_entry);
+        const std::pair                                new_local_entry(local_entry->variableName(), local_entry_value);
         locals.insert(new_local_entry);
         return true;
     }
 
-    bool                              symbol_table::add_entry(const module::ptr& module) {
+    bool                              symbol_table::add_entry(const Module::ptr& module) {
         if (nullptr == module) {
             return false;
         }
 
         if (!contains(module)) {
-            modules.insert(std::pair<std::string, std::vector<std::shared_ptr<syrec::module>>>(module->name, std::vector<module::ptr>()));
+            modules.insert(std::pair<std::string, std::vector<std::shared_ptr<Module>>>(module->name, std::vector<Module::ptr>()));
         }
         
-        std::vector<module::ptr> &modules_for_name = modules.find(module->name)->second;
+        std::vector<Module::ptr> &modules_for_name = modules.find(module->name)->second;
         modules_for_name.emplace_back(module);
         return true;
     }
@@ -118,18 +118,18 @@ namespace syrec {
         } 
     }
 
-    [[nodiscard]] bool symbol_table::do_module_signatures_match(const module::ptr& module, const module::ptr& other_module) {
+    [[nodiscard]] bool symbol_table::do_module_signatures_match(const Module::ptr& module, const Module::ptr& other_module) {
         bool signatures_match = module->parameters.size() == other_module->parameters.size();
         for (size_t param_idx = 0; param_idx < module->parameters.size() && signatures_match; param_idx++) {
-            const variable::ptr &parameter_first_module = module->parameters.at(param_idx);
-            const variable::ptr &parameter_other_module = other_module->parameters.at(param_idx);
+            const Variable::ptr &parameter_first_module = module->parameters.at(param_idx);
+            const Variable::ptr &parameter_other_module = other_module->parameters.at(param_idx);
             signatures_match                             = parameter_first_module->name == parameter_other_module->name
                 && can_assign_to(parameter_first_module, parameter_other_module, true);
         }
         return signatures_match;
     }
     
-    [[nodiscard]] bool symbol_table::can_assign_to(const variable::ptr& formal_parameter, const variable::ptr& actual_parameter, const bool parameter_types_must_match) {
+    [[nodiscard]] bool symbol_table::can_assign_to(const Variable::ptr& formal_parameter, const Variable::ptr& actual_parameter, const bool parameter_types_must_match) {
         return (parameter_types_must_match ? formal_parameter->type == actual_parameter->type : true) 
             && formal_parameter->dimensions == actual_parameter->dimensions
             && formal_parameter->bitwidth == actual_parameter->bitwidth;

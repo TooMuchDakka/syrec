@@ -16,7 +16,7 @@ namespace syrec {
 
         explicit method_call_guess(const symbol_table::ptr& symbol_table_scope, const std::string &method_ident):
             methods_matching_signature({}), symbol_table_scope(symbol_table_scope) {
-            const std::optional<std::vector<module::ptr>> &matching_modules = this->symbol_table_scope->get_matching_modules_for_name(method_ident);
+            const std::optional<std::vector<Module::ptr>> &matching_modules = this->symbol_table_scope->get_matching_modules_for_name(method_ident);
             if (matching_modules.has_value()) {
                 methods_matching_signature = matching_modules.value();
             }
@@ -31,15 +31,15 @@ namespace syrec {
          */
         bool refine(const std::string& parameter);
         bool matches_some_options() const;
-        [[nodiscard]] std::optional<module::ptr> get_remaining_guess() const;
+        [[nodiscard]] std::optional<Module::ptr> get_remaining_guess() const;
 
     private:
-        std::vector<module::ptr> methods_matching_signature;
+        std::vector<Module::ptr> methods_matching_signature;
         const symbol_table::ptr& symbol_table_scope;
         std::size_t              formal_parameter_idx;
 
         void discard_guesses_with_less_parameters(const std::size_t &num_formal_parameters);
-        void discard_not_matching_alternatives(const variable::ptr& actual_parameter);
+        void discard_not_matching_alternatives(const Variable::ptr& actual_parameter);
     };
 }
 

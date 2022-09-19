@@ -1,10 +1,4 @@
-/**
- * @file module.hpp
- *
- * @brief SyReC module data type
- */
-#ifndef MODULE_HPP
-#define MODULE_HPP
+#pragma once
 
 #include "core/syrec/statement.hpp"
 #include "core/syrec/variable.hpp"
@@ -12,28 +6,27 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace syrec {
 
-    class statement;
-
     /**
      * @brief SyReC module data type
      *
-     * This class represents a SyReC module. It containes of a name(), parameters(),
+     * This class represents a SyReC module. It consists of a name(), parameters(),
      * local variables(), and a list of statements().
      */
-    struct module {
+    struct Module {
         /**
        * @brief Smart pointer
        */
-        typedef std::shared_ptr<module> ptr;
+        using ptr = std::shared_ptr<Module>;
 
         /**
        * @brief Vector of smart pointers
        */
-        typedef std::vector<ptr> vec;
+        using vec = std::vector<ptr>;
 
         /**
        * @brief Constructor
@@ -42,15 +35,15 @@ namespace syrec {
        *
        * @param name Name of the module
        */
-        explicit module(const std::string& name):
-            name(name) {}
+        explicit Module(std::string name):
+            name(std::move(name)) {}
 
         /**
        * @brief Adds a parameter to the module
        *
        * @param parameter Parameter
        */
-        void add_parameter(const variable::ptr& parameter) {
+        void addParameter(const Variable::ptr& parameter) {
             parameters.emplace_back(parameter);
         }
 
@@ -63,8 +56,8 @@ namespace syrec {
        * Otherwise, using the \ref variable::type() "type" it can
        * be determined, whether it is a parameter of a variable.
        */
-        [[nodiscard]] variable::ptr find_parameter_or_variable(const std::string& n) const {
-            for (variable::ptr var: parameters) {
+        [[nodiscard]] Variable::ptr findParameterOrVariable(const std::string& n) const {
+            for (Variable::ptr var: parameters) {
                 if (var->name == n) {
                     return var;
                 }
@@ -78,16 +71,14 @@ namespace syrec {
        *
        * @param statement Statement
        */
-        void add_statement(const std::shared_ptr<statement>& statement) {
+        void addStatement(const std::shared_ptr<Statement>& statement) {
             statements.emplace_back(statement);
         }
 
         std::string    name{};
-        variable::vec  parameters{};
-        variable::vec  variables{};
-        statement::vec statements{};
+        Variable::vec  parameters{};
+        Variable::vec  variables{};
+        Statement::vec statements{};
     };
 
 } // namespace syrec
-
-#endif /* MODULE_HPP */

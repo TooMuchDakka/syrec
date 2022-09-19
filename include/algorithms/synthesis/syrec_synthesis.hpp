@@ -1,11 +1,4 @@
-/**
-* @file syrec_synthesis.hpp
-*
-* @brief SyReC Synthesis
-*/
-
-#ifndef SYREC_SYNTHESIS_HPP
-#define SYREC_SYNTHESIS_HPP
+#pragma once
 
 #include "core/circuit.hpp"
 #include "core/gate.hpp"
@@ -20,21 +13,18 @@
 #include <stack>
 
 namespace syrec::internal {
-    struct node_properties {
-        node_properties() = default;
+    struct NodeProperties {
+        NodeProperties() = default;
 
         unsigned                 control{};
-        gate::line_container     controls;
-        std::shared_ptr<circuit> circ;
+        Gate::line_container     controls;
+        std::shared_ptr<Circuit> circ;
     };
 
-    typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
-                                  boost::property<boost::vertex_name_t, node_properties>>
-            cct;
+    using cct      = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS, boost::property<boost::vertex_name_t, NodeProperties>>;
+    using cct_node = boost::graph_traits<cct>::vertex_descriptor;
 
-    typedef boost::graph_traits<cct>::vertex_descriptor cct_node;
-
-    struct cct_manager {
+    struct CctManager {
         cct      tree;
         cct_node current;
         cct_node root;
@@ -44,115 +34,117 @@ namespace syrec::internal {
 namespace syrec {
     using namespace internal;
 
-    class standard_syrec_synthesizer {
+    class SyrecSynthesis {
     public:
-        std::stack<unsigned>               exp_opp;
-        std::stack<std::vector<unsigned>>  exp_lhss, exp_rhss;
-        bool                               sub_flag = false;
-        std::vector<unsigned>              op_vec, assign_op_vector, exp_op_vector;
-        std::vector<std::vector<unsigned>> exp_lhs_vector, exp_rhs_vector;
+        std::stack<unsigned>               expOpp;
+        std::stack<std::vector<unsigned>>  expLhss;
+        std::stack<std::vector<unsigned>>  expRhss;
+        bool                               subFlag = false;
+        std::vector<unsigned>              opVec;
+        std::vector<unsigned>              assignOpVector;
+        std::vector<unsigned>              expOpVector;
+        std::vector<std::vector<unsigned>> expLhsVector;
+        std::vector<std::vector<unsigned>> expRhsVector;
 
-        typedef std::map<variable::ptr, unsigned> var_lines_map;
+        using var_lines_map = std::map<Variable::ptr, unsigned int>;
 
-        standard_syrec_synthesizer(circuit& circ, const program& prog);
+        explicit SyrecSynthesis(Circuit& circ);
+        virtual ~SyrecSynthesis() = default;
 
-        virtual ~standard_syrec_synthesizer() = default;
-
-        virtual void add_variables(circuit& circ, const variable::vec& variables);
-        virtual bool on_module(const module::ptr&);
-        virtual bool on_statement(const statement::ptr& statement);
-        virtual bool on_expression(const expression::ptr& expression, std::vector<unsigned>& lines, std::vector<unsigned>& lhs_stat, unsigned op);
-        virtual bool op_rhs_lhs_expression(const expression::ptr& expression, std::vector<unsigned>& v);
-        virtual bool full_statement(const statement::ptr& statement);
-        virtual bool flow(const expression::ptr& expression, std::vector<unsigned>& v);
-        virtual void set_main_module(const module::ptr& main_module);
-        virtual bool solver(const std::vector<unsigned>& stat_lhs, unsigned stat_op, const std::vector<unsigned>& exp_lhs, unsigned exp_op, const std::vector<unsigned>& exp_rhs);
+        void addVariables(Circuit& circ, const Variable::vec& variables);
+        void setMainModule(const Module::ptr& mainModule);
 
     protected:
-        virtual bool on_statement(const swap_statement& statement);
-        virtual bool on_statement(const unary_statement& statement);
-        virtual bool on_statement(const assign_statement& statement);
-        virtual bool on_statement(const if_statement& statement);
-        virtual bool on_statement(const for_statement& statement);
-        virtual bool on_statement(const call_statement& statement);
-        virtual bool on_statement(const uncall_statement& statement);
-        virtual bool on_statement(const skip_statement& statement);
-        virtual bool op_rhs_lhs_expression(const variable_expression& expression, std::vector<unsigned>& v);
-        virtual bool op_rhs_lhs_expression(const binary_expression& expression, std::vector<unsigned>& v);
-        virtual bool full_statement(const assign_statement& statement);
+        virtual bool processStatement(const Statement::ptr& statement) = 0;
 
-        // expressions
-        virtual bool on_expression(const numeric_expression& expression, std::vector<unsigned>& lines);
-        virtual bool on_expression(const variable_expression& expression, std::vector<unsigned>& lines);
-        virtual bool on_expression(const binary_expression& expression, std::vector<unsigned>& lines, std::vector<unsigned>& lhs_stat, unsigned op);
-        virtual bool on_expression(const shift_expression& expression, std::vector<unsigned>& lines, std::vector<unsigned>& lhs_stat, unsigned op);
+        virtual bool onModule(const Module::ptr&);
 
-        virtual bool flow(const variable_expression& expression, std::vector<unsigned>& v);
-        virtual bool flow(const binary_expression& expression, std::vector<unsigned>& v);
+        virtual bool opRhsLhsExpression([[maybe_unused]] const expression::ptr& expression, [[maybe_unused]] std::vector<unsigned>& v);
+        virtual bool opRhsLhsExpression([[maybe_unused]] const VariableExpression& expression, [[maybe_unused]] std::vector<unsigned>& v);
+        virtual bool opRhsLhsExpression([[maybe_unused]] const BinaryExpression& expression, [[maybe_unused]] std::vector<unsigned>& v);
+
+        virtual bool              onStatement(const Statement::ptr& statement);
+        virtual bool              onStatement(const AssignStatement& statement);
+        virtual bool              onStatement(const IfStatement& statement);
+        virtual bool              onStatement(const ForStatement& statement);
+        virtual bool              onStatement(const CallStatement& statement);
+        virtual bool              onStatement(const UncallStatement& statement);
+        bool                      onStatement(const SwapStatement& statement);
+        bool                      onStatement(const UnaryStatement& statement);
+        [[nodiscard]] static bool onStatement(const SkipStatement& statement);
+
+        virtual void assignAdd(bool& status, std::vector<unsigned>& lhs, std::vector<unsigned>& rhs, [[maybe_unused]] const unsigned& op) = 0;
+
+        virtual void assignSubtract(bool& status, std::vector<unsigned>& lhs, std::vector<unsigned>& rhs, [[maybe_unused]] const unsigned& op) = 0;
+        virtual void assignExor(bool& status, std::vector<unsigned>& lhs, std::vector<unsigned>& rhs, [[maybe_unused]] const unsigned& op)     = 0;
+
+        virtual bool onExpression(const expression::ptr& expression, std::vector<unsigned>& lines, std::vector<unsigned> const& lhsStat, unsigned op);
+        virtual bool onExpression(const BinaryExpression& expression, std::vector<unsigned>& lines, std::vector<unsigned> const& lhsStat, unsigned op);
+        virtual bool onExpression(const ShiftExpression& expression, std::vector<unsigned>& lines, std::vector<unsigned> const& lhsStat, unsigned op);
+        virtual bool onExpression(const NumericExpression& expression, std::vector<unsigned>& lines);
+        virtual bool onExpression(const VariableExpression& expression, std::vector<unsigned>& lines);
+
+        virtual void expAdd([[maybe_unused]] const unsigned& bitwidth, std::vector<unsigned>& lines, const std::vector<unsigned>& lhs, const std::vector<unsigned>& rhs) = 0;
+
+        virtual void expSubtract([[maybe_unused]] const unsigned& bitwidth, std::vector<unsigned>& lines, const std::vector<unsigned>& lhs, const std::vector<unsigned>& rhs) = 0;
+
+        virtual void expExor([[maybe_unused]] const unsigned& bitwidth, std::vector<unsigned>& lines, const std::vector<unsigned>& lhs, const std::vector<unsigned>& rhs) = 0;
 
         // unary operations
-        virtual bool bitwise_negation(const std::vector<unsigned>& dest); // ~
-        virtual bool decrement(const std::vector<unsigned>& dest);        // --
-        virtual bool increment(const std::vector<unsigned>& dest);        // ++
+        bool bitwiseNegation(const std::vector<unsigned>& dest); // ~
+        bool decrement(const std::vector<unsigned>& dest);       // --
+        bool increment(const std::vector<unsigned>& dest);       // ++
 
         // binary operations
-        virtual bool bitwise_and(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2); // &
-        virtual bool bitwise_cnot(const std::vector<unsigned>& dest, const std::vector<unsigned>& src);                                    // ^=
-        virtual bool bitwise_or(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);  // &
-        virtual bool conjunction(unsigned dest, unsigned src1, unsigned src2);                                                             // &&// -=
-        virtual bool decrease_with_carry(const std::vector<unsigned>& dest, const std::vector<unsigned>& src, unsigned carry);
-        virtual bool disjunction(unsigned dest, unsigned src1, unsigned src2);                                                          // ||
-        virtual bool division(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2); // /
-        virtual bool equals(unsigned dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);                       // =
-        virtual bool greater_equals(unsigned dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);               // >
-        virtual bool greater_than(unsigned dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);                 // >// +=
-        virtual bool increase_with_carry(const std::vector<unsigned>& dest, const std::vector<unsigned>& src, unsigned carry);
-        virtual bool less_equals(unsigned dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);                        // <=
-        virtual bool less_than(unsigned dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);                          // <
-        virtual bool modulo(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);         // %
-        virtual bool multiplication(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2); // *
-        virtual bool not_equals(unsigned dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);                         // !=
-        virtual void swap(const std::vector<unsigned>& dest1, const std::vector<unsigned>& dest2);                                            // <=>
-        virtual bool check_repeats();
+        bool         bitwiseAnd(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2); // &
+        bool         bitwiseCnot(const std::vector<unsigned>& dest, const std::vector<unsigned>& src);                                    // ^=
+        bool         bitwiseOr(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);  // &
+        bool         conjunction(unsigned dest, unsigned src1, unsigned src2);                                                            // &&// -=
+        bool         decreaseWithCarry(const std::vector<unsigned>& dest, const std::vector<unsigned>& src, unsigned carry);
+        bool         disjunction(unsigned dest, unsigned src1, unsigned src2);                                                          // ||
+        bool         division(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2); // /
+        bool         equals(unsigned dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);                       // =
+        bool         greaterEquals(unsigned dest, const std::vector<unsigned>& srcTwo, const std::vector<unsigned>& srcOne);            // >
+        bool         greaterThan(unsigned dest, const std::vector<unsigned>& src2, const std::vector<unsigned>& src1);                  // >// +=
+        bool         increaseWithCarry(const std::vector<unsigned>& dest, const std::vector<unsigned>& src, unsigned carry);
+        bool         lessEquals(unsigned dest, const std::vector<unsigned>& src2, const std::vector<unsigned>& src1);                         // <=
+        bool         lessThan(unsigned dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);                           // <
+        bool         modulo(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);         // %
+        bool         multiplication(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2); // *
+        bool         notEquals(unsigned dest, const std::vector<unsigned>& src1, const std::vector<unsigned>& src2);                          // !=
+        void         swap(const std::vector<unsigned>& dest1, const std::vector<unsigned>& dest2);                                            // <=>
+        bool         decrease(const std::vector<unsigned>& rhs, const std::vector<unsigned>& lhs);
+        bool         increase(const std::vector<unsigned>& rhs, const std::vector<unsigned>& lhs);
+        virtual bool expressionOpInverse([[maybe_unused]] unsigned op, [[maybe_unused]] const std::vector<unsigned>& expLhs, [[maybe_unused]] const std::vector<unsigned>& expRhs);
+        bool         checkRepeats();
 
-        virtual bool decrease_new(const std::vector<unsigned>& rhs, const std::vector<unsigned>& lhs);
-        virtual bool decrease_new_assign(const std::vector<unsigned>& rhs, const std::vector<unsigned>& lhs);
-        virtual bool increase_new(const std::vector<unsigned>& rhs, const std::vector<unsigned>& lhs);
-        virtual bool expression_op_inverse(unsigned op, const std::vector<unsigned>& exp_lhs, const std::vector<unsigned>& exp_rhs);
-        virtual bool expression_single_op(unsigned op, const std::vector<unsigned>& exp_lhs, const std::vector<unsigned>& exp_rhs);
-        virtual bool exp_evaluate(std::vector<unsigned>& lines, unsigned op, const std::vector<unsigned>& lhs, const std::vector<unsigned>& rhs);
         // shift operations
-        virtual void left_shift(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, unsigned src2);  // <<
-        virtual void right_shift(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, unsigned src2); // >>
+        void leftShift(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, unsigned src2);  // <<
+        void rightShift(const std::vector<unsigned>& dest, const std::vector<unsigned>& src1, unsigned src2); // >>
 
-        // efficient controls
-        virtual void add_active_control(unsigned);
-        virtual void remove_active_control(unsigned);
+        void addActiveControl(unsigned);
+        void removeActiveControl(unsigned);
 
-        virtual bool assemble_circuit(const cct_node&);
+        bool assembleCircuit(const cct_node&);
 
-        cct_manager cct_man;
+        CctManager cctMan;
 
-        virtual void add_variable(circuit& circ, const std::vector<unsigned>& dimensions, const variable::ptr& var, constant _constant, bool _garbage, const std::string& arraystr);
-        virtual void get_variables(const variable_access::ptr& var, std::vector<unsigned>& lines);
+        void addVariable(Circuit& circ, const std::vector<unsigned>& dimensions, const Variable::ptr& var, constant constant, bool garbage, const std::string& arraystr);
+        void getVariables(const VariableAccess::ptr& var, std::vector<unsigned>& lines);
 
-        virtual unsigned get_constant_line(bool value);
-        virtual void     get_constant_lines(unsigned bitwidth, unsigned value, std::vector<unsigned>& lines);
+        unsigned getConstantLine(bool value);
+        void     getConstantLines(unsigned bitwidth, unsigned value, std::vector<unsigned>& lines);
+
+        static bool synthesize(SyrecSynthesis* synthesizer, Circuit& circ, const program& program, const Properties::ptr& settings, const Properties::ptr& statistics);
+
+        std::stack<Statement::ptr>    stmts;
+        Circuit&                      circ;
+        Number::loop_variable_mapping loopMap;
+        std::stack<Module::ptr>       modules;
 
     private:
-        circuit&                              _circ;
-        std::stack<statement::ptr>            _stmts;
-        var_lines_map                         _var_lines;
-        std::map<bool, std::vector<unsigned>> free_const_lines_map;
-        number::loop_variable_mapping         loop_map;
-
-        std::stack<module::ptr> modules;
+        var_lines_map                         varLines;
+        std::map<bool, std::vector<unsigned>> freeConstLinesMap;
     };
 
-    /**
-    * @brief SyReC Synthesis
-    */
-    bool syrec_synthesis(circuit& circ, const program& program, const properties::ptr& settings = std::make_shared<properties>(), const properties::ptr& statistics = std::make_shared<properties>());
 } // namespace syrec
-
-#endif /* SYREC_SYNTHESIS_HPP */
