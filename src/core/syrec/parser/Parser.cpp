@@ -648,30 +648,39 @@ void Parser::IfStatement(std::optional<Statement::ptr> &statement ) {
 }
 
 void Parser::UnaryStatement(std::optional<Statement::ptr> &statement ) {
-		signal_evaluation_result unary_stmt_operand;
-		std::optional<syrec_operation::operation> unary_operation;	
+		SignalEvaluationResult unaryStmtOperand;
+		std::optional<syrec_operation::operation> unaryOperation;	
 		
 		if (la->kind == 33 /* "~" */) {
 			Get();
-			unary_operation.emplace(syrec_operation::operation::negate_assign);	
+			unaryOperation.emplace(syrec_operation::operation::negate_assign);	
 		} else if (la->kind == 34 /* "++" */) {
 			Get();
-			unary_operation.emplace(syrec_operation::operation::increment_assign);	
+			unaryOperation.emplace(syrec_operation::operation::increment_assign);	
 		} else if (la->kind == 35 /* "--" */) {
 			Get();
-			unary_operation.emplace(syrec_operation::operation::decrement_assign);	
+			unaryOperation.emplace(syrec_operation::operation::decrement_assign);	
 		} else SynErr(62);
 		Expect(24 /* "=" */);
-		Signal(unary_stmt_operand, false);
-		if (!unary_operation.has_value() || !unary_stmt_operand.has_value() || nullptr == std::get<VariableAccess::ptr>(unary_stmt_operand.value())) {
+		Signal(unaryStmtOperand, false);
+		bool allSemanticChecksOk = true;
+		if (!unaryOperation.has_value()){
+		allSemanticChecksOk = false;
+		// TODO: GEN_ERROR Expected a valid unary operand
+		}
+		if (unaryStmtOperand.isValid() && !unaryStmtOperand.isVariableAccess()) {
+		allSemanticChecksOk = false;
+		// TODO: GEN_ERROR Operand can only be variable access
+		}
+		
+		const std::optional<unsigned int> mappedOperation = map_operation_to_unary_operation(unaryOperation.value());
+		allSemanticChecksOk &= mappedOperation.has_value();
+		if (!allSemanticChecksOk) {
 		return;
 		}
 		
-		const VariableAccess::ptr unary_operand_variable = std::get<VariableAccess::ptr>(unary_stmt_operand.value());
-		const std::optional<unsigned int> mapped_operation = map_operation_to_unary_operation(unary_operation.value());
-		if (mapped_operation.has_value()) {
-		statement.emplace(std::make_shared<syrec::UnaryStatement>(syrec::UnaryStatement(mapped_operation.value(), unary_operand_variable)));
-		}
+		const VariableAccess::ptr unaryOperandAsVarAccess = unaryStmtOperand.getAsVariableAccess().value();
+		statement.emplace(std::make_shared<syrec::UnaryStatement>(syrec::UnaryStatement(mappedOperation.value(), unaryOperandAsVarAccess)));
 		
 }
 
@@ -681,98 +690,112 @@ void Parser::SkipStatement(std::optional<Statement::ptr> &statement ) {
 }
 
 void Parser::AssignStatement(std::optional<Statement::ptr> &statement ) {
-		signal_evaluation_result assign_stmt_lhs;
-		expression_evaluation_result assign_stmt_rhs;
-		std::optional<syrec_operation::operation> assign_operation;
-		unsigned int expression_bitwidth = 1u;
+		SignalEvaluationResult assignStmtLhs;
+		expression_evaluation_result assignStmtRhs;
+		std::optional<syrec_operation::operation> assignOperation;
+		unsigned int expressionBitwidth = 1u;
 		
 		std::optional<VariableAccess::ptr> assigned_to_obj;
+		bool allSemanticChecksOk = true;
 		
-		Signal(assign_stmt_lhs, false);
-		if (assign_stmt_lhs.has_value() && std::holds_alternative<VariableAccess::ptr>(assign_stmt_lhs.value())) {
-		assigned_to_obj.emplace(std::get<VariableAccess::ptr>(assign_stmt_lhs.value()));
-		expression_bitwidth = assigned_to_obj.value()->bitwidth();
+		Signal(assignStmtLhs, false);
+		allSemanticChecksOk = assignStmtLhs.isValid();
+		if (allSemanticChecksOk){
+		if (!assignStmtLhs.isVariableAccess()) {
+		allSemanticChecksOk = false;
+		// TODO: GEN_ERROR: Lhs operand must be variable access
+		}
+		else {
+		expressionBitwidth = assignStmtLhs.getAsVariableAccess().value()->bitwidth();
+		}
 		}
 		
 		if (la->kind == 36 /* "^" */) {
 			Get();
-			assign_operation.emplace(syrec_operation::operation::xor_assign);	
+			assignOperation.emplace(syrec_operation::operation::xor_assign);	
 		} else if (la->kind == 6 /* "+" */) {
 			Get();
-			assign_operation.emplace(syrec_operation::operation::add_assign);	
+			assignOperation.emplace(syrec_operation::operation::add_assign);	
 		} else if (la->kind == 7 /* "-" */) {
 			Get();
-			assign_operation.emplace(syrec_operation::operation::minus_assign);	
+			assignOperation.emplace(syrec_operation::operation::minus_assign);	
 		} else SynErr(63);
 		Expect(24 /* "=" */);
-		Expression(assign_stmt_rhs, expression_bitwidth, false);
-		if (!assigned_to_obj.has_value() || !assign_operation.has_value() || !assign_stmt_rhs.has_value()) {
+		Expression(assignStmtRhs, expressionBitwidth, false);
+		if (!allSemanticChecksOk || !assignOperation.has_value() || !assignStmtRhs.has_value()) {
 		return;
 		}
+		
 		// TODO: To not break reversability of operation, check that expression does not contain the assigned to signal 
-		const std::optional<unsigned int> mapped_operation = map_operation_to_assign_operation(assign_operation.value());
-		if (mapped_operation.has_value()) {
-		statement.emplace(std::make_shared<syrec::AssignStatement>(syrec::AssignStatement(assigned_to_obj.value(),
-		mapped_operation.value(),
-		assign_stmt_rhs.value().convert_to_expression(expression_bitwidth))));
+		const std::optional<unsigned int> mappedOperation = map_operation_to_assign_operation(assignOperation.value());
+		if (mappedOperation.has_value()) {
+		statement.emplace(std::make_shared<syrec::AssignStatement>(syrec::AssignStatement(assignStmtLhs.getAsVariableAccess().value(),
+		mappedOperation.value(),
+		assignStmtRhs.value().convert_to_expression(expressionBitwidth))));
 		}
 		
 }
 
 void Parser::SwapStatement(std::optional<Statement::ptr> &statement ) {
-		signal_evaluation_result swap_me, swap_other;
-		bool swap_operator_specified = false;
+		SignalEvaluationResult swapMe, swapOther;
+		bool isSwapOperatorDefined = false;
 		
-		Signal(swap_me, false);
+		Signal(swapMe, false);
 		Expect(37 /* "<=>" */);
-		swap_operator_specified = true;	
-		Signal(swap_other, false);
-		const bool lhs_operand_valid = swap_me.has_value() && std::holds_alternative<VariableAccess::ptr>(swap_me.value());
-		const bool rhs_operand_valid = swap_other.has_value() && std::holds_alternative<VariableAccess::ptr>(swap_other.value());
+		isSwapOperatorDefined = true;	
+		Signal(swapOther, false);
+		bool allSemanticChecksOk = true;
+		if (swapMe.isValid() && !swapMe.isVariableAccess()) {
+		allSemanticChecksOk = false;
+		// TODO: GEN_ERROR: Lhs operand must be variable access
+		}
+		if (swapOther.isValid() && !swapOther.isVariableAccess()){
+		allSemanticChecksOk = false;
+		// TODO: GEN_ERROR: Lhs operand must be variable access
+		}
 		
-		if (swap_operator_specified && lhs_operand_valid && rhs_operand_valid) {
-		const VariableAccess::ptr &lhs = std::get<VariableAccess::ptr>(swap_me.value());
-		const VariableAccess::ptr &rhs = std::get<VariableAccess::ptr>(swap_other.value());
-		statement.emplace(std::make_shared<syrec::SwapStatement>(syrec::SwapStatement(lhs, rhs)));
-		}			
+		if (isSwapOperatorDefined && allSemanticChecksOk) {
+		statement.emplace(std::make_shared<syrec::SwapStatement>(syrec::SwapStatement(swapMe.getAsVariableAccess().value(),
+		swapOther.getAsVariableAccess().value())));
+		}
 		
 }
 
-void Parser::Expression(expression_evaluation_result &user_defined_expression, unsigned int bitwidth, bool simplify_if_possible) {
-		signal_evaluation_result signal;
+void Parser::Expression(expression_evaluation_result &userDefinedExpression, unsigned int bitwidth, bool simplifyIfPossible) {
+		SignalEvaluationResult signal;
 		std::optional<Number::ptr> number;
 		
 		if (StartOf(1)) {
 			if (check_if_expression_is_number()) {
-				Number(number, simplify_if_possible);
+				Number(number, simplifyIfPossible);
 				if (number.has_value()) {
-				user_defined_expression.emplace(std::make_shared<NumericExpression>(NumericExpression(number.value(), bitwidth)));
+				userDefinedExpression.emplace(std::make_shared<NumericExpression>(NumericExpression(number.value(), bitwidth)));
 				}
 				
 			} else if (check_if_expression_is_binary_expression()) {
-				BinaryExpression(user_defined_expression, bitwidth, simplify_if_possible);
+				BinaryExpression(userDefinedExpression, bitwidth, simplifyIfPossible);
 			} else {
-				ShiftExpression(user_defined_expression, bitwidth, simplify_if_possible);
+				ShiftExpression(userDefinedExpression, bitwidth, simplifyIfPossible);
 			}
 		} else if (la->kind == _ident) {
-			Signal(signal, simplify_if_possible);
-			if (signal.has_value()) {
-			if (std::holds_alternative<VariableAccess::ptr>(signal.value())) {
-			const VariableAccess::ptr &var_access = std::get<VariableAccess::ptr>(signal.value());
-			user_defined_expression.emplace(std::make_shared<VariableExpression>(VariableExpression(var_access)));
+			Signal(signal, simplifyIfPossible);
+			if (!signal.isValid()) {
+			return;
 			}
-			else if (std::holds_alternative<Number::ptr>(signal.value())){
-			const Number::ptr &number_signal = std::get<Number::ptr>(signal.value());
-			user_defined_expression.emplace(std::make_shared<NumericExpression>(NumericExpression(number_signal, bitwidth)));
+			
+			if (signal.isVariableAccess()) {
+			userDefinedExpression.emplace(std::make_shared<VariableExpression>(VariableExpression(signal.getAsVariableAccess().value())));
 			}
+			else if (signal.isConstant()) {
+			userDefinedExpression.emplace(std::make_shared<NumericExpression>(NumericExpression(signal.getAsNumber().value(), bitwidth)));
 			}
 			
 		} else if (la->kind == 33 /* "~" */ || la->kind == 52 /* "!" */) {
-			UnaryExpression(user_defined_expression, bitwidth, simplify_if_possible);
+			UnaryExpression(userDefinedExpression, bitwidth, simplifyIfPossible);
 		} else SynErr(64);
 }
 
-void Parser::Signal(signal_evaluation_result &signalAccess, const bool simplifyIfPossible) {
+void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfPossible) {
 		std::optional<VariableAccess::ptr> accessedSignal;
 		const unsigned int defaultIndexExpressionBitwidth = 1u;
 		unsigned int indexExpressionBitwidth = defaultIndexExpressionBitwidth;
@@ -862,7 +885,7 @@ void Parser::Signal(signal_evaluation_result &signalAccess, const bool simplifyI
 			
 		}
 		if (isValidSignalAccess) {
-		signalAccess.emplace(accessedSignal.value());
+		signalAccess.updateResultToVariableAccess(accessedSignal.value());
 		}
 		
 }

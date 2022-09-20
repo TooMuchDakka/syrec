@@ -44,6 +44,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_error_message_generator.hpp"
 #include "core/syrec/parser/range_check.hpp"
+#include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/text_utils.hpp"
 
@@ -146,7 +147,6 @@ struct expression_or_constant {
 			std::variant<expression::ptr, unsigned int> variants;
 	};
 
-	typedef std::optional<std::variant<VariableAccess::ptr, Number::ptr>> signal_evaluation_result;
 	typedef std::optional<expression_or_constant> expression_evaluation_result;
 
 	// Place declarations of objects referenced in this ATG
@@ -491,8 +491,8 @@ struct expression_or_constant {
 	void SkipStatement(std::optional<Statement::ptr> &statement );
 	void AssignStatement(std::optional<Statement::ptr> &statement );
 	void SwapStatement(std::optional<Statement::ptr> &statement );
-	void Expression(expression_evaluation_result &user_defined_expression, unsigned int bitwidth, bool simplify_if_possible);
-	void Signal(signal_evaluation_result &signalAccess, const bool simplifyIfPossible);
+	void Expression(expression_evaluation_result &userDefinedExpression, unsigned int bitwidth, bool simplifyIfPossible);
+	void Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfPossible);
 	void BinaryExpression(expression_evaluation_result &user_defined_binary_expression, unsigned int bitwidth, bool simplify_if_possible);
 	void ShiftExpression(expression_evaluation_result &user_defined_shift_expression, unsigned int bitwidth, bool simplify_if_possible);
 	void UnaryExpression(expression_evaluation_result &unary_expression, unsigned int bitwidth, bool simplify_if_possible);
