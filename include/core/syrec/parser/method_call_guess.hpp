@@ -10,36 +10,31 @@
 
 
 namespace syrec {
-    class method_call_guess {
+    class MethodCallGuess {
     public:
-        typedef std::shared_ptr<method_call_guess> ptr;
+        typedef std::shared_ptr<MethodCallGuess> ptr;
 
-        explicit method_call_guess(const symbol_table::ptr& symbol_table_scope, const std::string &method_ident):
-            methods_matching_signature({}), symbol_table_scope(symbol_table_scope) {
-            const std::optional<std::vector<Module::ptr>> &matching_modules = this->symbol_table_scope->get_matching_modules_for_name(method_ident);
-            if (matching_modules.has_value()) {
-                methods_matching_signature = matching_modules.value();
+        explicit MethodCallGuess(const SymbolTable::ptr& activeSymbolTableScope, const std::string_view& methodName)
+            : methodsMatchingSignature({}), formalParameterIdx(0) {
+            const std::optional<Module::vec>& modulesMatchingName = activeSymbolTableScope->getMatchingModulesForName(methodName);
+            if (modulesMatchingName.has_value()) {
+                methodsMatchingSignature = modulesMatchingName.value();
             }
-            formal_parameter_idx = 0;
         }
 
-        /**
-         * \brief 
-         * \param parameter 
-         * \return
-         * \throws std::invalid_argument
-         */
-        bool refine(const std::string& parameter);
-        bool matches_some_options() const;
-        [[nodiscard]] std::optional<Module::ptr> get_remaining_guess() const;
+        void refineWithNextParameter(const Variable::ptr& actualParameter) noexcept;
+        [[nodiscard]] bool hasSomeMatches() const noexcept;
+        [[nodiscard]] std::optional<Module::vec> getMatchesForGuess() const noexcept;
+        void                                     discardGuessesWithMoreThanNParameters(const std::size_t& numFormalParameters) noexcept;
 
     private:
-        std::vector<Module::ptr> methods_matching_signature;
-        const symbol_table::ptr& symbol_table_scope;
-        std::size_t              formal_parameter_idx;
+        Module::vec methodsMatchingSignature;
+        std::size_t              formalParameterIdx;
 
-        void discard_guesses_with_less_parameters(const std::size_t &num_formal_parameters);
-        void discard_not_matching_alternatives(const Variable::ptr& actual_parameter);
+        void        discardGuessesWithLessOrEqualNumberOfParameters(const std::size_t& numFormalParameters, bool mustNumParamsMatch) noexcept;
+        void discardNotMatchingAlternatives(const Variable::ptr& actualParameter) noexcept;
+        static bool hasModuleAtLeastNFormalParameters(const std::size_t& numFormalParametersOfGuess, const Module::ptr& moduleToCheck, bool mustNumParamsMatch) noexcept;
+        static bool isActualParameterAssignableToFormalOne(const Variable::ptr& actualParameter, const Variable::ptr& formalParameter) noexcept;
     };
 }
 

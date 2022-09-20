@@ -152,7 +152,7 @@ struct expression_or_constant {
 	// Place declarations of objects referenced in this ATG
 	Module::vec modules;
 	parser_error_message_generator error_message_generator;
-	symbol_table::ptr current_symbol_table_scope;
+	SymbolTable::ptr currSymTabScope;
 
 	Number::loop_variable_mapping loop_variable_mapping_lookup;
 
@@ -160,7 +160,7 @@ struct expression_or_constant {
 	// This support is specific to the C++ version of Coco/R.
 	void Init() {
 		// nothing to do
-		symbol_table::open_scope(current_symbol_table_scope);
+		SymbolTable::openScope(currSymTabScope);
 	}
 
 	// Uncomment this method if cleanup is necessary,
@@ -405,7 +405,7 @@ struct expression_or_constant {
 	}
 
 	bool check_ident_was_declared(const std::string &ident) const {
-		if (!current_symbol_table_scope->contains(ident)) {
+		if (!currSymTabScope->contains(ident)) {
 			// TOOD: GEN_ERROR
 			return false;
 		}
@@ -492,7 +492,7 @@ struct expression_or_constant {
 	void AssignStatement(std::optional<Statement::ptr> &statement );
 	void SwapStatement(std::optional<Statement::ptr> &statement );
 	void Expression(expression_evaluation_result &user_defined_expression, unsigned int bitwidth, bool simplify_if_possible);
-	void Signal(signal_evaluation_result &signalAccess, bool simplifyIfPossible);
+	void Signal(signal_evaluation_result &signalAccess, const bool simplifyIfPossible);
 	void BinaryExpression(expression_evaluation_result &user_defined_binary_expression, unsigned int bitwidth, bool simplify_if_possible);
 	void ShiftExpression(expression_evaluation_result &user_defined_shift_expression, unsigned int bitwidth, bool simplify_if_possible);
 	void UnaryExpression(expression_evaluation_result &unary_expression, unsigned int bitwidth, bool simplify_if_possible);

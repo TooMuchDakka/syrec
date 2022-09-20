@@ -7,37 +7,36 @@
 #include "core/syrec/variable.hpp"
 
 namespace syrec {
-    class symbol_table {
+    class SymbolTable {
     public:
+        typedef std::shared_ptr<SymbolTable>  ptr;
 
-        typedef std::shared_ptr<symbol_table> ptr;
-
-        symbol_table() {
+        SymbolTable() {
             locals = {};
             modules = {};
             outer            = nullptr;
         }
 
-        ~symbol_table() = default;
+        ~SymbolTable() = default;
 
-        bool                              contains(const std::string &literal) const;
+        bool contains(const std:: string_view& literalIdent) const;
         bool                              contains(const Module::ptr& module) const;
-        [[nodiscard]] std::optional<std::variant<Variable::ptr, Number::ptr>> get_variable(const std::string &literal) const;
-        [[nodiscard]] std::optional<std::vector<Module::ptr>>   get_matching_modules_for_name(const std::string& module_name) const;
-        bool                              add_entry(const Variable::ptr& local_entry);
-        bool                              add_entry(const Number::ptr& local_entry);
-        bool                              add_entry(const Module::ptr& module);                     
+        [[nodiscard]] std::optional<std::variant<Variable::ptr, Number::ptr>> getVariable(const std::string_view& literalIdent) const;
+        [[nodiscard]] std::optional<Module::vec>   getMatchingModulesForName(const std::string_view& moduleName) const;
+        bool                              addEntry(const Variable::ptr& variable);
+        bool                              addEntry(const Number::ptr& number);
+        bool                              addEntry(const Module::ptr& module);                     
 
-        static void open_scope(symbol_table::ptr &current_scope);
-        static void close_scope(symbol_table::ptr& current_scope);
-        static bool can_assign_to(const Variable::ptr& formal_parameter, const Variable::ptr& actual_parameter, bool parameter_types_must_match);
+        static void openScope(SymbolTable::ptr &currentScope);
+        static void closeScope(SymbolTable::ptr& currentScope);
+        static bool isAssignableTo(const Variable::ptr& formalParameter, const Variable::ptr& actualParameter, bool mustParameterTypesMatch);
 
     private:
-        std::map<std::string, std::variant<Variable::ptr, Number::ptr>> locals;
-        std::map<std::string, std::vector<Module::ptr>> modules; 
-        symbol_table::ptr      outer;
+        std::map<std::string, std::variant<Variable::ptr, Number::ptr>, std::less<void>> locals;
+        std::map<std::string, Module::vec, std::less<void>> modules; 
+        SymbolTable::ptr outer;
 
-        static bool do_module_signatures_match(const Module::ptr& module, const Module::ptr& other_module);
+        static bool doModuleSignaturesMatch(const Module::ptr& module, const Module::ptr& otherModule);
     };    
 }
 

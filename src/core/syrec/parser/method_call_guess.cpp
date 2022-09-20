@@ -1,62 +1,71 @@
 #include "core/syrec/parser/method_call_guess.hpp"
 
-namespace syrec {
-    // TODO: When refining the guess sort the options according to the number of formal parameters ascendingly
-    bool method_call_guess::refine(const std::string& parameter) {
-        bool could_refine_guess = false;
+using namespace syrec;
 
-        if (!methods_matching_signature.empty() && this->symbol_table_scope->contains(parameter)) {
-            const auto parameter_symbol_table_entry = this->symbol_table_scope->get_variable(parameter).value();
-            if (std::holds_alternative<Variable::ptr>(parameter_symbol_table_entry)) {
-                const Variable::ptr parameter_entry = std::get<Variable::ptr>(parameter_symbol_table_entry);
+void MethodCallGuess::refineWithNextParameter(const Variable::ptr& actualParameter) noexcept {
+    this->discardGuessesWithLessOrEqualNumberOfParameters(this->formalParameterIdx + 1, false);
+    this->discardNotMatchingAlternatives(actualParameter);
 
-                discard_guesses_with_less_parameters(this->formal_parameter_idx + 1);
-                discard_not_matching_alternatives(parameter_entry);
-                could_refine_guess = matches_some_options();
-                this->formal_parameter_idx++;
-            }            
-        } else {
-            if (!methods_matching_signature.empty()) {
-                methods_matching_signature.clear();
-            }
-        }
-        return could_refine_guess;
+    if (this->hasSomeMatches()) {
+        this->formalParameterIdx++;
+    }
+}
+
+bool MethodCallGuess::hasSomeMatches() const noexcept {
+    return !this->methodsMatchingSignature.empty();
+}
+
+std::optional<Module::vec> MethodCallGuess::getMatchesForGuess() const noexcept {
+    return std::make_optional(this->methodsMatchingSignature);
+}
+
+void MethodCallGuess::discardGuessesWithMoreThanNParameters(const std::size_t& numFormalParameters) noexcept {
+    if (this->methodsMatchingSignature.empty()) {
+        return;
     }
 
-    bool method_call_guess::matches_some_options() const {
-        return !methods_matching_signature.empty();
+    this->discardGuessesWithLessOrEqualNumberOfParameters(numFormalParameters, true);
+}
+
+
+void MethodCallGuess::discardGuessesWithLessOrEqualNumberOfParameters(const std::size_t& numFormalParameters, bool mustNumParamsMatch) noexcept {
+    if (this->methodsMatchingSignature.empty()) {
+        return;
     }
 
-    void method_call_guess::discard_guesses_with_less_parameters(const std::size_t &num_formal_parameters) {
-        methods_matching_signature.erase(
-                std::remove_if(
-                    methods_matching_signature.begin(),
-                    methods_matching_signature.end(),
-                        [num_formal_parameters](const Module::ptr& module) { return module->parameters.size() < num_formal_parameters; }
-                ),
-                methods_matching_signature.end());
+    this->methodsMatchingSignature.erase(
+            std::remove_if(
+                    this->methodsMatchingSignature.begin(),
+                    this->methodsMatchingSignature.end(),
+                    [numFormalParameters, mustNumParamsMatch](const Module::ptr& module) { return !hasModuleAtLeastNFormalParameters(numFormalParameters, module, mustNumParamsMatch); }),
+            this->methodsMatchingSignature.end()
+    );
+}
+
+void MethodCallGuess::discardNotMatchingAlternatives(const Variable::ptr& actualParameter) noexcept {
+    if (this->methodsMatchingSignature.empty()) {
+        return;
     }
 
-    void method_call_guess::discard_not_matching_alternatives(const Variable::ptr& actual_parameter) {
-        const std::size_t formal_parameter_idx = this->formal_parameter_idx;
-        methods_matching_signature.erase(
-                std::remove_if(
-                        methods_matching_signature.begin(),
-                        methods_matching_signature.end(),
-                        [formal_parameter_idx, actual_parameter](const Module::ptr& module) {
-                            const Variable::ptr &formal_parameter = module->parameters.at(formal_parameter_idx);
-                            return !symbol_table::can_assign_to(formal_parameter, actual_parameter, false);
-                        }),
-                methods_matching_signature.end());
+    const std::size_t formalParameterIdx = this->formalParameterIdx;
+    this->methodsMatchingSignature.erase(
+            std::remove_if(
+                    this->methodsMatchingSignature.begin(),
+                    this->methodsMatchingSignature.end(),
+                    [formalParameterIdx, actualParameter](const Module::ptr& module) { return !isActualParameterAssignableToFormalOne(actualParameter, module->parameters.at(formalParameterIdx)); }),
+            this->methodsMatchingSignature.end());
+}
+
+bool MethodCallGuess::hasModuleAtLeastNFormalParameters(const std::size_t& numFormalParametersOfGuess, const Module::ptr& moduleToCheck, const bool mustNumParamsMatch) noexcept {
+    if (mustNumParamsMatch) {
+        return moduleToCheck->parameters.size() == numFormalParametersOfGuess;   
     }
-
-    std::optional<Module::ptr> method_call_guess::get_remaining_guess() const {
-        std::optional<Module::ptr> matching_guess;
-        if (methods_matching_signature.size() == 1) {
-            matching_guess.emplace(methods_matching_signature.at(0));
-        }
-        return matching_guess;
+    else {
+        return !(moduleToCheck->parameters.size() < numFormalParametersOfGuess);   
     }
+    
+}
 
-
+bool MethodCallGuess::isActualParameterAssignableToFormalOne(const Variable::ptr& actualParameter, const Variable::ptr& formalParameter) noexcept {
+    return SymbolTable::isAssignableTo(formalParameter, actualParameter, false);
 }

@@ -87,7 +87,7 @@ COMPILER SyReC
 	// Place declarations of objects referenced in this ATG
 	Module::vec modules;
 	parser_error_message_generator error_message_generator;
-	symbol_table::ptr current_symbol_table_scope;
+	SymbolTable::ptr currSymTabScope;
 
 	Number::loop_variable_mapping loop_variable_mapping_lookup;
 
@@ -95,7 +95,7 @@ COMPILER SyReC
 	// This support is specific to the C++ version of Coco/R.
 	void Init() {
 		// nothing to do
-		symbol_table::open_scope(current_symbol_table_scope);
+		SymbolTable::openScope(currSymTabScope);
 	}
 
 	// Uncomment this method if cleanup is necessary,
@@ -340,7 +340,7 @@ COMPILER SyReC
 	}
 
 	bool check_ident_was_declared(const std::string &ident) const {
-		if (!current_symbol_table_scope->contains(ident)) {
+		if (!currSymTabScope->contains(ident)) {
 			// TOOD: GEN_ERROR
 			return false;
 		}
@@ -444,7 +444,7 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 																			.)
 | '#' ident																	(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);
 																				if (check_ident_was_declared(signal_ident)) {
-																					const auto &symbol_table_entry = current_symbol_table_scope->get_variable(signal_ident);
+																					const auto &symbol_table_entry = currSymTabScope->getVariable(signal_ident);
 																					if (symbol_table_entry.has_value() && std::holds_alternative<Variable::ptr>(symbol_table_entry.value())) {
 																						parsed_number.emplace(std::make_shared<syrec::Number>(syrec::Number(std::get<Variable::ptr>(symbol_table_entry.value())->bitwidth)));
 																					}
@@ -455,7 +455,7 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 																			.)
 | '$' ident																	(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);
 																				if (check_ident_was_declared(signal_ident)) {
-																					const auto &symbol_table_entry = current_symbol_table_scope->get_variable(signal_ident);
+																					const auto &symbol_table_entry = currSymTabScope->getVariable(signal_ident);
 																					if (symbol_table_entry.has_value() && std::holds_alternative<Number::ptr>(symbol_table_entry.value())) {
 																						parsed_number.emplace(std::get<Number::ptr>(symbol_table_entry.value()));
 																					}
@@ -500,19 +500,19 @@ Program and Modules
 SyReC										(.	std::optional<Module::ptr> module;	.)
 =
 Module<module>								(.	if (module.has_value()) {
-													current_symbol_table_scope->add_entry(module.value());
+													currSymTabScope->addEntry(module.value());
 													this->modules.emplace_back(module.value());
 												}
 											.)
 {											(.	module.reset();	.)
 	Module<module>							(.	if (module.has_value()) {
 													const Module::ptr well_formed_module = module.value();
-													if (current_symbol_table_scope->contains(well_formed_module)) {
+													if (currSymTabScope->contains(well_formed_module)) {
 														// TODO: GEN_ERROR 
 														// TODO: Do not cancel parsing	
 													}
 													else {
-														current_symbol_table_scope->add_entry(well_formed_module);
+														currSymTabScope->addEntry(well_formed_module);
 														this->modules.emplace_back(module.value());
 													}
 												}
@@ -524,7 +524,7 @@ Module<module>								(.	if (module.has_value()) {
 Module production
 -------------------------------------------------------------------------*/
 
-Module <. std::optional<Module::ptr> &parsed_module	.>			(.	symbol_table::open_scope(current_symbol_table_scope);
+Module <. std::optional<Module::ptr> &parsed_module	.>			(.	SymbolTable::openScope(currSymTabScope);
 																	std::optional<std::vector<Variable::ptr>> locals;	
 																	bool valid_module_definition = false;
 																	Statement::vec module_body {};
@@ -537,7 +537,7 @@ Module <. std::optional<Module::ptr> &parsed_module	.>			(.	symbol_table::open_s
 {
 	SignalList<locals>											(.	valid_module_definition &= locals.has_value();	.)
 }														
-StatementList<module_body>										(.	symbol_table::close_scope(current_symbol_table_scope);
+StatementList<module_body>										(.	SymbolTable::closeScope(currSymTabScope);
 																	if (module_body.empty()) {
 																		valid_module_definition = false;
 																		// TODO: GEN_ERROR
@@ -563,16 +563,16 @@ ParameterList<bool &is_valid_module_definition, const Module::ptr &module>			(.	
 Parameter<parameter>																(.	is_valid_module_definition = parameter.has_value();
 																						if (is_valid_module_definition) {
 																							module->addParameter(parameter.value());
-																							current_symbol_table_scope->add_entry(parameter.value());
+																							currSymTabScope->addEntry(parameter.value());
 																						}
 																					.)
 {																					(.	parameter.reset();	.)
 	"," Parameter<parameter>														(.	is_valid_module_definition = parameter.has_value();
 																						if (is_valid_module_definition) {	
 																							const Variable::ptr &well_formed_parameter = parameter.value();
-																							if (!current_symbol_table_scope->contains(well_formed_parameter->name)) {
+																							if (!currSymTabScope->contains(well_formed_parameter->name)) {
 																								module->addParameter(well_formed_parameter);
-																								current_symbol_table_scope->add_entry(well_formed_parameter);
+																								currSymTabScope->addEntry(well_formed_parameter);
 																							}
 																							else {
 																								is_valid_module_definition = false;
@@ -629,26 +629,26 @@ SignalList <. std::optional<std::vector<Variable::ptr>> &signals .>	(.	Variable:
 																	.)
 SignalDeclaration<signal_type, declared_signal>						(.	if (valid_signal_type && declared_signal.has_value()) {
 																			const Variable::ptr &valid_signal_declaration = declared_signal.value();
-																			if (current_symbol_table_scope->contains(valid_signal_declaration->name)) {
+																			if (currSymTabScope->contains(valid_signal_declaration->name)) {
 																				// TODO: GEN_ERROR 
 																				// TODO: Do not cancel parsing
 																			}
 																			else {
 																				valid_signal_declarations.emplace_back(valid_signal_declaration);
-																				current_symbol_table_scope->add_entry(valid_signal_declaration);
+																				currSymTabScope->addEntry(valid_signal_declaration);
 																			}
 																		}
 																	.)
 {																	(.	declared_signal.reset();			.)	
 	"," SignalDeclaration<signal_type, declared_signal>				(.	if (valid_signal_type && declared_signal.has_value()) {
 																			const Variable::ptr &valid_signal_declaration = declared_signal.value();
-																			if (current_symbol_table_scope->contains(valid_signal_declaration->name)) {
+																			if (currSymTabScope->contains(valid_signal_declaration->name)) {
 																				// TODO: GEN_ERROR 
 																				// TODO: Do not cancel parsing
 																			}
 																			else {
 																				valid_signal_declarations.emplace_back(valid_signal_declaration);
-																				current_symbol_table_scope->add_entry(valid_signal_declaration);
+																				currSymTabScope->addEntry(valid_signal_declaration);
 																			}
 																		}
 																	.)
@@ -743,88 +743,91 @@ CallStatement production
 -------------------------------------------------------------------------*/
 
 // TODO: Are aliases between the formal and actual parameters necessary (i.e. in a call statement should the parameter be replaced with the actual value)
-CallStatement<. std::optional<Statement::ptr> &statement .>							(.	std::optional<bool> is_call_statement;
-																						std::vector<std::string> callee_arguments {};
-																						bool valid_call_operation = true;
-																						std::vector<std::string_view> formal_method_parameters {};
-																						std::size_t num_actual_parameters = 0;
+CallStatement<. std::optional<Statement::ptr> &statement .>							(.	std::optional<bool> isCallStatement;
+																						std::vector<std::string> calleeArguments {};
+																						std::size_t numActualParameters = 0;
+																						bool isValidCallOperation = true;
 																					.)
 =
 (
-	"call"																			(.	is_call_statement.emplace(true);	.)
-	| "uncall"																		(.	is_call_statement.emplace(false);	.)
-)																					(.	valid_call_operation = is_call_statement.has_value();	.)
-ident																				(.	const std::string method_ident = convert_to_uniform_text_format(t->val);
-																						method_call_guess::ptr guess_for_method = std::make_shared<method_call_guess>(method_call_guess(current_symbol_table_scope, method_ident));
-																						if (!guess_for_method->matches_some_options()) {
-																							// TODO: GEN_ERROR method not found
-																							valid_call_operation = false;
+	"call"																			(.	isCallStatement.emplace(true);	.)
+	| "uncall"																		(.	isCallStatement.emplace(false);	.)
+)																					(.	isValidCallOperation = isCallStatement.has_value();	.)
+ident																				(.	std::string methodIdent = convert_to_uniform_text_format(t->val);
+																						MethodCallGuess::ptr guessesForPossibleCall = std::make_shared<MethodCallGuess>(MethodCallGuess(currSymTabScope, methodIdent));
+																						if (!guessesForPossibleCall->hasSomeMatches()) {
+																							// TODO: GEN_ERROR no method for ident declared
+																							isValidCallOperation = false;
 																						}
 																					.)
 "(" 
-	ident																			(.	std::string variable_ident = convert_to_uniform_text_format(t->val);
-																						if (check_ident_was_declared(variable_ident)) {
-																							try {
-																								guess_for_method->refine(variable_ident);
-																								valid_call_operation &= guess_for_method->matches_some_options();
-																								if (valid_call_operation) {
-																									callee_arguments.emplace_back(variable_ident);
-																								}
-																							}
-																							catch (std::invalid_argument &ex) {
-																								// TODO: GEN_ERROR
-																								valid_call_operation = false;
-																							}
-																						}
-																						else {
-																							// TODO: GEN_ERROR
-																						}
-																						num_actual_parameters++;
-																					.)
-	{
-		"," ident																	(.	variable_ident = convert_to_uniform_text_format(t->val);
-																						if (check_ident_was_declared(variable_ident)) {
-																							try {
-																								guess_for_method->refine(variable_ident);
-																								valid_call_operation &= guess_for_method->matches_some_options();
-																								if (valid_call_operation) {
-																									const Variable::ptr actual_parameter_symbol_entry = std::get<Variable::ptr>(current_symbol_table_scope->get_variable(variable_ident).value());
-																									callee_arguments.emplace_back(variable_ident);
-																								}
-																							}
-																							catch (std::invalid_argument &ex) {
-																								// TODO: GEN_ERROR
-																								valid_call_operation = false;
-																							}
-																						}
-																						else {
-																							// TODO: GEN_ERROR
-																						}
-																						num_actual_parameters++;
-																					.)
-	}																
-")"																					(.	if (!valid_call_operation) {
-																							return;		
-																						}
-																						if (!guess_for_method->matches_some_options()) {
-																							// TODO: GEN_ERROR
-																							return;
-																						}
+	ident																			(.	std::string parameterIdent = convert_to_uniform_text_format(t->val);
+																						isValidCallOperation &= check_ident_was_declared(parameterIdent);
 
-																						const std::optional<Module::ptr> possible_match_for_guess = guess_for_method->get_remaining_guess();
-																						if (!possible_match_for_guess.has_value()) {
-																							// TODO: GEN_ERROR
-																							return;
-																						}
-																						else {
-																							const Module::ptr &matching_module = possible_match_for_guess.value();
+																						if (isValidCallOperation) {
+																							const std::optional<std::variant<Variable::ptr, Number::ptr>> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent);
+																							isValidCallOperation = paramSymTabEntry.has_value() && std::holds_alternative<Variable::ptr>(paramSymTabEntry.value());
 
-																							if (is_call_statement.value()) {
-																								statement.emplace(std::make_shared<syrec::CallStatement>(syrec::CallStatement(matching_module, callee_arguments)));
+																							if (isValidCallOperation) {
+																								guessesForPossibleCall->refineWithNextParameter(std::get<Variable::ptr>(paramSymTabEntry.value()));
+																								calleeArguments.emplace_back(parameterIdent);
 																							}
 																							else {
-																								statement.emplace(std::make_shared<syrec::UncallStatement>(syrec::UncallStatement(matching_module, callee_arguments)));
+																								// TODO: GEN_ERROR Declared identifier was not a variable (but a loop variable)
 																							}
+																						}
+																						else {
+																							// TODO: GEN_ERROR Use of undeclared identifier
+																						}
+																						numActualParameters++;
+																					.)
+	{
+		"," ident																	(.	std::string parameterIdent = convert_to_uniform_text_format(t->val);
+																						isValidCallOperation &= check_ident_was_declared(parameterIdent);
+
+																						if (isValidCallOperation) {
+																							const std::optional<std::variant<Variable::ptr, Number::ptr>> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent);
+																							isValidCallOperation = paramSymTabEntry.has_value() && std::holds_alternative<Variable::ptr>(paramSymTabEntry.value());
+
+																							if (isValidCallOperation) {
+																								guessesForPossibleCall->refineWithNextParameter(std::get<Variable::ptr>(paramSymTabEntry.value()));
+																								calleeArguments.emplace_back(parameterIdent);
+																							}
+																							else {
+																								// TODO: GEN_ERROR Declared identifier was not a variable (but a loop variable)
+																							}
+																						}
+																						else {
+																							// TODO: GEN_ERROR Use of undeclared identifier
+																						}
+																						numActualParameters++;
+																					.)
+	}																
+")"																					(.	if (!isValidCallOperation){
+																							return;
+																						}
+
+																						if (!guessesForPossibleCall->hasSomeMatches()) {
+																							return;		
+																						}
+																						
+																						guessesForPossibleCall->discardGuessesWithMoreThanNParameters(numActualParameters);
+																						if (!guessesForPossibleCall->hasSomeMatches()) {
+																							// TODO: GEN_ERROR All of the declared methods that matched had more than n parameters
+																							return;
+																						}
+
+																						Module::vec possibleCalls = guessesForPossibleCall->getMatchesForGuess().value();
+																						if (possibleCalls.size() > 1) {
+																							// TODO: GEN_ERROR Ambiguous call, more than one match for current setups
+																							return;
+																						}
+																						const Module::ptr matchingModuleForCall = possibleCalls.at(0);
+																						if (isCallStatement.value()) {
+																							statement.emplace(std::make_shared<syrec::CallStatement>(syrec::CallStatement(matchingModuleForCall, calleeArguments)));
+																						}
+																						else {
+																							statement.emplace(std::make_shared<syrec::UncallStatement>(syrec::UncallStatement(matchingModuleForCall, calleeArguments)));
 																						}
 																					.)
 .
@@ -852,9 +855,9 @@ ForStatement<. std::optional<Statement::ptr> &statement .>								(.	std::option
 			"$" ident																	(.	const std::string &loop_var_ident = convert_to_uniform_text_format(t->val);
 																							if (!check_ident_was_declared(loop_var_ident)) {
 																								loop_variable_ident.emplace(convert_to_uniform_text_format(t->val));
-																								symbol_table::open_scope(current_symbol_table_scope);
+																								SymbolTable::openScope(currSymTabScope);
 																								const Number::ptr loop_variable_entry = std::make_shared<syrec::Number>(syrec::Number(loop_var_ident));
-																								current_symbol_table_scope->add_entry(loop_variable_entry);
+																								currSymTabScope->addEntry(loop_variable_entry);
 																							}
 																						.)
 			"="
@@ -909,7 +912,7 @@ StatementList<loop_body>																(.	if (loop_body.empty()) {
 																							}
 																						.)
 "rof"																					(.	if (loop_variable_ident.has_value()) {
-																								symbol_table::close_scope(current_symbol_table_scope);
+																								SymbolTable::closeScope(currSymTabScope);
 																							}
 
 																							// TODO: If a statement must be generated, one could create a skip statement instead of simply returning 
@@ -1065,7 +1068,7 @@ Signal<signal_evaluation_result &signalAccess, const bool simplifyIfPossible>		(
 =
 	ident																			(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
 																						if (check_ident_was_declared(signalIdent)) {
-																							const auto symbolTableEntryForSignal = current_symbol_table_scope->get_variable(signalIdent);
+																							const auto symbolTableEntryForSignal = currSymTabScope->getVariable(signalIdent);
 																							if (symbolTableEntryForSignal.has_value() && std::holds_alternative<Variable::ptr>(symbolTableEntryForSignal.value())) {
 																								const VariableAccess::ptr container = std::make_shared<VariableAccess>(VariableAccess());
 																								container->setVar(std::get<Variable::ptr>(symbolTableEntryForSignal.value()));
