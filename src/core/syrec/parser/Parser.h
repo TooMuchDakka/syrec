@@ -40,6 +40,7 @@ Coco/R itself) does not fall under the GNU General Public License.
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/method_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_error_message_generator.hpp"
@@ -94,63 +95,7 @@ public:
 	Token *t;			// last recognized token
 	Token *la;			// lookahead token
 
-struct expression_or_constant {
-		public:
-            explicit expression_or_constant(const unsigned int constant_value) : constant_value(constant_value) ,variants(constant_value)
-			{
-			}
-
-			// TODO: Add loop variable mapping lookup as constructor parameter
-			explicit expression_or_constant(const expression::ptr &expression)
-			{
-                syrec::expression* referenced_expression = expression.get();
-                const NumericExpression* constant_expression = dynamic_cast<NumericExpression*>(referenced_expression);
-                if (nullptr != constant_expression && constant_expression->value->isConstant()) {
-                    constant_value.emplace(constant_expression->value->evaluate({}));
-					variants.emplace<unsigned int>(constant_value.value());
-                }
-				else {
-					variants.emplace<expression::ptr>(expression);
-				}
-			}
-				
-			[[nodiscard]] bool is_constant() const {
-                return constant_value.has_value();
-			}
-
-			[[nodiscard]] unsigned int get_constant_value() const {
-                if (!is_constant()) {
-                    throw std::logic_error("TODO x");
-                }
-                return constant_value.value();
-			}
-
-			[[nodiscard]] expression::ptr get_expression() const {
-                if (is_constant()) {
-                    throw std::logic_error("TODO a");
-                }
-				return std::get<expression::ptr>(variants);
-			}
-
-			[[nodiscard]] expression::ptr convert_to_expression(const unsigned int bitwidth) const {
-				if (is_constant()) {
-					const Number::ptr &constant_value_wrapper = std::make_shared<syrec::Number>(get_constant_value());
-					return std::make_shared<NumericExpression>(constant_value_wrapper, bitwidth);
-				}
-				else {
-					return std::get<expression::ptr>(variants);	
-				}
-			}
-			
-		private:
-            std::optional<unsigned int> constant_value;
-			std::variant<expression::ptr, unsigned int> variants;
-	};
-
-	typedef std::optional<expression_or_constant> expression_evaluation_result;
-
-	// Place declarations of objects referenced in this ATG
-	Module::vec modules;
+Module::vec modules;
 	parser_error_message_generator error_message_generator;
 	SymbolTable::ptr currSymTabScope;
 
@@ -404,20 +349,12 @@ struct expression_or_constant {
 		return mapping_result;
 	}
 
-	bool check_ident_was_declared(const std::string &ident) const {
+	bool check_ident_was_declared(const std::string_view& ident) const {
 		if (!currSymTabScope->contains(ident)) {
 			// TOOD: GEN_ERROR
 			return false;
 		}
 		return true;
-	}
-
-	[[nodiscard]] static std::optional<unsigned int> get_value_if_expression_is_constant(const expression_evaluation_result &expression){
-		std::optional<unsigned int> constant_value;
-		if (expression.has_value() && expression.value().is_constant()) {
-			constant_value.emplace(expression.value().get_constant_value());
-		}
-		return constant_value;
 	}
 
 	// TODO: Generate error/s in case of exceptions
@@ -467,6 +404,10 @@ struct expression_or_constant {
 		return value_of_number_container;
 	}
 
+	[[nodiscard]] ExpressionEvaluationResult::ptr createExpressionEvalutionResultContainer() const {
+		return std::make_shared<ExpressionEvaluationResult>(ExpressionEvaluationResult());
+	}
+
 /*-------------------------------------------------------------------------*/
 
 
@@ -482,7 +423,7 @@ struct expression_or_constant {
 	void SignalList(std::optional<std::vector<Variable::ptr>> &signals );
 	void StatementList(Statement::vec &statements );
 	void Parameter(std::optional<Variable::ptr> &parameter );
-	void SignalDeclaration(Variable::Types variable_type, std::optional<Variable::ptr> &declared_signal );
+	void SignalDeclaration(const Variable::Types variable_type, std::optional<Variable::ptr> &declared_signal );
 	void Statement(std::optional<Statement::ptr> &user_defined_statement );
 	void CallStatement(std::optional<Statement::ptr> &statement );
 	void ForStatement(std::optional<Statement::ptr> &statement );
@@ -491,11 +432,11 @@ struct expression_or_constant {
 	void SkipStatement(std::optional<Statement::ptr> &statement );
 	void AssignStatement(std::optional<Statement::ptr> &statement );
 	void SwapStatement(std::optional<Statement::ptr> &statement );
-	void Expression(expression_evaluation_result &userDefinedExpression, unsigned int bitwidth, bool simplifyIfPossible);
+	void Expression(const ExpressionEvaluationResult::ptr &userDefinedExpression, const unsigned int bitwidth, const bool simplifyIfPossible);
 	void Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfPossible);
-	void BinaryExpression(expression_evaluation_result &user_defined_binary_expression, unsigned int bitwidth, bool simplify_if_possible);
-	void ShiftExpression(expression_evaluation_result &user_defined_shift_expression, unsigned int bitwidth, bool simplify_if_possible);
-	void UnaryExpression(expression_evaluation_result &unary_expression, unsigned int bitwidth, bool simplify_if_possible);
+	void BinaryExpression(const ExpressionEvaluationResult::ptr &parsedBinaryExpression, const unsigned int bitwidth, const bool simplifyIfPossible);
+	void ShiftExpression(const ExpressionEvaluationResult::ptr &userDefinedShiftExpression, const unsigned int bitwidth, const bool simplifyIfPossible);
+	void UnaryExpression(const ExpressionEvaluationResult::ptr &unaryExpression, const unsigned int bitwidth, const bool simplifyIfPossible);
 
 	void Parse();
 

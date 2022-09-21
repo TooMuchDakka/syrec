@@ -3,6 +3,9 @@
 using namespace syrec;
 
 void SignalEvaluationResult::updateResultToVariableAccess(const VariableAccess::ptr& variableAccess) {
+    if (isValid()) {
+        this->evaluationResult.reset();
+    }
     this->evaluationResult.emplace(availableValueOptions(variableAccess));
 }
 

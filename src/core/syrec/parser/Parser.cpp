@@ -119,6 +119,7 @@ void Parser::Number(std::optional<Number::ptr> &parsed_number, bool simplify_if_
 			if (check_ident_was_declared(signal_ident)) {
 			const auto &symbol_table_entry = currSymTabScope->getVariable(signal_ident);
 			if (symbol_table_entry.has_value() && std::holds_alternative<Number::ptr>(symbol_table_entry.value())) {
+			// TODO: An optimization that can be done here would be the replacement of the loop variable with its current value from the mapping
 			parsed_number.emplace(std::get<Number::ptr>(symbol_table_entry.value()));
 			}
 			else {
@@ -357,7 +358,7 @@ void Parser::Parameter(std::optional<Variable::ptr> &parameter ) {
 		
 }
 
-void Parser::SignalDeclaration(Variable::Types variable_type, std::optional<Variable::ptr> &declared_signal ) {
+void Parser::SignalDeclaration(const Variable::Types variable_type, std::optional<Variable::ptr> &declared_signal ) {
 		std::vector<unsigned int> dimensions{};
 		// TODO: Use default bit width
 		unsigned int signal_width = 0;	
@@ -433,7 +434,7 @@ void Parser::CallStatement(std::optional<Statement::ptr> &statement ) {
 		isValidCallOperation = isCallStatement.has_value();	
 		Expect(_ident);
 		std::string methodIdent = convert_to_uniform_text_format(t->val);
-		MethodCallGuess::ptr guessesForPossibleCall = std::make_shared<MethodCallGuess>(MethodCallGuess(currSymTabScope, methodIdent));
+		const MethodCallGuess::ptr guessesForPossibleCall = std::make_shared<MethodCallGuess>(MethodCallGuess(currSymTabScope, methodIdent));
 		if (!guessesForPossibleCall->hasSomeMatches()) {
 		// TODO: GEN_ERROR no method for ident declared
 		isValidCallOperation = false;
@@ -516,133 +517,133 @@ void Parser::CallStatement(std::optional<Statement::ptr> &statement ) {
 }
 
 void Parser::ForStatement(std::optional<Statement::ptr> &statement ) {
-		std::optional<std::string> loop_variable_ident;
-		std::optional<Number::ptr> iteration_range_start;
-		std::optional<Number::ptr> iteration_range_end;
-		std::optional<Number::ptr> custom_step_size;
-		bool negative_step_size = false;
-		Statement::vec loop_body{};
-		bool explicit_range_start_defined = false;
-		bool explicit_step_size_defined = false;
+		std::optional<std::string> loopVariableIdent;
+		std::optional<Number::ptr> iterationRangeStart;
+		std::optional<Number::ptr> iterationRangeEnd;
+		std::optional<Number::ptr> customStepSize;
+		bool negativeStepSize = false;
+		Statement::vec loopBody{};
+		bool explicitRangeStartDefined = false;
+		bool explicitStepSizeDefined = false;
 		
 		Expect(23 /* "for" */);
 		if (check_if_loop_iteration_range_start_is_defined()) {
 			if (check_if_loop_variable_is_defined()) {
 				Expect(4 /* "$" */);
 				Expect(_ident);
-				const std::string &loop_var_ident = convert_to_uniform_text_format(t->val);
-				if (!check_ident_was_declared(loop_var_ident)) {
-				loop_variable_ident.emplace(convert_to_uniform_text_format(t->val));
+				const std::string &loopVarIdent = convert_to_uniform_text_format(t->val);
+				if (!check_ident_was_declared(loopVarIdent)) {
+				loopVariableIdent.emplace(convert_to_uniform_text_format(t->val));
 				SymbolTable::openScope(currSymTabScope);
-				const Number::ptr loop_variable_entry = std::make_shared<syrec::Number>(syrec::Number(loop_var_ident));
-				currSymTabScope->addEntry(loop_variable_entry);
+				const Number::ptr loopVariableEntry = std::make_shared<syrec::Number>(syrec::Number(loopVarIdent));
+				currSymTabScope->addEntry(loopVariableEntry);
 				}
 				
 				Expect(24 /* "=" */);
 			}
-			Number(iteration_range_start, false);
-			explicit_range_start_defined = true;	
+			Number(iterationRangeStart, true);
+			explicitRangeStartDefined = true;	
 			Expect(25 /* "to" */);
 		}
-		Number(iteration_range_end, false);
-		if (!explicit_range_start_defined){
-		iteration_range_start = iteration_range_end;
+		Number(iterationRangeEnd, true);
+		if (!explicitRangeStartDefined){
+		iterationRangeStart = iterationRangeEnd;
 		}
 		
 		if (la->kind == 26 /* "step" */) {
 			Get();
-			explicit_step_size_defined = true;	
+			explicitStepSizeDefined = true;	
 			if (la->kind == 7 /* "-" */) {
 				Get();
-				negative_step_size = true;	
+				negativeStepSize = true;	
 			}
-			Number(custom_step_size, false);
-			if (custom_step_size.has_value() && !custom_step_size.value()->evaluate({})) {
+			Number(customStepSize, true);
+			if (customStepSize.has_value() && !customStepSize.value()->evaluate({})) {
 			// TODO: GEN_ERROR step size cannot be zero ?
 			}
 			
 		}
-		if (!explicit_step_size_defined) {
-		custom_step_size.emplace(std::make_shared<syrec::Number>(syrec::Number(1)));
+		if (!explicitStepSizeDefined) {
+		customStepSize.emplace(std::make_shared<syrec::Number>(syrec::Number(1)));
 		}
 		
-		bool valid_loop_header = loop_variable_ident.has_value() 
-						&& (explicit_range_start_defined ? iteration_range_start.has_value() : true)
-						&& iteration_range_end.has_value()
-						&& (explicit_step_size_defined ? custom_step_size.has_value() : true);
-		if (valid_loop_header) {
-		const unsigned int iteration_range_start_value = iteration_range_start.value()->evaluate({});
-		const unsigned int iteration_range_end_value = iteration_range_end.value()->evaluate({});
-		const unsigned int step_size = custom_step_size.value()->evaluate({});
+		bool validLoopHeader = loopVariableIdent.has_value() 
+						&& (explicitRangeStartDefined ? iterationRangeStart.has_value() : true)
+						&& iterationRangeEnd.has_value()
+						&& (explicitStepSizeDefined ? customStepSize.has_value() : true);
+		if (validLoopHeader) {
+		const unsigned int iterationRangeStartValue = iterationRangeStart.value()->evaluate({});
+		const unsigned int iterationRangeEndValue = iterationRangeEnd.value()->evaluate({});
+		const unsigned int stepSize = customStepSize.value()->evaluate({});
 		
-		unsigned int num_iterations;
-		if ((negative_step_size && iteration_range_end_value > iteration_range_start_value)
-		|| (!negative_step_size && iteration_range_start_value > iteration_range_end_value)
-		|| !step_size) {
+		unsigned int numIterations;
+		if ((negativeStepSize && iterationRangeEndValue > iterationRangeStartValue)
+		|| (!negativeStepSize && iterationRangeStartValue > iterationRangeEndValue)
+		|| !stepSize) {
 		// TODO: Either generate error or warning
-		num_iterations = 0;	
-		valid_loop_header = false;
+		numIterations = 0;	
+		validLoopHeader = false;
 		}
 		else {
-		num_iterations = negative_step_size 
-		? (iteration_range_start_value - iteration_range_end_value)
-		: (iteration_range_end_value - iteration_range_start_value);
-		num_iterations = (num_iterations + 1) / step_size;
+		numIterations = negativeStepSize 
+		? (iterationRangeStartValue - iterationRangeEndValue)
+		: (iterationRangeEndValue - iterationRangeStartValue);
+		numIterations = (numIterations + 1) / stepSize;
 		}
 		}
 		
 		Expect(27 /* "do" */);
-		StatementList(loop_body);
-		if (loop_body.empty()) {
+		StatementList(loopBody);
+		if (loopBody.empty()) {
 		// TODO: GEN_ERROR
 		}
 		
 		Expect(28 /* "rof" */);
-		if (loop_variable_ident.has_value()) {
+		if (loopVariableIdent.has_value()) {
 		SymbolTable::closeScope(currSymTabScope);
 		}
 		
 		// TODO: If a statement must be generated, one could create a skip statement instead of simply returning 
-		if (!valid_loop_header || loop_body.empty()) {
+		if (!validLoopHeader || loopBody.empty()) {
 		return;
 		}
 		
-		const std::shared_ptr<syrec::ForStatement> loop_statement = std::make_shared<syrec::ForStatement>(syrec::ForStatement());
-		loop_statement->loopVariable = loop_variable_ident.value();
-		loop_statement->range = std::pair(iteration_range_start.value(), iteration_range_end.value());
-		loop_statement->step = custom_step_size.value();
-		loop_statement->statements = loop_body;
-		statement.emplace(loop_statement);
+		const std::shared_ptr<syrec::ForStatement> loopStatement = std::make_shared<syrec::ForStatement>();
+		loopStatement->loopVariable = loopVariableIdent.value();
+		loopStatement->range = std::pair(iterationRangeStart.value(), iterationRangeEnd.value());
+		loopStatement->step = customStepSize.value();
+		loopStatement->statements = loopBody;
+		statement.emplace(loopStatement);
 		
 }
 
 void Parser::IfStatement(std::optional<Statement::ptr> &statement ) {
-		expression_evaluation_result condition;
-		expression_evaluation_result closing_condition;
-		Statement::vec true_branch{};
-		Statement::vec false_branch{};
+		const ExpressionEvaluationResult::ptr condition = createExpressionEvalutionResultContainer();
+		const ExpressionEvaluationResult::ptr closingCondition = createExpressionEvalutionResultContainer();
+		Statement::vec trueBranch{};
+		Statement::vec falseBranch{};
 		
 		Expect(29 /* "if" */);
 		Expression(condition, 1u, false);
 		Expect(30 /* "then" */);
-		StatementList(true_branch);
+		StatementList(trueBranch);
 		Expect(31 /* "else" */);
-		StatementList(false_branch);
+		StatementList(falseBranch);
 		Expect(32 /* "fi" */);
-		Expression(closing_condition, 1u, false);
-		const bool conditional_well_formed = condition.has_value() 
-		&& closing_condition.has_value()
-		&& !true_branch.empty()
-		&& !false_branch.empty();
-		if (!conditional_well_formed) {
+		Expression(closingCondition, 1u, false);
+		const bool conditionalWellFormed = condition->hasValue() 
+		&& closingCondition->hasValue()
+		&& !trueBranch.empty()
+		&& !falseBranch.empty();
+		if (!conditionalWellFormed) {
 		return;
 		}
 		
-		const std::shared_ptr<syrec::IfStatement> &conditional = std::make_shared<syrec::IfStatement>(syrec::IfStatement());
-		conditional->condition = condition.value().convert_to_expression(1u);
-		conditional->fiCondition = closing_condition.value().convert_to_expression(1u);
-		conditional->thenStatements                    = true_branch;
-		conditional->elseStatements                    = false_branch;
+		const std::shared_ptr<syrec::IfStatement> &conditional = std::make_shared<syrec::IfStatement>();
+		conditional->condition = condition->getOrConvertToExpression(1u).value();
+		conditional->fiCondition = closingCondition->getOrConvertToExpression(1u).value();
+		conditional->thenStatements                    = trueBranch;
+		conditional->elseStatements                    = falseBranch;
 		statement.emplace(conditional);
 		
 }
@@ -691,7 +692,7 @@ void Parser::SkipStatement(std::optional<Statement::ptr> &statement ) {
 
 void Parser::AssignStatement(std::optional<Statement::ptr> &statement ) {
 		SignalEvaluationResult assignStmtLhs;
-		expression_evaluation_result assignStmtRhs;
+		const ExpressionEvaluationResult::ptr assignStmtRhs = createExpressionEvalutionResultContainer();
 		std::optional<syrec_operation::operation> assignOperation;
 		unsigned int expressionBitwidth = 1u;
 		
@@ -722,7 +723,7 @@ void Parser::AssignStatement(std::optional<Statement::ptr> &statement ) {
 		} else SynErr(63);
 		Expect(24 /* "=" */);
 		Expression(assignStmtRhs, expressionBitwidth, false);
-		if (!allSemanticChecksOk || !assignOperation.has_value() || !assignStmtRhs.has_value()) {
+		if (!allSemanticChecksOk || !assignOperation.has_value() || !assignStmtRhs->hasValue()) {
 		return;
 		}
 		
@@ -731,7 +732,7 @@ void Parser::AssignStatement(std::optional<Statement::ptr> &statement ) {
 		if (mappedOperation.has_value()) {
 		statement.emplace(std::make_shared<syrec::AssignStatement>(syrec::AssignStatement(assignStmtLhs.getAsVariableAccess().value(),
 		mappedOperation.value(),
-		assignStmtRhs.value().convert_to_expression(expressionBitwidth))));
+		assignStmtRhs->getOrConvertToExpression(expressionBitwidth).value())));
 		}
 		
 }
@@ -761,7 +762,7 @@ void Parser::SwapStatement(std::optional<Statement::ptr> &statement ) {
 		
 }
 
-void Parser::Expression(expression_evaluation_result &userDefinedExpression, unsigned int bitwidth, bool simplifyIfPossible) {
+void Parser::Expression(const ExpressionEvaluationResult::ptr &userDefinedExpression, const unsigned int bitwidth, const bool simplifyIfPossible) {
 		SignalEvaluationResult signal;
 		std::optional<Number::ptr> number;
 		
@@ -769,7 +770,8 @@ void Parser::Expression(expression_evaluation_result &userDefinedExpression, uns
 			if (check_if_expression_is_number()) {
 				Number(number, simplifyIfPossible);
 				if (number.has_value()) {
-				userDefinedExpression.emplace(std::make_shared<NumericExpression>(NumericExpression(number.value(), bitwidth)));
+				const NumericExpression::ptr expr = std::make_shared<NumericExpression>(NumericExpression(number.value(), bitwidth));
+				userDefinedExpression->setResult(expr);
 				}
 				
 			} else if (check_if_expression_is_binary_expression()) {
@@ -784,10 +786,10 @@ void Parser::Expression(expression_evaluation_result &userDefinedExpression, uns
 			}
 			
 			if (signal.isVariableAccess()) {
-			userDefinedExpression.emplace(std::make_shared<VariableExpression>(VariableExpression(signal.getAsVariableAccess().value())));
+			userDefinedExpression->setResult(std::make_shared<VariableExpression>(VariableExpression(signal.getAsVariableAccess().value())));
 			}
 			else if (signal.isConstant()) {
-			userDefinedExpression.emplace(std::make_shared<NumericExpression>(NumericExpression(signal.getAsNumber().value(), bitwidth)));
+			userDefinedExpression->setResult(std::make_shared<NumericExpression>(NumericExpression(signal.getAsNumber().value(), bitwidth)));
 			}
 			
 		} else if (la->kind == 33 /* "~" */ || la->kind == 52 /* "!" */) {
@@ -819,12 +821,12 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 		
 		while (la->kind == 18 /* "[" */) {
 			Get();
-			expression_evaluation_result dimensionExpression; 
+			ExpressionEvaluationResult::ptr dimensionExpression = createExpressionEvalutionResultContainer(); 
 			Expression(dimensionExpression, indexExpressionBitwidth, simplifyIfPossible);
-			indexExpressionsSemanticallyOk &= dimensionExpression.has_value();
+			indexExpressionsSemanticallyOk &= dimensionExpression->hasValue();
 			
 			if (indexExpressionsSemanticallyOk) {
-			const std::optional<unsigned int> &constantValueForAccessedDimension = get_value_if_expression_is_constant(dimensionExpression);
+			const std::optional<unsigned int> &constantValueForAccessedDimension = dimensionExpression->getAsConstant();
 			if (constantValueForAccessedDimension.has_value()) {
 			// TODO: Using global flag indicating zero_based indexing or not
 			indexExpressionsSemanticallyOk = range_check::isValidDimensionAccess(accessedSignal.value()->getVar(), constantValueForAccessedDimension.value(), true);
@@ -837,7 +839,7 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 			}
 			
 			if (indexExpressionsSemanticallyOk) {
-			accessedSignal.value()->indexes.emplace_back(dimensionExpression.value().convert_to_expression(indexExpressionBitwidth));
+			accessedSignal.value()->indexes.emplace_back(dimensionExpression->getOrConvertToExpression(indexExpressionBitwidth).value());
 			}
 			}
 			accessedDimensionIdx++;
@@ -890,161 +892,166 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 		
 }
 
-void Parser::BinaryExpression(expression_evaluation_result &user_defined_binary_expression, unsigned int bitwidth, bool simplify_if_possible) {
-		expression_evaluation_result binary_expr_lhs;
-		expression_evaluation_result binary_expr_rhs;
-		std::optional<syrec_operation::operation> binary_operation;
-		unsigned int operands_bitwidth = 0u;
+void Parser::BinaryExpression(const ExpressionEvaluationResult::ptr &parsedBinaryExpression, const unsigned int bitwidth, const bool simplifyIfPossible) {
+		ExpressionEvaluationResult::ptr binaryExprLhs = createExpressionEvalutionResultContainer();
+		ExpressionEvaluationResult::ptr binaryExprRhs = createExpressionEvalutionResultContainer();
+		std::optional<syrec_operation::operation> binaryOperation;
+		unsigned int expectedBitWidth = bitwidth;
 		
 		Expect(5 /* "(" */);
-		Expression(binary_expr_lhs, bitwidth, simplify_if_possible);
-		if (binary_expr_lhs.has_value()) {
-		operands_bitwidth = std::max(binary_expr_lhs->convert_to_expression(bitwidth)->bitwidth(), bitwidth);
+		Expression(binaryExprLhs, bitwidth, simplifyIfPossible);
+		if (binaryExprLhs->hasValue()) {
+		expectedBitWidth = std::max(binaryExprLhs->getOrConvertToExpression(expectedBitWidth).value()->bitwidth(), expectedBitWidth);
 		}
 		
 		switch (la->kind) {
 		case 6 /* "+" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::addition);	
+			binaryOperation.emplace(syrec_operation::operation::addition);	
 			break;
 		}
 		case 7 /* "-" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::subtraction);	
+			binaryOperation.emplace(syrec_operation::operation::subtraction);	
 			break;
 		}
 		case 36 /* "^" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::bitwise_xor);	
+			binaryOperation.emplace(syrec_operation::operation::bitwise_xor);	
 			break;
 		}
 		case 8 /* "*" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::multiplication);	
+			binaryOperation.emplace(syrec_operation::operation::multiplication);	
 			break;
 		}
 		case 9 /* "/" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::division);	
+			binaryOperation.emplace(syrec_operation::operation::division);	
 			break;
 		}
 		case 41 /* "%" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::modulo);	
+			binaryOperation.emplace(syrec_operation::operation::modulo);	
 			break;
 		}
 		case 42 /* "*>" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::upper_bits_multiplication);	
+			binaryOperation.emplace(syrec_operation::operation::upper_bits_multiplication);	
 			break;
 		}
 		case 43 /* "&&" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::logical_and);	
+			binaryOperation.emplace(syrec_operation::operation::logical_and);	
 			break;
 		}
 		case 44 /* "||" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::logical_or);	
+			binaryOperation.emplace(syrec_operation::operation::logical_or);	
 			break;
 		}
 		case 45 /* "&" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::bitwise_and);	
+			binaryOperation.emplace(syrec_operation::operation::bitwise_and);	
 			break;
 		}
 		case 46 /* "|" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::bitwise_or);	
+			binaryOperation.emplace(syrec_operation::operation::bitwise_or);	
 			break;
 		}
 		case 47 /* "<" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::less_than);	
+			binaryOperation.emplace(syrec_operation::operation::less_than);	
 			break;
 		}
 		case 48 /* ">" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::greater_than);	
+			binaryOperation.emplace(syrec_operation::operation::greater_than);	
 			break;
 		}
 		case 24 /* "=" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::equals);	
+			binaryOperation.emplace(syrec_operation::operation::equals);	
 			break;
 		}
 		case 49 /* "!=" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::not_equals);	
+			binaryOperation.emplace(syrec_operation::operation::not_equals);	
 			break;
 		}
 		case 50 /* "<=" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::less_equals);	
+			binaryOperation.emplace(syrec_operation::operation::less_equals);	
 			break;
 		}
 		case 51 /* ">=" */: {
 			Get();
-			binary_operation.emplace(syrec_operation::operation::greater_equals);	
+			binaryOperation.emplace(syrec_operation::operation::greater_equals);	
 			break;
 		}
 		default: SynErr(65); break;
 		}
-		Expression(binary_expr_rhs, operands_bitwidth, simplify_if_possible);
+		if (!binaryOperation.has_value()) {
+		// TODO: GEN_ERROR Expected one of n possible operands but non was specified
+		}
+		
+		Expression(binaryExprRhs, expectedBitWidth, simplifyIfPossible);
 		Expect(10 /* ")" */);
-		if (binary_expr_lhs.has_value() && binary_operation.has_value() && binary_expr_rhs.has_value()) {
-		const std::optional<unsigned int> mapped_operation = map_operation_to_binary_operation(binary_operation.value());
-		if (mapped_operation.has_value()) {
-			if (binary_expr_lhs->is_constant() && binary_expr_rhs->is_constant()) {
-				const unsigned int binary_expr_lhs_value = binary_expr_lhs->get_constant_value();
-				const unsigned int binary_expr_rhs_value = binary_expr_rhs->get_constant_value();
-				const std::optional<unsigned int> evaluation_result = apply_binary_operation(binary_operation.value(),
-																binary_expr_lhs_value, binary_expr_rhs_value);
-				if (evaluation_result.has_value()) {
-					user_defined_binary_expression.emplace(evaluation_result.value());
-				}
-			}
-			else {
-				const expression::ptr lhs_operand = binary_expr_lhs->convert_to_expression(operands_bitwidth);
-				const expression::ptr rhs_operand = binary_expr_rhs->convert_to_expression(operands_bitwidth);
-				user_defined_binary_expression.emplace(std::make_shared<syrec::BinaryExpression>(syrec::BinaryExpression(lhs_operand,
-									mapped_operation.value(),
-									rhs_operand)));
-			}
+		if (binaryExprLhs->hasValue() && binaryOperation.has_value() && binaryExprRhs->hasValue()) {
+		const std::optional<unsigned int> mappedOperation = map_operation_to_binary_operation(binaryOperation.value());
+		if (!mappedOperation.has_value()) {
+		return;
+		}
+		
+		if (binaryExprLhs->evaluatedToConstant() && binaryExprRhs->evaluatedToConstant()) {
+		const unsigned int lhsValueEvaluated = binaryExprLhs->getAsConstant().value();
+		const unsigned int rhsValueEvaluated = binaryExprRhs->getAsConstant().value();
+		const std::optional<unsigned int> operationApplicationResult = apply_binary_operation(binaryOperation.value(), lhsValueEvaluated, rhsValueEvaluated);
+		if (operationApplicationResult.has_value()) {
+		parsedBinaryExpression->setResult(operationApplicationResult.value(), expectedBitWidth);
+		}
+		}
+		else {
+		const expression::ptr lhsOperand = binaryExprLhs->getOrConvertToExpression(std::nullopt).value();
+		const expression::ptr rhsOperand = binaryExprRhs->getOrConvertToExpression(std::nullopt).value();
+		parsedBinaryExpression->setResult(std::make_shared<syrec::BinaryExpression>(syrec::BinaryExpression(lhsOperand, 
+																				 mappedOperation.value(),
+																				 rhsOperand)));
 		}
 		}
 		
 }
 
-void Parser::ShiftExpression(expression_evaluation_result &user_defined_shift_expression, unsigned int bitwidth, bool simplify_if_possible) {
-		expression_evaluation_result shift_expression_lhs;
-		std::optional<Number::ptr> shift_amount;
-		std::optional<syrec_operation::operation> shift_operation;
+void Parser::ShiftExpression(const ExpressionEvaluationResult::ptr &userDefinedShiftExpression, const unsigned int bitwidth, const bool simplifyIfPossible) {
+		ExpressionEvaluationResult::ptr shiftExpressionLhs = createExpressionEvalutionResultContainer();
+		std::optional<Number::ptr> shiftAmount;
+		std::optional<syrec_operation::operation> shiftOperation;
 		
 		Expect(5 /* "(" */);
-		Expression(shift_expression_lhs, bitwidth, simplify_if_possible);
+		Expression(shiftExpressionLhs, bitwidth, simplifyIfPossible);
 		if (la->kind == 53 /* "<<" */) {
 			Get();
-			shift_operation.emplace(syrec_operation::operation::shift_left);	
+			shiftOperation.emplace(syrec_operation::operation::shift_left);	
 		} else if (la->kind == 54 /* ">>" */) {
 			Get();
-			shift_operation.emplace(syrec_operation::operation::shift_right);	
+			shiftOperation.emplace(syrec_operation::operation::shift_right);	
 		} else SynErr(66);
-		Number(shift_amount, simplify_if_possible);
-		if (shift_expression_lhs.has_value() && shift_operation.has_value() && shift_amount.has_value()) {
-		const std::optional<unsigned int> mapped_shift_operation = map_operation_to_shift_operation(shift_operation.value());
-		const expression::ptr lhs_operand_expression = shift_expression_lhs.value().convert_to_expression(bitwidth);
+		Number(shiftAmount, simplifyIfPossible);
+		if (!shiftExpressionLhs->hasValue() || !shiftOperation.has_value() || !shiftAmount.has_value()) {
+		return;
+		}
+		const std::optional<unsigned int> mappedShiftOperation = map_operation_to_shift_operation(shiftOperation.value());
+		const expression::ptr lhsOperandExpression = shiftExpressionLhs->getOrConvertToExpression(bitwidth).value();
 		
 		// One could replace the shift statement with a skip statement if the shift amount is zero 
-		const std::optional<unsigned int> shift_amount_value_evaluated = evaluate_number_container_to_constant(shift_amount.value());
-		if (shift_amount_value_evaluated.has_value() && shift_expression_lhs.value().is_constant()) {
-		const unsigned int shift_operand_lhs_value = shift_expression_lhs.value().get_constant_value();
-		const std::optional<unsigned int> shift_application_result = syrec_operation::apply(shift_operation.value(), 
-		shift_operand_lhs_value,
-		shift_amount_value_evaluated.value());
+		const std::optional<unsigned int> shiftAmountValueEvaluated = evaluate_number_container_to_constant(shiftAmount.value());
+		const std::optional<unsigned int> lhsOperandValueEvaluated = shiftExpressionLhs->getAsConstant();
 		
-		if (shift_application_result.has_value()) {
-		user_defined_shift_expression.emplace(expression_or_constant(shift_application_result.value()));
+		if (shiftAmountValueEvaluated.has_value() && lhsOperandValueEvaluated.has_value()) {
+		const std::optional<unsigned int> shiftApplicationResult = syrec_operation::apply(shiftOperation.value(), lhsOperandValueEvaluated.value(), shiftAmountValueEvaluated.value());
+		if (shiftApplicationResult.has_value()) {
+		userDefinedShiftExpression->setResult(shiftApplicationResult.value(), bitwidth);
 		}
 		else {
 		// TODO: GEN_ERROR
@@ -1052,33 +1059,27 @@ void Parser::ShiftExpression(expression_evaluation_result &user_defined_shift_ex
 		}
 		}
 		else {
-		const expression::ptr lhs_operand_expression = shift_expression_lhs.value().convert_to_expression(bitwidth);
-		user_defined_shift_expression.emplace(std::make_shared<syrec::ShiftExpression>(lhs_operand_expression,
-		mapped_shift_operation.value(),
-		shift_amount.value()));
-		}
+		userDefinedShiftExpression->setResult(std::make_shared<syrec::ShiftExpression>(lhsOperandExpression,
+		mappedShiftOperation.value(),
+		shiftAmount.value()));
 		}
 		
 		Expect(10 /* ")" */);
 }
 
-void Parser::UnaryExpression(expression_evaluation_result &unary_expression, unsigned int bitwidth, bool simplify_if_possible) {
-		expression_evaluation_result unary_expression_operand;
-		std::optional<syrec_operation::operation> unary_operation;
+void Parser::UnaryExpression(const ExpressionEvaluationResult::ptr &unaryExpression, const unsigned int bitwidth, const bool simplifyIfPossible) {
+		ExpressionEvaluationResult::ptr unaryExpressionOperand = createExpressionEvalutionResultContainer();
+		std::optional<syrec_operation::operation> unaryOperation;
 		
 		if (la->kind == 52 /* "!" */) {
 			Get();
-			unary_operation.emplace(syrec_operation::operation::logical_negation);	
+			unaryOperation.emplace(syrec_operation::operation::logical_negation);	
 		} else if (la->kind == 33 /* "~" */) {
 			Get();
-			unary_operation.emplace(syrec_operation::operation::bitwise_negation);	
+			unaryOperation.emplace(syrec_operation::operation::bitwise_negation);	
 		} else SynErr(67);
-		Expression(unary_expression_operand, bitwidth, simplify_if_possible);
-		if (unary_operation.has_value() && unary_expression_operand.has_value()){
-		// TODO:
-		}
-		
-		// TODO: Notify user (i.e. via error) that reference parser currently does not support unary statements - we will ignore them for now
+		Expression(unaryExpressionOperand, bitwidth, simplifyIfPossible);
+		return;
 		
 }
 
