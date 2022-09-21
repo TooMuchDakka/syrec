@@ -349,7 +349,7 @@ Module::vec modules;
 		return mapping_result;
 	}
 
-	bool check_ident_was_declared(const std::string_view& ident) const {
+	bool checkIdentWasDeclaredOrLogError(const std::string_view& ident) const {
 		if (!currSymTabScope->contains(ident)) {
 			// TOOD: GEN_ERROR
 			return false;
@@ -357,51 +357,25 @@ Module::vec modules;
 		return true;
 	}
 
-	// TODO: Generate error/s in case of exceptions
-	[[nodiscard]] std::optional<unsigned int> apply_unary_operation(const syrec_operation::operation operation, const Number::ptr &left_operand) const {
-		std::optional<unsigned int> operation_result;
-		try {
-			operation_result.emplace(syrec_operation::apply(operation, left_operand->evaluate(loop_variable_mapping_lookup)));
-		}
-		catch (std::overflow_error &err) {
-		
-		}
-		catch(std::invalid_argument &err) {
-		
-		}
-        return operation_result;
-	}
-
-	// TODO: Generate error/s in case of exceptions
-	[[nodiscard]] static std::optional<unsigned int> apply_binary_operation(const syrec_operation::operation operation, const unsigned int &left_operand, const unsigned int &right_operand) {
-		std::optional<unsigned int> operation_result;
-		try {
-			operation_result.emplace(syrec_operation::apply(operation, left_operand, right_operand));
-		}
-		catch (std::overflow_error &err) {
-		
-		}
-		catch(std::invalid_argument &err) {
-		
-		}
-        return operation_result;
-	}
-
-	[[nodiscard]] std::optional<unsigned int> evaluate_number_container_to_constant(const Number::ptr &number_container) const {
-		std::optional<unsigned int> value_of_number_container;
-		if (number_container->isLoopVariable()) {
-			const std::string &loop_variable_name = number_container->variableName();
-			if (loop_variable_mapping_lookup.find(loop_variable_name) == loop_variable_mapping_lookup.end()) {
-				// TODO: GEN_ERROR
-			}
-			else {
-				value_of_number_container.emplace(number_container->evaluate(loop_variable_mapping_lookup));
-			}
+	[[nodiscard]] static std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
+		if (operation == syrec_operation::operation::division && rightOperand == 0) {
+			// TODO: GEN_ERROR
+			return std::nullopt;	
 		}
 		else {
-			value_of_number_container.emplace(number_container->evaluate(loop_variable_mapping_lookup));
+			return syrec_operation::apply(operation, leftOperand, rightOperand);	
 		}
-		return value_of_number_container;
+	}
+
+	[[nodiscard]] std::optional<unsigned int> evaluateNumberContainer(const Number::ptr &numberContainer) const {
+		if (numberContainer->isLoopVariable()) {
+			const std::string& loopVariableIdentToResolve = numberContainer->variableName();
+			if (loop_variable_mapping_lookup.find(loopVariableIdentToResolve) == loop_variable_mapping_lookup.end()) {
+				// TODO: GEN_ERROR
+				return std::nullopt;
+			}
+		}
+		return std::optional(numberContainer->evaluate(loop_variable_mapping_lookup));
 	}
 
 	[[nodiscard]] ExpressionEvaluationResult::ptr createExpressionEvalutionResultContainer() const {
@@ -416,7 +390,7 @@ Module::vec modules;
 	~Parser();
 	void SemErr(const wchar_t* msg);
 
-	void Number(std::optional<Number::ptr> &parsed_number, bool simplify_if_possible );
+	void Number(std::optional<Number::ptr> &parsedNumber, const bool simplifyIfPossible );
 	void SyReC();
 	void Module(std::optional<Module::ptr> &parsed_module	);
 	void ParameterList(bool &is_valid_module_definition, const Module::ptr &module);

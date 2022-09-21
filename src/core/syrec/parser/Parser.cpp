@@ -89,50 +89,55 @@ bool Parser::WeakSeparator(int n, int syFol, int repFol) {
 	}
 }
 
-void Parser::Number(std::optional<Number::ptr> &parsed_number, bool simplify_if_possible ) {
+void Parser::Number(std::optional<Number::ptr> &parsedNumber, const bool simplifyIfPossible ) {
 		if (la->kind == _int) {
 			Get();
 			const std::optional<unsigned int> conversion_result = convert_token_value_to_number(*t);
 			if (conversion_result.has_value()) {
 			const Number::ptr result = std::make_shared<syrec::Number>(syrec::Number(conversion_result.value())); 
-			parsed_number.emplace(result);
+			parsedNumber.emplace(result);
 			}
 			
 		} else if (la->kind == 3 /* "#" */) {
 			Get();
 			Expect(_ident);
-			const std::string signal_ident = convert_to_uniform_text_format(t->val);
-			if (check_ident_was_declared(signal_ident)) {
-			const auto &symbol_table_entry = currSymTabScope->getVariable(signal_ident);
-			if (symbol_table_entry.has_value() && std::holds_alternative<Variable::ptr>(symbol_table_entry.value())) {
-			parsed_number.emplace(std::make_shared<syrec::Number>(syrec::Number(std::get<Variable::ptr>(symbol_table_entry.value())->bitwidth)));
+			const std::string signalIdent = convert_to_uniform_text_format(t->val);
+			if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
+			return;
+			}
+			
+			const auto &symTabEntry = currSymTabScope->getVariable(signalIdent);
+			if (symTabEntry.has_value() && std::holds_alternative<Variable::ptr>(symTabEntry.value())) {
+			parsedNumber.emplace(std::make_shared<syrec::Number>(syrec::Number(std::get<Variable::ptr>(symTabEntry.value())->bitwidth)));
 			}
 			else {
 			// TODO: GEN_ERROR, this should not happen but check anyways
-			}
+			return;
 			}
 			
 		} else if (la->kind == 4 /* "$" */) {
 			Get();
 			Expect(_ident);
-			const std::string signal_ident = convert_to_uniform_text_format(t->val);
-			if (check_ident_was_declared(signal_ident)) {
-			const auto &symbol_table_entry = currSymTabScope->getVariable(signal_ident);
-			if (symbol_table_entry.has_value() && std::holds_alternative<Number::ptr>(symbol_table_entry.value())) {
+			const std::string signalIdent = convert_to_uniform_text_format(t->val);
+			if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
+			return;
+			}
+			
+			const auto &symTabEntry = currSymTabScope->getVariable(signalIdent);
+			if (symTabEntry.has_value() && std::holds_alternative<Number::ptr>(symTabEntry.value())) {
 			// TODO: An optimization that can be done here would be the replacement of the loop variable with its current value from the mapping
-			parsed_number.emplace(std::get<Number::ptr>(symbol_table_entry.value()));
+			parsedNumber.emplace(std::get<Number::ptr>(symTabEntry.value()));
 			}
 			else {
 			// TODO: GEN_ERROR, this should not happen but check anyways
 			}
-			}
 			
 		} else if (la->kind == 5 /* "(" */) {
-			std::optional<Number::ptr> lhs_operand, rhs_operand;  
+			std::optional<Number::ptr> lhsOperand, rhsOperand;  
 			std::optional<syrec_operation::operation> op;
 			
 			Get();
-			Number(lhs_operand, simplify_if_possible);
+			Number(lhsOperand, simplifyIfPossible);
 			if (la->kind == 6 /* "+" */) {
 				Get();
 				op.emplace(syrec_operation::operation::addition);		
@@ -146,19 +151,25 @@ void Parser::Number(std::optional<Number::ptr> &parsed_number, bool simplify_if_
 				Get();
 				op.emplace(syrec_operation::operation::division);		
 			} else SynErr(56);
-			Number(rhs_operand, simplify_if_possible);
-			if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
-			const std::optional<unsigned int> lhs_value = evaluate_number_container_to_constant(lhs_operand.value());
-			const std::optional<unsigned int> rhs_value = evaluate_number_container_to_constant(rhs_operand.value());
-			
-			if (lhs_value.has_value() && rhs_value.has_value()) {
-			const std::optional<unsigned int> op_result = apply_binary_operation(op.value(),
-			lhs_operand.value()->evaluate(loop_variable_mapping_lookup),
-			rhs_operand.value()->evaluate(loop_variable_mapping_lookup));
-			if (op_result.has_value()) {
-			const Number::ptr result = std::make_shared<syrec::Number>(syrec::Number(op_result.value())); 
-			parsed_number.emplace(result);
+			Number(rhsOperand, simplifyIfPossible);
+			if (!op.has_value()) {
+			// TODO: GEN_ERROR Expected one of n operand but not of them was specified
+			return;
 			}
+			
+			if (!lhsOperand.has_value() || !rhsOperand.has_value()){
+			return;
+			}
+			
+			const std::optional<unsigned int> lhsEvaluated = evaluateNumberContainer(lhsOperand.value());
+			const std::optional<unsigned int> rhsEvaluated = evaluateNumberContainer(rhsOperand.value());
+			
+			if (lhsEvaluated.has_value() && rhsEvaluated.has_value()) {
+			const std::optional<unsigned int> evaluationResult = applyBinaryOperation(op.value(), lhsEvaluated.value(), rhsEvaluated.value());
+			
+			if (evaluationResult.has_value()) {
+			const Number::ptr result = std::make_shared<syrec::Number>(syrec::Number(evaluationResult.value())); 
+			parsedNumber.emplace(result);
 			}
 			}
 			
@@ -443,7 +454,7 @@ void Parser::CallStatement(std::optional<Statement::ptr> &statement ) {
 		Expect(5 /* "(" */);
 		Expect(_ident);
 		std::string parameterIdent = convert_to_uniform_text_format(t->val);
-		isValidCallOperation &= check_ident_was_declared(parameterIdent);
+		isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent);
 		
 		if (isValidCallOperation) {
 		const std::optional<std::variant<Variable::ptr, Number::ptr>> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent);
@@ -466,7 +477,7 @@ void Parser::CallStatement(std::optional<Statement::ptr> &statement ) {
 			Get();
 			Expect(_ident);
 			std::string parameterIdent = convert_to_uniform_text_format(t->val);
-			isValidCallOperation &= check_ident_was_declared(parameterIdent);
+			isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent);
 			
 			if (isValidCallOperation) {
 			const std::optional<std::variant<Variable::ptr, Number::ptr>> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent);
@@ -532,7 +543,7 @@ void Parser::ForStatement(std::optional<Statement::ptr> &statement ) {
 				Expect(4 /* "$" */);
 				Expect(_ident);
 				const std::string &loopVarIdent = convert_to_uniform_text_format(t->val);
-				if (!check_ident_was_declared(loopVarIdent)) {
+				if (!checkIdentWasDeclaredOrLogError(loopVarIdent)) {
 				loopVariableIdent.emplace(convert_to_uniform_text_format(t->val));
 				SymbolTable::openScope(currSymTabScope);
 				const Number::ptr loopVariableEntry = std::make_shared<syrec::Number>(syrec::Number(loopVarIdent));
@@ -807,7 +818,7 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 		
 		Expect(_ident);
 		const std::string signalIdent = convert_to_uniform_text_format(t->val);
-		if (check_ident_was_declared(signalIdent)) {
+		if (checkIdentWasDeclaredOrLogError(signalIdent)) {
 		const auto symbolTableEntryForSignal = currSymTabScope->getVariable(signalIdent);
 		if (symbolTableEntryForSignal.has_value() && std::holds_alternative<Variable::ptr>(symbolTableEntryForSignal.value())) {
 		const VariableAccess::ptr container = std::make_shared<VariableAccess>(VariableAccess());
@@ -901,7 +912,7 @@ void Parser::BinaryExpression(const ExpressionEvaluationResult::ptr &parsedBinar
 		Expect(5 /* "(" */);
 		Expression(binaryExprLhs, bitwidth, simplifyIfPossible);
 		if (binaryExprLhs->hasValue()) {
-		expectedBitWidth = std::max(binaryExprLhs->getOrConvertToExpression(expectedBitWidth).value()->bitwidth(), expectedBitWidth);
+		expectedBitWidth = std::max(binaryExprLhs->getOrConvertToExpression(std::nullopt).value()->bitwidth(), expectedBitWidth);
 		}
 		
 		switch (la->kind) {
@@ -1007,7 +1018,7 @@ void Parser::BinaryExpression(const ExpressionEvaluationResult::ptr &parsedBinar
 		if (binaryExprLhs->evaluatedToConstant() && binaryExprRhs->evaluatedToConstant()) {
 		const unsigned int lhsValueEvaluated = binaryExprLhs->getAsConstant().value();
 		const unsigned int rhsValueEvaluated = binaryExprRhs->getAsConstant().value();
-		const std::optional<unsigned int> operationApplicationResult = apply_binary_operation(binaryOperation.value(), lhsValueEvaluated, rhsValueEvaluated);
+		const std::optional<unsigned int> operationApplicationResult = applyBinaryOperation(binaryOperation.value(), lhsValueEvaluated, rhsValueEvaluated);
 		if (operationApplicationResult.has_value()) {
 		parsedBinaryExpression->setResult(operationApplicationResult.value(), expectedBitWidth);
 		}
@@ -1045,7 +1056,7 @@ void Parser::ShiftExpression(const ExpressionEvaluationResult::ptr &userDefinedS
 		const expression::ptr lhsOperandExpression = shiftExpressionLhs->getOrConvertToExpression(bitwidth).value();
 		
 		// One could replace the shift statement with a skip statement if the shift amount is zero 
-		const std::optional<unsigned int> shiftAmountValueEvaluated = evaluate_number_container_to_constant(shiftAmount.value());
+		const std::optional<unsigned int> shiftAmountValueEvaluated = evaluateNumberContainer(shiftAmount.value());
 		const std::optional<unsigned int> lhsOperandValueEvaluated = shiftExpressionLhs->getAsConstant();
 		
 		if (shiftAmountValueEvaluated.has_value() && lhsOperandValueEvaluated.has_value()) {

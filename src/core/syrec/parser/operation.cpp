@@ -1,105 +1,110 @@
 #include "core/syrec/parser/operation.hpp"
 
-#include <stdexcept>
-
 namespace syrec_operation {
 
-    static unsigned int apply(const operation operation, const unsigned int left_operand_value, const unsigned int right_operand_value)
+    static std::optional<unsigned int> apply(const operation operation, const unsigned int leftOperand, const unsigned int rightOperand) noexcept
     {
         unsigned int result;
+        bool         isValidBinaryOperation = true;
         switch (operation) {
             case syrec_operation::operation::addition:
             case syrec_operation::operation::add_assign:
-                result = left_operand_value + right_operand_value;
+                result = leftOperand + rightOperand;
                 break;
             case syrec_operation::operation::subtraction:
             case syrec_operation::operation::minus_assign:
-                result = left_operand_value - right_operand_value;
+                result = leftOperand - rightOperand;
                 break;
             case syrec_operation::operation::multiplication:
                 // TODO: Implement correctly
             case syrec_operation::operation::upper_bits_multiplication:
-                result = left_operand_value * right_operand_value;
+                result = leftOperand * rightOperand;
                 break;
             case syrec_operation::operation::division:
-                result = right_operand_value != 0 ? (left_operand_value / right_operand_value) : 0;
+                if (rightOperand == 0) {
+                    isValidBinaryOperation = false;
+                }
+                else {
+                    result = leftOperand / rightOperand;
+                }
                 break;
             case syrec_operation::operation::bitwise_and:
-                result = left_operand_value & right_operand_value;
+                result = leftOperand & rightOperand;
                 break;
             case syrec_operation::operation::bitwise_or:
-                result = left_operand_value | right_operand_value;
+                result = leftOperand | rightOperand;
                 break;
             case syrec_operation::operation::bitwise_xor:
             case syrec_operation::operation::xor_assign:
-                result = left_operand_value ^ right_operand_value;
+                result = leftOperand ^ rightOperand;
                 break;
             case syrec_operation::operation::modulo:
-                result = left_operand_value % right_operand_value;
+                result = leftOperand % rightOperand;
                 break;
             // TODO: Implement correctly
             case syrec_operation::operation::logical_and:
-                result = left_operand_value && right_operand_value;
+                result = leftOperand && rightOperand;
                 break;
             // TODO: Implement correctly
             case syrec_operation::operation::logical_or:
-                result = left_operand_value || right_operand_value;
+                result = leftOperand || rightOperand;
                 break;
             case syrec_operation::operation::less_than:
-                result = left_operand_value < right_operand_value;
+                result = leftOperand < rightOperand;
                 break;
             case syrec_operation::operation::greater_than:
-                result = left_operand_value > right_operand_value;
+                result = leftOperand > rightOperand;
                 break;
             case syrec_operation::operation::equals:
-                result = left_operand_value == right_operand_value;
+                result = leftOperand == rightOperand;
                 break;
             case syrec_operation::operation::not_equals:
-                result = left_operand_value != right_operand_value;
+                result = leftOperand != rightOperand;
                 break;
             case syrec_operation::operation::less_equals:
-                result = left_operand_value <= right_operand_value;
+                result = leftOperand <= rightOperand;
                 break;
             case syrec_operation::operation::greater_equals:
-                result = left_operand_value >= right_operand_value;
+                result = leftOperand >= rightOperand;
                 break;
             case syrec_operation::operation::shift_left:
-                result = left_operand_value << right_operand_value;
+                result = leftOperand << rightOperand;
                 break;
             case syrec_operation::operation::shift_right:
-                result = left_operand_value >> right_operand_value;
+                result = leftOperand >> rightOperand;
                 break;
             default:
-                // TODO:
-                throw std::invalid_argument("TODO:");
+                isValidBinaryOperation = false;
         }
-        return result;
+
+        return isValidBinaryOperation ? std::optional(result) : std::nullopt;
     }
 
-    static unsigned int         apply(const operation operation, const unsigned int left_operand_value) {
+    static std::optional<unsigned int> apply(const operation operation, const unsigned int operand) noexcept {
         unsigned int result = 0;
+        bool isValidUnaryOperation = true;
+
         switch (operation) {
             case syrec_operation::operation::bitwise_negation:
-                result = ~left_operand_value;
+                result = ~operand;
                 break;
             // TODO: Implement correctly
             case syrec_operation::operation::logical_negation:
                 break;
             case syrec_operation::operation::increment_assign:
-                result = left_operand_value + 1;
+                result = operand + 1;
                 break;
             case syrec_operation::operation::decrement_assign:
-                result = left_operand_value - 1;
+                result = operand - 1;
                 break;
             // TODO: Implement correctly
             case syrec_operation::operation::negate_assign:
-                result = ~left_operand_value;
+                result = ~operand;
                 break;
-
             default:
-                // TODO:
-                throw std::invalid_argument("TODO:");
+                isValidUnaryOperation = false;
         }
-        return result;
+
+        return isValidUnaryOperation ? std::optional(result) : std::nullopt;
     }
 }

@@ -284,7 +284,7 @@ COMPILER SyReC
 		return mapping_result;
 	}
 
-	bool check_ident_was_declared(const std::string_view& ident) const {
+	bool checkIdentWasDeclaredOrLogError(const std::string_view& ident) const {
 		if (!currSymTabScope->contains(ident)) {
 			// TOOD: GEN_ERROR
 			return false;
@@ -292,51 +292,25 @@ COMPILER SyReC
 		return true;
 	}
 
-	// TODO: Generate error/s in case of exceptions
-	[[nodiscard]] std::optional<unsigned int> apply_unary_operation(const syrec_operation::operation operation, const Number::ptr &left_operand) const {
-		std::optional<unsigned int> operation_result;
-		try {
-			operation_result.emplace(syrec_operation::apply(operation, left_operand->evaluate(loop_variable_mapping_lookup)));
-		}
-		catch (std::overflow_error &err) {
-		
-		}
-		catch(std::invalid_argument &err) {
-		
-		}
-        return operation_result;
-	}
-
-	// TODO: Generate error/s in case of exceptions
-	[[nodiscard]] static std::optional<unsigned int> apply_binary_operation(const syrec_operation::operation operation, const unsigned int &left_operand, const unsigned int &right_operand) {
-		std::optional<unsigned int> operation_result;
-		try {
-			operation_result.emplace(syrec_operation::apply(operation, left_operand, right_operand));
-		}
-		catch (std::overflow_error &err) {
-		
-		}
-		catch(std::invalid_argument &err) {
-		
-		}
-        return operation_result;
-	}
-
-	[[nodiscard]] std::optional<unsigned int> evaluate_number_container_to_constant(const Number::ptr &number_container) const {
-		std::optional<unsigned int> value_of_number_container;
-		if (number_container->isLoopVariable()) {
-			const std::string &loop_variable_name = number_container->variableName();
-			if (loop_variable_mapping_lookup.find(loop_variable_name) == loop_variable_mapping_lookup.end()) {
-				// TODO: GEN_ERROR
-			}
-			else {
-				value_of_number_container.emplace(number_container->evaluate(loop_variable_mapping_lookup));
-			}
+	[[nodiscard]] static std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
+		if (operation == syrec_operation::operation::division && rightOperand == 0) {
+			// TODO: GEN_ERROR
+			return std::nullopt;	
 		}
 		else {
-			value_of_number_container.emplace(number_container->evaluate(loop_variable_mapping_lookup));
+			return syrec_operation::apply(operation, leftOperand, rightOperand);	
 		}
-		return value_of_number_container;
+	}
+
+	[[nodiscard]] std::optional<unsigned int> evaluateNumberContainer(const Number::ptr &numberContainer) const {
+		if (numberContainer->isLoopVariable()) {
+			const std::string& loopVariableIdentToResolve = numberContainer->variableName();
+			if (loop_variable_mapping_lookup.find(loopVariableIdentToResolve) == loop_variable_mapping_lookup.end()) {
+				// TODO: GEN_ERROR
+				return std::nullopt;
+			}
+		}
+		return std::optional(numberContainer->evaluate(loop_variable_mapping_lookup));
 	}
 
 	[[nodiscard]] ExpressionEvaluationResult::ptr createExpressionEvalutionResultContainer() const {
@@ -377,59 +351,70 @@ we redefine the token 'Number as a non-terminal symbol
 
 // TODO: Expression productions still require checks that the bitwidth of the internal expressions (i.e. the left and right expression in a binary expression) are not larger than the input one
 
-Number<. std::optional<Number::ptr> &parsed_number, bool simplify_if_possible .>									
+Number<. std::optional<Number::ptr> &parsedNumber, const bool simplifyIfPossible .>									
 =
 int																			(.	const std::optional<unsigned int> conversion_result = convert_token_value_to_number(*t);
 																				if (conversion_result.has_value()) {
 																					const Number::ptr result = std::make_shared<syrec::Number>(syrec::Number(conversion_result.value())); 
-																					parsed_number.emplace(result);
+																					parsedNumber.emplace(result);
 																				}
 																			.)
-| '#' ident																	(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);
-																				if (check_ident_was_declared(signal_ident)) {
-																					const auto &symbol_table_entry = currSymTabScope->getVariable(signal_ident);
-																					if (symbol_table_entry.has_value() && std::holds_alternative<Variable::ptr>(symbol_table_entry.value())) {
-																						parsed_number.emplace(std::make_shared<syrec::Number>(syrec::Number(std::get<Variable::ptr>(symbol_table_entry.value())->bitwidth)));
-																					}
-																					else {
-																						// TODO: GEN_ERROR, this should not happen but check anyways
-																					}
+| '#' ident																	(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
+																				if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
+																					return;
+																				}
+
+																				const auto &symTabEntry = currSymTabScope->getVariable(signalIdent);
+																				if (symTabEntry.has_value() && std::holds_alternative<Variable::ptr>(symTabEntry.value())) {
+																					parsedNumber.emplace(std::make_shared<syrec::Number>(syrec::Number(std::get<Variable::ptr>(symTabEntry.value())->bitwidth)));
+																				}
+																				else {
+																					// TODO: GEN_ERROR, this should not happen but check anyways
+																					return;
 																				}
 																			.)
-| '$' ident																	(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);
-																				if (check_ident_was_declared(signal_ident)) {
-																					const auto &symbol_table_entry = currSymTabScope->getVariable(signal_ident);
-																					if (symbol_table_entry.has_value() && std::holds_alternative<Number::ptr>(symbol_table_entry.value())) {
-																						// TODO: An optimization that can be done here would be the replacement of the loop variable with its current value from the mapping
-																						parsed_number.emplace(std::get<Number::ptr>(symbol_table_entry.value()));
-																					}
-																					else {
-																						// TODO: GEN_ERROR, this should not happen but check anyways
-																					}
+| '$' ident																	(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
+																				if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
+																					return;
+																				}
+																				
+																				const auto &symTabEntry = currSymTabScope->getVariable(signalIdent);
+																				if (symTabEntry.has_value() && std::holds_alternative<Number::ptr>(symTabEntry.value())) {
+																					// TODO: An optimization that can be done here would be the replacement of the loop variable with its current value from the mapping
+																					parsedNumber.emplace(std::get<Number::ptr>(symTabEntry.value()));
+																				}
+																				else {
+																					// TODO: GEN_ERROR, this should not happen but check anyways
 																				}
 																			.)
-| (																			(.	std::optional<Number::ptr> lhs_operand, rhs_operand;  
+| (																			(.	std::optional<Number::ptr> lhsOperand, rhsOperand;  
 																				std::optional<syrec_operation::operation> op;
 																			.)
 	'(' 
-		Number<lhs_operand, simplify_if_possible>
+		Number<lhsOperand, simplifyIfPossible>
 		('+'																(.	op.emplace(syrec_operation::operation::addition);		.)
 		|'-'																(.	op.emplace(syrec_operation::operation::subtraction);	.)
 		|'*'																(.	op.emplace(syrec_operation::operation::multiplication);	.)
 		|'/'																(.	op.emplace(syrec_operation::operation::division);		.)
 		) 
-		Number<rhs_operand, simplify_if_possible>							(.	if (op.has_value() && lhs_operand.has_value() && rhs_operand.has_value()){
-																					const std::optional<unsigned int> lhs_value = evaluate_number_container_to_constant(lhs_operand.value());
-																					const std::optional<unsigned int> rhs_value = evaluate_number_container_to_constant(rhs_operand.value());
+		Number<rhsOperand, simplifyIfPossible>								(.	if (!op.has_value()) {
+																					// TODO: GEN_ERROR Expected one of n operand but not of them was specified
+																					return;
+																				}
 
-																					if (lhs_value.has_value() && rhs_value.has_value()) {
-																						const std::optional<unsigned int> op_result = apply_binary_operation(op.value(),
-																																							lhs_operand.value()->evaluate(loop_variable_mapping_lookup),
-																																							rhs_operand.value()->evaluate(loop_variable_mapping_lookup));
-																						if (op_result.has_value()) {
-																							const Number::ptr result = std::make_shared<syrec::Number>(syrec::Number(op_result.value())); 
-																							parsed_number.emplace(result);
-																						}
+																				if (!lhsOperand.has_value() || !rhsOperand.has_value()){
+																					return;
+																				}
+
+																				const std::optional<unsigned int> lhsEvaluated = evaluateNumberContainer(lhsOperand.value());
+																				const std::optional<unsigned int> rhsEvaluated = evaluateNumberContainer(rhsOperand.value());
+
+																				if (lhsEvaluated.has_value() && rhsEvaluated.has_value()) {
+																					const std::optional<unsigned int> evaluationResult = applyBinaryOperation(op.value(), lhsEvaluated.value(), rhsEvaluated.value());
+
+																					if (evaluationResult.has_value()) {
+																						const Number::ptr result = std::make_shared<syrec::Number>(syrec::Number(evaluationResult.value())); 
+																						parsedNumber.emplace(result);
 																					}
 																				}
 																			.)
@@ -706,7 +691,7 @@ ident																				(.	std::string methodIdent = convert_to_uniform_text_fo
 																					.)
 "(" 
 	ident																			(.	std::string parameterIdent = convert_to_uniform_text_format(t->val);
-																						isValidCallOperation &= check_ident_was_declared(parameterIdent);
+																						isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent);
 
 																						if (isValidCallOperation) {
 																							const std::optional<std::variant<Variable::ptr, Number::ptr>> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent);
@@ -727,7 +712,7 @@ ident																				(.	std::string methodIdent = convert_to_uniform_text_fo
 																					.)
 	{
 		"," ident																	(.	std::string parameterIdent = convert_to_uniform_text_format(t->val);
-																						isValidCallOperation &= check_ident_was_declared(parameterIdent);
+																						isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent);
 
 																						if (isValidCallOperation) {
 																							const std::optional<std::variant<Variable::ptr, Number::ptr>> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent);
@@ -797,7 +782,7 @@ ForStatement<. std::optional<Statement::ptr> &statement .>								(.	std::option
 	[
 		IF (check_if_loop_variable_is_defined()) (
 			"$" ident																	(.	const std::string &loopVarIdent = convert_to_uniform_text_format(t->val);
-																							if (!check_ident_was_declared(loopVarIdent)) {
+																							if (!checkIdentWasDeclaredOrLogError(loopVarIdent)) {
 																								loopVariableIdent.emplace(convert_to_uniform_text_format(t->val));
 																								SymbolTable::openScope(currSymTabScope);
 																								const Number::ptr loopVariableEntry = std::make_shared<syrec::Number>(syrec::Number(loopVarIdent));
@@ -1034,7 +1019,7 @@ Signal<SignalEvaluationResult &signalAccess, const bool simplifyIfPossible>			(.
 																					.)
 =
 	ident																			(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
-																						if (check_ident_was_declared(signalIdent)) {
+																						if (checkIdentWasDeclaredOrLogError(signalIdent)) {
 																							const auto symbolTableEntryForSignal = currSymTabScope->getVariable(signalIdent);
 																							if (symbolTableEntryForSignal.has_value() && std::holds_alternative<Variable::ptr>(symbolTableEntryForSignal.value())) {
 																								const VariableAccess::ptr container = std::make_shared<VariableAccess>(VariableAccess());
@@ -1191,7 +1176,7 @@ BinaryExpression<const ExpressionEvaluationResult::ptr &parsedBinaryExpression, 
 																																				if (binaryExprLhs->evaluatedToConstant() && binaryExprRhs->evaluatedToConstant()) {
 																																					const unsigned int lhsValueEvaluated = binaryExprLhs->getAsConstant().value();
 																																					const unsigned int rhsValueEvaluated = binaryExprRhs->getAsConstant().value();
-																																					const std::optional<unsigned int> operationApplicationResult = apply_binary_operation(binaryOperation.value(), lhsValueEvaluated, rhsValueEvaluated);
+																																					const std::optional<unsigned int> operationApplicationResult = applyBinaryOperation(binaryOperation.value(), lhsValueEvaluated, rhsValueEvaluated);
 																																					if (operationApplicationResult.has_value()) {
 																																						parsedBinaryExpression->setResult(operationApplicationResult.value(), expectedBitWidth);
 																																					}
@@ -1246,7 +1231,7 @@ ShiftExpression<const ExpressionEvaluationResult::ptr &userDefinedShiftExpressio
 																																					const expression::ptr lhsOperandExpression = shiftExpressionLhs->getOrConvertToExpression(bitwidth).value();
 																																		
 																																					// One could replace the shift statement with a skip statement if the shift amount is zero 
-																																					const std::optional<unsigned int> shiftAmountValueEvaluated = evaluate_number_container_to_constant(shiftAmount.value());
+																																					const std::optional<unsigned int> shiftAmountValueEvaluated = evaluateNumberContainer(shiftAmount.value());
 																																					const std::optional<unsigned int> lhsOperandValueEvaluated = shiftExpressionLhs->getAsConstant();
 
 																																					if (shiftAmountValueEvaluated.has_value() && lhsOperandValueEvaluated.has_value()) {

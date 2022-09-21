@@ -1,5 +1,6 @@
 #ifndef OPERATION_HPP
 #define OPERATION_HPP
+#include <optional>
 
 namespace syrec_operation {
     enum class operation {
@@ -39,21 +40,8 @@ namespace syrec_operation {
         shift_right
     };
 
-    /**
-     *  TODO: Add documentation
-     * @returns
-     * @throws std::overflow_error
-     * @throws std::invalid_argument
-     **/
-    [[nodiscard]] unsigned int                apply(const operation operation, const unsigned int left_operand_value, const unsigned int right_operand_value);
-
-    /**
-     * TODO: Add documentation
-     * @returns
-     * @throws std::overflow_error
-     * @throws std::invalid_argument
-     **/
-    [[nodiscard]] unsigned int apply(const operation operation, const unsigned int left_operand_value);
+    [[nodiscard]] std::optional<unsigned int> apply(operation operation, unsigned int leftOperand, unsigned int rightOperand) noexcept;
+    [[nodiscard]] std::optional<unsigned int> apply(operation operation, unsigned int operand) noexcept;
 };
 
 #endif
