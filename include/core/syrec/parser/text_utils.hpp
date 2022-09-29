@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <string>
 
-namespace syrec {
+namespace parser {
     [[nodiscard]] static std::string convert_to_uniform_text_format(const wchar_t* text) {
         const std::wstring wide_text_as_string(text);
         const std::size_t        size_of_wide_text = wide_text_as_string.size();

@@ -1,6 +1,6 @@
 #include "core/syrec/parser/parser_error_message_generator.hpp"
 
-namespace syrec {
+namespace parser {
 
     [[nodiscard]] std::vector<std::string_view> parser_error_message_generator::split_string_at_format_specifiers(const std::string_view format_string, const std::vector<format_specifier_position>& format_specifier_positions) {
         std::vector<std::string_view> message_string_parts;

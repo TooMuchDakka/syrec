@@ -13,7 +13,7 @@ enum error_message {
 
 // https://stackoverflow.com/questions/1657883/variable-number-of-arguments-in-c
 // https://refactoring.guru/design-patterns/builder/cpp/example
-namespace syrec {
+namespace parser {
     class parser_error_message_generator {
         struct format_specifier_position {
             std::size_t start_position;

@@ -1,8 +1,8 @@
 #include "core/syrec/parser/method_call_guess.hpp"
 
-using namespace syrec;
+using namespace parser;
 
-void MethodCallGuess::refineWithNextParameter(const Variable::ptr& actualParameter) noexcept {
+void MethodCallGuess::refineWithNextParameter(const syrec::Variable::ptr& actualParameter) noexcept {
     this->discardGuessesWithLessOrEqualNumberOfParameters(this->formalParameterIdx + 1, false);
     this->discardNotMatchingAlternatives(actualParameter);
 
@@ -15,7 +15,7 @@ bool MethodCallGuess::hasSomeMatches() const noexcept {
     return !this->methodsMatchingSignature.empty();
 }
 
-std::optional<Module::vec> MethodCallGuess::getMatchesForGuess() const noexcept {
+std::optional<syrec::Module::vec> MethodCallGuess::getMatchesForGuess() const noexcept {
     return std::make_optional(this->methodsMatchingSignature);
 }
 
@@ -37,12 +37,12 @@ void MethodCallGuess::discardGuessesWithLessOrEqualNumberOfParameters(const std:
             std::remove_if(
                     this->methodsMatchingSignature.begin(),
                     this->methodsMatchingSignature.end(),
-                    [numFormalParameters, mustNumParamsMatch](const Module::ptr& module) { return !hasModuleAtLeastNFormalParameters(numFormalParameters, module, mustNumParamsMatch); }),
+                    [numFormalParameters, mustNumParamsMatch](const syrec::Module::ptr& module) { return !hasModuleAtLeastNFormalParameters(numFormalParameters, module, mustNumParamsMatch); }),
             this->methodsMatchingSignature.end()
     );
 }
 
-void MethodCallGuess::discardNotMatchingAlternatives(const Variable::ptr& actualParameter) noexcept {
+void MethodCallGuess::discardNotMatchingAlternatives(const syrec::Variable::ptr& actualParameter) noexcept {
     if (this->methodsMatchingSignature.empty()) {
         return;
     }
@@ -52,11 +52,11 @@ void MethodCallGuess::discardNotMatchingAlternatives(const Variable::ptr& actual
             std::remove_if(
                     this->methodsMatchingSignature.begin(),
                     this->methodsMatchingSignature.end(),
-                    [formalParameterIdx, actualParameter](const Module::ptr& module) { return !isActualParameterAssignableToFormalOne(actualParameter, module->parameters.at(formalParameterIdx)); }),
+                    [formalParameterIdx, actualParameter](const syrec::Module::ptr& module) { return !isActualParameterAssignableToFormalOne(actualParameter, module->parameters.at(formalParameterIdx)); }),
             this->methodsMatchingSignature.end());
 }
 
-bool MethodCallGuess::hasModuleAtLeastNFormalParameters(const std::size_t& numFormalParametersOfGuess, const Module::ptr& moduleToCheck, const bool mustNumParamsMatch) noexcept {
+bool MethodCallGuess::hasModuleAtLeastNFormalParameters(const std::size_t& numFormalParametersOfGuess, const syrec::Module::ptr& moduleToCheck, const bool mustNumParamsMatch) noexcept {
     if (mustNumParamsMatch) {
         return moduleToCheck->parameters.size() == numFormalParametersOfGuess;   
     }
@@ -66,6 +66,6 @@ bool MethodCallGuess::hasModuleAtLeastNFormalParameters(const std::size_t& numFo
     
 }
 
-bool MethodCallGuess::isActualParameterAssignableToFormalOne(const Variable::ptr& actualParameter, const Variable::ptr& formalParameter) noexcept {
+bool MethodCallGuess::isActualParameterAssignableToFormalOne(const syrec::Variable::ptr& actualParameter, const syrec::Variable::ptr& formalParameter) noexcept {
     return SymbolTable::isAssignableTo(formalParameter, actualParameter, false);
 }

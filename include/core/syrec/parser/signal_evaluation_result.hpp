@@ -6,23 +6,23 @@
 
 #include <variant>
 
-namespace syrec {
+namespace parser {
     class SignalEvaluationResult {
     public:
         typedef std::shared_ptr<SignalEvaluationResult> ptr;
 
         SignalEvaluationResult() = default;
-        void updateResultToVariableAccess(const VariableAccess::ptr& variableAccess);
+        void updateResultToVariableAccess(const syrec::VariableAccess::ptr& variableAccess);
 
         bool isValid() const;
         bool isConstant() const;
         bool isVariableAccess() const;
 
-        std::optional<VariableAccess::ptr> getAsVariableAccess();
-        std::optional<Number::ptr> getAsNumber();
+        std::optional<syrec::VariableAccess::ptr> getAsVariableAccess();
+        std::optional<syrec::Number::ptr> getAsNumber();
 
     private:
-        typedef std::variant<VariableAccess::ptr, Number::ptr>        availableValueOptions;
+        typedef std::variant<syrec::VariableAccess::ptr, syrec::Number::ptr>        availableValueOptions;
         std::optional<availableValueOptions> evaluationResult;
     };
 }

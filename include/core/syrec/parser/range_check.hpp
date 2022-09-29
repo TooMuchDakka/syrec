@@ -1,9 +1,9 @@
 #ifndef RANGE_CHECK_HPP
 #define RANGE_CHECK_HPP
 
-#include "../variable.hpp"
+#include "core/syrec/variable.hpp"
 
-namespace range_check {
+namespace parser {
     struct IndexAccessRangeConstraint {
         const std::size_t minimumValidValue;
         const std::size_t maximumValidValue;

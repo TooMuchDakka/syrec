@@ -1,8 +1,7 @@
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 
-using namespace syrec;
-
-void SignalEvaluationResult::updateResultToVariableAccess(const VariableAccess::ptr& variableAccess) {
+using namespace parser;
+void SignalEvaluationResult::updateResultToVariableAccess(const syrec::VariableAccess::ptr& variableAccess) {
     if (isValid()) {
         this->evaluationResult.reset();
     }
@@ -10,7 +9,7 @@ void SignalEvaluationResult::updateResultToVariableAccess(const VariableAccess::
 }
 
 bool SignalEvaluationResult::isConstant() const {
-    return std::holds_alternative<Number::ptr>(this->evaluationResult.value());
+    return std::holds_alternative<syrec::Number::ptr>(this->evaluationResult.value());
 }
 
 bool SignalEvaluationResult::isValid() const {
@@ -18,21 +17,21 @@ bool SignalEvaluationResult::isValid() const {
 }
 
 bool SignalEvaluationResult::isVariableAccess() const {
-    return std::holds_alternative<VariableAccess::ptr>(this->evaluationResult.value());
+    return std::holds_alternative<syrec::VariableAccess::ptr>(this->evaluationResult.value());
 }
 
-std::optional<VariableAccess::ptr> SignalEvaluationResult::getAsVariableAccess() {
-    std::optional<VariableAccess::ptr> fetchedValue;
+std::optional<syrec::VariableAccess::ptr> SignalEvaluationResult::getAsVariableAccess() {
+    std::optional<syrec::VariableAccess::ptr> fetchedValue;
     if (isValid() && isVariableAccess()) {
-        fetchedValue.emplace(std::get<VariableAccess::ptr>(this->evaluationResult.value()));
+        fetchedValue.emplace(std::get<syrec::VariableAccess::ptr>(this->evaluationResult.value()));
     }
     return fetchedValue;
 }
 
-std::optional<Number::ptr> SignalEvaluationResult::getAsNumber() {
-    std::optional<Number::ptr> fetchedValue;
+std::optional<syrec::Number::ptr> SignalEvaluationResult::getAsNumber() {
+    std::optional<syrec::Number::ptr> fetchedValue;
     if (isValid() && isConstant()) {
-        fetchedValue.emplace(std::get<Number::ptr>(this->evaluationResult.value()));
+        fetchedValue.emplace(std::get<syrec::Number::ptr>(this->evaluationResult.value()));
     }
     return fetchedValue;
 }

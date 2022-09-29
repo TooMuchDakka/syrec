@@ -20,13 +20,12 @@ add_library(${PROJECT_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/core/io/pla_parser.cpp
             
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_evaluation_result.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/grammar_conflict_resolver.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/method_call_guess.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/operation.cpp
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Parser.h
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Parser.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/parser_error_message_generator.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/range_check.cpp
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Scanner.h
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/Scanner.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/signal_evaluation_result.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/symbol_table.cpp
@@ -34,10 +33,13 @@ add_library(${PROJECT_NAME}
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_evaluation_result.hpp
+            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/grammar_conflict_resolver.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/method_call_guess.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/operation.hpp
+            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/Parser.h
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_error_message_generator.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/range_check.hpp
+            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/Scanner.h
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_evaluation_result.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/text_utils.hpp
