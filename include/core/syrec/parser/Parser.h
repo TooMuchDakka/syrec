@@ -12,7 +12,6 @@
 #include "core/syrec/parser/grammar_conflict_resolver.hpp"
 #include "core/syrec/parser/method_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
-#include "core/syrec/parser/parser_error_message_generator.hpp"
 #include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
@@ -65,7 +64,6 @@ public:
 	Token *la;			// lookahead token
 
 syrec::Module::vec modules;
-	parser_error_message_generator error_message_generator;
 	SymbolTable::ptr currSymTabScope;
 
 	syrec::Number::loop_variable_mapping loop_variable_mapping_lookup;
