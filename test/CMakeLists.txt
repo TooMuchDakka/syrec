@@ -25,8 +25,14 @@ endif()
 
 # add a C++ test executable ``testname`` providing all source files as additional arguments.
 macro(PACKAGE_ADD_TEST testname)
+
   # create an executable in which the tests will be stored
   add_executable(${testname} ${ARGN})
+
+  # Temporary update to include headers files from utils folder required by syrec parser success tests
+  MESSAGE(STATUS ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/utils)
+  target_include_directories(${testname} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/utils)
+
   # link the Google test infrastructure and a default main function to the test executable.
   target_link_libraries(${testname} PUBLIC MQT::${PROJECT_NAME} gmock gtest_main)
   # discover tests
@@ -50,7 +56,7 @@ package_add_test(
   unittests/test_huffman.cpp
   unittests/test_pla_parser.cpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_error_cases_fixture.cpp
-  unittests/syrecParserComponentsTests/fixtures/syrec_parser_success_cases_fixture.cpp unittests/syrecParserComponentsTests/utils/syrec_ir_json_utils.hpp unittests/syrecParserComponentsTests/utils/syrec_ir_json_utils.cpp
+  unittests/syrecParserComponentsTests/fixtures/syrec_parser_success_cases_fixture.cpp unittests/syrecParserComponentsTests/utils/syrec_ir_json_utils.hpp unittests/syrecParserComponentsTests/utils/syrec_ir_equivalence_checker.hpp unittests/syrecParserComponentsTests/utils/syrec_ir_json_utils.cpp unittests/syrecParserComponentsTests/utils/syrec_ir_equivalence_checker.cpp
 )
 
 add_custom_command(

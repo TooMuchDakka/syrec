@@ -52,7 +52,7 @@ protected:
         ASSERT_TRUE(parsedJson.at(cExpectedErrorsJsonKey).is_array()) << "Expected entry with key '" << cExpectedErrorsJsonKey << "' to by an array";
 
         circuitDefinition = parsedJson.at(cCircuitDefinitionJsonKey).get<std::string>();
-        loadExpectedErrors(parsedJson);
+        loadExpectedErrors(parsedJson.at(cExpectedErrorsJsonKey));
     }
 
     void loadExpectedErrors(const json& json) {
