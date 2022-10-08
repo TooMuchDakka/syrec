@@ -48,7 +48,10 @@ package_add_test(
   unittests/test_tt_to_dd.cpp
   unittests/test_extend_tt.cpp
   unittests/test_huffman.cpp
-  unittests/test_pla_parser.cpp)
+  unittests/test_pla_parser.cpp
+  unittests/syrecParserComponentsTests/fixtures/syrec_parser_error_cases_fixture.cpp
+  unittests/syrecParserComponentsTests/fixtures/syrec_parser_success_cases_fixture.cpp unittests/syrecParserComponentsTests/utils/syrec_ir_json_utils.hpp unittests/syrecParserComponentsTests/utils/syrec_ir_json_utils.cpp
+)
 
 add_custom_command(
   TARGET ${PROJECT_NAME}_test
@@ -56,6 +59,7 @@ add_custom_command(
   COMMAND
     ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/${PROJECT_NAME}_test
     ${CMAKE_BINARY_DIR}/${PROJECT_NAME}_test
+
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/circuits
           $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/circuits
   COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/circuits
@@ -64,5 +68,17 @@ add_custom_command(
           $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/configs
   COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/configs
           ${CMAKE_BINARY_DIR}/configs
+
+  COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/unittests
+  COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/unittests/syrecParserComponentsTests
+
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/unittests
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/unittests/syrecParserComponentsTests
+
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/testdata
+          $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/unittests/syrecParserComponentsTests/testdata
+  COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/unittests/syrecParserComponentsTests/testdata
+          ${CMAKE_BINARY_DIR}/unittests/syrecParserComponentsTests/testdata
+
   COMMENT "Copying circuits and creating symlinks for ${PROJECT_NAME}_test"
   VERBATIM)

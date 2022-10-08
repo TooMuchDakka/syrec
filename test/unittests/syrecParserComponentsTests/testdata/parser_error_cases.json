@@ -1,0 +1,17 @@
+{
+  "test-one": {
+    "circuit": "module test-one(in a(16), in b(16)\n skip ",
+    "errors": [
+      {
+        "line": 1,
+        "column": 2,
+        "message": "A message"
+      }
+    ]
+  },
+  "test-two": {
+    "circuit": "TestM",
+    "errors": []
+  }
+
+}

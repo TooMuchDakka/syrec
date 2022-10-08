@@ -1,0 +1,14 @@
+[
+  {
+    "testCase": "otherOne",
+    "circuit": "aNother test",
+    "expectedIR": {
+    }
+  },
+  {
+    "testCase": "otherOne",
+    "circuit": "aNother test",
+    "expectedIR": {
+    }
+  }
+]
