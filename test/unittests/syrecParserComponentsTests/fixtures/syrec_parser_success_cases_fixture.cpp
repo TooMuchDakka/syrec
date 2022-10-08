@@ -13,6 +13,7 @@ using json = nlohmann::json;
 class SyReCParserSuccessCasesFixture: public ::testing::TestWithParam<std::string> {
 private:
     const std::string testCaseFileLocationRelativePath = "./unittests/syrecParserComponentsTests/testdata/";
+    const syrecTestsJsonUtils::SyrecIRJsonParser syrecIRJsonParser;
 
 protected:
     std::string circuit;
@@ -25,7 +26,7 @@ protected:
         ASSERT_TRUE(configFileStream.good()) << "Could not open test data json file @ " << testCaseDataFileRelativePath;
 
         json parsedJson = json::parse(configFileStream);
-        ASSERT_TRUE(parsedJson.is_object()) << "Expected test data in json to a an object";
+        ASSERT_TRUE(parsedJson.is_object()) << "Expected test data in json to an object";
         ASSERT_TRUE(parsedJson.contains(syrecTestsJsonUtils::cJsonKeyTestCaseRawCircuitData))
                 << "Expected json entry with key '" << syrecTestsJsonUtils::cJsonKeyTestCaseRawCircuitData << "' was not found";
         ASSERT_TRUE(parsedJson.at(syrecTestsJsonUtils::cJsonKeyTestCaseRawCircuitData).is_string())
@@ -42,8 +43,11 @@ protected:
     void parseExpectedModuleJsonData(const json& jsonData) {
         for (auto& jsonModuleEntry: jsonData.at(syrecTestsJsonUtils::cJsonKeyTestCaseExpectedIR)) {
             ASSERT_TRUE(jsonModuleEntry.is_object()) << "Expected definition of expected IR module entry in json to be a json object";
-            const std::optional<syrec::Module::ptr> parsedModule = syrecTestsJsonUtils::parseModuleFromJson(jsonModuleEntry);
-            ASSERT_TRUE(parsedModule.has_value()) << "Failed to parse json entry for one of the expected modules";
+
+            std::optional<syrec::Module::ptr>       parsedModule;
+            ASSERT_NO_THROW(syrecIRJsonParser.parseModuleFromJson(jsonModuleEntry, parsedModule)) << "Failed to parse json entry for one of the expected modules";
+            // TODO: Failure should not happen here
+            ASSERT_TRUE(parsedModule.has_value());
             expectedIR.emplace_back(parsedModule.value());
         }
     }
@@ -51,7 +55,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(Another,
                          SyReCParserSuccessCasesFixture,
-                         testing::Values("test-value-one"),
+                         testing::Values("parser_success_cases"),
                         [](const testing::TestParamInfo<SyReCParserSuccessCasesFixture::ParamType>& info) {
                             auto s = info.param;
                             std::replace(s.begin(), s.end(), '-', '_');
