@@ -66,6 +66,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON 
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/qfr" "extern/qfr")
 target_link_libraries(${PROJECT_NAME} PUBLIC MQT::qfr)
 
+# add fmt library
+add_subdirectory("${PROJECT_SOURCE_DIR}/extern/fmt" "extern/fmt")
+target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
+
+
 # add header-only part of the Boost library
 set(BOOST_USE_MULTITHREADED ON)
 set(BOOST_USE_STATIC_RUNTIME OFF)

@@ -41,6 +41,7 @@ namespace syrec {
         }
 
         std::string read(const std::string& filename, ReadProgramSettings settings = ReadProgramSettings{});
+        std::string readFromString(const std::string& circuitStringified, ReadProgramSettings settings = ReadProgramSettings{});
 
     private:
         Module::vec modulesVec;
@@ -60,6 +61,8 @@ namespace syrec {
         * @return true if parsing was successful, otherwise false
         */
         bool readFile(const std::string& filename, ReadProgramSettings settings, std::string* error = nullptr);
+        std::string parseBufferContent(const unsigned char* buffer, int bufferSizeInBytes);
+        unsigned char* readAndBufferFileContent(const std::string& filename, std::size_t* fileContentLength);
     };
 
 } // namespace syrec

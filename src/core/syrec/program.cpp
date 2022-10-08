@@ -6,43 +6,55 @@ using parser::Parser;
 using parser::Scanner;
 using namespace syrec;
 
+
+std::string program::read(const std::string& filename, const ReadProgramSettings settings) {
+    std::size_t fileContentLength = 0;
+    auto const*     fileContentBuffer  = readAndBufferFileContent(filename, &fileContentLength);
+    if (nullptr == fileContentBuffer) {
+        return "Cannot open given circuit file @ " + filename;
+    }
+
+    return parseBufferContent(fileContentBuffer, fileContentLength);
+}
+
+std::string program::readFromString(const std::string& circuitStringified, const ReadProgramSettings settings) {
+    return parseBufferContent(reinterpret_cast<const unsigned char*>(circuitStringified.c_str()), circuitStringified.size());
+}
+
 bool program::readFile(const std::string& filename, const ReadProgramSettings settings, std::string* error) {
     *error = read(filename, settings);
     return error->empty();
 }
 
-unsigned char* read_and_buffer_file_content(const std::string& filename, std::streampos* file_content_size) {
-    *file_content_size = 0;
+unsigned char* program::readAndBufferFileContent(const std::string& filename, std::size_t* fileContentLength) {
+    unsigned char*                     fileContentBuffer = nullptr;
+
     std::basic_ifstream<unsigned char> is(filename.c_str(), std::ifstream::in | std::ifstream::binary);
     if (is.is_open()) {
         is.seekg(0, is.end);
-        *file_content_size = is.tellg();
+        *fileContentLength = is.tellg();
         is.seekg(0, is.beg);
-
-        const auto input_circuit_content_buffer = new unsigned char[*file_content_size];
-        is.read(input_circuit_content_buffer, *file_content_size);
-        return input_circuit_content_buffer;
-    } else {
-        *file_content_size = -1;
-        return nullptr;
+        
+        fileContentBuffer = new unsigned char[*fileContentLength];
+        is.read(fileContentBuffer, *fileContentLength);
     }
+    return fileContentBuffer;
 }
 
-std::string program::read(const std::string& filename, const ReadProgramSettings settings) {
-    std::streampos input_circuit_file_length    = 0;
-    const auto     input_circuit_content_buffer = read_and_buffer_file_content(filename, &input_circuit_file_length);
-    if (input_circuit_content_buffer != nullptr) {
-        auto scanner = Scanner(input_circuit_content_buffer, input_circuit_file_length);
-        auto parser  = Parser(&scanner);
-        parser.Parse();
-
-        if (parser.errors->count) {
-            return "Error while parsing input circuit from file @" + filename;
-        } else {
-            this->modulesVec = parser.modules;
-            return {};
-        }
-    } else {
-        return "Cannot open given circuit file @ " + filename;
+// TODO: Added erros from parser to return value
+std::string program::parseBufferContent(const unsigned char* buffer, const int bufferSizeInBytes) {
+    if (nullptr == buffer) {
+        return "Cannot parse invalid buffer";
     }
+
+    auto scanner = Scanner(buffer, bufferSizeInBytes);
+    auto parser  = Parser(&scanner);
+    parser.Parse();
+
+    if (parser.errors->count == 0) {
+        this->modulesVec = parser.modules;
+        return "";
+    }
+    return "";
 }
+
