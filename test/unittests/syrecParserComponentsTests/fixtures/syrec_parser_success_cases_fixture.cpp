@@ -41,7 +41,7 @@ protected:
     }
 
     void parseExpectedModuleJsonData(const json& jsonData) {
-        for (auto& jsonModuleEntry: jsonData.at(syrecTestsJsonUtils::cJsonKeyTestCaseExpectedIR)) {
+        for (auto& jsonModuleEntry: jsonData) {
             ASSERT_TRUE(jsonModuleEntry.is_object()) << "Expected definition of expected IR module entry in json to be a json object";
 
             std::optional<syrec::Module::ptr>       parsedModule;

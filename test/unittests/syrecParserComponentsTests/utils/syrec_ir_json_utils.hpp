@@ -10,49 +10,50 @@
 #include "core/syrec/parser/operation.hpp"
 
 namespace syrecTestsJsonUtils {
-    const std::string cJsonKeyModuleName             = "moduleName";
-    const std::string cJsonKeyModuleParameters       = "parameters";
-    const std::string cJsonKeyParameterAssignability = "assignability";
-    const std::string cJsonKeyModuleLocals           = "locals";
-    const std::string cJsonKeyModuleBodyStatements   = "statements";
+    const std::string_view cJsonKeyModuleName             = "moduleName";
+    const std::string_view cJsonKeyModuleParameters       = "parameters";
+    const std::string_view cJsonKeyParameterAssignability = "assignability";
+    const std::string_view cJsonKeyModuleLocals           = "locals";
+    const std::string_view cJsonKeyModuleBodyStatements   = "statements";
 
-    const std::string cJsonKeySignalName      = "signalName";
-    const std::string cJsonKeySignalDimension = "dimension";
-    const std::string cJsonKeySignalWidth     = "signalWidth";
+    const std::string_view cJsonKeySignalName      = "signalName";
+    const std::string_view cJsonKeySignalDimensions = "dimensions";
+    const std::string_view cJsonKeySignalWidth     = "signalWidth";
 
-    const std::string cJsonKeyStatementType               = "statementType";
-    const std::string cJsonKeyIfStmtCheckCondition        = "checkCondition";
-    const std::string cJsonKeyIfStmtTrueBranchStatements  = "trueBranchStatements";
-    const std::string cJsonKeyIfStmtFalseBranchStatements = "falseBranchStatements";
-    const std::string cJsonKeyIFStmtClosingCondition      = "closingCondition";
+    const std::string_view cJsonKeyStatementType               = "statementType";
+    const std::string_view cJsonKeyIfStmtCheckCondition        = "checkCondition";
+    const std::string_view cJsonKeyIfStmtTrueBranchStatements  = "trueBranchStatements";
+    const std::string_view cJsonKeyIfStmtFalseBranchStatements = "falseBranchStatements";
+    const std::string_view cJsonKeyIFStmtClosingCondition      = "closingCondition";
 
-    const std::string cJsonKeyForStmtVariableName   = "loopVariableName";
-    const std::string cJsonKeyForStmtIterationRange = "iterationRange";
-    const std::string cJsonKeyForStmtStepSize       = "stepsize";
-    const std::string cJsonKeyForStmtBodyStatements = "loopBodyStatements";
+    const std::string_view cJsonKeyForStmtVariableName   = "loopVariableName";
+    const std::string_view cJsonKeyForStmtIterationRange = "iterationRange";
+    const std::string_view cJsonKeyForStmtStepSize       = "stepsize";
+    const std::string_view cJsonKeyForStmtBodyStatements = "loopBodyStatements";
 
-    const std::string cJsonKeyExprLhsOperand = "lhs";
-    const std::string cJsonKeyExprRhsOperand = "rhs";
-    const std::string cJsonKeyExprOperation  = "operation";
-    const std::string cJsonKeyExprOperand    = "operand";
+    const std::string_view cJsonKeyExprLhsOperand = "lhs";
+    const std::string_view cJsonKeyExprRhsOperand = "rhs";
+    const std::string_view cJsonKeyExprOperation  = "operation";
+    const std::string_view cJsonKeyExprOperand    = "operand";
 
-    const std::string cJsonKeyCallStmtActualParameters = "actualParameters";
-    const std::string cJsonKeySignalDimensionsAccess   = "dimensions";
-    const std::string cJsonKeySignalBitAccess          = "accessedBits";
+    const std::string_view cJsonKeyCallStmtActualParameters = "actualParameters";
+    const std::string_view cJsonKeySignalDimensionsAccess   = "accessedDimensions";
+    const std::string_view cJsonKeySignalBitAccess          = "accessedBits";
 
-    const std::string cJsonKeyExpressionType             = "expressionType";
-    const std::string cJsonKeyNumberAsExpression         = "numerAsExpression";
-    const std::string cJsonKeyNumberAsConstantInteger    = "numerAsConstantInteger";
-    const std::string cJsonKeyNumberAsConstantFromSignal = "numberAsConstantFromSignal";
+    const std::string_view cJsonKeyExpressionType             = "expressionType";
+    const std::string_view cJsonKeyNumberType                 = "number";
+    const std::string_view cJsonKeyNumberValue                = "value";
+    const std::string_view cJsonKeyNumberAsConstantInteger    = "asConstantInteger";
+    const std::string_view cJsonKeyNumberAsConstantFromSignal = "fromLoopVariable";
 
-    const std::string cJsonKeyTestCaseName = "testCase";
-    const std::string cJsonKeyTestCaseRawCircuitData = "circuit";
-    const std::string cJsonKeyTestCaseExpectedIR = "expectedIR";
+    const std::string_view cJsonKeyTestCaseName = "testCase";
+    const std::string_view cJsonKeyTestCaseRawCircuitData = "circuit";
+    const std::string_view cJsonKeyTestCaseExpectedIR = "expectedIR";
 
     class SyrecIRJsonParser {
     public:
         SyrecIRJsonParser() {
-            validIdentValueRegex = std::regex("^(\_|\W)(\_|\w)*", std::regex_constants::ECMAScript | std::regex_constants::icase | std::regex_constants::optimize);
+            validIdentValueRegex = std::regex("(\_|[a-z]|[A-Z])(\_|[a-z]|[A-Z]|\\d)*", std::regex_constants::ECMAScript | std::regex_constants::icase | std::regex_constants::optimize);
         }
 
         void parseModuleFromJson(const nlohmann::json& json, std::optional<syrec::Module::ptr>& module) const;
@@ -79,9 +80,31 @@ namespace syrecTestsJsonUtils {
 
     protected:
         std::regex validIdentValueRegex;
-        
+        [[nodiscard]] bool isValidIdentValue(const std::string& identValue) const;
+
+        const std::string_view cJsonValueSignalInAsString = "in";
+        const std::string_view cJsonValueSignalOutAsString = "out";
+        const std::string_view cJsonValueSignalInOutAsString = "inout";
+        const std::string_view cJsonValueSignalWireAsString  = "wire";
+        const std::string_view cJsonValueSignalStateAsString = "state";
+
+        enum NumberType {
+            InvalidNumberType = -1,
+            Constant,
+            FromLoopVariable
+        };
+
+        enum SignalType {
+            InvalidSignalType = -1,
+            In,
+            InOut,
+            Out,
+            State,
+            Wire
+        };
+
         enum StatementType {
-            InvalidStatement,
+            InvalidStatement = -1,
             IfStatement,
             ForStatement,
             AssignStatement,
@@ -93,7 +116,7 @@ namespace syrecTestsJsonUtils {
         };
 
         enum ExpressionType {
-            InvalidExpression,
+            InvalidExpression = -1,
             Number,
             VariableAccess,
             Unary,
@@ -101,55 +124,11 @@ namespace syrecTestsJsonUtils {
             Shift
         };
 
-        bool isValidIdentValue(const std::string& identValue) const;
-
-        NLOHMANN_JSON_SERIALIZE_ENUM(StatementType, {
-                                                            {IfStatement, "if"},
-                                                            {ForStatement, "for"},
-                                                            {AssignStatement, "assign"},
-                                                            {CallStatement, "call"},
-                                                            {UncallStatement, "uncall"},
-                                                            {SkipStatement, "skip"},
-                                                            {SwapStatement, "swap"},
-                                                            {UnaryStatement, "unary"},
-                                                    })
-
-        NLOHMANN_JSON_SERIALIZE_ENUM(ExpressionType, {{Number, "number"},
-                                                      {VariableAccess, "variableAccess"},
-                                                      {Unary, "unary"},
-                                                      {Binary, "binary"},
-                                                      {Shift, "shift"}})
-
-        NLOHMANN_JSON_SERIALIZE_ENUM(syrec_operation::operation, {{syrec_operation::operation::addition, "+"},
-                                                                  {syrec_operation::operation::subtraction, "-"},
-                                                                  {syrec_operation::operation::multiplication, "*"},
-                                                                  {syrec_operation::operation::division, "/"},
-                                                                  {syrec_operation::operation::modulo, "%"},
-                                                                  {syrec_operation::operation::upper_bits_multiplication, "*>"},
-                                                                  {syrec_operation::operation::bitwise_xor, "|"},
-                                                                  {syrec_operation::operation::logical_and, "&&"},
-                                                                  {syrec_operation::operation::logical_or, "||"},
-                                                                  {syrec_operation::operation::bitwise_and, "&"},
-                                                                  {syrec_operation::operation::bitwise_or, "|"},
-                                                                  {syrec_operation::operation::less_than, "<"},
-                                                                  {syrec_operation::operation::greater_than, ">"},
-                                                                  {syrec_operation::operation::equals, "="},
-                                                                  {syrec_operation::operation::not_equals, "!="},
-                                                                  {syrec_operation::operation::less_equals, "<="},
-                                                                  {syrec_operation::operation::greater_equals, ">="},
-                                                                  {syrec_operation::operation::increment_assign, "++="},
-                                                                  {syrec_operation::operation::decrement_assign, "--="},
-                                                                  {syrec_operation::operation::negate_assign, "~="},
-                                                                  {syrec_operation::operation::add_assign, "+="},
-                                                                  {syrec_operation::operation::minus_assign, "-="},
-                                                                  {syrec_operation::operation::xor_assign, "^="},
-                                                                  {syrec_operation::operation::bitwise_negation, "~"},
-                                                                  {syrec_operation::operation::logical_negation, "!"},
-                                                                  {syrec_operation::operation::shift_left, "<<"},
-                                                                  {syrec_operation::operation::shift_right, ">>"}})
+        [[nodiscard]] SignalType getSignalTypeFromJson(const std::string_view& signalTypeAsJsonString) const;
+        [[nodiscard]] StatementType getStatementTypeFromJson(const std::string_view& statementTypeAsJsonString) const;
+        [[nodiscard]] ExpressionType getExpressionTypeFromJson(const std::string_view& expressionTypeAsJsonString) const;
+        [[nodiscard]] NumberType     getNumberTypeFromjson(const std::string_view& numberTypeAsJsonString) const;
+        [[nodiscard]] syrec_operation::operation getOperationFromJson(const std::string_view& operationAsJsonString) const;
     };
 }
-
-
-
 #endif

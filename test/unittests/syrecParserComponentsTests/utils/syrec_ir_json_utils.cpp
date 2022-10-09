@@ -9,7 +9,6 @@ void syrecTestsJsonUtils::SyrecIRJsonParser::parseModuleFromJson(const nlohmann:
     ASSERT_TRUE(json.contains(syrecTestsJsonUtils::cJsonKeyModuleName));
     ASSERT_TRUE(json.at(syrecTestsJsonUtils::cJsonKeyModuleName).is_string());
     
-    // TODO: Validation of module name
     const std::string moduleName = json.at(syrecTestsJsonUtils::cJsonKeyModuleName);
     ASSERT_TRUE(isValidIdentValue(moduleName));
 
@@ -61,7 +60,41 @@ void syrecTestsJsonUtils::SyrecIRJsonParser::parseModuleFromJson(const nlohmann:
 }
 
 
-void syrecTestsJsonUtils::SyrecIRJsonParser::parseStatementFromJson(const nlohmann::json& json, std::optional<syrec::Statement::ptr>& stmt) const {}
+void syrecTestsJsonUtils::SyrecIRJsonParser::parseStatementFromJson(const nlohmann::json& json, std::optional<syrec::Statement::ptr>& stmt) const {
+    ASSERT_TRUE(json.is_object());
+    ASSERT_TRUE(json.contains(syrecTestsJsonUtils::cJsonKeyStatementType));
+    StatementType stmtType = StatementType::InvalidStatement;
+    ASSERT_NO_THROW(json.at(syrecTestsJsonUtils::cJsonKeyStatementType).get<StatementType>());
+    switch (stmtType) {
+        case StatementType::AssignStatement:
+            ASSERT_NO_THROW(parseAssignStatementFromJson(json, stmt));
+            break;
+        case StatementType::CallStatement:
+            ASSERT_NO_THROW(parseCallStatementFromJson(json, stmt));
+            break;
+        case StatementType::ForStatement:
+            ASSERT_NO_THROW(parseForStatementFromJson(json, stmt));
+            break;
+        case StatementType::IfStatement:
+            ASSERT_NO_THROW(parseIfStatementFromJson(json, stmt));
+            break;
+        case StatementType::SkipStatement:
+            ASSERT_NO_THROW(parseSkipStatementFromJson(json, stmt));
+            break;
+        case StatementType::SwapStatement:
+            ASSERT_NO_THROW(parseSwapStatementFromJson(json, stmt));
+            break;
+        case StatementType::UncallStatement:
+            ASSERT_NO_THROW(parseUncallStatementFromJson(json, stmt));
+            break;
+        case StatementType::UnaryStatement:
+            ASSERT_NO_THROW(parseUnaryStatementFromJson(json, stmt));
+            break;
+        default:
+            FAIL();
+    }
+}
+
 void syrecTestsJsonUtils::SyrecIRJsonParser::parseIfStatementFromJson(const nlohmann::json& json, std::optional<syrec::IfStatement::ptr>& ifStmt) const {}
 void syrecTestsJsonUtils::SyrecIRJsonParser::parseForStatementFromJson(const nlohmann::json& json, std::optional<syrec::ForStatement::ptr>& forStmt) const {}
 void syrecTestsJsonUtils::SyrecIRJsonParser::parseAssignStatementFromJson(const nlohmann::json& json, std::optional<syrec::AssignStatement::ptr>& assignStmt) const {}
@@ -71,8 +104,66 @@ void syrecTestsJsonUtils::SyrecIRJsonParser::parseSkipStatementFromJson(const nl
 void syrecTestsJsonUtils::SyrecIRJsonParser::parseSwapStatementFromJson(const nlohmann::json& json, std::optional<syrec::SwapStatement::ptr>& swapStmt) const {}
 void syrecTestsJsonUtils::SyrecIRJsonParser::parseUnaryStatementFromJson(const nlohmann::json& json, std::optional<syrec::UnaryStatement::ptr>& unaryStmt) const {}
 
-void syrecTestsJsonUtils::SyrecIRJsonParser::parseNumberFromJson(const nlohmann::json& json, std::optional<syrec::Number::ptr>& number) const {}
-void syrecTestsJsonUtils::SyrecIRJsonParser::parseVariableFromJson(const nlohmann::json& json, std::optional<syrec::Variable::ptr>& variable) const {}
+void syrecTestsJsonUtils::SyrecIRJsonParser::parseNumberFromJson(const nlohmann::json& json, std::optional<syrec::Number::ptr>& number) const {
+    ASSERT_TRUE(json.is_object());
+    ASSERT_TRUE(json.contains(syrecTestsJsonUtils::cJsonKeyNumberType));
+    const NumberType parsedNumberType = getNumberTypeFromjson(json.at(syrecTestsJsonUtils::cJsonKeyNumberType).get<std::string>());
+    ASSERT_TRUE(json.contains(syrecTestsJsonUtils::cJsonKeyNumberValue));
+
+    switch (parsedNumberType) {
+        case NumberType::Constant:
+            ASSERT_TRUE(json.at(syrecTestsJsonUtils::cJsonKeyNumberValue).is_number_unsigned());
+            number.emplace(std::make_shared<syrec::Number>(syrec::Number(json.at(syrecTestsJsonUtils::cJsonKeyNumberValue).get<unsigned int>())));
+            break;
+        case NumberType::FromLoopVariable: {
+            ASSERT_TRUE(json.at(syrecTestsJsonUtils::cJsonKeyNumberValue).is_string());
+            const std::string accessedSignalWithOperationPrefix = json.at(syrecTestsJsonUtils::cJsonKeyNumberValue).get<std::string>();
+            ASSERT_TRUE(accessedSignalWithOperationPrefix.size() > 1 && accessedSignalWithOperationPrefix.at(0) == '$');
+
+            const std::string loopVariableName = accessedSignalWithOperationPrefix.substr(1, accessedSignalWithOperationPrefix.size() - 1);
+            ASSERT_TRUE(isValidIdentValue(loopVariableName));
+
+            number.emplace(std::make_shared<syrec::Number>(syrec::Number(loopVariableName)));
+            break;   
+        }
+        default:
+            FAIL();
+    }
+}
+
+void syrecTestsJsonUtils::SyrecIRJsonParser::parseVariableFromJson(const nlohmann::json& json, std::optional<syrec::Variable::ptr>& variable) const {
+    ASSERT_TRUE(json.is_object());
+    ASSERT_TRUE(json.contains(syrecTestsJsonUtils::cJsonKeyParameterAssignability));
+    const SignalType parsedSignalType = getSignalTypeFromJson(json.at(syrecTestsJsonUtils::cJsonKeyParameterAssignability).get<std::string>());
+    ASSERT_NE(SignalType::InvalidSignalType, parsedSignalType);
+
+    ASSERT_TRUE(json.contains(syrecTestsJsonUtils::cJsonKeySignalName));
+    ASSERT_TRUE(json.at(syrecTestsJsonUtils::cJsonKeySignalName).is_string());
+    const std::string signalName = json.at(syrecTestsJsonUtils::cJsonKeySignalName).get<std::string>();
+    ASSERT_TRUE(isValidIdentValue(signalName));
+
+    ASSERT_TRUE(json.contains(syrecTestsJsonUtils::cJsonKeySignalDimensions));
+    ASSERT_TRUE(json.at(syrecTestsJsonUtils::cJsonKeySignalDimensions).is_array());
+    std::vector<unsigned int> dimensions{};
+
+    for (auto& dimension: json.at(syrecTestsJsonUtils::cJsonKeySignalDimensions)) {
+        ASSERT_TRUE(dimension.is_number_unsigned());
+        dimensions.emplace_back(dimension.get<unsigned int>());
+    }
+    if (dimensions.empty()) {
+        dimensions.emplace_back(1);
+        // TODO: Remove
+        int x = 0;
+    }
+
+    ASSERT_TRUE(json.contains(syrecTestsJsonUtils::cJsonKeySignalWidth));
+    ASSERT_TRUE(json.at(syrecTestsJsonUtils::cJsonKeySignalWidth).is_number_unsigned());
+    const unsigned int signalWidth = json.at(syrecTestsJsonUtils::cJsonKeySignalWidth).get<unsigned int>();
+
+    // TODO: Add mapping to correct signal type
+    variable.emplace(std::make_shared<syrec::Variable>(syrec::Variable(0, signalName, dimensions, signalWidth)));
+}
+
 void syrecTestsJsonUtils::SyrecIRJsonParser::parseVariableAccessFromJson(const nlohmann::json& json, std::optional<syrec::VariableAccess::ptr>& variableAccess) const {}
 
 void syrecTestsJsonUtils::SyrecIRJsonParser::parseExpressionFromJson(const nlohmann::json& json, std::optional<syrec::expression::ptr>& expr) const {}
@@ -84,4 +175,35 @@ void syrecTestsJsonUtils::SyrecIRJsonParser::parseShiftExpressionFromJson(const 
 // TODO: Add EXCEPT_TRUE call for regex match to enable better error traceability in test output
 inline bool syrecTestsJsonUtils::SyrecIRJsonParser::isValidIdentValue(const std::string& identValue) const {
     return !identValue.empty() && std::regex_match(identValue, validIdentValueRegex);
+}
+
+inline syrecTestsJsonUtils::SyrecIRJsonParser::SignalType syrecTestsJsonUtils::SyrecIRJsonParser::getSignalTypeFromJson(const std::string_view& signalTypeAsJsonString) const {
+    if (signalTypeAsJsonString == cJsonValueSignalInAsString)
+        return SignalType::In;   
+    if (signalTypeAsJsonString == cJsonValueSignalOutAsString)
+        return SignalType::Out;   
+    if (signalTypeAsJsonString == cJsonValueSignalInOutAsString)
+        return SignalType::InOut;   
+    if (signalTypeAsJsonString == cJsonValueSignalWireAsString)
+        return SignalType::Wire;  
+    if (signalTypeAsJsonString == cJsonValueSignalStateAsString)
+        return SignalType::State;
+
+    return SignalType::InvalidSignalType;
+}
+
+syrecTestsJsonUtils::SyrecIRJsonParser::StatementType syrecTestsJsonUtils::SyrecIRJsonParser::getStatementTypeFromJson(const std::string_view& statementTypeAsJsonString) const {
+    
+}
+
+syrecTestsJsonUtils::SyrecIRJsonParser::ExpressionType syrecTestsJsonUtils::SyrecIRJsonParser::getExpressionTypeFromJson(const std::string_view& expressionTypeAsJsonString) const {
+    
+}
+
+syrecTestsJsonUtils::SyrecIRJsonParser::NumberType syrecTestsJsonUtils::SyrecIRJsonParser::getNumberTypeFromjson(const std::string_view& numberTypeAsJsonString) const {
+    
+}
+
+syrec_operation::operation syrecTestsJsonUtils::SyrecIRJsonParser::getOperationFromJson(const std::string_view& operationAsJsonString) const {
+    
 }
