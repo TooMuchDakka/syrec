@@ -437,7 +437,7 @@ SignalList <. std::optional<std::vector<syrec::Variable::ptr>> &signals .>	(.	sy
 =
 (
 	"wire"															(.	signal_type = syrec::Variable::Wire;		.)
-	| "signal"														(.	signal_type = syrec::Variable::State;		.)
+	| "state"														(.	signal_type = syrec::Variable::State;		.)
 )																	(.	if (syrec::Variable::Wire != signal_type && syrec::Variable::State != signal_type) {
 																			// TODO: GEN_ERROR ?
 																			// TODO: Do not cancel parsing

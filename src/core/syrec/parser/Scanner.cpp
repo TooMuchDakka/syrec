@@ -457,7 +457,7 @@ void Scanner::Init() {
 	keywords.set(L"out", 14);
 	keywords.set(L"inout", 15);
 	keywords.set(L"wire", 16);
-	keywords.set(L"signal", 17);
+	keywords.set(L"state", 17);
 	keywords.set(L"call", 21);
 	keywords.set(L"uncall", 22);
 	keywords.set(L"for", 23);
