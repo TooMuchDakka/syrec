@@ -27,7 +27,7 @@ namespace parser {
         bool                                                                         addEntry(const syrec::Number::ptr& number);
         bool                                                                         addEntry(const syrec::Module::ptr& module);                     
 
-        static void openScope(SymbolTable::ptr &currentScope);
+        static void openScope(SymbolTable::ptr& currentScope);
         static void closeScope(SymbolTable::ptr& currentScope);
         static bool isAssignableTo(const syrec::Variable::ptr& formalParameter, const syrec::Variable::ptr& actualParameter, bool mustParameterTypesMatch);
 

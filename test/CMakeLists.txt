@@ -56,7 +56,7 @@ package_add_test(
   unittests/test_huffman.cpp
   unittests/test_pla_parser.cpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_error_cases_fixture.cpp
-  unittests/syrecParserComponentsTests/fixtures/syrec_parser_success_cases_fixture.cpp unittests/syrecParserComponentsTests/utils/syrec_ir_json_utils.hpp unittests/syrecParserComponentsTests/utils/syrec_ir_equivalence_checker.hpp unittests/syrecParserComponentsTests/utils/syrec_ir_json_utils.cpp unittests/syrecParserComponentsTests/utils/syrec_ir_equivalence_checker.cpp
+  unittests/syrecParserComponentsTests/fixtures/syrec_parser_success_cases_fixture.cpp unittests/syrecParserComponentsTests/utils/syrec_ast_dump_utils.hpp unittests/syrecParserComponentsTests/utils/syrec_ast_dump_utils.cpp 
 )
 
 add_custom_command(

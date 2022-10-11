@@ -5,51 +5,35 @@
 #include <algorithm>
 #include <fstream>
 
-#include "syrec_ir_json_utils.hpp"
+#include "syrec_ast_dump_utils.hpp"
 #include "core/syrec/program.hpp"
 
 using json = nlohmann::json;
 
 class SyReCParserSuccessCasesFixture: public ::testing::TestWithParam<std::string> {
 private:
+    const std::string cJsonKeyCircuit                  = "circuit";
+    const std::string cJsonKeyTestCaseName             = "testCaseName";
     const std::string testCaseFileLocationRelativePath = "./unittests/syrecParserComponentsTests/testdata/";
-    const syrecTestsJsonUtils::SyrecIRJsonParser syrecIRJsonParser;
 
 protected:
-    std::string circuit;
-    std::vector<syrec::Module::ptr> expectedIR;
+    std::string                        circuit;
     syrec::program                  parserPublicInterface;
 
     void SetUp() override {
-        const std::string testCaseDataFileRelativePath = testCaseFileLocationRelativePath + GetParam() + ".json";
-        std::ifstream configFileStream(testCaseDataFileRelativePath, std::ios_base::in);
+        const std::string testCaseKey                  = GetParam();
+        const std::string testCaseDataFileRelativePath = testCaseFileLocationRelativePath + testCaseKey + ".json";
+        std::ifstream     configFileStream(testCaseDataFileRelativePath, std::ios_base::in);
         ASSERT_TRUE(configFileStream.good()) << "Could not open test data json file @ " << testCaseDataFileRelativePath;
 
-        json parsedJson = json::parse(configFileStream);
-        ASSERT_TRUE(parsedJson.is_object()) << "Expected test data in json to an object";
-        ASSERT_TRUE(parsedJson.contains(syrecTestsJsonUtils::cJsonKeyTestCaseRawCircuitData))
-                << "Expected json entry with key '" << syrecTestsJsonUtils::cJsonKeyTestCaseRawCircuitData << "' was not found";
-        ASSERT_TRUE(parsedJson.at(syrecTestsJsonUtils::cJsonKeyTestCaseRawCircuitData).is_string())
-                << "Expected json entry with key '" << syrecTestsJsonUtils::cJsonKeyTestCaseRawCircuitData << "' to be a string";
+        const json parsedJson = json::parse(configFileStream);
+        ASSERT_TRUE(parsedJson.is_object()) << "Expected test data to be in the form of a json array";
+        ASSERT_TRUE(parsedJson.contains(GetParam())) << "Expected an entry for the test '" << testCaseKey << "'";
 
-        ASSERT_TRUE(parsedJson.contains(syrecTestsJsonUtils::cJsonKeyTestCaseExpectedIR))
-                << "Expected json entry with key '" << syrecTestsJsonUtils::cJsonKeyTestCaseExpectedIR << "' was not found";
-        ASSERT_TRUE(parsedJson.at(syrecTestsJsonUtils::cJsonKeyTestCaseExpectedIR).is_array())
-                << "Expected json entry with key '" << syrecTestsJsonUtils::cJsonKeyTestCaseExpectedIR << "' to be an array";
-
-        ASSERT_NO_THROW(parseExpectedModuleJsonData(parsedJson.at(syrecTestsJsonUtils::cJsonKeyTestCaseExpectedIR))) << "Failed to parsed test case data";
-    }
-
-    void parseExpectedModuleJsonData(const json& jsonData) {
-        for (auto& jsonModuleEntry: jsonData) {
-            ASSERT_TRUE(jsonModuleEntry.is_object()) << "Expected definition of expected IR module entry in json to be a json object";
-
-            std::optional<syrec::Module::ptr>       parsedModule;
-            ASSERT_NO_THROW(syrecIRJsonParser.parseModuleFromJson(jsonModuleEntry, parsedModule)) << "Failed to parse json entry for one of the expected modules";
-            // TODO: Failure should not happen here
-            ASSERT_TRUE(parsedModule.has_value());
-            expectedIR.emplace_back(parsedModule.value());
-        }
+        const json testCaseJsonData = parsedJson[testCaseKey];
+        ASSERT_TRUE(testCaseJsonData.is_object()) << "Expected test case data for test '" << testCaseKey << "' to be in the form of a json object";
+        ASSERT_TRUE(testCaseJsonData.contains(cJsonKeyCircuit) && testCaseJsonData[cJsonKeyCircuit].is_string()) << "Test case did not contain an entry with key '" << cJsonKeyCircuit << "' and a string as value";
+        circuit = testCaseJsonData.at(cJsonKeyCircuit);
     }
 };
 
@@ -67,4 +51,7 @@ TEST_P(SyReCParserSuccessCasesFixture, GenericSyrecParserSuccessTest) {
     ASSERT_NO_THROW(errorsFromParsedCircuit = parserPublicInterface.readFromString(this->circuit));
     ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors";
 
+    std::string stringifiedProgram = "";
+    ASSERT_NO_THROW(stringifiedProgram = syrecAstDumpUtils::stringifyModules(parserPublicInterface.modules())) << "Failed to stringify parsed modules";
+    ASSERT_EQ(this->circuit, stringifiedProgram);
 }

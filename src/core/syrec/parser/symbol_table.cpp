@@ -87,9 +87,9 @@ bool SymbolTable::addEntry(const syrec::Module::ptr& module) {
 
 void SymbolTable::openScope(SymbolTable::ptr& currentScope) {
     // TODO: Implement me
-    const SymbolTable::ptr newScope(new SymbolTable());
-    newScope->outer = currentScope;
-    currentScope    = newScope;
+    SymbolTable::ptr       newScope = std::make_shared<SymbolTable>(SymbolTable());
+    newScope->outer           = currentScope;
+    currentScope                    = newScope;
 }
 
 void SymbolTable::closeScope(SymbolTable::ptr& currentScope) {
