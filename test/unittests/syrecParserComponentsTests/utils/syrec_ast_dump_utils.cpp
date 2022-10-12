@@ -11,16 +11,16 @@ std::string SyrecASTDumper::stringifyModules(const syrec::Module::vec& modules) 
     }
 
     std::ostringstream resultBuffer{};
-    std::copy(stringifiedModules.cbegin(), stringifiedModules.cend(), infix_ostream_iterator<std::string>(resultBuffer, newlineSequence.c_str()));
+    std::copy(stringifiedModules.cbegin(), stringifiedModules.cend(), infix_ostream_iterator<std::string>(resultBuffer, this->dumpConfig.newlineSequence.c_str()));
     return resultBuffer.str();
 }
 
 std::string SyrecASTDumper::stringifyModule(const syrec::Module::ptr& moduleToStringify) {
-    const std::string stringifiedParameters = stringifyAndJoinMany(moduleToStringify->parameters, parameterDelimiter.c_str(), stringifyVariable);
+    const std::string stringifiedParameters = stringifyAndJoinMany(moduleToStringify->parameters, this->dumpConfig.parameterDelimiter.c_str(), stringifyVariable);
     const std::string stringifiedLocals     = stringifyAndJoinMany(moduleToStringify->variables, " ", stringifyVariable);
     const std::string stringifiedStmts      = stringifyStatements(moduleToStringify->statements);
 
-    return "module " + moduleToStringify->name + "(" + stringifiedParameters + ")" + newlineSequence + stringifiedLocals + newlineSequence + stringifiedStmts;
+    return "module " + moduleToStringify->name + "(" + stringifiedParameters + ")" + this->dumpConfig.newlineSequence + stringifiedLocals + this->dumpConfig.newlineSequence + stringifiedStmts;
 }
 
 inline std::string SyrecASTDumper::stringifyStatements(const syrec::Statement::vec& statements) {
@@ -28,11 +28,11 @@ inline std::string SyrecASTDumper::stringifyStatements(const syrec::Statement::v
 
     size_t stmtIndex = 0;
     for (const auto& stmt: statements) {
-        stringifiedStmts.at(stmtIndex++) = repeatNTimes(identationSequence, this->identationLevel) + stringifyStatement(stmt);
+        stringifiedStmts.at(stmtIndex++) = repeatNTimes(this->dumpConfig.identationSequence, this->identationLevel) + stringifyStatement(stmt);
     }
 
     std::ostringstream resultBuffer{};
-    std::copy(stringifiedStmts.cbegin(), stringifiedStmts.cend(), infix_ostream_iterator<std::string>(resultBuffer, stmtDelimiter.c_str()));
+    std::copy(stringifiedStmts.cbegin(), stringifiedStmts.cend(), infix_ostream_iterator<std::string>(resultBuffer,  this->dumpConfig.stmtDelimiter.c_str()));
     return resultBuffer.str();
 }
 
@@ -84,12 +84,12 @@ std::string SyrecASTDumper::stringifyAssignStatement(const syrec::AssignStatemen
     return stringifyVariableAccess(assignStmt.lhs) + " " + assignOpStringified + " " + stringifyExpression(assignStmt.rhs);
 }
 
-inline std::string SyrecASTDumper::stringifyCallStatement(const syrec::CallStatement& callStmt) {
-    return "uncall " + callStmt.target->name + "(" + stringifyAndJoinMany<std::string>(callStmt.parameters, parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
+inline std::string SyrecASTDumper::stringifyCallStatement(const syrec::CallStatement& callStmt) const {
+    return "uncall " + callStmt.target->name + "(" + stringifyAndJoinMany<std::string>(callStmt.parameters, this->dumpConfig.parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
 }
 
-inline std::string SyrecASTDumper::stringifyUncallStatement(const syrec::UncallStatement& uncallStmt) {
-    return "uncall " + uncallStmt.target->name + "(" + stringifyAndJoinMany<std::string>(uncallStmt.parameters, parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
+inline std::string SyrecASTDumper::stringifyUncallStatement(const syrec::UncallStatement& uncallStmt) const {
+    return "uncall " + uncallStmt.target->name + "(" + stringifyAndJoinMany<std::string>(uncallStmt.parameters, this->dumpConfig.parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
 }
 
 std::string SyrecASTDumper::stringifyUnaryStatement(const syrec::UnaryStatement& unaryStmt) {
@@ -126,26 +126,26 @@ std::string SyrecASTDumper::stringifyForStatement(const syrec::ForStatement& for
     loopHeader += std::string(" step ") + (stepsize < 0 ? "-" : "") + stringifyNumber(forStmt.step) + " do";
 
 
-    std::string stringifiedStmt = "for " + loopHeader + newlineSequence;
+    std::string stringifiedStmt = "for " + loopHeader + this->dumpConfig.newlineSequence;
     this->identationLevel++;
-    stringifiedStmt += stringifyStatements(forStmt.statements) + newlineSequence;
+    stringifiedStmt += stringifyStatements(forStmt.statements) + this->dumpConfig.newlineSequence;
     this->identationLevel--;
-    stringifiedStmt += repeatNTimes(identationSequence, this->identationLevel) + "rof";
+    stringifiedStmt += repeatNTimes(this->dumpConfig.identationSequence, this->identationLevel) + "rof";
     return stringifiedStmt;
 }
 
 std::string SyrecASTDumper::stringifyIfStatement(const syrec::IfStatement& ifStmt) {
-    std::string stringifiedCondition = "if " + stringifyExpression(ifStmt.condition) + " then" + newlineSequence;
+    std::string stringifiedCondition = "if " + stringifyExpression(ifStmt.condition) + " then" + this->dumpConfig.newlineSequence;
     this->identationLevel++;
     stringifiedCondition += stringifyStatements(ifStmt.thenStatements);
     this->identationLevel--;
-    stringifiedCondition += newlineSequence + repeatNTimes(identationSequence, this->identationLevel) + "else" + newlineSequence;
+    stringifiedCondition += this->dumpConfig.newlineSequence + repeatNTimes(this->dumpConfig.identationSequence, this->identationLevel) + "else" + this->dumpConfig.newlineSequence;
 
     this->identationLevel++;
     stringifiedCondition += stringifyStatements(ifStmt.elseStatements);
     this->identationLevel--;
 
-    stringifiedCondition += newlineSequence + repeatNTimes(identationSequence, this->identationLevel) + "fi " + stringifyExpression(ifStmt.fiCondition);
+    stringifiedCondition += this->dumpConfig.newlineSequence + repeatNTimes(this->dumpConfig.identationSequence, this->identationLevel) + "fi " + stringifyExpression(ifStmt.fiCondition);
     return stringifiedCondition;
 }
 

@@ -33,14 +33,33 @@ namespace syrecAstDumpUtils {
 
     class SyrecASTDumper {
     private:
-        inline static const std::string newlineSequence = "\n";
-        inline static const std::string identationSequence  = "\t";
-        inline static const std::string stmtDelimiter       = ";\n";
-        inline static const std::string parameterDelimiter  = ", ";
+        struct ASTDumpConfig {
+            const std::string newlineSequence;
+            const std::string identationSequence;
+            const std::string stmtDelimiter;
+            const std::string parameterDelimiter;
+
+            explicit ASTDumpConfig(std::string newlineSequence, std::string identationSequence, std::string stmtDelimiter, std::string parameterDelimiter):
+                newlineSequence(std::move(newlineSequence)), identationSequence(std::move(identationSequence)), stmtDelimiter(std::move(stmtDelimiter)), parameterDelimiter(std::move(parameterDelimiter)){};
+        };
+
         std::size_t       identationLevel     = 0;
+        const ASTDumpConfig dumpConfig;
+
+        [[nodiscard]] static ASTDumpConfig createDefaultASTDumpConfig() {
+            return ASTDumpConfig("\n", "\t", ";\n", ", ");       
+        }
+
+        [[nodiscard]] static ASTDumpConfig createDefaultDebugASTDumpConfig() {
+            return ASTDumpConfig(" ", "", "; ", ", ");
+        }
 
     public:
+        explicit SyrecASTDumper(bool useDebugConfig):
+            dumpConfig(useDebugConfig ? createDefaultDebugASTDumpConfig() : createDefaultASTDumpConfig()){}
+
         [[nodiscard]] std::string stringifyModules(const syrec::Module::vec& modules);
+
     protected:
         [[nodiscard]] std::string stringifyModule(const syrec::Module::ptr& moduleToStringify);
 
@@ -48,8 +67,8 @@ namespace syrecAstDumpUtils {
         [[nodiscard]] std::string stringifyStatement(const syrec::Statement::ptr& statement);
         [[nodiscard]] static std::string stringifySwapStatement(const syrec::SwapStatement& swapStmt);
         [[nodiscard]] static std::string stringifyAssignStatement(const syrec::AssignStatement& assignStmt);
-        [[nodiscard]] static std::string stringifyCallStatement(const syrec::CallStatement& callStmt);
-        [[nodiscard]] static std::string stringifyUncallStatement(const syrec::UncallStatement& uncallStmt);
+        [[nodiscard]] std::string stringifyCallStatement(const syrec::CallStatement& callStmt) const;
+        [[nodiscard]] std::string stringifyUncallStatement(const syrec::UncallStatement& uncallStmt) const;
         [[nodiscard]] static std::string stringifyUnaryStatement(const syrec::UnaryStatement& unaryStmt);
         [[nodiscard]] static std::string stringifySkipStatement();
         [[nodiscard]] std::string stringifyForStatement(const syrec::ForStatement& forStmt);

@@ -13,13 +13,17 @@ using json = nlohmann::json;
 class SyReCParserSuccessCasesFixture: public ::testing::TestWithParam<std::string> {
 private:
     const std::string cJsonKeyCircuit                  = "circuit";
+    const std::string cJsonKeyExpectedCircuitOutput    = "expectedCircuit";
     const std::string cJsonKeyTestCaseName             = "testCaseName";
     const std::string testCaseFileLocationRelativePath = "./unittests/syrecParserComponentsTests/testdata/";
 
 protected:
     std::string                        circuit;
+    std::string                        expectedCircuit;
     syrec::program                  parserPublicInterface;
     syrecAstDumpUtils::SyrecASTDumper  astDumper;
+
+    SyReCParserSuccessCasesFixture() : astDumper(syrecAstDumpUtils::SyrecASTDumper(true)) {}
 
     void SetUp() override {
         const std::string testCaseKey                  = GetParam();
@@ -35,6 +39,14 @@ protected:
         ASSERT_TRUE(testCaseJsonData.is_object()) << "Expected test case data for test '" << testCaseKey << "' to be in the form of a json object";
         ASSERT_TRUE(testCaseJsonData.contains(cJsonKeyCircuit) && testCaseJsonData[cJsonKeyCircuit].is_string()) << "Test case did not contain an entry with key '" << cJsonKeyCircuit << "' and a string as value";
         circuit = testCaseJsonData.at(cJsonKeyCircuit);
+
+        if (testCaseJsonData.contains(cJsonKeyExpectedCircuitOutput)) {
+            ASSERT_TRUE(testCaseJsonData[cJsonKeyExpectedCircuitOutput].is_string()) << "Expected optional circuit output data to be in the form of a json string";
+            expectedCircuit = testCaseJsonData[cJsonKeyExpectedCircuitOutput].get<std::string>();
+        }
+        else {
+            expectedCircuit = circuit;
+        }
     }
 };
 
@@ -56,5 +68,5 @@ TEST_P(SyReCParserSuccessCasesFixture, GenericSyrecParserSuccessTest) {
 
     std::string stringifiedProgram;
     ASSERT_NO_THROW(stringifiedProgram = astDumper.stringifyModules(parserPublicInterface.modules())) << "Failed to stringify parsed modules";
-    ASSERT_EQ(this->circuit, stringifiedProgram);
+    ASSERT_EQ(this->expectedCircuit, stringifiedProgram);
 }
