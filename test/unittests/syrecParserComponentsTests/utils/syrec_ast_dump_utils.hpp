@@ -6,6 +6,7 @@
 #include "sstream"
 
 #include "core/syrec/module.hpp"
+#include "infix_iterator.hpp"
 
 namespace syrecAstDumpUtils {
     template<class T>
@@ -23,7 +24,7 @@ namespace syrecAstDumpUtils {
                 std::back_inserter(stringifiedElements),
                 [stringifyFunc](const T& elem) { return stringifyFunc(elem); });
 
-        std::copy(stringifiedElements.cbegin(), stringifiedElements.cend(), std::ostream_iterator<std::string>(resultBuffer, delimiter));
+        std::copy(stringifiedElements.cbegin(), stringifiedElements.cend(), infix_ostream_iterator<std::string>(resultBuffer, delimiter));
         return resultBuffer.str();
     }
 
