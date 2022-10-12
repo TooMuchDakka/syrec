@@ -7,6 +7,8 @@
 #include "core/syrec/statement.hpp"
 #include "core/syrec/variable.hpp"
 
+#include "core/syrec/parser/parser_config.hpp"
+
 #include <fstream>
 #include <vector>
 

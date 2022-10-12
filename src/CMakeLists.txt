@@ -36,6 +36,7 @@ add_library(${PROJECT_NAME}
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/grammar_conflict_resolver.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/method_call_guess.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/operation.hpp
+            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_config.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/Parser.h
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/range_check.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/Scanner.h

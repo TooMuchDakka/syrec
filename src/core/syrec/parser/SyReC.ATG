@@ -18,6 +18,7 @@ https://ssw.jku.at/Research/Projects/Coco/Doc/UserManual.pdf
 #include "core/syrec/parser/method_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/range_check.hpp"
+#include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/text_utils.hpp"
@@ -26,6 +27,7 @@ COMPILER SyReC
 	// Place declarations of objects referenced in this ATG
 	syrec::Module::vec modules;
 	SymbolTable::ptr currSymTabScope;
+	ParserConfig config;
 
 	syrec::Number::loop_variable_mapping loop_variable_mapping_lookup;
 
@@ -203,6 +205,10 @@ COMPILER SyReC
 
 	[[nodiscard]] ExpressionEvaluationResult::ptr createExpressionEvalutionResultContainer() const {
 		return std::make_shared<ExpressionEvaluationResult>(ExpressionEvaluationResult());
+	}
+
+	void setConfig(const ParserConfig& customConfig) {
+		this->config = customConfig;
 	}
 
 /*-------------------------------------------------------------------------*/
@@ -486,39 +492,38 @@ SignalDeclaration<signalType, declaredSignal>											(.	if (isValidSignalType
 SignalDeclaration production
 -------------------------------------------------------------------------*/
 
-SignalDeclaration<. const syrec::Variable::Types variable_type, std::optional<syrec::Variable::ptr> &declared_signal .>	(.	std::vector<unsigned int> dimensions{};
-																												// TODO: Use default bit width
-																												unsigned int signal_width = 0;	
-																												bool valid_declaration = true;
-																											.)
+SignalDeclaration<. const syrec::Variable::Types variableType, std::optional<syrec::Variable::ptr> &signalDeclaration .>	(.	std::vector<unsigned int> dimensions{};
+																																unsigned int signalWidth = config.cDefaultSignalWidth;	
+																																bool isValidSignalDeclaration = true;
+																															.)
 =
-ident																										(.	const std::string signal_ident = convert_to_uniform_text_format(t->val);	.)
+ident																														(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);	.)
 {"[" 
-	int																										(.	const std::optional<unsigned int> dimension = convert_token_value_to_number(*t);
-																												if (!dimension.has_value()) {
-																													valid_declaration = false;
-																													// TODO: GEN_ERROR
-																												}
-																												else {
-																													dimensions.emplace_back(dimension.value());	
-																												}
-																											.)
-"]"}																									
+	int																														(.	const std::optional<unsigned int> dimension = convert_token_value_to_number(*t);
+																																if (!dimension.has_value()) {
+																																	isValidSignalDeclaration = false;
+																																	// TODO: GEN_ERROR
+																																}
+																																else {
+																																	dimensions.emplace_back(dimension.value());	
+																																}
+																															.)
+"]"}																										
 ["(" 
-	int																									(.	const std::optional<unsigned int> user_defined_signal_width = convert_token_value_to_number(*t);
-																											if (!user_defined_signal_width.has_value()) {
-																												// TODO: GEN_ERROR
-																												valid_declaration = false;
-																											}
-																											else {
-																												signal_width = user_defined_signal_width.value();
-																											}
-																										.)
-")"]																									(.	// TODO: What if no dimensions is specified, add default dimension entry ?
-																											if (valid_declaration) {
-																												declared_signal.emplace(std::make_shared<syrec::Variable>(syrec::Variable(variable_type, signal_ident, dimensions, signal_width)));
-																											}
-																										.)	
+	int																														(.	const std::optional<unsigned int> customSignalWidth = convert_token_value_to_number(*t);
+																																if (!customSignalWidth.has_value()) {
+																																	// TODO: GEN_ERROR
+																																	isValidSignalDeclaration = false;
+																																}
+																																else {
+																																	signalWidth = customSignalWidth.value();
+																																}
+																															.)
+")"]																														(.	// TODO: What if no dimensions is specified, add default dimension entry ?
+																																if (isValidSignalDeclaration) {
+																																	signalDeclaration.emplace(std::make_shared<syrec::Variable>(syrec::Variable(variableType, signalIdent, dimensions, signalWidth)));
+																																}
+																															.)	
 .
 
 /*-------------------------------------------------------------------------

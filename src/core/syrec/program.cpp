@@ -4,6 +4,7 @@
 
 using parser::Parser;
 using parser::Scanner;
+using parser::ParserConfig;
 using namespace syrec;
 
 
@@ -49,12 +50,13 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
 
     auto scanner = Scanner(buffer, bufferSizeInBytes);
     auto parser  = Parser(&scanner);
+    parser.setConfig(ParserConfig{});
     parser.Parse();
 
     if (parser.errors->count == 0) {
         this->modulesVec = parser.modules;
         return "";
     }
-    return "";
+    return "ERR";
 }
 

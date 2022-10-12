@@ -13,6 +13,7 @@
 #include "core/syrec/parser/method_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/range_check.hpp"
+#include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/text_utils.hpp"
@@ -65,6 +66,7 @@ public:
 
 syrec::Module::vec modules;
 	SymbolTable::ptr currSymTabScope;
+	ParserConfig config;
 
 	syrec::Number::loop_variable_mapping loop_variable_mapping_lookup;
 
@@ -244,6 +246,10 @@ syrec::Module::vec modules;
 		return std::make_shared<ExpressionEvaluationResult>(ExpressionEvaluationResult());
 	}
 
+	void setConfig(const ParserConfig& customConfig) {
+		this->config = customConfig;
+	}
+
 /*-------------------------------------------------------------------------*/
 
 
@@ -259,7 +265,7 @@ syrec::Module::vec modules;
 	void SignalList(const syrec::Module::ptr& module, bool &isValidModuleDefinition );
 	void StatementList(syrec::Statement::vec &statements );
 	void Parameter(std::optional<syrec::Variable::ptr> &parameter );
-	void SignalDeclaration(const syrec::Variable::Types variable_type, std::optional<syrec::Variable::ptr> &declared_signal );
+	void SignalDeclaration(const syrec::Variable::Types variableType, std::optional<syrec::Variable::ptr> &signalDeclaration );
 	void Statement(std::optional<syrec::Statement::ptr> &user_defined_statement );
 	void CallStatement(std::optional<syrec::Statement::ptr> &statement );
 	void ForStatement(std::optional<syrec::Statement::ptr> &statement );

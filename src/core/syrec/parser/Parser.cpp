@@ -269,7 +269,7 @@ void Parser::SignalList(const syrec::Module::ptr& module, bool &isValidModuleDef
 		else {
 		currSymTabScope->addEntry(validSignalDeclaration);
 		if (isValidModuleDefinition) {
-            module->variables.emplace_back(validSignalDeclaration);
+		module->variables.emplace_back(validSignalDeclaration);
 		}
 		}
 		}
@@ -291,7 +291,7 @@ void Parser::SignalList(const syrec::Module::ptr& module, bool &isValidModuleDef
 			else {
 			currSymTabScope->addEntry(validSignalDeclaration);
 			if (isValidModuleDefinition) {
-                module->variables.emplace_back(validSignalDeclaration);
+			module->variables.emplace_back(validSignalDeclaration);
 			}
 			}
 			}
@@ -347,20 +347,19 @@ void Parser::Parameter(std::optional<syrec::Variable::ptr> &parameter ) {
 		
 }
 
-void Parser::SignalDeclaration(const syrec::Variable::Types variable_type, std::optional<syrec::Variable::ptr> &declared_signal ) {
+void Parser::SignalDeclaration(const syrec::Variable::Types variableType, std::optional<syrec::Variable::ptr> &signalDeclaration ) {
 		std::vector<unsigned int> dimensions{};
-		// TODO: Use default bit width
-		unsigned int signal_width = 0;	
-		bool valid_declaration = true;
+		unsigned int signalWidth = config.cDefaultSignalWidth;	
+		bool isValidSignalDeclaration = true;
 		
 		Expect(_ident);
-		const std::string signal_ident = convert_to_uniform_text_format(t->val);	
+		const std::string signalIdent = convert_to_uniform_text_format(t->val);	
 		while (la->kind == 18 /* "[" */) {
 			Get();
 			Expect(_int);
 			const std::optional<unsigned int> dimension = convert_token_value_to_number(*t);
 			if (!dimension.has_value()) {
-			valid_declaration = false;
+			isValidSignalDeclaration = false;
 			// TODO: GEN_ERROR
 			}
 			else {
@@ -372,19 +371,19 @@ void Parser::SignalDeclaration(const syrec::Variable::Types variable_type, std::
 		if (la->kind == 5 /* "(" */) {
 			Get();
 			Expect(_int);
-			const std::optional<unsigned int> user_defined_signal_width = convert_token_value_to_number(*t);
-			if (!user_defined_signal_width.has_value()) {
+			const std::optional<unsigned int> customSignalWidth = convert_token_value_to_number(*t);
+			if (!customSignalWidth.has_value()) {
 			// TODO: GEN_ERROR
-			valid_declaration = false;
+			isValidSignalDeclaration = false;
 			}
 			else {
-			signal_width = user_defined_signal_width.value();
+			signalWidth = customSignalWidth.value();
 			}
 			
 			Expect(10 /* ")" */);
 		}
-		if (valid_declaration) {
-		declared_signal.emplace(std::make_shared<syrec::Variable>(syrec::Variable(variable_type, signal_ident, dimensions, signal_width)));
+		if (isValidSignalDeclaration) {
+		signalDeclaration.emplace(std::make_shared<syrec::Variable>(syrec::Variable(variableType, signalIdent, dimensions, signalWidth)));
 		}
 		
 }
