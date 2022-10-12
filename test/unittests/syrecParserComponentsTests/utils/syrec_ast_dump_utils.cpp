@@ -2,23 +2,41 @@
 
 using namespace syrecAstDumpUtils;
 
-std::string syrecAstDumpUtils::stringifyModules(const syrec::Module::vec& modules) {
-    return stringifyAndJoinMany(modules, "\n", stringifyModule);
+std::string SyrecASTDumper::stringifyModules(const syrec::Module::vec& modules) {
+    std::vector<std::string> stringifiedModules(modules.size());
+
+    size_t moduleIndex = 0;
+    for (const auto& module: modules) {
+        stringifiedModules.at(moduleIndex++) = stringifyModule(module);
+    }
+
+    std::ostringstream resultBuffer{};
+    std::copy(stringifiedModules.cbegin(), stringifiedModules.cend(), infix_ostream_iterator<std::string>(resultBuffer, newlineSequence.c_str()));
+    return resultBuffer.str();
 }
 
-std::string syrecAstDumpUtils::stringifyModule(const syrec::Module::ptr& moduleToStringify) {
-    const std::string stringifiedParameters = stringifyAndJoinMany(moduleToStringify->parameters, ", ", stringifyVariable);
+std::string SyrecASTDumper::stringifyModule(const syrec::Module::ptr& moduleToStringify) {
+    const std::string stringifiedParameters = stringifyAndJoinMany(moduleToStringify->parameters, parameterDelimiter.c_str(), stringifyVariable);
     const std::string stringifiedLocals     = stringifyAndJoinMany(moduleToStringify->variables, " ", stringifyVariable);
     const std::string stringifiedStmts      = stringifyStatements(moduleToStringify->statements);
 
-    return "module " + moduleToStringify->name + "(" + stringifiedParameters + ")\n" + stringifiedLocals + "\n" + stringifiedStmts;
+    return "module " + moduleToStringify->name + "(" + stringifiedParameters + ")" + newlineSequence + stringifiedLocals + newlineSequence + stringifiedStmts;
 }
 
-std::string syrecAstDumpUtils::stringifyStatements(const syrec::Statement::vec& statements) {
-    return stringifyAndJoinMany(statements, ";\n", stringifyStatement);
+inline std::string SyrecASTDumper::stringifyStatements(const syrec::Statement::vec& statements) {
+    std::vector<std::string> stringifiedStmts(statements.size());
+
+    size_t stmtIndex = 0;
+    for (const auto& stmt: statements) {
+        stringifiedStmts.at(stmtIndex++) = repeatNTimes(identationSequence, this->identationLevel) + stringifyStatement(stmt);
+    }
+
+    std::ostringstream resultBuffer{};
+    std::copy(stringifiedStmts.cbegin(), stringifiedStmts.cend(), infix_ostream_iterator<std::string>(resultBuffer, stmtDelimiter.c_str()));
+    return resultBuffer.str();
 }
 
-std::string syrecAstDumpUtils::stringifyStatement(const syrec::Statement::ptr& statement) {
+std::string SyrecASTDumper::stringifyStatement(const syrec::Statement::ptr& statement) {
     if (auto const* swapStmt = dynamic_cast<syrec::SwapStatement*>(statement.get())) {
         return stringifySwapStatement(*swapStmt);
     }
@@ -40,14 +58,14 @@ std::string syrecAstDumpUtils::stringifyStatement(const syrec::Statement::ptr& s
     if (auto const* ifStmt = dynamic_cast<syrec::IfStatement*>(statement.get())) {
         return stringifyIfStatement(*ifStmt);
     }
-    return stringifySkipStatement(*statement);
+    return stringifySkipStatement();
 }
 
-std::string syrecAstDumpUtils::stringifySwapStatement(const syrec::SwapStatement& swapStmt) {
+inline std::string SyrecASTDumper::stringifySwapStatement(const syrec::SwapStatement& swapStmt) {
     return stringifyVariableAccess(swapStmt.lhs) + " " + "<=>" + " " + stringifyVariableAccess(swapStmt.rhs);
 }
 
-std::string syrecAstDumpUtils::stringifyAssignStatement(const syrec::AssignStatement& assignStmt) {
+std::string SyrecASTDumper::stringifyAssignStatement(const syrec::AssignStatement& assignStmt) {
     std::string assignOpStringified;
     switch (assignStmt.op) {
         case syrec::AssignStatement::Add:
@@ -66,15 +84,15 @@ std::string syrecAstDumpUtils::stringifyAssignStatement(const syrec::AssignState
     return stringifyVariableAccess(assignStmt.lhs) + " " + assignOpStringified + " " + stringifyExpression(assignStmt.rhs);
 }
 
-std::string syrecAstDumpUtils::stringifyCallStatement(const syrec::CallStatement& callStmt) {
-    return "call " + callStmt.target->name + "(" + stringifyAndJoinMany<std::string>(callStmt.parameters, ", ", [](const std::string& elem) { return elem; }) + ")";
+inline std::string SyrecASTDumper::stringifyCallStatement(const syrec::CallStatement& callStmt) {
+    return "uncall " + callStmt.target->name + "(" + stringifyAndJoinMany<std::string>(callStmt.parameters, parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
 }
 
-std::string syrecAstDumpUtils::stringifyUncallStatement(const syrec::UncallStatement& uncallStmt) {
-    return "uncall " + uncallStmt.target->name + "(" + stringifyAndJoinMany<std::string>(uncallStmt.parameters, ", ", [](const std::string& elem) { return elem; }) + ")";
+inline std::string SyrecASTDumper::stringifyUncallStatement(const syrec::UncallStatement& uncallStmt) {
+    return "uncall " + uncallStmt.target->name + "(" + stringifyAndJoinMany<std::string>(uncallStmt.parameters, parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
 }
 
-std::string syrecAstDumpUtils::stringifyUnaryStatement(const syrec::UnaryStatement& unaryStmt) {
+std::string SyrecASTDumper::stringifyUnaryStatement(const syrec::UnaryStatement& unaryStmt) {
     std::string unaryOpStringified;
     switch (unaryStmt.op) {
         case syrec::UnaryStatement::Increment:
@@ -93,12 +111,11 @@ std::string syrecAstDumpUtils::stringifyUnaryStatement(const syrec::UnaryStateme
     return unaryOpStringified + " " + stringifyVariableAccess(unaryStmt.var);
 }
 
-std::string syrecAstDumpUtils::stringifySkipStatement(const syrec::SkipStatement& skipStmt) {
+inline std::string SyrecASTDumper::stringifySkipStatement() {
     return "skip";
 }
 
-std::string syrecAstDumpUtils::stringifyForStatement(const syrec::ForStatement& forStmt) {
-
+std::string SyrecASTDumper::stringifyForStatement(const syrec::ForStatement& forStmt) {
     const std::string loopVarStringified = forStmt.loopVariable.empty() ? "" : "$" + forStmt.loopVariable + " = ";
     std::string       loopHeader = loopVarStringified;
     if (forStmt.range.first != forStmt.range.second) {
@@ -108,18 +125,31 @@ std::string syrecAstDumpUtils::stringifyForStatement(const syrec::ForStatement& 
     const unsigned int stepsize            = forStmt.step->evaluate({});
     loopHeader += std::string(" step ") + (stepsize < 0 ? "-" : "") + stringifyNumber(forStmt.step) + " do";
 
-    return "for " + loopHeader + "\n" + stringifyStatements(forStmt.statements) + "\nrof";
+
+    std::string stringifiedStmt = "for " + loopHeader + newlineSequence;
+    this->identationLevel++;
+    stringifiedStmt += stringifyStatements(forStmt.statements) + newlineSequence;
+    this->identationLevel--;
+    stringifiedStmt += repeatNTimes(identationSequence, this->identationLevel) + "rof";
+    return stringifiedStmt;
 }
 
-std::string syrecAstDumpUtils::stringifyIfStatement(const syrec::IfStatement& ifStmt) {
-    return "if " + stringifyExpression(ifStmt.condition) + "then\n "
-            + stringifyStatements(ifStmt.thenStatements)
-        + "\nelse\n "
-        +    stringifyStatements(ifStmt.elseStatements)
-        + "\n fi" + " " + stringifyExpression(ifStmt.fiCondition); 
+std::string SyrecASTDumper::stringifyIfStatement(const syrec::IfStatement& ifStmt) {
+    std::string stringifiedCondition = "if " + stringifyExpression(ifStmt.condition) + " then" + newlineSequence;
+    this->identationLevel++;
+    stringifiedCondition += stringifyStatements(ifStmt.thenStatements);
+    this->identationLevel--;
+    stringifiedCondition += newlineSequence + repeatNTimes(identationSequence, this->identationLevel) + "else" + newlineSequence;
+
+    this->identationLevel++;
+    stringifiedCondition += stringifyStatements(ifStmt.elseStatements);
+    this->identationLevel--;
+
+    stringifiedCondition += newlineSequence + repeatNTimes(identationSequence, this->identationLevel) + "fi " + stringifyExpression(ifStmt.fiCondition);
+    return stringifiedCondition;
 }
 
-std::string syrecAstDumpUtils::stringifyExpression(const syrec::expression::ptr& expression) {
+std::string SyrecASTDumper::stringifyExpression(const syrec::expression::ptr& expression) {
     if (auto const* numberExpr = dynamic_cast<syrec::NumericExpression*>(expression.get())) {
         return stringifyNumericExpression(*numberExpr);
     }
@@ -136,7 +166,7 @@ std::string syrecAstDumpUtils::stringifyExpression(const syrec::expression::ptr&
     return "";
 }
 
-std::string syrecAstDumpUtils::stringifyBinaryExpression(const syrec::BinaryExpression& binaryExpr) {
+std::string SyrecASTDumper::stringifyBinaryExpression(const syrec::BinaryExpression& binaryExpr) {
     std::string binaryExprStringified;
     switch (binaryExpr.op) {
         case syrec::BinaryExpression::Add:
@@ -197,21 +227,21 @@ std::string syrecAstDumpUtils::stringifyBinaryExpression(const syrec::BinaryExpr
     return "(" + stringifyExpression(binaryExpr.lhs) + " " + binaryExprStringified + " " + stringifyExpression(binaryExpr.rhs) + ")";
 }
 
-std::string syrecAstDumpUtils::stringifyNumericExpression(const syrec::NumericExpression& numericExpr) {
+std::string SyrecASTDumper::stringifyNumericExpression(const syrec::NumericExpression& numericExpr) {
     return stringifyNumber(numericExpr.value);
 }
 
-std::string syrecAstDumpUtils::stringifyShiftExpression(const syrec::ShiftExpression& shiftExpr) {
+std::string SyrecASTDumper::stringifyShiftExpression(const syrec::ShiftExpression& shiftExpr) {
     return "(" + stringifyExpression(shiftExpr.lhs) + " " + (shiftExpr.op == syrec::ShiftExpression::Left ? ">>" : "<<") + " " + stringifyNumber(shiftExpr.rhs) + ")";
 }
 
-std::string syrecAstDumpUtils::stringifyVariableExpression(const syrec::VariableExpression& variableExpression) {
+std::string SyrecASTDumper::stringifyVariableExpression(const syrec::VariableExpression& variableExpression) {
     return stringifyVariableAccess(variableExpression.var);
 }
 
 // TODO: Throw exception on invalid signal type ?
-std::string syrecAstDumpUtils::stringifyVariable(const syrec::Variable::ptr& variable) {
-    const std::string dimensionsStringified = stringifyAndJoinMany<unsigned int>(variable->dimensions, "", [](const unsigned int& t) { return "[" + std::to_string(t) + "]"; });
+std::string SyrecASTDumper::stringifyVariable(const syrec::Variable::ptr& variable) {
+    const std::string dimensionsStringified = stringifyAndJoinMany(variable->dimensions, "", &SyrecASTDumper::stringifyDimension);
     const std::string bitwidthStringified   = "(" + std::to_string(variable->bitwidth) + ")";
 
     std::string variableAssignabilityStringified;
@@ -238,12 +268,12 @@ std::string syrecAstDumpUtils::stringifyVariable(const syrec::Variable::ptr& var
     return variableAssignabilityStringified + " " + variable->name + dimensionsStringified + bitwidthStringified;
 }
 
-std::string syrecAstDumpUtils::stringifyVariableAccess(const syrec::VariableAccess::ptr& variableAccess) {
+std::string SyrecASTDumper::stringifyVariableAccess(const syrec::VariableAccess::ptr& variableAccess) {
     std::string accessedDimension;
     std::string bitAccess;
 
     if (!variableAccess->indexes.empty()) {
-       accessedDimension = stringifyAndJoinManyComplex<syrec::expression>(variableAccess->indexes, "", [](const syrec::expression::ptr& expr) { return "[" + stringifyExpression(expr) + "]"; });
+        accessedDimension = stringifyAndJoinManyComplex<syrec::expression>(variableAccess->indexes, "", stringifyDimensionExpression);
     }
 
     if (variableAccess->range.has_value()) {
@@ -258,9 +288,28 @@ std::string syrecAstDumpUtils::stringifyVariableAccess(const syrec::VariableAcce
 }
 
 // TODO: Handling of loop variable
-std::string syrecAstDumpUtils::stringifyNumber(const syrec::Number::ptr& number) {
+inline std::string SyrecASTDumper::stringifyNumber(const syrec::Number::ptr& number) {
     if (number->isLoopVariable()) {
         return "$" + number->variableName();
     }
     return std::to_string(number->evaluate({}));
+}
+
+inline std::string SyrecASTDumper::stringifyDimensionExpression(const syrec::expression::ptr& expr) {
+    return "[" + stringifyExpression(expr) + "]";
+}
+
+inline std::string SyrecASTDumper::stringifyDimension(const unsigned int& dimension) {
+    return '[' + std::to_string(dimension) + "]";
+}
+
+inline std::string SyrecASTDumper::repeatNTimes(const std::string& str, const size_t numRepetitions) {
+    if (numRepetitions == 0) {
+        return "";
+    }
+
+    const std::vector repeatContainer(numRepetitions, str);
+    std::ostringstream       resultBuffer{};
+    std::copy(repeatContainer.cbegin(), repeatContainer.cend(), infix_ostream_iterator<std::string>(resultBuffer, ""));
+    return resultBuffer.str();
 }

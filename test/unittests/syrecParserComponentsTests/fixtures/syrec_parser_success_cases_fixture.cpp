@@ -19,6 +19,7 @@ private:
 protected:
     std::string                        circuit;
     syrec::program                  parserPublicInterface;
+    syrecAstDumpUtils::SyrecASTDumper  astDumper;
 
     void SetUp() override {
         const std::string testCaseKey                  = GetParam();
@@ -51,7 +52,9 @@ TEST_P(SyReCParserSuccessCasesFixture, GenericSyrecParserSuccessTest) {
     ASSERT_NO_THROW(errorsFromParsedCircuit = parserPublicInterface.readFromString(this->circuit));
     ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors";
 
-    std::string stringifiedProgram = "";
-    ASSERT_NO_THROW(stringifiedProgram = syrecAstDumpUtils::stringifyModules(parserPublicInterface.modules())) << "Failed to stringify parsed modules";
+    int z = 0;
+
+    std::string stringifiedProgram;
+    ASSERT_NO_THROW(stringifiedProgram = astDumper.stringifyModules(parserPublicInterface.modules())) << "Failed to stringify parsed modules";
     ASSERT_EQ(this->circuit, stringifiedProgram);
 }
