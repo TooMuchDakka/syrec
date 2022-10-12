@@ -34,36 +34,63 @@ std::string syrecAstDumpUtils::stringifyStatement(const syrec::Statement::ptr& s
     if (auto const* unaryStmt = dynamic_cast<syrec::UnaryStatement*>(statement.get())) {
         return stringifyUnaryStatement(*unaryStmt);
     }
-    if (auto const* skipStmt = dynamic_cast<syrec::SkipStatement*>(statement.get())) {
-        return stringifySkipStatement(*skipStmt);
-    }
     if (auto const* forStmt = dynamic_cast<syrec::ForStatement*>(statement.get())) {
         return stringifyForStatement(*forStmt);
     }
     if (auto const* ifStmt = dynamic_cast<syrec::IfStatement*>(statement.get())) {
         return stringifyIfStatement(*ifStmt);
     }
-    return "";
+    return stringifySkipStatement(*statement);
 }
 
 std::string syrecAstDumpUtils::stringifySwapStatement(const syrec::SwapStatement& swapStmt) {
-    return "";
+    return stringifyVariableAccess(swapStmt.lhs) + " " + "<=>" + " " + stringifyVariableAccess(swapStmt.rhs);
 }
 
 std::string syrecAstDumpUtils::stringifyAssignStatement(const syrec::AssignStatement& assignStmt) {
-    return "";
+    std::string assignOpStringified;
+    switch (assignStmt.op) {
+        case syrec::AssignStatement::Add:
+            assignOpStringified = "+=";
+            break;
+        case syrec::AssignStatement::Subtract:
+            assignOpStringified = "-=";
+            break;
+        case syrec::AssignStatement::Exor:
+            assignOpStringified = "^=";
+            break;
+        default:
+            assignOpStringified = "";
+            break;
+    }
+    return stringifyVariableAccess(assignStmt.lhs) + " " + assignOpStringified + " " + stringifyExpression(assignStmt.rhs);
 }
 
 std::string syrecAstDumpUtils::stringifyCallStatement(const syrec::CallStatement& callStmt) {
-    return "";
+    return "call " + callStmt.target->name + "(" + stringifyAndJoinMany<std::string>(callStmt.parameters, ", ", [](const std::string& elem) { return elem; }) + ")";
 }
 
 std::string syrecAstDumpUtils::stringifyUncallStatement(const syrec::UncallStatement& uncallStmt) {
-    return "";
+    return "uncall " + uncallStmt.target->name + "(" + stringifyAndJoinMany<std::string>(uncallStmt.parameters, ", ", [](const std::string& elem) { return elem; }) + ")";
 }
 
 std::string syrecAstDumpUtils::stringifyUnaryStatement(const syrec::UnaryStatement& unaryStmt) {
-    return "";
+    std::string unaryOpStringified;
+    switch (unaryStmt.op) {
+        case syrec::UnaryStatement::Increment:
+            unaryOpStringified = "++=";
+            break;
+        case syrec::UnaryStatement::Decrement:
+            unaryOpStringified = "--=";
+            break;
+        case syrec::UnaryStatement::Invert:
+            unaryOpStringified = "~=";
+            break;
+        default:
+            unaryOpStringified = "";
+            break;
+    }
+    return unaryOpStringified + " " + stringifyVariableAccess(unaryStmt.var);
 }
 
 std::string syrecAstDumpUtils::stringifySkipStatement(const syrec::SkipStatement& skipStmt) {
@@ -71,11 +98,25 @@ std::string syrecAstDumpUtils::stringifySkipStatement(const syrec::SkipStatement
 }
 
 std::string syrecAstDumpUtils::stringifyForStatement(const syrec::ForStatement& forStmt) {
-    return "";
+
+    const std::string loopVarStringified = forStmt.loopVariable.empty() ? "" : "$" + forStmt.loopVariable + " = ";
+    std::string       loopHeader = loopVarStringified;
+    if (forStmt.range.first != forStmt.range.second) {
+        loopHeader += stringifyNumber(forStmt.range.first) + " to ";
+    }
+    loopHeader += stringifyNumber(forStmt.range.second);
+    const unsigned int stepsize            = forStmt.step->evaluate({});
+    loopHeader += std::string(" step ") + (stepsize < 0 ? "-" : "") + stringifyNumber(forStmt.step) + " do";
+
+    return "for " + loopHeader + "\n" + stringifyStatements(forStmt.statements) + "\nrof";
 }
 
 std::string syrecAstDumpUtils::stringifyIfStatement(const syrec::IfStatement& ifStmt) {
-    return "";
+    return "if " + stringifyExpression(ifStmt.condition) + "then\n "
+            + stringifyStatements(ifStmt.thenStatements)
+        + "\nelse\n "
+        +    stringifyStatements(ifStmt.elseStatements)
+        + "\n fi" + " " + stringifyExpression(ifStmt.fiCondition); 
 }
 
 std::string syrecAstDumpUtils::stringifyExpression(const syrec::expression::ptr& expression) {
