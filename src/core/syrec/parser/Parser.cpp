@@ -817,7 +817,7 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 			const std::optional<unsigned int> &constantValueForAccessedDimension = dimensionExpression->getAsConstant();
 			if (constantValueForAccessedDimension.has_value()) {
 			// TODO: Using global flag indicating zero_based indexing or not
-			indexExpressionsSemanticallyOk = isValidDimensionAccess(accessedSignal.value()->getVar(), constantValueForAccessedDimension.value(), true);
+			indexExpressionsSemanticallyOk = isValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, constantValueForAccessedDimension.value(), true);
 			
 			if (!indexExpressionsSemanticallyOk) {
 			// TODO: Using global flag indicating zero_based indexing or not
