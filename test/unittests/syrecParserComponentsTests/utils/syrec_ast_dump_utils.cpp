@@ -7,15 +7,15 @@ std::string syrecAstDumpUtils::stringifyModules(const syrec::Module::vec& module
 }
 
 std::string syrecAstDumpUtils::stringifyModule(const syrec::Module::ptr& moduleToStringify) {
-    const std::string stringifiedParameters = stringifyAndJoinMany(moduleToStringify->parameters, ",", stringifyVariable);
-    const std::string stringifiedLocals     = stringifyAndJoinMany(moduleToStringify->variables, ",", stringifyVariable);
+    const std::string stringifiedParameters = stringifyAndJoinMany(moduleToStringify->parameters, ", ", stringifyVariable);
+    const std::string stringifiedLocals     = stringifyAndJoinMany(moduleToStringify->variables, " ", stringifyVariable);
     const std::string stringifiedStmts      = stringifyStatements(moduleToStringify->statements);
 
     return "module " + moduleToStringify->name + "(" + stringifiedParameters + ")\n" + stringifiedLocals + "\n" + stringifiedStmts;
 }
 
 std::string syrecAstDumpUtils::stringifyStatements(const syrec::Statement::vec& statements) {
-    return stringifyAndJoinMany(statements, ";", stringifyStatement);
+    return stringifyAndJoinMany(statements, ";\n", stringifyStatement);
 }
 
 std::string syrecAstDumpUtils::stringifyStatement(const syrec::Statement::ptr& statement) {
@@ -67,7 +67,7 @@ std::string syrecAstDumpUtils::stringifyUnaryStatement(const syrec::UnaryStateme
 }
 
 std::string syrecAstDumpUtils::stringifySkipStatement(const syrec::SkipStatement& skipStmt) {
-    return "";
+    return "skip";
 }
 
 std::string syrecAstDumpUtils::stringifyForStatement(const syrec::ForStatement& forStmt) {
@@ -79,23 +79,93 @@ std::string syrecAstDumpUtils::stringifyIfStatement(const syrec::IfStatement& if
 }
 
 std::string syrecAstDumpUtils::stringifyExpression(const syrec::expression::ptr& expression) {
+    if (auto const* numberExpr = dynamic_cast<syrec::NumericExpression*>(expression.get())) {
+        return stringifyNumericExpression(*numberExpr);
+    }
+    if (auto const* binaryExpr = dynamic_cast<syrec::BinaryExpression*>(expression.get())) {
+        return stringifyBinaryExpression(*binaryExpr);    
+    }
+    if (auto const* shiftExpr = dynamic_cast<syrec::ShiftExpression*>(expression.get())) {
+        return stringifyShiftExpression(*shiftExpr);
+    }
+    if (auto const* variableExpr = dynamic_cast<syrec::VariableExpression*>(expression.get())) {
+        return stringifyVariableExpression(*variableExpr);
+    }
+    // TODO: Unary epxression is currently not supported
     return "";
 }
 
 std::string syrecAstDumpUtils::stringifyBinaryExpression(const syrec::BinaryExpression& binaryExpr) {
-    return "";
+    std::string binaryExprStringified;
+    switch (binaryExpr.op) {
+        case syrec::BinaryExpression::Add:
+            binaryExprStringified = "+";
+            break;
+        case syrec::BinaryExpression::Subtract:
+            binaryExprStringified = "-";
+            break;
+        case syrec::BinaryExpression::Exor:
+            binaryExprStringified = "^";
+            break;
+        case syrec::BinaryExpression::Multiply:
+            binaryExprStringified = "*";
+            break;
+        case syrec::BinaryExpression::Divide:
+            binaryExprStringified = "/";
+            break;
+        case syrec::BinaryExpression::Modulo:
+            binaryExprStringified = "%";
+            break;
+        case syrec::BinaryExpression::FracDivide:
+            binaryExprStringified = "*>";
+            break;
+        case syrec::BinaryExpression::LogicalAnd:
+            binaryExprStringified = "&&";
+            break;
+        case syrec::BinaryExpression::LogicalOr:
+            binaryExprStringified = "||";
+            break;
+        case syrec::BinaryExpression::BitwiseAnd:
+            binaryExprStringified = "&";
+            break;
+        case syrec::BinaryExpression::BitwiseOr:
+            binaryExprStringified = "|";
+            break;
+        case syrec::BinaryExpression::LessThan:
+            binaryExprStringified = "<";
+            break;
+        case syrec::BinaryExpression::GreaterThan:
+            binaryExprStringified = ">";
+            break;
+        case syrec::BinaryExpression::Equals:
+            binaryExprStringified = "=";
+            break;
+        case syrec::BinaryExpression::NotEquals:
+            binaryExprStringified = "!=";
+            break;
+        case syrec::BinaryExpression::LessEquals:
+            binaryExprStringified = "<=";
+            break;
+        case syrec::BinaryExpression::GreaterEquals:
+            binaryExprStringified = ">=";
+            break;
+        default:
+            binaryExprStringified = "";
+            break;
+    }
+    return "(" + stringifyExpression(binaryExpr.lhs) + " " + binaryExprStringified + " " + stringifyExpression(binaryExpr.rhs) + ")";
 }
 
 std::string syrecAstDumpUtils::stringifyNumericExpression(const syrec::NumericExpression& numericExpr) {
-    return "";
+    return stringifyNumber(numericExpr.value);
 }
 
 std::string syrecAstDumpUtils::stringifyShiftExpression(const syrec::ShiftExpression& shiftExpr) {
-    return "";
+    return "(" + stringifyExpression(shiftExpr.lhs) + " " + (shiftExpr.op == syrec::ShiftExpression::Left ? ">>" : "<<") + " " + stringifyNumber(shiftExpr.rhs) + ")";
 }
 
 std::string syrecAstDumpUtils::stringifyVariableExpression(const syrec::VariableExpression& variableExpression) {
-    return "";
+    return stringifyVariableAccess(variableExpression.var);
 }
 
 // TODO: Throw exception on invalid signal type ?
