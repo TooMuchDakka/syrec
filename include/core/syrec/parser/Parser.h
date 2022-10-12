@@ -18,7 +18,7 @@
 #include "core/syrec/parser/text_utils.hpp"
 
 
-#include "Scanner.h"
+#include "core/syrec/parser/Scanner.h"
 
 namespace parser {
 
@@ -254,9 +254,9 @@ syrec::Module::vec modules;
 
 	void Number(std::optional<syrec::Number::ptr> &parsedNumber, const bool simplifyIfPossible );
 	void SyReC();
-	void Module(std::optional<syrec::Module::ptr> &parsed_module	);
+	void Module(std::optional<syrec::Module::ptr> &parsedModule	);
 	void ParameterList(bool &is_valid_module_definition, const syrec::Module::ptr &module);
-	void SignalList(std::optional<std::vector<syrec::Variable::ptr>> &signals );
+	void SignalList(const syrec::Module::ptr& module, bool &isValidModuleDefinition );
 	void StatementList(syrec::Statement::vec &statements );
 	void Parameter(std::optional<syrec::Variable::ptr> &parameter );
 	void SignalDeclaration(const syrec::Variable::Types variable_type, std::optional<syrec::Variable::ptr> &declared_signal );

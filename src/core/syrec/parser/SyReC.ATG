@@ -341,31 +341,30 @@ Module<module>								(.	if (module.has_value()) {
 syrec::Module production
 -------------------------------------------------------------------------*/
 
-Module <. std::optional<syrec::Module::ptr> &parsed_module	.>			(.	SymbolTable::openScope(currSymTabScope);
+Module <. std::optional<syrec::Module::ptr> &parsedModule	.>			(.	SymbolTable::openScope(currSymTabScope);
 																			std::optional<std::vector<syrec::Variable::ptr>> locals;	
-																			bool valid_module_definition = false;
-																			syrec::Statement::vec module_body {};
+																			bool isValidModuleDefinition = false;
+																			syrec::Statement::vec moduleStmts {};
 																		.)	
 =
-"module" ident															(.	const std::string module_name = convert_to_uniform_text_format(t->val);	
-																			syrec::Module::ptr user_defined_module = std::make_shared<syrec::Module>(syrec::Module(module_name));
+"module" ident															(.	const std::string moduleName = convert_to_uniform_text_format(t->val);	
+																			syrec::Module::ptr userDefinedModule = std::make_shared<syrec::Module>(syrec::Module(moduleName));
 																		.)	
-"(" [ParameterList<valid_module_definition, user_defined_module>] ")" 
-{
-	SignalList<locals>													(.	valid_module_definition &= locals.has_value();	.)
+"(" [ParameterList<isValidModuleDefinition, userDefinedModule>] ")" 
+{																		
+	SignalList<userDefinedModule, isValidModuleDefinition>					
 }														
-StatementList<module_body>												(.	SymbolTable::closeScope(currSymTabScope);
-																			if (module_body.empty()) {
-																				valid_module_definition = false;
+StatementList<moduleStmts>												(.	SymbolTable::closeScope(currSymTabScope);
+																			if (moduleStmts.empty()) {
+																				isValidModuleDefinition = false;
 																				// TODO: GEN_ERROR
 																			}
 
-																			if (valid_module_definition) {
-																				user_defined_module->variables = locals.value_or(std::vector<syrec::Variable::ptr>{});
-																				for (const auto &statement : module_body) {
-																					user_defined_module->addStatement(statement);
+																			if (isValidModuleDefinition) {
+																				for (const auto &statement : moduleStmts) {
+																					userDefinedModule->addStatement(statement);
 																				}
-																				parsed_module.emplace(user_defined_module);
+																				parsedModule.emplace(userDefinedModule);
 																			}
 																		.)
 .
@@ -375,7 +374,7 @@ StatementList<module_body>												(.	SymbolTable::closeScope(currSymTabScope
 ParameterList production
 -------------------------------------------------------------------------*/
 
-ParameterList<bool &is_valid_module_definition, const syrec::Module::ptr &module>			(.	std::optional<syrec::Variable::ptr> parameter;	.)
+ParameterList<bool &is_valid_module_definition, const syrec::Module::ptr &module>	(.	std::optional<syrec::Variable::ptr> parameter;	.)
 =
 Parameter<parameter>																(.	is_valid_module_definition = parameter.has_value();
 																						if (is_valid_module_definition) {
@@ -429,51 +428,58 @@ SignalDeclaration<parameter_type, parameter>										(.	if (!valid_variable_typ
 SignalList production
 -------------------------------------------------------------------------*/
 
-SignalList <. std::optional<std::vector<syrec::Variable::ptr>> &signals .>	(.	syrec::Variable::Types signal_type = syrec::Variable::In;
-																		std::optional<syrec::Variable::ptr> declared_signal;
-																		bool valid_signal_type = true;
-																		std::vector<syrec::Variable::ptr> valid_signal_declarations;
-																	.)
+SignalList <. const syrec::Module::ptr& module, bool &isValidModuleDefinition .>		(.	syrec::Variable::Types signalType = syrec::Variable::In;
+																							std::optional<syrec::Variable::ptr> declaredSignal;
+																							bool isValidSignalType = true;
+																						.)
 =
 (
-	"wire"															(.	signal_type = syrec::Variable::Wire;		.)
-	| "state"														(.	signal_type = syrec::Variable::State;		.)
-)																	(.	if (syrec::Variable::Wire != signal_type && syrec::Variable::State != signal_type) {
-																			// TODO: GEN_ERROR ?
-																			// TODO: Do not cancel parsing
-																			valid_signal_type = false;
-																		}
-																	.)
-SignalDeclaration<signal_type, declared_signal>						(.	if (valid_signal_type && declared_signal.has_value()) {
-																			const syrec::Variable::ptr &valid_signal_declaration = declared_signal.value();
-																			if (currSymTabScope->contains(valid_signal_declaration->name)) {
-																				// TODO: GEN_ERROR 
-																				// TODO: Do not cancel parsing
-																			}
-																			else {
-																				valid_signal_declarations.emplace_back(valid_signal_declaration);
-																				currSymTabScope->addEntry(valid_signal_declaration);
-																			}
-																		}
-																	.)
-{																	(.	declared_signal.reset();			.)	
-	"," SignalDeclaration<signal_type, declared_signal>				(.	if (valid_signal_type && declared_signal.has_value()) {
-																			const syrec::Variable::ptr &valid_signal_declaration = declared_signal.value();
-																			if (currSymTabScope->contains(valid_signal_declaration->name)) {
-																				// TODO: GEN_ERROR 
-																				// TODO: Do not cancel parsing
-																			}
-																			else {
-																				valid_signal_declarations.emplace_back(valid_signal_declaration);
-																				currSymTabScope->addEntry(valid_signal_declaration);
-																			}
-																		}
-																	.)
-}																	(.	if (valid_signal_declarations.size()){
-																			signals.emplace(valid_signal_declarations);
-																		}
-																	.)
-.
+	"wire"																				(.	signalType = syrec::Variable::Wire;		.)
+	| "state"																			(.	signalType = syrec::Variable::State;		.)
+)																						(.	if (syrec::Variable::Wire != signalType && syrec::Variable::State != signalType) {
+																								// TODO: GEN_ERROR ?
+																								// TODO: Do not cancel parsing
+																								isValidSignalType = false;
+																							}
+																						.)
+SignalDeclaration<signalType, declaredSignal>											(.	if (isValidSignalType && declaredSignal.has_value()) {
+																								const syrec::Variable::ptr &validSignalDeclaration = declaredSignal.value();
+																								if (currSymTabScope->contains(validSignalDeclaration->name)) {
+																									// TODO: GEN_ERROR 
+																									// TODO: Do not cancel parsing
+																									isValidModuleDefinition = false;
+																								}
+																								else {
+																									currSymTabScope->addEntry(validSignalDeclaration);
+																									if (isValidModuleDefinition) {
+																										module->variables.emplace_back(validSignalDeclaration);
+																									}
+																								}
+																							}
+																							else {
+																								isValidModuleDefinition = false;
+																							}
+																						.)
+{																						(.	declaredSignal.reset();			.)	
+	"," SignalDeclaration<signalType, declaredSignal>									(.	if (isValidSignalType && declaredSignal.has_value()) {
+																								const syrec::Variable::ptr &validSignalDeclaration = declaredSignal.value();
+																								if (currSymTabScope->contains(validSignalDeclaration->name)) {
+																									// TODO: GEN_ERROR 
+																									// TODO: Do not cancel parsing
+																									isValidModuleDefinition = false;
+																								}
+																								else {
+																									currSymTabScope->addEntry(validSignalDeclaration);
+																									if (isValidModuleDefinition) {
+																										module->variables.emplace_back(validSignalDeclaration);
+																									}
+																								}
+																							}
+																							else {
+																								isValidModuleDefinition = false;
+																							}
+																						.)
+}.
 
 
 /*-------------------------------------------------------------------------

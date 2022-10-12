@@ -176,39 +176,37 @@ void Parser::SyReC() {
 		}
 }
 
-void Parser::Module(std::optional<syrec::Module::ptr> &parsed_module	) {
+void Parser::Module(std::optional<syrec::Module::ptr> &parsedModule	) {
 		SymbolTable::openScope(currSymTabScope);
 		std::optional<std::vector<syrec::Variable::ptr>> locals;	
-		bool valid_module_definition = false;
-		syrec::Statement::vec module_body {};
+		bool isValidModuleDefinition = false;
+		syrec::Statement::vec moduleStmts {};
 		
 		Expect(11 /* "module" */);
 		Expect(_ident);
-		const std::string module_name = convert_to_uniform_text_format(t->val);	
-		syrec::Module::ptr user_defined_module = std::make_shared<syrec::Module>(syrec::Module(module_name));
+		const std::string moduleName = convert_to_uniform_text_format(t->val);	
+		syrec::Module::ptr userDefinedModule = std::make_shared<syrec::Module>(syrec::Module(moduleName));
 		
 		Expect(5 /* "(" */);
 		if (la->kind == 13 /* "in" */ || la->kind == 14 /* "out" */ || la->kind == 15 /* "inout" */) {
-			ParameterList(valid_module_definition, user_defined_module);
+			ParameterList(isValidModuleDefinition, userDefinedModule);
 		}
 		Expect(10 /* ")" */);
-		while (la->kind == 16 /* "wire" */ || la->kind == 17 /* "signal" */) {
-			SignalList(locals);
-			valid_module_definition &= locals.has_value();	
+		while (la->kind == 16 /* "wire" */ || la->kind == 17 /* "state" */) {
+			SignalList(userDefinedModule, isValidModuleDefinition);
 		}
-		StatementList(module_body);
+		StatementList(moduleStmts);
 		SymbolTable::closeScope(currSymTabScope);
-		if (module_body.empty()) {
-		valid_module_definition = false;
+		if (moduleStmts.empty()) {
+		isValidModuleDefinition = false;
 		// TODO: GEN_ERROR
 		}
 		
-		if (valid_module_definition) {
-		user_defined_module->variables = locals.value_or(std::vector<syrec::Variable::ptr>{});
-		for (const auto &statement : module_body) {
-		user_defined_module->addStatement(statement);
+		if (isValidModuleDefinition) {
+		for (const auto &statement : moduleStmts) {
+		userDefinedModule->addStatement(statement);
 		}
-		parsed_module.emplace(user_defined_module);
+		parsedModule.emplace(userDefinedModule);
 		}
 		
 }
@@ -242,59 +240,66 @@ void Parser::ParameterList(bool &is_valid_module_definition, const syrec::Module
 		}
 }
 
-void Parser::SignalList(std::optional<std::vector<syrec::Variable::ptr>> &signals ) {
-		syrec::Variable::Types signal_type = syrec::Variable::In;
-		std::optional<syrec::Variable::ptr> declared_signal;
-		bool valid_signal_type = true;
-		std::vector<syrec::Variable::ptr> valid_signal_declarations;
+void Parser::SignalList(const syrec::Module::ptr& module, bool &isValidModuleDefinition ) {
+		syrec::Variable::Types signalType = syrec::Variable::In;
+		std::optional<syrec::Variable::ptr> declaredSignal;
+		bool isValidSignalType = true;
 		
 		if (la->kind == 16 /* "wire" */) {
 			Get();
-			signal_type = syrec::Variable::Wire;		
-		} else if (la->kind == 17 /* "signal" */) {
+			signalType = syrec::Variable::Wire;		
+		} else if (la->kind == 17 /* "state" */) {
 			Get();
-			signal_type = syrec::Variable::State;		
+			signalType = syrec::Variable::State;		
 		} else SynErr(58);
-		if (syrec::Variable::Wire != signal_type && syrec::Variable::State != signal_type) {
+		if (syrec::Variable::Wire != signalType && syrec::Variable::State != signalType) {
 		// TODO: GEN_ERROR ?
 		// TODO: Do not cancel parsing
-		valid_signal_type = false;
+		isValidSignalType = false;
 		}
 		
-		SignalDeclaration(signal_type, declared_signal);
-		if (valid_signal_type && declared_signal.has_value()) {
-		const syrec::Variable::ptr &valid_signal_declaration = declared_signal.value();
-		if (currSymTabScope->contains(valid_signal_declaration->name)) {
+		SignalDeclaration(signalType, declaredSignal);
+		if (isValidSignalType && declaredSignal.has_value()) {
+		const syrec::Variable::ptr &validSignalDeclaration = declaredSignal.value();
+		if (currSymTabScope->contains(validSignalDeclaration->name)) {
 		// TODO: GEN_ERROR 
 		// TODO: Do not cancel parsing
+		isValidModuleDefinition = false;
 		}
 		else {
-		valid_signal_declarations.emplace_back(valid_signal_declaration);
-		currSymTabScope->addEntry(valid_signal_declaration);
+		currSymTabScope->addEntry(validSignalDeclaration);
+		if (isValidModuleDefinition) {
+            module->variables.emplace_back(validSignalDeclaration);
 		}
+		}
+		}
+		else {
+		isValidModuleDefinition = false;
 		}
 		
 		while (la->kind == 12 /* "," */) {
-			declared_signal.reset();			
+			declaredSignal.reset();			
 			Get();
-			SignalDeclaration(signal_type, declared_signal);
-			if (valid_signal_type && declared_signal.has_value()) {
-			const syrec::Variable::ptr &valid_signal_declaration = declared_signal.value();
-			if (currSymTabScope->contains(valid_signal_declaration->name)) {
+			SignalDeclaration(signalType, declaredSignal);
+			if (isValidSignalType && declaredSignal.has_value()) {
+			const syrec::Variable::ptr &validSignalDeclaration = declaredSignal.value();
+			if (currSymTabScope->contains(validSignalDeclaration->name)) {
 			// TODO: GEN_ERROR 
 			// TODO: Do not cancel parsing
+			isValidModuleDefinition = false;
 			}
 			else {
-			valid_signal_declarations.emplace_back(valid_signal_declaration);
-			currSymTabScope->addEntry(valid_signal_declaration);
+			currSymTabScope->addEntry(validSignalDeclaration);
+			if (isValidModuleDefinition) {
+                module->variables.emplace_back(validSignalDeclaration);
 			}
+			}
+			}
+			else {
+			isValidModuleDefinition = false;
 			}
 			
 		}
-		if (valid_signal_declarations.size()){
-		signals.emplace(valid_signal_declarations);
-		}
-		
 }
 
 void Parser::StatementList(syrec::Statement::vec &statements ) {
@@ -1223,7 +1228,7 @@ void Errors::SynErr(int line, int col, int n) {
 			case 14: s = coco_string_create(L"\"out\" expected"); break;
 			case 15: s = coco_string_create(L"\"inout\" expected"); break;
 			case 16: s = coco_string_create(L"\"wire\" expected"); break;
-			case 17: s = coco_string_create(L"\"signal\" expected"); break;
+			case 17: s = coco_string_create(L"\"state\" expected"); break;
 			case 18: s = coco_string_create(L"\"[\" expected"); break;
 			case 19: s = coco_string_create(L"\"]\" expected"); break;
 			case 20: s = coco_string_create(L"\";\" expected"); break;
