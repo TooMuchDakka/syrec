@@ -20,7 +20,9 @@ std::string SyrecASTDumper::stringifyModule(const syrec::Module::ptr& moduleToSt
     const std::string stringifiedLocals     = stringifyAndJoinMany(moduleToStringify->variables, " ", stringifyVariable);
     const std::string stringifiedStmts      = stringifyStatements(moduleToStringify->statements);
 
-    return "module " + moduleToStringify->name + "(" + stringifiedParameters + ")" + this->dumpConfig.newlineSequence + stringifiedLocals + this->dumpConfig.newlineSequence + stringifiedStmts;
+    return "module " + moduleToStringify->name + "(" + stringifiedParameters + ")" + this->dumpConfig.newlineSequence
+        + (!moduleToStringify->variables.empty() ? stringifiedLocals + this->dumpConfig.newlineSequence : "")
+        + stringifiedStmts;
 }
 
 inline std::string SyrecASTDumper::stringifyStatements(const syrec::Statement::vec& statements) {
