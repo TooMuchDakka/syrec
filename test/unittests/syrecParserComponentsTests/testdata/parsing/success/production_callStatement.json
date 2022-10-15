@@ -1,0 +1,12 @@
+{
+  "TODO": "Should there be tests for the compatibility of assignability of formal and actual parameters",
+  "callWithNoParameters": {
+    "circuit": ""
+  },
+  "callWithOneParameter": {
+    "circuit": ""
+  },
+  "callWithNParameters": {
+    "circuit": ""
+  }
+}

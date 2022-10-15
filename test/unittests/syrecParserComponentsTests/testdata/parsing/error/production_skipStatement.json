@@ -1,0 +1,5 @@
+{
+  "simpleTest": {
+    "circuit": "module main() skip"
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "noParametersAndLocals": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsNoCustomBitwidthAndDimensionDefaultsAssumed_inType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithCustomBitwidthAndNoExplicitDimension_inType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithCustomBitwidthAndOneExplicitDimension_inType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithCustomBitwidthAndNExplicitDimensions_inType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithOnlyOneDimension_inType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithMultipleDimensions_inType": {
+    "circuit": ""
+  },
+  "nParametersSameTypeNoLocals_inType": {
+    "circuit": ""
+  },
+
+
+  "oneParameterNoLocalsNoCustomBitwidthAndDimensionDefaultsAssumed_outType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithCustomBitwidthAndNoExplicitDimension_outType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithCustomBitwidthAndOneExplicitDimension_outType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithCustomBitwidthAndNExplicitDimensions_outType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithOnlyOneDimension_outType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithMultipleDimensions_outType": {
+    "circuit": ""
+  },
+  "nParametersSameTypeNoLocals_outType": {
+    "circuit": ""
+  },
+
+
+  "oneParameterNoLocalsNoCustomBitwidthAndDimensionDefaultsAssumed_inoutType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithCustomBitwidthAndNoExplicitDimension_inoutType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithCustomBitwidthAndOneExplicitDimension_inoutType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithCustomBitwidthAndNExplicitDimensions_inoutType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithOnlyOneDimension_inoutType": {
+    "circuit": ""
+  },
+  "oneParameterNoLocalsWithMultipleDimensions_inoutType": {
+    "circuit": ""
+  },
+  "nParametersSameTypeNoLocals_inoutType": {
+    "circuit": ""
+  },
+
+
+  "nParametersMixedTypeNoLocals": {
+    "circuit": ""
+  },
+
+
+  "noParameterOneLocalNoCustomBitwidthAndDimensionDefaultsAssumed_wireType": {
+    "circuit": ""
+  },
+  "noParameterOneLocalWithCustomBitwidthAndNoExplicitDimension_wireType": {
+    "circuit": ""
+  },
+  "noParameterOneLocalWithCustomBitwidthAndOneExplicitDimension_wireType": {
+    "circuit": ""
+  },
+  "noParametersOneLocalWithCustomBitwidthAndNExplicitDimensions_wireType": {
+    "circuit": ""
+  },
+  "noParametersOneLocalWithOnlyOneDimension_wireType": {
+    "circuit": ""
+  },
+  "noParametersOneLocalWithMultipleDimensions_wireType": {
+    "circuit": ""
+  },
+  "noParametersNLocalsSameTypeAllInOneLine_wireType": {
+    "circuit": ""
+  },
+  "noParametersNLocalsSameTypeInNLines_wireType": {
+    "circuit": ""
+  },
+
+
+  "noParameterOneLocalNoCustomBitwidthAndDimensionDefaultsAssumed_stateType": {
+    "circuit": ""
+  },
+  "noParameterOneLocalWithCustomBitwidthAndNoExplicitDimension_stateType": {
+    "circuit": ""
+  },
+  "noParameterOneLocalWithCustomBitwidthAndOneExplicitDimension_stateType": {
+    "circuit": ""
+  },
+  "noParametersOneLocalWithCustomBitwidthAndNExplicitDimensions_stateType": {
+    "circuit": ""
+  },
+  "noParametersOneLocalWithOnlyOneDimension_stateType": {
+    "circuit": ""
+  },
+  "noParametersOneLocalWithMultipleDimensions_stateType": {
+    "circuit": ""
+  },
+  "noParametersNLocalsSameTypeAllInOneLine_stateType": {
+    "circuit": ""
+  },
+  "noParametersNLocalsSameTypeInNLines_stateType": {
+    "circuit": ""
+  },
+
+
+  "nParametersAndNLocals": {
+    "circuit": ""
+  },
+
+  "singleStatementBody": {
+    "circuit": ""
+  },
+  "multipleStatementBody": {
+    "circuit": ""
+  },
+
+  "singleModule": {
+    "circuit": ""
+  },
+  "multipleModules": {
+    "circuit": ""
+  }
+}

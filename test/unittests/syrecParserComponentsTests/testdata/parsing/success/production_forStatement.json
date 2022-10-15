@@ -1,0 +1,41 @@
+{
+  "rangeAsOnlyInitialValue": {
+    "circuit": ""
+  },
+  "rangeAsInitialValueWithPositiveStepSize": {
+    "circuit": ""
+  },
+  "rangeAsInitialValueWithNegativeStepSize": {
+    "circuit": ""
+  },
+  "fullRangeWithoutStepsize": {
+    "circuit": ""
+  },
+  "fullRangeWithPositiveStepsize": {
+    "circuit": ""
+  },
+  "fullRangeWithNegativeStepsize": {
+    "circuit": ""
+  },
+  "loopVariableWithOnlyInitialValue": {
+    "circuit": ""
+  },
+  "loopVariableWithInitialValueAndPositiveStepsize": {
+    "circuit": ""
+  },
+  "loopVariableWithInitialValueAndNegativeStepsize": {
+    "circuit": ""
+  },
+  "loopVariableWithFullRangeDefinedAndPositiveStepsize": {
+    "circuit": ""
+  },
+  "loopVariableWithFullRangeDefinedAndNegativeStepsize": {
+    "circuit": ""
+  },
+  "singleStatementInBody": {
+    "circuit": ""
+  },
+  "multipleStatementsInBody": {
+    "circuit": ""
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "numberAsCondition": {
+    "circuit": ""
+  },
+  "signalAsCondition": {
+    "circuit": ""
+  },
+  "binaryExpressionAsCondition": {
+    "circuit": ""
+  },
+  "unaryExpressionAsCondition": {
+    "circuit": ""
+  },
+  "shiftExpressionAsCondition": {
+    "circuit": ""
+  },
+
+  "singleStatementThenBranch": {
+    "circuit": ""
+  },
+  "multipleStatementsThenBranch": {
+    "circuit": ""
+  },
+  "singleStatementElseBranch": {
+    "circuit": ""
+  },
+  "multipleStatementsElseBranch": {
+    "circuit": ""
+  }
+}

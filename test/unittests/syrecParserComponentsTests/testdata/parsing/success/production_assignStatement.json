@@ -1,0 +1,86 @@
+{
+  "TODO": "Repeat tests for out, inout parameter and wire and state locals ?",
+  "xorAssign_lhsNoExplicitDimension": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c ^= a"
+  },
+  "xorAssign_lhsNoExplicitDimensionOneBit": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c.0 ^= a.1"
+  },
+  "xorAssign_lhsNoExplicitDimensionBitRange": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c.0:15 ^= a.0:15"
+  },
+  "xorAssign_lhsOneExplicitDimension": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1] ^= a[1]"
+  },
+  "xorAssign_lhsOneExplicitDimensionOneBit": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1].8 ^= a[1].8"
+  },
+  "xorAssign_lhsOneExplicitDimensionBitRange": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1].0:15 ^= a[1].0:15"
+  },
+  "xorAssign_lhsMultipleDimensionsNested": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7] ^= a[1][3][4]"
+  },
+  "xorAssign_lhsMultipleDimensionsNestedOneBit": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7].8 ^= a[1][3][4].8"
+  },
+  "xorAssign_lhsMultipleDimensionsNestedBitRange": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7].0:15 ^= a[1][3][4].0:15"
+  },
+
+  "addAssign_lhsNoExplicitDimension": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c += a"
+  },
+  "addAssign_lhsNoExplicitDimensionOneBit": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c.0 += a.1"
+  },
+  "addAssign_lhsNoExplicitDimensionBitRange": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c.0:15 += a.0:15"
+  },
+  "addAssign_lhsOneExplicitDimension": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1] += a[1]"
+  },
+  "addAssign_lhsOneExplicitDimensionOneBit": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1].8 += a[1].8"
+  },
+  "addAssign_lhsOneExplicitDimensionBitRange": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1].0:15 += a[1].0:15"
+  },
+  "addAssign_lhsMultipleDimensionsNested": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7] += a[1][3][4]"
+  },
+  "addAssign_lhsMultipleDimensionsNestedOneBit": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7].8 += a[1][3][4].8"
+  },
+  "addAssign_lhsMultipleDimensionsNestedBitRange": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7].0:15 += a[1][3][4].0:15"
+  },
+
+  "subAssign_lhsNoExplicitDimension": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c -= a"
+  },
+  "subAssign_lhsNoExplicitDimensionOneBit": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c.0 -= a.1"
+  },
+  "subAssign_lhsNoExplicitDimensionBitRange": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c.0:15 -= a.0:15"
+  },
+  "subAssign_lhsOneExplicitDimension": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1] -= a[1]"
+  },
+  "subAssign_lhsOneExplicitDimensionOneBit": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1].8 -= a[1].8"
+  },
+  "subAssign_lhsOneExplicitDimensionBitRange": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1].0:15 -= a[1].0:15"
+  },
+  "subAssign_lhsMultipleDimensionsNested": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7] -= a[1][3][4]"
+  },
+  "subAssign_lhsMultipleDimensionsNestedOneBit": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7].8 -= a[1][3][4].8"
+  },
+  "subAssign_lhsMultipleDimensionsNestedBitRange": {
+    "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7].0:15 -= a[1][3][4].0:15"
+  }
+}

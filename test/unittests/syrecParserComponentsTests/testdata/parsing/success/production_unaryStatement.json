@@ -1,0 +1,85 @@
+{
+  "negateAssign_fullSignal": {
+    "circuit": ""
+  },
+  "negateAssign_noExplicitDimensionBitAccess": {
+    "circuit": ""
+  },
+  "negateAssign_noExplicitDimensionBitRange": {
+    "circuit": ""
+  },
+  "negateAssign_oneExplicitDimension": {
+    "circuit": ""
+  },
+  "negateAssign_oneExplicitDimensionBitAccess": {
+    "circuit": ""
+  },
+  "negateAssign_oneExplicitDimensionBitRange": {
+    "circuit": ""
+  },
+  "negateAssign_nExplicitDimensions": {
+    "circuit": ""
+  },
+  "negateAssign_nExplicitDimensionBitAccess": {
+    "circuit": ""
+  },
+  "negateAssign_nExplicitDimensionBitRange": {
+    "circuit": ""
+  },
+
+  "incrementAssign_fullSignal": {
+    "circuit": ""
+  },
+  "incrementAssign_noExplicitDimensionBitAccess": {
+    "circuit": ""
+  },
+  "incrementAssign_noExplicitDimensionBitRange": {
+    "circuit": ""
+  },
+  "incrementAssign_oneExplicitDimension": {
+    "circuit": ""
+  },
+  "incrementAssign_oneExplicitDimensionBitAccess": {
+    "circuit": ""
+  },
+  "incrementAssign_oneExplicitDimensionBitRange": {
+    "circuit": ""
+  },
+  "incrementAssign_nExplicitDimensions": {
+    "circuit": ""
+  },
+  "incrementAssign_nExplicitDimensionBitAccess": {
+    "circuit": ""
+  },
+  "incrementAssign_nExplicitDimensionBitRange": {
+    "circuit": ""
+  },
+
+  "decrementAssign_fullSignal": {
+    "circuit": ""
+  },
+  "decrementAssign_noExplicitDimensionBitAccess": {
+    "circuit": ""
+  },
+  "decrementAssign_noExplicitDimensionBitRange": {
+    "circuit": ""
+  },
+  "decrementAssign_oneExplicitDimension": {
+    "circuit": ""
+  },
+  "decrementAssign_oneExplicitDimensionBitAccess": {
+    "circuit": ""
+  },
+  "decrementAssign_oneExplicitDimensionBitRange": {
+    "circuit": ""
+  },
+  "decrementAssign_nExplicitDimensions": {
+    "circuit": ""
+  },
+  "decrementAssign_nExplicitDimensionBitAccess": {
+    "circuit": ""
+  },
+  "decrementAssign_nExplicitDimensionBitRange": {
+    "circuit": ""
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "TODO": "Tests to check combinations e.g. one dimension of lhs with whole signal on the right if dimension match",
+  "bothSignalsTotal": {
+    "circuit": ""
+  },
+  "oneBitOfLhs": {
+    "circuit": ""
+  },
+  "bitRangeOfLhs": {
+    "circuit": ""
+  },
+  "oneDimensionOfLhs": {
+    "circuit": ""
+  },
+  "oneBitOfOneDimensionOfLhs": {
+    "circuit": ""
+  },
+  "bitRangeOfOneDimensionOfLhs": {
+    "circuit": ""
+  },
+  "nestedDimensionOfLhs": {
+    "circuit": ""
+  },
+  "oneBitOfNestedDimensionOfLhs": {
+    "circuit": ""
+  },
+  "bitRangeOfNestedDimensionOfLhs": {
+    "circuit": ""
+  },
+
+  "oneBitOfRhs": {
+    "circuit": ""
+  },
+  "bitRangeOfRhs": {
+    "circuit": ""
+  },
+  "oneDimensionOfRhs": {
+    "circuit": ""
+  },
+  "oneBitOfOneDimensionOfRhs": {
+    "circuit": ""
+  },
+  "bitRangeOfOneDimensionOfRhs": {
+    "circuit": ""
+  },
+  "nestedDimensionOfRhs": {
+    "circuit": ""
+  },
+  "oneBitOfNestedDimensionOfRhs": {
+    "circuit": ""
+  },
+  "bitRangeOfNestedDimensionOfRhs": {
+    "circuit": ""
+  }
+}
