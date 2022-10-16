@@ -136,6 +136,10 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_module", "multipleStatementBody"),
                         std::make_pair("production_module", "singleModule"),
                         std::make_pair("production_module", "multipleModules"),
+
+                        /* StatementList production */
+                        std::make_pair("production_statementList", "singleStatement"),
+                        std::make_pair("production_statementList", "multipleStatements"),
                             
                         /* Call and uncall production */
                         std::make_pair("production_callStatement", "callWithNoParameters"),
@@ -287,6 +291,25 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_shiftExpression", "rightShiftByLoopVariable"),
                         std::make_pair("production_shiftExpression", "rightShiftBySimpleNumberExpression"),
                         std::make_pair("production_shiftExpression", "rightShiftByComplexNumberExpression"),
+
+                        /* Signal production */
+                        std::make_pair("production_signal", "completeSignal"),
+                        std::make_pair("production_signal", "accessingBit"),
+                        std::make_pair("production_signal", "accessingBitRange"),
+                        std::make_pair("production_signal", "accessingSingleDimension"),
+                        std::make_pair("production_signal", "accessingBitOfSingleDimension"),
+                        std::make_pair("production_signal", "accessingBitRangeOfSingleDimension"),
+                        std::make_pair("production_signal", "accessingNestedDimension"),
+                        std::make_pair("production_signal", "accessingBitOfNestedDimension"),
+                        std::make_pair("production_signal", "accessingBitRangeOfNestedDimension"),
+
+                        /* number */
+                        std::make_pair("number", "asConstant"),
+                        std::make_pair("number", "asSignalWidth"),
+                        std::make_pair("number", "asLoopVariable"),
+                        std::make_pair("number", "asSimpleExpression"),
+                        std::make_pair("number", "asExpressionWithLhsBeingNested"),
+                        std::make_pair("number", "asExpressionWithRhsBeingNested"),
 
                         /* Complete benchmarks */
                         std::make_pair("complete_circuits", "test_circuit")
