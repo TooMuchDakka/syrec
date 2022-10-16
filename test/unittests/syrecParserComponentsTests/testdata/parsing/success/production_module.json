@@ -1,148 +1,156 @@
 {
   "noParametersAndLocals": {
-    "circuit": ""
+    "circuit": "module main() skip"
   },
   "oneParameterNoLocalsNoCustomBitwidthAndDimensionDefaultsAssumed_inType": {
-    "circuit": ""
+    "circuit": "module main(in parameter) skip",
+    "expectedCircuit": "module main(in parameter(32)) skip"
   },
   "oneParameterNoLocalsWithCustomBitwidthAndNoExplicitDimension_inType": {
-    "circuit": ""
+    "circuit": "module main(in parameter(5)) skip"
   },
   "oneParameterNoLocalsWithCustomBitwidthAndOneExplicitDimension_inType": {
-    "circuit": ""
+    "circuit": "module main(in parameter[2](5)) skip"
   },
   "oneParameterNoLocalsWithCustomBitwidthAndNExplicitDimensions_inType": {
-    "circuit": ""
+    "circuit": "module main(in parameter[2][4][5](5)) skip"
   },
   "oneParameterNoLocalsWithOnlyOneDimension_inType": {
-    "circuit": ""
+    "circuit": "module main(in parameter[2]) skip",
+    "expectedCircuit": "module main(in parameter[2](32)) skip"
   },
   "oneParameterNoLocalsWithMultipleDimensions_inType": {
-    "circuit": ""
+    "circuit": "module main(in param_3[2][4][1]) skip",
+    "expectedCircuit": "module main(in param_3[2][4][1](32)) skip"
   },
   "nParametersSameTypeNoLocals_inType": {
-    "circuit": ""
+    "circuit": "module main(in param_1[2](16), in param_2(32), in param_3[2][4][1](34)) skip"
   },
 
 
   "oneParameterNoLocalsNoCustomBitwidthAndDimensionDefaultsAssumed_outType": {
-    "circuit": ""
+    "circuit": "module main(out parameter) skip",
+    "expectedCircuit": "module main(out parameter(32)) skip"
   },
   "oneParameterNoLocalsWithCustomBitwidthAndNoExplicitDimension_outType": {
-    "circuit": ""
+    "circuit": "module main(out parameter(5)) skip"
   },
   "oneParameterNoLocalsWithCustomBitwidthAndOneExplicitDimension_outType": {
-    "circuit": ""
+    "circuit": "module main(out parameter[2](5)) skip"
   },
   "oneParameterNoLocalsWithCustomBitwidthAndNExplicitDimensions_outType": {
-    "circuit": ""
+    "circuit": "module main(out parameter[2][4][5](5)) skip"
   },
   "oneParameterNoLocalsWithOnlyOneDimension_outType": {
-    "circuit": ""
+    "circuit": "module main(out parameter[2]) skip",
+    "expectedCircuit": "module main(out parameter[2](32)) skip"
   },
   "oneParameterNoLocalsWithMultipleDimensions_outType": {
-    "circuit": ""
+    "circuit": "module main(out param_3[2][4][1]) skip",
+    "expectedCircuit": "module main(out param_3[2][4][1](32)) skip"
   },
   "nParametersSameTypeNoLocals_outType": {
-    "circuit": ""
+    "circuit": "module main(out param_1[2](16), out param_2(32), out param_3[2][4][1](34)) skip"
   },
 
 
   "oneParameterNoLocalsNoCustomBitwidthAndDimensionDefaultsAssumed_inoutType": {
-    "circuit": ""
+    "circuit": "module main(inout parameter) skip",
+    "expectedCircuit": "module main(inout parameter(32)) skip"
   },
   "oneParameterNoLocalsWithCustomBitwidthAndNoExplicitDimension_inoutType": {
-    "circuit": ""
+    "circuit": "module main(inout parameter(5)) skip"
   },
   "oneParameterNoLocalsWithCustomBitwidthAndOneExplicitDimension_inoutType": {
-    "circuit": ""
+    "circuit": "module main(inout parameter[2](5)) skip"
   },
   "oneParameterNoLocalsWithCustomBitwidthAndNExplicitDimensions_inoutType": {
-    "circuit": ""
+    "circuit": "module main(inout parameter[2][4][5](5)) skip"
   },
   "oneParameterNoLocalsWithOnlyOneDimension_inoutType": {
-    "circuit": ""
+    "circuit": "module main(inout parameter[2]) skip",
+    "expectedCircuit": "module main(inout parameter[2](32)) skip"
   },
   "oneParameterNoLocalsWithMultipleDimensions_inoutType": {
-    "circuit": ""
+    "circuit": "module main(inout param_3[2][4][1]) skip",
+    "expectedCircuit": "module main(inout param_3[2][4][1](32)) skip"
   },
   "nParametersSameTypeNoLocals_inoutType": {
-    "circuit": ""
+    "circuit": "module main(inout param_1[2](16), inout param_2(32), inout param_3[2][4][1](34)) skip"
   },
 
 
   "nParametersMixedTypeNoLocals": {
-    "circuit": ""
+    "circuit": "module main(in param_1[5](16), inout param_2[2][4](10), out param_3, out param_4[2], inout param_5(15)) skip",
+    "expectedCircuit": "module main(in param_1[5](16), inout param_2[2][4](10), out param_3(32), out param_4[2](32), inout param_5(15)) skip"
   },
 
 
   "noParameterOneLocalNoCustomBitwidthAndDimensionDefaultsAssumed_wireType": {
-    "circuit": ""
+    "circuit": "module main() wire local_1 skip",
+    "expectedCircuit": "module main() wire local_1(32) skip"
   },
   "noParameterOneLocalWithCustomBitwidthAndNoExplicitDimension_wireType": {
-    "circuit": ""
+    "circuit": "module main() wire local_1(5) skip"
   },
   "noParameterOneLocalWithCustomBitwidthAndOneExplicitDimension_wireType": {
-    "circuit": ""
+    "circuit": "module main() wire local_1[2](19) skip"
   },
   "noParametersOneLocalWithCustomBitwidthAndNExplicitDimensions_wireType": {
-    "circuit": ""
+    "circuit": "module main() wire local_1[2][16][4](19) skip"
   },
   "noParametersOneLocalWithOnlyOneDimension_wireType": {
-    "circuit": ""
+    "circuit": "module main() wire local_1[2] skip",
+    "expectedCircuit": "module main() wire local_1[2](32) skip"
   },
   "noParametersOneLocalWithMultipleDimensions_wireType": {
-    "circuit": ""
+    "circuit": "module main() wire local_1[2][1][5] skip",
+    "expectedCircuit": "module main() wire local_1[2][1][5](32) skip"
   },
   "noParametersNLocalsSameTypeAllInOneLine_wireType": {
-    "circuit": ""
+    "circuit": "module main() wire local_1(10), local_2[2](5), local_3[2][4](30)"
   },
   "noParametersNLocalsSameTypeInNLines_wireType": {
-    "circuit": ""
+    "circuit": "module main() wire local_1(1) wire local_2[2](5) wire local_3[2][4](30)"
   },
 
 
   "noParameterOneLocalNoCustomBitwidthAndDimensionDefaultsAssumed_stateType": {
-    "circuit": ""
+    "circuit": "module main() state local_1 skip",
+    "expectedCircuit": "module main() state local_1(32) skip"
   },
   "noParameterOneLocalWithCustomBitwidthAndNoExplicitDimension_stateType": {
-    "circuit": ""
+    "circuit": "module main() state local_1(5) skip"
   },
   "noParameterOneLocalWithCustomBitwidthAndOneExplicitDimension_stateType": {
-    "circuit": ""
+    "circuit": "module main() state local_1[2](19) skip"
   },
   "noParametersOneLocalWithCustomBitwidthAndNExplicitDimensions_stateType": {
-    "circuit": ""
+    "circuit": "module main() state local_1[2][16][4](19) skip"
   },
   "noParametersOneLocalWithOnlyOneDimension_stateType": {
-    "circuit": ""
+    "circuit": "module main() state local_1[2] skip",
+    "expectedCircuit": "module main() state local_1[2](32) skip"
   },
   "noParametersOneLocalWithMultipleDimensions_stateType": {
-    "circuit": ""
+    "circuit": "module main() state local_1[2][1][5] skip",
+    "expectedCircuit": "module main() state local_1[2][1][5](32) skip"
   },
   "noParametersNLocalsSameTypeAllInOneLine_stateType": {
-    "circuit": ""
+    "circuit": "module main() state local_1(10), local_2[2](5), local_3[2][4](30)"
   },
   "noParametersNLocalsSameTypeInNLines_stateType": {
-    "circuit": ""
-  },
-
-
-  "nParametersAndNLocals": {
-    "circuit": ""
+    "circuit": "module main() state local_1(1) state local_2[2](5) state local_3[2][4](30)"
   },
 
   "singleStatementBody": {
-    "circuit": ""
+    "circuit": "module main(in a(3), in b(3), out c(3)) c += (a + b)"
   },
   "multipleStatementBody": {
-    "circuit": ""
+    "circuit": "module main(in a(3), in b(3), out c(3)) c += (a + b); c.0 ^= (a.0 + b.1); skip"
   },
 
-  "singleModule": {
-    "circuit": ""
-  },
   "multipleModules": {
-    "circuit": ""
+    "circuit": "module main(in a(3), in b(3), out c(3)) c += (a + b); skip module other(inout b[2][4](16), in t(10)) wire x(19), y[2](15) state s[2](10) skip; skip"
   }
 }

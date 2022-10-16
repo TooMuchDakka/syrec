@@ -1,8 +1,8 @@
 {
   "singleStatement": {
-
+    "circuit": "module main(in a[2](16), in b[4](32), out c[2](16)) c[0] += (a[1] + b[2])"
   },
   "multipleStatements": {
-
+    "circuit": "module main(in a[2](16), in b[4](32), out c[2](16)) c[0] += (a[1] + b[2]); skip; skip; c[1] += (a[0] + b[3]); skip"
   }
 }

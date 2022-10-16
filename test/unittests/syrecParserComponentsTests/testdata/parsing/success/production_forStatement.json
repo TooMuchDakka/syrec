@@ -1,41 +1,38 @@
 {
   "rangeAsOnlyInitialValue": {
-    "circuit": ""
+    "circuit": "module main() for 2 do skip rof",
+    "expectedCircuit": "module main() for 2 step 1 do skip rof"
   },
   "rangeAsInitialValueWithPositiveStepSize": {
-    "circuit": ""
+    "circuit": "module main() for 2 step 2 do skip rof"
   },
   "rangeAsInitialValueWithNegativeStepSize": {
-    "circuit": ""
+    "circuit": "module main() for 2 step -2 do skip rof"
   },
   "fullRangeWithoutStepsize": {
-    "circuit": ""
+    "circuit": "module main() for 0 to 2 do skip rof",
+    "expectedCircuit": "module main() for 0 to 2 step 1 do skip rof"
   },
   "fullRangeWithPositiveStepsize": {
-    "circuit": ""
+    "circuit": "module main() for 0 to 2 step 2 do skip rof"
   },
   "fullRangeWithNegativeStepsize": {
-    "circuit": ""
+    "circuit": "module main() for 2 to 0 step -2 do skip rof"
   },
-  "loopVariableWithOnlyInitialValue": {
-    "circuit": ""
+  "loopVariableWithoutStepsize": {
+    "circuit": "module main() for $i = 0 to 4 do skip rof",
+    "expectedCircuit": "module main() for $i to 4 step 1 do skip rof"
   },
-  "loopVariableWithInitialValueAndPositiveStepsize": {
-    "circuit": ""
+  "loopVariableWithPositiveStepsize": {
+    "circuit": "module main() for $i = 0 to 4 step 2 do skip rof"
   },
-  "loopVariableWithInitialValueAndNegativeStepsize": {
-    "circuit": ""
-  },
-  "loopVariableWithFullRangeDefinedAndPositiveStepsize": {
-    "circuit": ""
-  },
-  "loopVariableWithFullRangeDefinedAndNegativeStepsize": {
-    "circuit": ""
+  "loopVariableWithNegativeStepsize": {
+    "circuit": "module main() for $i = 4 to 0 step -2 do skip rof"
   },
   "singleStatementInBody": {
-    "circuit": ""
+    "circuit": "module main() for 2 step 1 do skip rof"
   },
   "multipleStatementsInBody": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16), out c[2](16)) for 2 step 1 do c[0] += (a[0].0:3 + b[0].5:8); skip; ++= c[0]; c[0] <=> c[1] rof"
   }
 }

@@ -1,20 +1,20 @@
 {
   "asConstant": {
-
+    "circuit": "module main() wire local_1(2) local_1 += 2"
   },
   "asSignalWidth": {
-
+    "circuit": "module main(in a(4)) wire local_1(4) local_1 += #a"
   },
   "asLoopVariable": {
-
+    "circuit": "module main() wire local_1(4) for $i = 0 to 2 do local_1 += $i"
   },
   "asSimpleExpression": {
-
+    "circuit": "module main(in a(4)) wire local_1(4) local_1(4) += (#a - 2)"
   },
   "asExpressionWithLhsBeingNested": {
-
+    "circuit": "module main(in a(4)) wire local_1(4) local_1(4) += (((#a - 2) * 2) - 2)"
   },
   "asExpressionWithRhsBeingNested": {
-
+    "circuit": "module main(in a(4)) wire local_1(4) local_1(4) += (2 - (((#a - 4) * 2) + #a))"
   }
 }

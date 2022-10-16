@@ -1,41 +1,41 @@
 {
   "isConstant": {
-    "circuit": ""
+    "circuit": "module main() wire test(16) test += 2"
   },
   "isSignalWidth": {
-    "circuit": ""
+    "circuit": "module main() wire test(16) test += #test"
   },
   "isLoopVariable": {
-    "circuit": ""
+    "circuit": "module main() wire test(16) for $i = 0 to 2 step 1 do test += $i"
   },
   "isExpressionWithoutNesting": {
-    "circuit": ""
+    "circuit": "module main() wire test(16) test += (#test + 6)"
   },
   "isExpressionWithLhsBeingNested": {
-    "circuit": ""
+    "circuit": "module main() wire test(16) test += (((#test - 6) / 2) + 6)"
   },
   "isExpressionWithRhsBeingNested": {
-    "circuit": ""
+    "circuit": "module main() wire test(16) test += (6 + ((#test - 6) / 2))"
   },
   "isFullSignal": {
-    "circuit": ""
+    "circuit": "module main() wire test(16), other(16) test += other"
   },
   "isBitOfSignal": {
-    "circuit": ""
+    "circuit": "module main() wire test(16), other(16) test += other.0"
   },
   "isBitRangeOfSignal": {
-    "circuit": ""
+    "circuit": "module main() wire test(16), other(16) test += other.0:8"
   },
   "isBitOfSignalDimension": {
-    "circuit": ""
+    "circuit": "module main() wire test(16), other[2](16) test += other[1].5"
   },
   "isBitRangeOfSignalDimension": {
-    "circuit": ""
+    "circuit": "module main() wire test(16), other[2](16) test += other[1].5:14"
   },
   "isBitOfNestedSignalDimension": {
-    "circuit": ""
+    "circuit": "module main() wire test(16), other[2][1][5](16) test += other[1][0][3].5"
   },
   "isBitRangeOfNestedSignalDimension": {
-    "circuit": ""
+    "circuit": "module main() wire test(16), other[2][1][5](16) test += other[1][0][3].5:14"
   }
 }

@@ -1,30 +1,30 @@
 {
   "numberAsCondition": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16)) if 2 then skip else skip fi 2"
   },
   "signalAsCondition": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16)) if a[1].0:5 then skip else skip fi a[1].0:5"
   },
   "binaryExpressionAsCondition": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16)) if ((a[1].0:5 + b[0].0:5) >= 2) then skip else skip fi ((a[1].0:5 + b[0].0:5) >= 2)"
   },
   "unaryExpressionAsCondition": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16)) if (!a[1].0:5) then skip else skip fi (!a[1].0:5)"
   },
   "shiftExpressionAsCondition": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16)) if (a[1] >> 2) then skip else skip fi (a[1] >> 2)"
   },
 
   "singleStatementThenBranch": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16)) if (a[1] >> 2) then skip else skip fi (a[1] >> 2)"
   },
   "multipleStatementsThenBranch": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16), out c[2](32)) if (a[1] >> 2) then skip; c[0] += (a[1] - b[0]); ++= c[1] else skip fi (a[1] >> 2)"
   },
   "singleStatementElseBranch": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16)) if (a[1] >> 2) then skip else skip fi (a[1] >> 2)"
   },
   "multipleStatementsElseBranch": {
-    "circuit": ""
+    "circuit": "module main(in a[2](8), in b[2](16), out c[2](32)) if (a[1] >> 2) then skip else skip; c[0] += (a[1] - b[0]); ++= c[1] fi (a[1] >> 2)"
   }
 }

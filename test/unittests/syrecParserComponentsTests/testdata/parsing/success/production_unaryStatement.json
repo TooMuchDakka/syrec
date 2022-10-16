@@ -1,85 +1,85 @@
 {
   "negateAssign_fullSignal": {
-    "circuit": ""
+    "circuit": "module main(out a(4)) ~= a"
   },
   "negateAssign_noExplicitDimensionBitAccess": {
-    "circuit": ""
+    "circuit": "module main(out a(4)) ~= a.1"
   },
   "negateAssign_noExplicitDimensionBitRange": {
-    "circuit": ""
+    "circuit": "module main(out a(4)) ~= a.1:3"
   },
   "negateAssign_oneExplicitDimension": {
-    "circuit": ""
+    "circuit": "module main(out a[2](4)) ~= a[1]"
   },
   "negateAssign_oneExplicitDimensionBitAccess": {
-    "circuit": ""
+    "circuit": "module main(out a[2](4)) ~= a[1].1"
   },
   "negateAssign_oneExplicitDimensionBitRange": {
-    "circuit": ""
+    "circuit": "module main(out a[2](4)) ~= a[1].1:3"
   },
   "negateAssign_nExplicitDimensions": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][3](4)) ~= a[1][2][1]"
   },
   "negateAssign_nExplicitDimensionBitAccess": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][3](4)) ~= a[1][2][1].1"
   },
   "negateAssign_nExplicitDimensionBitRange": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][3](4)) ~= a[1][2][1].1:3"
   },
 
   "incrementAssign_fullSignal": {
-    "circuit": ""
+    "circuit": "module main(out a(4)) ++= a"
   },
   "incrementAssign_noExplicitDimensionBitAccess": {
-    "circuit": ""
+    "circuit": "module main(out a(4)) ++= a.1"
   },
   "incrementAssign_noExplicitDimensionBitRange": {
-    "circuit": ""
+    "circuit": "module main(out a(4)) ++= a.1:3"
   },
   "incrementAssign_oneExplicitDimension": {
-    "circuit": ""
+    "circuit": "module main(out a[2](4)) ++= a[1]"
   },
   "incrementAssign_oneExplicitDimensionBitAccess": {
-    "circuit": ""
+    "circuit": "module main(out a[2](4)) ++= a[1].1"
   },
   "incrementAssign_oneExplicitDimensionBitRange": {
-    "circuit": ""
+    "circuit": "module main(out a[2](4)) ++= a[1].1:3"
   },
   "incrementAssign_nExplicitDimensions": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][3](4)) ++= a[1][2][1]"
   },
   "incrementAssign_nExplicitDimensionBitAccess": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][3](4)) ++= a[1][2][1].1"
   },
   "incrementAssign_nExplicitDimensionBitRange": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][3](4)) ++= a[1][2][1].1:3"
   },
 
   "decrementAssign_fullSignal": {
-    "circuit": ""
+    "circuit": "module main(out a(4)) --= a"
   },
   "decrementAssign_noExplicitDimensionBitAccess": {
-    "circuit": ""
+    "circuit": "module main(out a(4)) --= a.1"
   },
   "decrementAssign_noExplicitDimensionBitRange": {
-    "circuit": ""
+    "circuit": "module main(out a(4)) --= a.1:3"
   },
   "decrementAssign_oneExplicitDimension": {
-    "circuit": ""
+    "circuit": "module main(out a[2](4)) --= a[1]"
   },
   "decrementAssign_oneExplicitDimensionBitAccess": {
-    "circuit": ""
+    "circuit": "module main(out a[2](4)) --= a[1].1"
   },
   "decrementAssign_oneExplicitDimensionBitRange": {
-    "circuit": ""
+    "circuit": "module main(out a[2](4)) --= a[1].1:3"
   },
   "decrementAssign_nExplicitDimensions": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][3](4)) --= a[1][2][1]"
   },
   "decrementAssign_nExplicitDimensionBitAccess": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][3](4)) --= a[1][2][1].1"
   },
   "decrementAssign_nExplicitDimensionBitRange": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][3](4)) --= a[1][2][1].1:3"
   }
 }

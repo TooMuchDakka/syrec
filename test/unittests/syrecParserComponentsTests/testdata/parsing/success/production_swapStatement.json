@@ -1,55 +1,55 @@
 {
   "TODO": "Tests to check combinations e.g. one dimension of lhs with whole signal on the right if dimension match",
   "bothSignalsTotal": {
-    "circuit": ""
+    "circuit": "module main(out a(10), out b(10)) a <=> b"
   },
   "oneBitOfLhs": {
-    "circuit": ""
+    "circuit": "module main(out a(10), out b(1)) a.0 <=> b"
   },
   "bitRangeOfLhs": {
-    "circuit": ""
+    "circuit": "module main(out a(10), out b(3)) a.2:5 <=> b"
   },
   "oneDimensionOfLhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2](10), out b(10)) a[1] <=> b"
   },
   "oneBitOfOneDimensionOfLhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2](10), out b(1)) a[1].4 <=> b"
   },
   "bitRangeOfOneDimensionOfLhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2](10), out b(3)) a[1].2:5 <=> b"
   },
   "nestedDimensionOfLhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][8](10), out b(10)) a[1][3][7] <=> b"
   },
   "oneBitOfNestedDimensionOfLhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][8](10), out b(1)) a[1][3][7].8 <=> b"
   },
   "bitRangeOfNestedDimensionOfLhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][8](10), out b(3)) a[1][3][7].2:5 <=> b"
   },
 
   "oneBitOfRhs": {
-    "circuit": ""
+    "circuit": "module main(out a(10), out b(1)) b <=> a.0"
   },
   "bitRangeOfRhs": {
-    "circuit": ""
+    "circuit": "module main(out a(10), out b(3)) b <=> a.2:5"
   },
   "oneDimensionOfRhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2](10), out b(10)) b <=> a[1]"
   },
   "oneBitOfOneDimensionOfRhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2](10), out b(1)) b <=> a[1].4"
   },
   "bitRangeOfOneDimensionOfRhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2](10), out b(3)) b <=> a[1].2:5"
   },
   "nestedDimensionOfRhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][8](10), out b(10)) b <=> a[1][3][7]"
   },
   "oneBitOfNestedDimensionOfRhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][8](10), out b(1)) b <=> a[1][3][7].8"
   },
   "bitRangeOfNestedDimensionOfRhs": {
-    "circuit": ""
+    "circuit": "module main(out a[2][4][8](10), out b(3)) b <=> a[1][3][7].2:5"
   }
 }
