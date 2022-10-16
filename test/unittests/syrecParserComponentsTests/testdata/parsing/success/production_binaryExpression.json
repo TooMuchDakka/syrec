@@ -1,62 +1,122 @@
 {
-  "lhsOperandDoesNotSimplifyToConstant": {
-    "circuit": ""
+  "addOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] + b[0])"
   },
-  "rhsOperandDoesNotSimplifyToConstant": {
-    "circuit": ""
+  "addOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#a[2] + #b[0])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 36"
   },
-  "bothOperandDoNotSimplifyToConstant": {
-    "circuit": ""
+  "subOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] - b[0])"
   },
-  "addOperationResultNoSimplified": {
-    "circuit": ""
+  "subOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] - #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 4"
   },
-  "subOperationResultNoSimplified": {
-    "circuit": ""
+  "xorOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] ^ b[0])"
   },
-  "xorOperationResultNoSimplified": {
-    "circuit": ""
+  "xorOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] ^ #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 4"
   },
-  "multiplyOperationResultNoSimplified": {
-    "circuit": ""
+
+  "multiplyOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] * b[0])"
   },
-  "divideOperationResultNoSimplified": {
-    "circuit": ""
+  "multiplyOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] * #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 320"
   },
-  "moduloOperationResultNoSimplified": {
-    "circuit": ""
+  "divideOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] / b[0])"
   },
-  "upperbitsMultiplicationOperationResultNoSimplified": {
-    "circuit": ""
+  "divideOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] / #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 1"
   },
-  "logicalAndOperationResultNoSimplified": {
-    "circuit": ""
+  "moduloOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] % b[0])"
   },
-  "logicalOrOperationResultNoSimplified": {
-    "circuit": ""
+  "moduloOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] % #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 4"
   },
-  "bitwiseAndOperationResultNoSimplified": {
-    "circuit": ""
+  "upperbitsMultiplicationOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] *> b[0])"
   },
-  "bitwiseOrOperationResultNoSimplified": {
-    "circuit": ""
+  "upperbitsOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] *> #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 4"
   },
-  "lessThanOperationResultNoSimplified": {
-    "circuit": ""
+  "logicalAndOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] && b[0])"
   },
-  "greaterThanOperationResultNoSimplified": {
-    "circuit": ""
+  "logicalAndOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] && #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 1"
   },
-  "equalOperationResultNoSimplified": {
-    "circuit": ""
+  "logicalOrOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] || b[0])"
   },
-  "notEqualOperationResultNoSimplified": {
-    "circuit": ""
+  "logicalOrOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] || #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 1"
   },
-  "lessOrEqualThanOperationResultNoSimplified": {
-    "circuit": ""
+  "bitwiseAndOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] & b[0])"
   },
-  "greatherThanOperationResultNoSimplified": {
-    "circuit": ""
+  "bitwiseAndOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] & #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 16"
+  },
+  "bitwiseOrOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] | b[0])"
+  },
+  "bitwiseOrOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) a[0] += (#b[0] | #c[1])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 52"
+  },
+  "lessThanOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] < b[0])"
+  },
+  "lessThanOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] < #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 0"
+  },
+  "greaterThanOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] > b[0])"
+  },
+  "greaterThanOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] > #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 1"
+  },
+  "equalOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] = b[0])"
+  },
+  "equalOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] = #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 0"
+  },
+  "notEqualOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] != b[0])"
+  },
+  "notEqualOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] != #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 1"
+  },
+  "lessOrEqualThanOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] <= b[0])"
+  },
+  "lessOrEqualOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] <= #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 0"
+  },
+  "greaterOrEqualThanOperationResultNoSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (a[2] >= b[0])"
+  },
+  "greaterOrEqualThanOperationResultWithSimplification": {
+    "circuit": "module main(in a[4](16), in b[2](20), out c[2](32)) c[0] += (#b[0] >= #a[2])",
+    "expectedCircuit": "module main(out c[2](32)) c[0] += 1"
   }
 }

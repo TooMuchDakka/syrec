@@ -1,35 +1,17 @@
 {
   "TODO": "Exhaustive testing like leftShiftNumberByConstant, leftShiftSignalByConstant, leftShiftBinaryExpressionByConstant, leftShiftUnaryExpressionByConstant, leftShiftShiftExpressionByConstant",
-  "leftShiftByConstant": {
-    "circuit": ""
+  "leftShift": {
+    "circuit": "module main() wire test(16), other(32) test += (other >> 10)"
   },
-  "leftShiftBySignalWidth": {
-    "circuit": ""
+  "leftShiftSimplified": {
+    "circuit": "module main(in a(2)) wire test(16) test += (#a >> 2)",
+    "expectedCircuit": "module main(in a(2)) wire test(16) test += 0"
   },
-  "leftShiftByLoopVariable": {
-    "circuit": ""
+  "rightShift": {
+    "circuit": "module main() wire test(16), other(32) test += (other << 10)"
   },
-  "leftShiftBySimpleNumberExpression": {
-    "circuit": ""
-  },
-  "leftShiftByComplexNumberExpression": {
-    "circuit": ""
-  },
-
-
-  "rightShiftByConstant": {
-    "circuit": ""
-  },
-  "rightShiftBySignalWidth": {
-    "circuit": ""
-  },
-  "rightShiftByLoopVariable": {
-    "circuit": ""
-  },
-  "rightShiftBySimpleNumberExpression": {
-    "circuit": ""
-  },
-  "rightShiftByComplexNumberExpression": {
-    "circuit": ""
+  "rightShiftSimplified": {
+    "circuit": "module main(in a(2)) wire test(16) test += (#a << 2)",
+    "expectedCircuit": "module main(in a(2)) wire test(16) test += 8"
   }
 }

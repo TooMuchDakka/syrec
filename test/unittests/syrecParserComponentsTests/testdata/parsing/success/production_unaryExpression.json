@@ -1,39 +1,29 @@
 {
   "logicalNegationOfNumber": {
-    "circuit": ""
+    "circuit": "module main() wire test(16) test += !22"
   },
   "logicalNegationOfSignal": {
-    "circuit": ""
+    "circuit": "module main(in a(16)) wire test(16) test += !a"
   },
-  "logicalNegationOfBinaryExpressionSimple": {
-    "circuit": ""
+  "logicalNegationOfExpression": {
+    "circuit": "module main(in a(16)) wire test(16) test += !(((#a + 2) << 2) - !((#test / #a) % 2))"
   },
-  "logicalNegationOfBinaryExpressionComplex": {
-    "circuit": ""
-  },
-  "logicalNegationOfUnaryExpression": {
-    "circuit": ""
-  },
-  "logicalNegationOfShiftExpression": {
-    "circuit": ""
+  "logicalNegationSimplified": {
+    "circuit": "module main(in a(4)) wire test(16) test += !(#a >> 2)",
+    "expectedCircuit": "module main(in a(4)) wire test(16) test += 1"
   },
 
   "bitwiseNegationOfNumber": {
-    "circuit": ""
+    "circuit": "module main() wire test(16) test += ~22"
   },
   "bitwiseNegationOfSignal": {
-    "circuit": ""
+    "circuit": "module main(in a(16)) wire test(16) test += ~a"
   },
-  "bitwiseNegationOfBinaryExpressionSimple": {
-    "circuit": ""
+  "bitwiseNegationOfExpression": {
+    "circuit": "module main(in a(16)) wire test(16) test += ~(((#a + 2) << 2) - !((#test / #a) % 2))"
   },
-  "bitwiseNegationOfBinaryExpressionComplex": {
-    "circuit": ""
-  },
-  "bitwiseNegationOfUnaryExpression": {
-    "circuit": ""
-  },
-  "bitwiseNegationOfShiftExpression": {
-    "circuit": ""
+  "bitwiseNegationSimplified": {
+    "circuit": "module main(in a(5)) wire test(16) test += !(#a << 2)",
+    "expectedCircuit": "module main(in a(4)) wire test(16) test += 20"
   }
 }
