@@ -1,0 +1,39 @@
+{
+  "logicalNegationOfNumber": {
+    "circuit": ""
+  },
+  "logicalNegationOfSignal": {
+    "circuit": ""
+  },
+  "logicalNegationOfBinaryExpressionSimple": {
+    "circuit": ""
+  },
+  "logicalNegationOfBinaryExpressionComplex": {
+    "circuit": ""
+  },
+  "logicalNegationOfUnaryExpression": {
+    "circuit": ""
+  },
+  "logicalNegationOfShiftExpression": {
+    "circuit": ""
+  },
+
+  "bitwiseNegationOfNumber": {
+    "circuit": ""
+  },
+  "bitwiseNegationOfSignal": {
+    "circuit": ""
+  },
+  "bitwiseNegationOfBinaryExpressionSimple": {
+    "circuit": ""
+  },
+  "bitwiseNegationOfBinaryExpressionComplex": {
+    "circuit": ""
+  },
+  "bitwiseNegationOfUnaryExpression": {
+    "circuit": ""
+  },
+  "bitwiseNegationOfShiftExpression": {
+    "circuit": ""
+  }
+}

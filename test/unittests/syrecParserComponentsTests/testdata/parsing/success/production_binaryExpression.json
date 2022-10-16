@@ -1,0 +1,62 @@
+{
+  "lhsOperandDoesNotSimplifyToConstant": {
+    "circuit": ""
+  },
+  "rhsOperandDoesNotSimplifyToConstant": {
+    "circuit": ""
+  },
+  "bothOperandDoNotSimplifyToConstant": {
+    "circuit": ""
+  },
+  "addOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "subOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "xorOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "multiplyOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "divideOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "moduloOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "upperbitsMultiplicationOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "logicalAndOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "logicalOrOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "bitwiseAndOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "bitwiseOrOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "lessThanOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "greaterThanOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "equalOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "notEqualOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "lessOrEqualThanOperationResultNoSimplified": {
+    "circuit": ""
+  },
+  "greatherThanOperationResultNoSimplified": {
+    "circuit": ""
+  }
+}

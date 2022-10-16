@@ -1,0 +1,35 @@
+{
+  "TODO": "Exhaustive testing like leftShiftNumberByConstant, leftShiftSignalByConstant, leftShiftBinaryExpressionByConstant, leftShiftUnaryExpressionByConstant, leftShiftShiftExpressionByConstant",
+  "leftShiftByConstant": {
+    "circuit": ""
+  },
+  "leftShiftBySignalWidth": {
+    "circuit": ""
+  },
+  "leftShiftByLoopVariable": {
+    "circuit": ""
+  },
+  "leftShiftBySimpleNumberExpression": {
+    "circuit": ""
+  },
+  "leftShiftByComplexNumberExpression": {
+    "circuit": ""
+  },
+
+
+  "rightShiftByConstant": {
+    "circuit": ""
+  },
+  "rightShiftBySignalWidth": {
+    "circuit": ""
+  },
+  "rightShiftByLoopVariable": {
+    "circuit": ""
+  },
+  "rightShiftBySimpleNumberExpression": {
+    "circuit": ""
+  },
+  "rightShiftByComplexNumberExpression": {
+    "circuit": ""
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "isConstant": {
+    "circuit": ""
+  },
+  "isSignalWidth": {
+    "circuit": ""
+  },
+  "isLoopVariable": {
+    "circuit": ""
+  },
+  "isExpressionWithoutNesting": {
+    "circuit": ""
+  },
+  "isExpressionWithLhsBeingNested": {
+    "circuit": ""
+  },
+  "isExpressionWithRhsBeingNested": {
+    "circuit": ""
+  },
+  "isFullSignal": {
+    "circuit": ""
+  },
+  "isBitOfSignal": {
+    "circuit": ""
+  },
+  "isBitRangeOfSignal": {
+    "circuit": ""
+  },
+  "isBitOfSignalDimension": {
+    "circuit": ""
+  },
+  "isBitRangeOfSignalDimension": {
+    "circuit": ""
+  },
+  "isBitOfNestedSignalDimension": {
+    "circuit": ""
+  },
+  "isBitRangeOfNestedSignalDimension": {
+    "circuit": ""
+  }
+}
