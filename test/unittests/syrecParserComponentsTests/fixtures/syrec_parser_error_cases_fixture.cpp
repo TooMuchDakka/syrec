@@ -11,10 +11,10 @@
 
 using json = nlohmann::json;
 
-class SyReCParserErrorCasesFixture: public ::testing::TestWithParam<std::string> {
+class SyrecParserErrorCasesFixture: public ::testing::TestWithParam<std::pair<std::string, std::string>> {
 private:
     const std::string expectedErrorMessageFormat   = "-- line %d col %d: %ls\n";
-    const std::string relativePathToTestCaseFile   = "./unittests/syrecParserComponentsTests/testdata/";
+    const std::string relativePathToTestCaseFile   = "./unittests/syrecParserComponentsTests/testdata/parsing/error/";
     const std::string cJsonErrorLineJsonKey        = "line";
     const std::string cJsonErrorColumnJsonKey      = "column";
     const std::string cJsonErrorExpectedMessageKey = "message";
@@ -23,16 +23,13 @@ private:
     const std::string cExpectedErrorsJsonKey    = "expected_errors";
 
 protected:
-
     struct ExpectedError {
         std::size_t line;
         std::size_t column;
         std::string message;
 
-        ExpectedError(const std::size_t line, const std::size_t column, const std::string& message):
-            line(line), column(column), message(message) {
-            
-        }
+        explicit ExpectedError(const std::size_t line, const std::size_t column, std::string message):
+            line(line), column(column), message(std::move(message)) {}
     };
 
     std::string                circuitDefinition;
@@ -40,19 +37,28 @@ protected:
     syrec::program             parserPublicInterface;
 
     void SetUp() override {
-        const std::string relativeTestFilePath     = relativePathToTestCaseFile + GetParam() + ".json";
+        const std::pair<std::string, std::string> testCaseData = GetParam();
+        const std::string                         testCaseJsonKey = testCaseData.second;
+        const std::string                         testCaseFileName = testCaseData.first;
+
+        const std::string relativeTestFilePath     = relativePathToTestCaseFile + testCaseFileName + ".json";
         std::ifstream     configFileStream(relativeTestFilePath, std::ios_base::in);
         ASSERT_TRUE(configFileStream.good()) << "Could not open test data json file @ "
                                              << relativeTestFilePath;
 
         const json parsedJson = json::parse(configFileStream);
-        ASSERT_TRUE(parsedJson.contains(cCircuitDefinitionJsonKey)) << "Required entry with key '" << cCircuitDefinitionJsonKey << "' was not found";
-        ASSERT_TRUE(parsedJson.at(cCircuitDefinitionJsonKey).is_string()) << "Expected entry with key '" << cCircuitDefinitionJsonKey << "' to by a string";
-        ASSERT_TRUE(parsedJson.contains(cExpectedErrorsJsonKey)) << "Required entry with key '" << cExpectedErrorsJsonKey << "' was not found";
-        ASSERT_TRUE(parsedJson.at(cExpectedErrorsJsonKey).is_array()) << "Expected entry with key '" << cExpectedErrorsJsonKey << "' to by an array";
+        ASSERT_TRUE(parsedJson.contains(testCaseJsonKey)) << "Required entry for given test case with key '" << testCaseJsonKey << "' was not found";
 
-        circuitDefinition = parsedJson.at(cCircuitDefinitionJsonKey).get<std::string>();
-        loadExpectedErrors(parsedJson.at(cExpectedErrorsJsonKey));
+        const json testcaseJsonData = parsedJson[testCaseJsonKey];
+        ASSERT_TRUE(testcaseJsonData.is_object()) << "Expected test case data for test with key '" << testCaseJsonKey << "' to be in the form of a json object";
+
+        ASSERT_TRUE(testcaseJsonData.contains(cCircuitDefinitionJsonKey)) << "Required entry with key '" << cCircuitDefinitionJsonKey << "' was not found";
+        ASSERT_TRUE(testcaseJsonData.at(cCircuitDefinitionJsonKey).is_string()) << "Expected entry with key '" << cCircuitDefinitionJsonKey << "' to by a string";
+        ASSERT_TRUE(testcaseJsonData.contains(cExpectedErrorsJsonKey)) << "Required entry with key '" << cExpectedErrorsJsonKey << "' was not found";
+        ASSERT_TRUE(testcaseJsonData.at(cExpectedErrorsJsonKey).is_array()) << "Expected entry with key '" << cExpectedErrorsJsonKey << "' to by an array";
+
+        circuitDefinition = testcaseJsonData.at(cCircuitDefinitionJsonKey).get<std::string>();
+        loadExpectedErrors(testcaseJsonData.at(cExpectedErrorsJsonKey));
     }
 
     void loadExpectedErrors(const json& json) {
@@ -97,16 +103,18 @@ protected:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(Another,
-                         SyReCParserErrorCasesFixture,
-                         testing::Values("parser_error_cases"),
-                         [](const testing::TestParamInfo<SyReCParserErrorCasesFixture::ParamType>& info) {
-                            auto s = info.param;
-                            std::replace(s.begin(), s.end(), '-', '_');
-                            return s;
+INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
+                         SyrecParserErrorCasesFixture,
+                         testing::Values(
+                                 std::make_pair("production_module", "")
+                         ),
+                         [](const testing::TestParamInfo<SyrecParserErrorCasesFixture::ParamType>& info) {
+                             auto s = info.param.first + "_" + info.param.second;
+                             std::replace(s.begin(), s.end(), '-', '_');
+                             return s;
                         });
 
-TEST_P(SyReCParserErrorCasesFixture, GenericSyrecParserErrorTest) {
+TEST_P(SyrecParserErrorCasesFixture, GenericSyrecParserErrorTest) {
     std::string actualErrorsConcatinated;
     ASSERT_NO_THROW(actualErrorsConcatinated = parserPublicInterface.readFromString(this->circuitDefinition, syrec::ReadProgramSettings{})) << "Error while parsing circuit";
     ASSERT_NO_THROW(compareExpectedAndActualErrors(this->expectedErrors, transformActualErrors(actualErrorsConcatinated))) << "Missmatch between expected and actual errors";
