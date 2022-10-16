@@ -1,8 +1,39 @@
 {
-  "test_case_1": {
-    "circuit": "module test(in ab[2][4](32), out b[2](2), inout c(16)) wire other state test[2](10) wire bot(10) for $lVar = 5 to 2 step -((10 / 2) + 5) do if ($lVar >= 0) then ab[0].2:16 += ((b[0].0 + test[0].2:8) + 2); if ((3 + 5) != b[1]) then skip; skip else ab[1].2 += 2 fi ((3 + 5) != b[1]); skip; ++= ab[0].2:5 else ab[1].2 += ((b[0].1 - test[1].2) / 2); skip fi ($lVar >= 0) rof; skip"
+  "invalidAssignOperator": {
+    "circuit": "",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ""
+      }
+    ]
   },
-  "test_case_2": {
-    "test": 123
+  "invalidAssignmentToInParameter": {
+
+  },
+  "invalidAssignmentToInParameterBit": {
+
+  },
+  "invalidAssignmentToInParameterBitRange": {
+
+  },
+  "invalidAssignmentToInParameterDimension": {
+
+  },
+  "invalidAssignmentToInParameterDimensionBit": {
+
+  },
+  "invalidAssignmentToInParameterDimensionBitRange": {
+
+  },
+  "invalidAssignmentToInParameterNestedDimension": {
+
+  },
+  "invalidAssignmentToInParameterNestedDimensionBit": {
+
+  },
+  "invalidAssignmentToInParameterNestedDimensionBitRange": {
+
   }
 }

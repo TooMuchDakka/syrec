@@ -106,7 +106,134 @@ protected:
 INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                          SyrecParserErrorCasesFixture,
                          testing::Values(
-                                 std::make_pair("production_module", "")
+                             /* Module production */
+                             std::make_pair("production_module", "missingModulePrefix"),
+                             std::make_pair("production_module", "invalidSymbolAtModuleIdentStart"),
+                             std::make_pair("production_module", "invalidSymbolInModuleIdent"),
+                             std::make_pair("production_module", "missingParameterListOpeningBracket"),
+                             std::make_pair("production_module", "missingParameterListClosingBracket"),
+                             std::make_pair("production_module", "invalidParameterType"),
+                             std::make_pair("production_module", "invalidParameterIdent"),
+                             std::make_pair("production_module", "parameterWithDimensionMissingOpeningBracket"),
+                             std::make_pair("production_module", "parameterWithDimensionMissingClosingBracket"),
+                             std::make_pair("production_module", "parameterWithDimensionNotBeingANumber"),
+                             std::make_pair("production_module", "parameterWithSignalwidthMissingOpeningBracket"),
+
+                             std::make_pair("production_module", "parameterWithSignalwidthMissingClosingBracket"),
+                             std::make_pair("production_module", "parameterWithSignalwidthNotBeingANumber"),
+                             std::make_pair("production_module", "missingParameterDelimiter"),
+                             std::make_pair("production_module", "missingParameterAfterDelimiter"),
+                             std::make_pair("production_module", "duplicateParameterOfSameType"),
+                             std::make_pair("production_module", "duplicateParameterOfDifferentType"),
+                             std::make_pair("production_module", "invalidLocalType"),
+                             std::make_pair("production_module", "invalidLocalIdent"),
+                             std::make_pair("production_module", "localWithDimensionMissingOpeningBracket"),
+                             std::make_pair("production_module", "localWithDimensionMissingClosingBracket"),
+                             std::make_pair("production_module", "localWithDimensionNotBeingANumber"),
+                             std::make_pair("production_module", "localWithSignalwidthMissingOpeningBracket"),
+                             std::make_pair("production_module", "localWithSignalwidthMissingClosingBracket"),
+
+                             std::make_pair("production_module", "localWithSignalwidthNotBeingANumber"),
+                             std::make_pair("production_module", "missingLocalDelimiter"),
+                             std::make_pair("production_module", "missingLocalAfterDelimiter"),
+                             std::make_pair("production_module", "duplicateLocalInSameLine"),
+                             std::make_pair("production_module", "duplicateLocalInDifferentDeclaration"),
+                             std::make_pair("production_module", "duplicateLocalOfDifferentType"),
+                             std::make_pair("production_module", "invalidStatementInvalidatesModule"),
+                             std::make_pair("production_module", "emptyStatementBody"),
+                             std::make_pair("production_module", "duplicateModules"),
+                             std::make_pair("production_module", "missingMainModule"),
+
+                             /* StatementList production */
+                             std::make_pair("production_statementList", "missingStatementDelimiter"),
+                             std::make_pair("production_statementList", "oneDelimiterTooManyAfterLastStatementOfBlock"),
+
+                             /* CallStatement production */
+                             std::make_pair("production_callStatement", "invalidCallIdent"),
+                             std::make_pair("production_callStatement", "invalidUncallIdent"),
+                             std::make_pair("production_callStatement", "callWithMissingOpeningBracket"),
+                             std::make_pair("production_callStatement", "callWithMissingClosingBracket"),
+                             std::make_pair("production_callStatement", "callOfUndefinedModule"),
+                             std::make_pair("production_callStatement", "callOfModuleWithNotEnoughParameters"),
+                             std::make_pair("production_callStatement", "callOfModuleWithTooManyParameters"),
+                             std::make_pair("production_callStatement", "callWithInvalidParameterDelimiter"),
+                             std::make_pair("production_callStatement", "uncallWithInvalidParameterDelimiter"),
+                             std::make_pair("production_callStatement", "callAfterCallWithoutPriorUncallOfTheFormer"),
+
+                             /* ForStatement production */
+                             std::make_pair("production_forStatement", "invalidForIdent"),
+                             std::make_pair("production_forStatement", "invalidLoopVariablePrefix"),
+                             std::make_pair("production_forStatement", "invalidLoopVariableInitialValueAssignmentOperator"),
+                             std::make_pair("production_forStatement", "invalidRangeStartAndEndDelimiterIdent"),
+                             std::make_pair("production_forStatement", "invalidStepsizeIdent"),
+                             std::make_pair("production_forStatement", "invalidNegativeStepsizeIdent"),
+                             std::make_pair("production_forStatement", "invalidLoopHeaderPostfixIdent"),
+                             std::make_pair("production_forStatement", "invalidRofEndDelimiter"),
+
+                             /* IfStatement production */
+                             std::make_pair("production_ifStatement", "invalidIfIdent"),
+                             std::make_pair("production_ifStatement", "invalidThenIdent"),
+                             std::make_pair("production_ifStatement", "invalidElseIdent"),
+                             std::make_pair("production_ifStatement", "invalidFiIdent"),
+                             std::make_pair("production_ifStatement", "invalidIfConditionExpression"),
+                             std::make_pair("production_ifStatement", "invalidFiConditionExpression"),
+                             std::make_pair("production_ifStatement", "emptyIfBody"),
+                             std::make_pair("production_ifStatement", "emptyThenBody"),
+                             std::make_pair("production_ifStatement", "missmatchBetweenIfAndFiCondition"),
+
+                             /* UnaryStatement production */
+                             std::make_pair("production_unaryStatement", "invalidUnaryOperator"),
+                             std::make_pair("production_unaryStatement", "invalidAssignmentToInParameter"),
+                             std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterBit"),
+                             std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterBitRange"),
+                             std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterDimension"),
+                             std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterDimensionBit"),
+                             std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterDimensionBitRange"),
+                             std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterNestedDimension"),
+                             std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterNestedDimensionBit"),
+                             std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterNestedDimensionBitRange"),
+
+                             /* AssignStatement production */
+                             std::make_pair("production_assignStatement", "invalidAssignOperator"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentToInParameter"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentToInParameterBit"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentToInParameterBitRange"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentToInParameterDimension"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentToInParameterDimensionBit"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentToInParameterDimensionBitRange"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentToInParameterNestedDimension"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentToInParameterNestedDimensionBit"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentToInParameterNestedDimensionBitRange"),
+
+                             /* SwapStatement production */
+                             std::make_pair("production_swapStatement", "invalidSwapStatementOperator"),
+
+                             /* SkipStatement production */
+                             std::make_pair("production_skipStatement", "missingSkipIdent"),
+
+                             /* Signal production */
+                             std::make_pair("production_signal", "undeclaredIdent"),
+                             std::make_pair("production_signal", "missingDimensionAccessOpeningBracket"),
+                             std::make_pair("production_signal", "missingDimensionAccessOpeningBracketInNestedDimensionAccess"),
+                             std::make_pair("production_signal", "missingDimensionAccessClosingBracket"),
+                             std::make_pair("production_signal", "missingDimensionAccessClosingBracketInNestedDimensionAccess"),
+                             std::make_pair("production_signal", "missingBitAccessIdent"),
+                             std::make_pair("production_signal", "missingBitRangeAccessEndPrefixIdent"),
+                             std::make_pair("production_signal", "dimensionOutOfRange"),
+                             std::make_pair("production_signal", "valueForDimensionOutOfRange"),
+                             std::make_pair("production_signal", "bitAccessOutOfRange"),
+                             std::make_pair("production_signal", "bitRangeStartOutOfRange"),
+                             std::make_pair("production_signal", "bitRangeEndOutOfRange"),
+
+                             /* number */
+                             std::make_pair("number", "accessingBitwidthOfUndeclaredSignal"),
+                             std::make_pair("number", "accessingUndeclaredLoopVariable"),
+                             std::make_pair("number", "missingOpeningBracketInExpression"),
+                             std::make_pair("number", "missingOpeningBracketInNestedExpression"),
+                             std::make_pair("number", "missingClosingBracketInExpression"),
+                             std::make_pair("number", "missingClosingBracketInNestedExpression"),
+                             std::make_pair("number", "invalidOperationInExpression"),
+                             std::make_pair("number", "invalidOperationInNestedExpression")
                          ),
                          [](const testing::TestParamInfo<SyrecParserErrorCasesFixture::ParamType>& info) {
                              auto s = info.param.first + "_" + info.param.second;
@@ -117,5 +244,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
 TEST_P(SyrecParserErrorCasesFixture, GenericSyrecParserErrorTest) {
     std::string actualErrorsConcatinated;
     ASSERT_NO_THROW(actualErrorsConcatinated = parserPublicInterface.readFromString(this->circuitDefinition, syrec::ReadProgramSettings{})) << "Error while parsing circuit";
+    ASSERT_TRUE(this->parserPublicInterface.modules().empty()) << "Expected no valid modules but actually found " << this->parserPublicInterface.modules().size() << " valid modules";
+    ASSERT_FALSE(actualErrorsConcatinated.empty()) << "Expected at least one error";
     ASSERT_NO_THROW(compareExpectedAndActualErrors(this->expectedErrors, transformActualErrors(actualErrorsConcatinated))) << "Missmatch between expected and actual errors";
 }

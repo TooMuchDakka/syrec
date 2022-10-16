@@ -1,0 +1,115 @@
+{
+  "TODO": "Repeat parameter tests with more than one parameter/locals (i.e. module has three and first two are correct but last one tests correct error messages)",
+  "missingModulePrefix": {
+    "circuit": "",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ""
+      }
+    ]
+  },
+  "invalidSymbolAtModuleIdentStart": {
+
+  },
+  "invalidSymbolInModuleIdent": {
+
+  },
+  "missingParameterListOpeningBracket": {
+
+  },
+  "missingParameterListClosingBracket": {
+
+  },
+  "invalidParameterType": {
+
+  },
+  "invalidParameterIdent": {
+
+  },
+  "parameterWithDimensionMissingOpeningBracket": {
+
+  },
+  "parameterWithDimensionMissingClosingBracket": {
+
+  },
+  "parameterWithDimensionNotBeingANumber": {
+
+  },
+  "parameterWithSignalwidthMissingOpeningBracket": {
+
+  },
+  "parameterWithSignalwidthMissingClosingBracket": {
+
+  },
+  "parameterWithSignalwidthNotBeingANumber": {
+
+  },
+  "missingParameterDelimiter": {
+
+  },
+  "missingParameterAfterDelimiter": {
+
+  },
+  "duplicateParameterOfSameType": {
+
+  },
+  "duplicateParameterOfDifferentType": {
+
+  },
+  "invalidLocalType": {
+
+  },
+  "invalidLocalIdent": {
+
+  },
+  "localWithDimensionMissingOpeningBracket": {
+
+  },
+  "localWithDimensionMissingClosingBracket": {
+
+  },
+  "localWithDimensionNotBeingANumber": {
+
+  },
+  "localWithSignalwidthMissingOpeningBracket": {
+
+  },
+  "localWithSignalwidthMissingClosingBracket": {
+
+  },
+  "localWithSignalwidthNotBeingANumber": {
+
+  },
+  "missingLocalDelimiter": {
+
+  },
+  "missingLocalAfterDelimiter": {
+
+  },
+  "duplicateLocalInSameLine": {
+
+  },
+  "duplicateLocalInDifferentDeclaration": {
+
+  },
+  "duplicateLocalOfDifferentType": {
+
+  },
+
+  "invalidStatementInvalidatesModule": {
+
+  },
+  "emptyStatementBody": {
+
+  },
+
+
+  "duplicateModules": {
+
+  },
+  "missingMainModule": {
+
+  }
+}

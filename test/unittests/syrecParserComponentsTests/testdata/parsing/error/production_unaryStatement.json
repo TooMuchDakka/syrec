@@ -1,0 +1,39 @@
+{
+  "invalidUnaryOperator": {
+    "circuit": "",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ""
+      }
+    ]
+  },
+  "invalidAssignmentToInParameter": {
+
+  },
+  "invalidAssignmentToInParameterBit": {
+
+  },
+  "invalidAssignmentToInParameterBitRange": {
+
+  },
+  "invalidAssignmentToInParameterDimension": {
+
+  },
+  "invalidAssignmentToInParameterDimensionBit": {
+
+  },
+  "invalidAssignmentToInParameterDimensionBitRange": {
+
+  },
+  "invalidAssignmentToInParameterNestedDimension": {
+
+  },
+  "invalidAssignmentToInParameterNestedDimensionBit": {
+
+  },
+  "invalidAssignmentToInParameterNestedDimensionBitRange": {
+
+  }
+}

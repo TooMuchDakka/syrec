@@ -1,5 +1,5 @@
 {
-  "missingSkipIdent": {
+  "missingStatementDelimiter": {
     "circuit": "",
     "errors": [
       {
@@ -8,5 +8,8 @@
         "message": ""
       }
     ]
+  },
+  "oneDelimiterTooManyAfterLastStatementOfBlock": {
+
   }
 }
