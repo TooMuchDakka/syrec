@@ -96,7 +96,7 @@
       {
         "line": 1,
         "column": 21,
-        "message": "number expected"
+        "message": "int expected"
       }
     ]
   },
@@ -126,7 +126,7 @@
       {
         "line": 1,
         "column": 21,
-        "message": "number expected"
+        "message": "int expected"
       }
     ]
   },
@@ -232,7 +232,7 @@
       {
         "line": 1,
         "column": 25,
-        "message": "number expected"
+        "message": "int expected"
       }
     ]
   },
@@ -262,7 +262,7 @@
       {
         "line": 1,
         "column": 25,
-        "message": "number expected"
+        "message": "int expected"
       }
     ]
   },

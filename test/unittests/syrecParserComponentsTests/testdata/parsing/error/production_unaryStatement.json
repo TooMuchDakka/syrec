@@ -1,16 +1,43 @@
 {
   "invalidUnaryOperator": {
-    "circuit": "",
+    "circuit": "module main(in a) := a",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ""
+        "column": 19,
+        "message": "invalid unary operand"
+      }
+    ]
+  },
+  "missingEqualityOperator": {
+    "circuit": "module main(in a) : a",
+    "errors": [
+      {
+        "line": 1,
+        "column": 20,
+        "message": "= expected"
+      }
+    ]
+  },
+  "invalidEqualityOperator": {
+    "circuit": "module main(in a) ++r a",
+    "errors": [
+      {
+        "line": 1,
+        "column": 21,
+        "message": "= expected"
       }
     ]
   },
   "invalidAssignmentToInParameter": {
-
+    "circuit": "module main(in a) ++= a",
+    "errors": [
+      {
+        "line": 1,
+        "column": 23,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   },
   "invalidAssignmentToInParameterBit": {
 

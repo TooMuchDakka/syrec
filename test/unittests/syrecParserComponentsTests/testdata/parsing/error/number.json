@@ -1,33 +1,92 @@
 {
-  "accessingBitwidthOfUndeclaredSignal": {
-    "circuit": "",
+  "notAnInteger": {
+    "circuit": "module main(out c(16)) c += 1a2",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ""
+        "column": 30,
+        "message": "TODO"
+      }
+    ]
+  },
+  "accessingBitwidthOfUndeclaredSignal": {
+    "circuit": "module main(out c(16)) c += #a",
+    "errors": [
+      {
+        "line": 1,
+        "column": 30,
+        "message": "undeclared signal 'a'"
       }
     ]
   },
   "accessingUndeclaredLoopVariable": {
-
+    "circuit": "module main(out c(16)) c += $a",
+    "errors": [
+      {
+        "line": 1,
+        "column": 30,
+        "message": "undeclared signal 'a'"
+      }
+    ]
   },
   "missingOpeningBracketInExpression": {
-
+    "circuit": "module main(out c(16)) c += 2 + #c)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 29,
+        "message": "( expected"
+      }
+    ]
   },
   "missingOpeningBracketInNestedExpression": {
-
+    "circuit": "module main(out c(16)) c += (2 + #c) + 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 29,
+        "message": "TODO"
+      }
+    ]
   },
   "missingClosingBracketInExpression": {
-
+    "circuit": "module main(out c(16)) c += (2 + #c",
+    "errors": [
+      {
+        "line": 1,
+        "column": 37,
+        "message": ") expected"
+      }
+    ]
   },
   "missingClosingBracketInNestedExpression": {
-
+    "circuit": "module main(out c(16)) c += ((2 + #c + 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 37,
+        "message": "TODO: invalid number expression operand"
+      }
+    ]
   },
   "invalidOperationInExpression": {
-
+    "circuit": "module main(out c(16), in a[2](16)) c += a[(2 % #c)]",
+    "errors": [
+      {
+        "line": 1,
+        "column": 48,
+        "message": "invalid number expression operand"
+      }
+    ]
   },
   "invalidOperationInNestedExpression": {
-
+    "circuit": "module main(out c(16), in a[2](16)) c += a[((2 + #c) % 2)]",
+    "errors": [
+      {
+        "line": 1,
+        "column": 55,
+        "message": "invalid number expression operand"
+      }
+    ]
   }
 }

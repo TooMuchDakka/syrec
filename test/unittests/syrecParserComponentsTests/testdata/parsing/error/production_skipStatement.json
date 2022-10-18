@@ -1,11 +1,11 @@
 {
   "missingSkipIdent": {
-    "circuit": "",
+    "circuit": "module main()",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ""
+        "column": 14,
+        "message": "skip expected"
       }
     ]
   }

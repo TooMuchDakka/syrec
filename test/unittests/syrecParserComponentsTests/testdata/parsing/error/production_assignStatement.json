@@ -1,17 +1,55 @@
 {
   "invalidAssignOperator": {
-    "circuit": "",
+    "circuit": "module main(in a, out c) c #= (a + 2)",
     "errors": [
       {
         "line": 1,
         "column": 1,
-        "message": ""
+        "message": "TODO"
+      }
+    ]
+  },
+  "missingAssignmentOperatorPostfix": {
+    "circuit": "module main(in a, out c) c + a",
+    "errors": [
+      {
+        "line": 1,
+        "column": 29,
+        "message": "= expected"
+      }
+    ]
+  },
+  "invalidAssignmentOperatorPostfix": {
+    "circuit": "module main(in a, out c) c +* a",
+    "errors": [
+      {
+        "line": 1,
+        "column": 29,
+        "message": "= expected"
       }
     ]
   },
   "invalidAssignmentToInParameter": {
-
+    "circuit": "module main(in a) a += (2 + 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 19,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   },
+  "invalidAssignmentVariableIsUsedInRhs": {
+    "circuit": "module main(in a) a += (a + 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 31,
+        "message": "reversibility of operation is broken if assigned to variable 'a' is used in rhs expression"
+      }
+    ]
+  },
+
   "invalidAssignmentToInParameterBit": {
 
   },

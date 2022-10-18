@@ -185,6 +185,9 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
 
                              /* UnaryStatement production */
                              std::make_pair("production_unaryStatement", "invalidUnaryOperator"),
+                             std::make_pair("production_unaryStatement", "missingEqualityOperator"),
+                             std::make_pair("production_unaryStatement", "invalidEqualityOperator"),
+
                              /* Do all of these cases need to be checked ?*/
                              std::make_pair("production_unaryStatement", "invalidAssignmentToInParameter"),
                              std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterBit"),
@@ -199,6 +202,11 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              /* AssignStatement production */
                              std::make_pair("production_assignStatement", "invalidAssignOperator"),
                              std::make_pair("production_assignStatement", "invalidAssignmentToInParameter"),
+
+                             std::make_pair("production_assignStatement", "missingAssignmentOperatorPostfix"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentOperatorPostfix"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentVariableIsUsedInRhs"),
+
                              /* Do all of these cases need to be checked ? */
                              std::make_pair("production_assignStatement", "invalidAssignmentToInParameterBit"),
                              std::make_pair("production_assignStatement", "invalidAssignmentToInParameterBitRange"),
@@ -238,15 +246,19 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_signal", "missingDimensionAccessOpeningBracketInNestedDimensionAccess"),
                              std::make_pair("production_signal", "missingDimensionAccessClosingBracket"),
                              std::make_pair("production_signal", "missingDimensionAccessClosingBracketInNestedDimensionAccess"),
+                             std::make_pair("production_signal", "invalidBitAccessPrefix"),
                              std::make_pair("production_signal", "missingBitAccessIdent"),
-                             std::make_pair("production_signal", "missingBitRangeAccessEndPrefixIdent"),
+                             std::make_pair("production_signal", "missingBitRangeAccessEndValuePrefixIdent"),
+                             std::make_pair("production_signal", "invalidBitRangeAccessEndValuePrefixIdent"),
                              std::make_pair("production_signal", "dimensionOutOfRange"),
                              std::make_pair("production_signal", "valueForDimensionOutOfRange"),
                              std::make_pair("production_signal", "bitAccessOutOfRange"),
                              std::make_pair("production_signal", "bitRangeStartOutOfRange"),
                              std::make_pair("production_signal", "bitRangeEndOutOfRange"),
+                             std::make_pair("production_signal", "bitRangeStartValueLargerThanEnd"),
 
                              /* number */
+                             std::make_pair("number", "notAnInteger"),
                              std::make_pair("number", "accessingBitwidthOfUndeclaredSignal"),
                              std::make_pair("number", "accessingUndeclaredLoopVariable"),
                              std::make_pair("number", "missingOpeningBracketInExpression"),

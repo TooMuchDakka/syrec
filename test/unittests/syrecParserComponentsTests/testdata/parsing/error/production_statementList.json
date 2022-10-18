@@ -1,15 +1,22 @@
 {
   "missingStatementDelimiter": {
-    "circuit": "",
+    "circuit": "module main(in a, in b, out c) skip c += (a + b)",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ""
+        "column": 36,
+        "message": "; expected"
       }
     ]
   },
   "oneDelimiterTooManyAfterLastStatementOfBlock": {
-
+    "circuit": "module main(in a, in b, out c) skip; c += (a + b);",
+    "errors": [
+      {
+        "line": 1,
+        "column": 50,
+        "message": "TODO:"
+      }
+    ]
   }
 }
