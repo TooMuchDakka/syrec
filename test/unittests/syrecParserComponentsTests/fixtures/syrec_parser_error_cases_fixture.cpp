@@ -20,7 +20,7 @@ private:
     const std::string cJsonErrorExpectedMessageKey = "message";
 
     const std::string cCircuitDefinitionJsonKey = "circuit";
-    const std::string cExpectedErrorsJsonKey    = "expected_errors";
+    const std::string cExpectedErrorsJsonKey    = "errors";
 
 protected:
     struct ExpectedError {
@@ -62,7 +62,7 @@ protected:
     }
 
     void loadExpectedErrors(const json& json) {
-        for (auto& errorJsonObject: json.at(cExpectedErrorsJsonKey)) {
+        for (auto& errorJsonObject: json) {
             ASSERT_TRUE(errorJsonObject.is_object()) << "Expected test case data to a json object";
             ASSERT_TRUE(errorJsonObject.contains(cJsonErrorLineJsonKey)) << "Required entry with key '" << cJsonErrorLineJsonKey << "' was not found";
             ASSERT_TRUE(errorJsonObject.contains(cJsonErrorColumnJsonKey)) << "Required entry with key '" << cJsonErrorColumnJsonKey << "' was not found";
@@ -125,6 +125,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_module", "missingParameterAfterDelimiter"),
                              std::make_pair("production_module", "duplicateParameterOfSameType"),
                              std::make_pair("production_module", "duplicateParameterOfDifferentType"),
+                             std::make_pair("production_module", "duplicateDeclarationMatchBetweenParameterAndLocal"),
                              std::make_pair("production_module", "invalidLocalType"),
                              std::make_pair("production_module", "invalidLocalIdent"),
                              std::make_pair("production_module", "localWithDimensionMissingOpeningBracket"),
