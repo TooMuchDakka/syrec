@@ -1,115 +1,362 @@
 {
   "TODO": "Repeat parameter tests with more than one parameter/locals (i.e. module has three and first two are correct but last one tests correct error messages)",
   "missingModulePrefix": {
-    "circuit": "",
+    "circuit": "main() skip",
     "errors": [
       {
         "line": 1,
         "column": 1,
-        "message": ""
+        "message": "\"module\" expected"
       }
     ]
   },
   "invalidSymbolAtModuleIdentStart": {
-
+    "circuit": "module 12main() skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 2,
+        "message": "ident expected"
+      }
+    ]
   },
   "invalidSymbolInModuleIdent": {
-
+    "circuit": "module mai@23() skip",
+    "errrors": [
+      {
+        "line": 1,
+        "column": 7,
+        "message": "ident expected"
+      }
+    ]
   },
   "missingParameterListOpeningBracket": {
-
+    "circuit": "module main in in32(32)) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 13,
+        "message": "( expected"
+      }
+    ]
   },
   "missingParameterListClosingBracket": {
-
+    "circuit": "module main(in in32(32) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 21,
+        "message": "( expected"
+      }
+    ]
   },
   "invalidParameterType": {
-
+    "circuit": "module main(tes in32(32)) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid parameter type 'tes'"
+      }
+    ]
   },
   "invalidParameterIdent": {
-
+    "circuit": "module main(in test@23(32)) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 16,
+        "message": "ident expected"
+      }
+    ]
   },
   "parameterWithDimensionMissingOpeningBracket": {
-
+    "circuit": "module main(in test23](32)) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 22,
+        "message": "[ expected"
+      }
+    ]
   },
   "parameterWithDimensionMissingClosingBracket": {
-
+    "circuit": "module main(in test[23(32)) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 23,
+        "message": "[ expected"
+      }
+    ]
   },
   "parameterWithDimensionNotBeingANumber": {
-
+    "circuit": "module main(in test[23abc](32)) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 21,
+        "message": "number expected"
+      }
+    ]
   },
   "parameterWithSignalwidthMissingOpeningBracket": {
-
+    "circuit": "module main(in test[23]32)) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 24,
+        "message": ", expected"
+      }
+    ]
   },
   "parameterWithSignalwidthMissingClosingBracket": {
-
+    "circuit": "module main(in test[23](32) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 27,
+        "message": ") expected"
+      }
+    ]
   },
   "parameterWithSignalwidthNotBeingANumber": {
-
+    "circuit": "module main(in test(32abc)) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 21,
+        "message": "number expected"
+      }
+    ]
   },
   "missingParameterDelimiter": {
-
+    "circuit": "module main(in test inout abc) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 19,
+        "message": ", expected"
+      }
+    ]
   },
   "missingParameterAfterDelimiter": {
-
+    "circuit": "module main(in test, )) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 21,
+        "message": "ident expected"
+      },
+      {
+        "line": 1,
+        "column": 21,
+        "message": "invalid parameter type 'test'"
+      }
+    ]
   },
   "duplicateParameterOfSameType": {
-
+    "circuit": "module main(in test, in test[2](16))) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 24,
+        "message": "variable 'test' has already been defined or declared"
+      }
+    ]
   },
   "duplicateParameterOfDifferentType": {
-
+    "circuit": "module main(in test, out test[2](16))) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 24,
+        "message": "variable 'test' has already been defined or declared"
+      }
+    ]
   },
-  "invalidLocalType": {
+  "duplicateDeclarationMatchBetweenParameterAndLocal": {
+    "circuit": "module main(in test) wire x state test skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 35,
+        "message": "variable 'test' has already been defined or declared"
+      }
+    ]
+  },
 
+  "invalidLocalType": {
+    "circuit": "module main() tes test skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 15,
+        "message": "invalid variable type 'tes'"
+      }
+    ]
   },
   "invalidLocalIdent": {
-
+    "circuit": "module main() wire test23@23 skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 19,
+        "message": "ident expected"
+      }
+    ]
   },
   "localWithDimensionMissingOpeningBracket": {
-
+    "circuit": "module main() wire test23] skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 26,
+        "message": "TODO: ident expected"
+      }
+    ]
   },
   "localWithDimensionMissingClosingBracket": {
-
+    "circuit": "module main() wire test[23(16) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 25,
+        "message": "] expected"
+      }
+    ]
   },
   "localWithDimensionNotBeingANumber": {
-
+    "circuit": "module main() wire test[abc] skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 25,
+        "message": "number expected"
+      }
+    ]
   },
   "localWithSignalwidthMissingOpeningBracket": {
-
+    "circuit": "module main() wire test15) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 26,
+        "message": "TODO: ident expected"
+      }
+    ]
   },
   "localWithSignalwidthMissingClosingBracket": {
-
+    "circuit": "module main() wire test(15 skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 27,
+        "message": ") expected"
+      }
+    ]
   },
   "localWithSignalwidthNotBeingANumber": {
-
+    "circuit": "module main() wire test(1abc5) skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 25,
+        "message": "number expected"
+      }
+    ]
   },
   "missingLocalDelimiter": {
-
+    "circuit": "module main() wire test abc skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 24,
+        "message": ", expected"
+      }
+    ]
   },
   "missingLocalAfterDelimiter": {
-
+    "circuit": "module main() wire test, skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 25,
+        "message": "ident expected"
+      }
+    ]
   },
   "duplicateLocalInSameLine": {
-
+    "circuit": "module main() wire test(15), test[2] skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 30,
+        "message": "variable 'test' has already been defined or declared"
+      }
+    ]
   },
   "duplicateLocalInDifferentDeclaration": {
-
+    "circuit": "module main() wire test(15) wire x, test[2] skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 37,
+        "message": "variable 'test' has already been defined or declared"
+      }
+    ]
   },
   "duplicateLocalOfDifferentType": {
-
+    "circuit": "module main() wire test(15) state test[2] skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 35,
+        "message": "variable 'test' has already been defined or declared"
+      }
+    ]
   },
 
   "invalidStatementInvalidatesModule": {
-
+    "circuit": "module main() wire test(15) state test[2] test <=> abc",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "TODO: Probably throws two errors, one for invalid swap statement and one for the empty module body"
+      }
+    ]
   },
   "emptyStatementBody": {
-
+    "circuit": "module main()",
+    "errors": [
+      {
+        "line": 1,
+        "column": 14,
+        "message": "TODO"
+      }
+    ]
   },
 
 
   "duplicateModules": {
-
+    "circuit": "module main() wire test(15) wire x, test[2] skip module main() skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 57,
+        "message": "module 'test' has already been defined"
+      }
+    ]
   },
   "missingMainModule": {
-
+    "circuit": "module test() wire test(15) wire x, test[2] skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 50,
+        "message": "a module with name 'main' must be defined but was not found"
+      }
+    ]
   }
 }
