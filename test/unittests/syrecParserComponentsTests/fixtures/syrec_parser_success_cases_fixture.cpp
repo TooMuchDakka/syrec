@@ -206,6 +206,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_swapStatement", "nestedDimensionOfRhs"),
                         std::make_pair("production_swapStatement", "oneBitOfNestedDimensionOfRhs"),
                         std::make_pair("production_swapStatement", "bitRangeOfNestedDimensionOfRhs"),
+                        std::make_pair("production_swapStatement", "lhsAndRhsWithSameDimensions"),
 
                         /* SkipStatement production */
                         std::make_pair("production_skipStatement", "simpleTest"),

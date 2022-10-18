@@ -1,5 +1,5 @@
 {
-  "TODO": "Invalid swaps between for example a bit of the lhs with a bit range on the right or swapping a dimension with a bit"
+  "TODO": "Invalid swaps between for example a bit of the lhs with a bit range on the right or swapping a dimension with a bit",
   "invalidSwapStatementOperator": {
     "circuit": "",
     "errors": [
@@ -9,5 +9,59 @@
         "message": ""
       }
     ]
+  },
+  "invalidSwapOfLhsBitWithBitRangeOfRhs": {
+
+  },
+  "invalidSwapOfLhsBitWithDimensionOfRhsWithLongerSignalwidth": {
+
+  },
+  "invalidSwapOfLhsBitWithNestedDimensionOfRhsWithLongerSignalwidth": {
+
+  },
+  "invalidSwapOfLhsBitWithFullSignalOfRhsWithLongerSignalwidth": {
+
+  },
+
+  "invalidSwapOfLhsBitRangeWithBitOfRhs": {
+
+  },
+  "invalidSwapOfLhsBitRangeWithDimensionOfRhsWithLongerSignalwidth": {
+
+  },
+  "invalidSwapOfLhsBitRangeWithNestedDimensionOfRhsWithLongerSignalwidth": {
+
+  },
+  "invalidSwapOfLhsBitRangeWithFullSignalOfRhsWithLongerSignalwidth": {
+
+  },
+
+  "invalidSwapOfLhsBitRangeWithDimensionOfRhsWithSmallerSignalwidth": {
+
+  },
+  "invalidSwapOfLhsBitRangeWithNestedDimensionOfRhsWithSmallerSignalwidth": {
+
+  },
+  "invalidSwapOfLhsBitRangeWithFullSignalOfSmallerSignalwidth": {
+
+  },
+
+  "invalidSwapOfLhsSignalWithTooLargeBitRangeOfRhs": {
+
+  },
+  "invalidSwapOfLhsSignalWithTooSmallBitRangeOfRhs": {
+
+  },
+  "invalidSwapOfLhsSignalWithRhsSignalWithLessDimensions": {
+
+  },
+  "invalidSwapOfLhsSignalWithRhsSignalWithTooManyDimensions": {
+
+  },
+  "invalidSwapOfLhsSignalWithRhsSignalWithSmallerBitwidth": {
+
+  },
+  "invalidSwapOfLhsSignalWithRhsSignalWithLargerBitwidth": {
+
   }
 }

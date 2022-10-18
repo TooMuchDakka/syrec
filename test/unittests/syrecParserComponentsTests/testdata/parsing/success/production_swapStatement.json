@@ -51,5 +51,9 @@
   },
   "bitRangeOfNestedDimensionOfRhs": {
     "circuit": "module main(out a[2][4][8](10), out b(3)) b <=> a[1][3][7].2:5"
+  },
+
+  "lhsAndRhsWithSameDimensions": {
+    "circuit": "module main(out a[2][3][5](10), in b[2][3][5](10)) a <=> b"
   }
 }

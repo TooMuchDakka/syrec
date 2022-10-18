@@ -169,6 +169,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_forStatement", "invalidNegativeStepsizeIdent"),
                              std::make_pair("production_forStatement", "invalidLoopHeaderPostfixIdent"),
                              std::make_pair("production_forStatement", "invalidRofEndDelimiter"),
+                             std::make_pair("production_forStatement", "assignmentToLoopVariableNotValid"),
 
                              /* IfStatement production */
                              std::make_pair("production_ifStatement", "invalidIfIdent"),
@@ -183,6 +184,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
 
                              /* UnaryStatement production */
                              std::make_pair("production_unaryStatement", "invalidUnaryOperator"),
+                             /* Do all of these cases need to be checked ?*/
                              std::make_pair("production_unaryStatement", "invalidAssignmentToInParameter"),
                              std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterBit"),
                              std::make_pair("production_unaryStatement", "invalidAssignmentToInParameterBitRange"),
@@ -196,6 +198,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              /* AssignStatement production */
                              std::make_pair("production_assignStatement", "invalidAssignOperator"),
                              std::make_pair("production_assignStatement", "invalidAssignmentToInParameter"),
+                             /* Do all of these cases need to be checked ? */
                              std::make_pair("production_assignStatement", "invalidAssignmentToInParameterBit"),
                              std::make_pair("production_assignStatement", "invalidAssignmentToInParameterBitRange"),
                              std::make_pair("production_assignStatement", "invalidAssignmentToInParameterDimension"),
@@ -207,6 +210,23 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
 
                              /* SwapStatement production */
                              std::make_pair("production_swapStatement", "invalidSwapStatementOperator"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitWithBitRangeOfRhs"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitWithDimensionOfRhsWithLongerSignalwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitWithNestedDimensionOfRhsWithLongerSignalwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitWithFullSignalOfRhsWithLongerSignalwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitRangeWithBitOfRhs"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitRangeWithDimensionOfRhsWithLongerSignalwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitRangeWithNestedDimensionOfRhsWithLongerSignalwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitRangeWithFullSignalOfRhsWithLongerSignalwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitRangeWithDimensionOfRhsWithSmallerSignalwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitRangeWithNestedDimensionOfRhsWithSmallerSignalwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsBitRangeWithFullSignalOfSmallerSignalwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalWithTooLargeBitRangeOfRhs"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalWithTooSmallBitRangeOfRhs"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalWithRhsSignalWithLessDimensions"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalWithRhsSignalWithTooManyDimensions"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalWithRhsSignalWithSmallerBitwidth"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalWithRhsSignalWithLargerBitwidth"),
 
                              /* SkipStatement production */
                              std::make_pair("production_skipStatement", "missingSkipIdent"),
