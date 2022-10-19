@@ -11,57 +11,209 @@
     ]
   },
   "invalidSwapOfLhsBitWithBitRangeOfRhs": {
-
+    "circuit": "module main(out a(16), out b(5)) a.0 <=> b.0:3",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 1 while the other had a signal width of 4"
+      }
+    ]
   },
   "invalidSwapOfLhsBitWithDimensionOfRhsWithLongerSignalwidth": {
-
+    "circuit": "module main(out a(16), out b[2](5)) a.0 <=> b[0]",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 1 while the other had a signal width of 5"
+      }
+    ]
   },
   "invalidSwapOfLhsBitWithNestedDimensionOfRhsWithLongerSignalwidth": {
-
+    "circuit": "module main(out a(16), out b[2][4][6](5)) a.0 <=> b[0][2][2]",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 1 while the other had a signal width of 5"
+      }
+    ]
   },
   "invalidSwapOfLhsBitWithFullSignalOfRhsWithLongerSignalwidth": {
-
+    "circuit": "module main(out a(16), out b(5)) a.0 <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 1 while the other had a signal width of 5"
+      }
+    ]
   },
 
   "invalidSwapOfLhsBitRangeWithBitOfRhs": {
 
   },
+  "invalidSwapOfLhsBitRangeWithFullSignalOfRhsWithLongerSignalwidth": {
+    "circuit": "module main(out a(5), out b(16)) a.0:3 <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 4 while the other had a signal width of 16"
+      }
+    ]
+  },
   "invalidSwapOfLhsBitRangeWithDimensionOfRhsWithLongerSignalwidth": {
-
+    "circuit": "module main(out a(5), out b[2](16)) a.0:3 <=> b[0].2:8",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 4 while the other had a signal width of 7"
+      }
+    ]
   },
   "invalidSwapOfLhsBitRangeWithNestedDimensionOfRhsWithLongerSignalwidth": {
-
+    "circuit": "module main(out a(5), out b[2][4](16)) a.0:3 <=> b[0][3].2:8",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 4 while the other had a signal width of 7"
+      }
+    ]
   },
-  "invalidSwapOfLhsBitRangeWithFullSignalOfRhsWithLongerSignalwidth": {
 
+  "invalidSwapOfLhsBitRangeWithFullSignalOfSmallerSignalwidth": {
+    "circuit": "module main(out a(5), out b(2)) a.0:3 <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 4 while the other had a signal width of 2"
+      }
+    ]
   },
-
   "invalidSwapOfLhsBitRangeWithDimensionOfRhsWithSmallerSignalwidth": {
-
+    "circuit": "module main(out a(5), out b[2](2)) a.0:3 <=> b[0]",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 4 while the other had a signal width of 2"
+      }
+    ]
   },
   "invalidSwapOfLhsBitRangeWithNestedDimensionOfRhsWithSmallerSignalwidth": {
-
-  },
-  "invalidSwapOfLhsBitRangeWithFullSignalOfSmallerSignalwidth": {
-
+    "circuit": "module main(out a(5), out b[2][4](2)) a.0:3 <=> b[0][2]",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 4 while the other had a signal width of 2"
+      }
+    ]
   },
 
   "invalidSwapOfLhsSignalWithTooLargeBitRangeOfRhs": {
-
+    "circuit": "module main(out a(5), out b(16)) a <=> b.0:14",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 5 while the other had a signal width of 14"
+      }
+    ]
   },
   "invalidSwapOfLhsSignalWithTooSmallBitRangeOfRhs": {
-
+    "circuit": "module main(out a(5), out b(16)) a <=> b.0:3",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 5 while the other had a signal width of 4"
+      }
+    ]
   },
   "invalidSwapOfLhsSignalWithRhsSignalWithLessDimensions": {
-
+    "circuit": "module main(out a[2][4](5), out b[1](16)) a <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a 2 dimension defined while the other had a 1"
+      }
+    ]
   },
   "invalidSwapOfLhsSignalWithRhsSignalWithTooManyDimensions": {
-
+    "circuit": "module main(out a[2](5), out b[1][4](16)) a <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a 1 dimension defined while the other had a 2"
+      }
+    ]
+  },
+  "invalidSwapOfLhsSignalWithRhsSignalWithValueForDimensionTooSmall": {
+    "circuit": "module main(out a[2](5), out b[1](16)) a <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a value of 2 defined for dimension 0 while the other had a value of 1"
+      }
+    ]
+  },
+  "invalidSwapOfLhsSignalWithRhsSignalWithValueForDimensionTooLarge": {
+    "circuit": "module main(out a[2](16), out b[5](16)) a <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a value of 2 defined for dimension 0 while the other had a value of 5"
+      }
+    ]
+  },
+  "invalidSwapOfLhsSignalWithRhsSignalWithValueForOneNestedDimensionTooSmall": {
+    "circuit": "module main(out a[2][4](16), out b[2][1](16)) a <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a value of 4 defined for dimension 1 while the other had a value of 1"
+      }
+    ]
+  },
+  "invalidSwapOfLhsSignalWithRhsSignalWithValueForOneNestedDimensionTooLarge": {
+    "circuit": "module main(out a[2][4](16), out b[2][5](16)) a <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a value of 4 defined for dimension 1 while the other had a value of 5"
+      }
+    ]
   },
   "invalidSwapOfLhsSignalWithRhsSignalWithSmallerBitwidth": {
-
+    "circuit": "module main(out a[2][4](5), out b[2][4](16)) a <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a signal width of 5 while the other had a signal width of 16"
+      }
+    ]
   },
   "invalidSwapOfLhsSignalWithRhsSignalWithLargerBitwidth": {
-
+    "circuit": "module main(out a[2][4](16), out b[2][5](32)) a <=> b",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid swap, first operand had a value of 16 defined for dimension 1 while the other had a value of 32"
+      }
+    ]
   }
 }

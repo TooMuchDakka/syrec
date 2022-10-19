@@ -1,36 +1,122 @@
 {
   "invalidIfIdent": {
-    "circuit": "",
+    "circuit": "module main(in a, in b) test (a > 2) then skip else skip fi (a < 2",
     "errors": [
       {
         "line": 1,
         "column": 1,
-        "message": ""
+        "message": "TODO expected"
+      }
+    ]
+  },
+  "missingIfIdent": {
+    "circuit": "module main(in a, in b) (a > 2) then skip else skip fi (a < 2",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "TODO expected"
+      }
+    ]
+  },
+  "missingThenIdent": {
+    "circuit": "module main(in a, in b) if (a > 2) skip else skip fi (a > 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "then expected"
       }
     ]
   },
   "invalidThenIdent": {
-
+    "circuit": "module main(in a, in b) if (a > 2) test skip else skip fi (a > 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "then expected"
+      }
+    ]
   },
   "invalidIfConditionExpression": {
-
+    "circuit": "module main(in a, in b) if (a > 2 then skip else skip fi (a > 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ") expected"
+      },
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid if statement, missmatch between opening and closing condition"
+      }
+    ]
   },
   "invalidFiConditionExpression": {
-
+    "circuit": "module main(in a, in b) if (a > 2) then skip else skip fi (a < 2",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ") expected"
+      },
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid if statement, missmatch between opening and closing condition"
+      }
+    ]
   },
   "emptyIfBody": {
-
+    "circuit": "module main(in a, in b) if (a > 2) then else skip fi (a > 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "TODO"
+      }
+    ]
   },
-  "emptyThenBody": {
-
+  "emptyElseBody": {
+    "circuit": "module main(in a, in b) if (a > 2) then skip else fi (a > 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "TODO"
+      }
+    ]
   },
   "invalidElseIdent": {
-
+    "circuit": "module main(in a, in b) if (a > 2) then skip els skip fi (a > 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "else expected"
+      }
+    ]
   },
   "invalidFiIdent": {
-
+    "circuit": "module main(in a, in b) if (a > 2) then skip else skip test (a > 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "fi expected"
+      }
+    ]
   },
   "missmatchBetweenIfAndFiCondition": {
-
+    "circuit": "module main(in a, in b) if (a > 2) then else skip fi (a < 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid if statement, missmatch between opening and closing condition"
+      }
+    ]
   }
 }

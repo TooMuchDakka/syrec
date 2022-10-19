@@ -223,6 +223,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_forStatement", "loopVariableWithNegativeStepsize"),
                         std::make_pair("production_forStatement", "singleStatementInBody"),
                         std::make_pair("production_forStatement", "multipleStatementsInBody"),
+                        std::make_pair("production_forStatement", "reusingLoopVariableNameInAnotherLoopAfterPreviousOneWasLeft"),
 
                         /* Expression production */
                         std::make_pair("production_expression", "isConstant"),

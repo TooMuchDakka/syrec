@@ -9,28 +9,154 @@
       }
     ]
   },
+  "missingLoopVariablePrefix": {
+    "circuit": "module main() for a = 0 to 2 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "$ expected"
+      }
+    ]
+  },
   "invalidLoopVariablePrefix": {
-
+    "circuit": "module main() for %a = 0 to 2 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "$ expected"
+      }
+    ]
   },
   "invalidLoopVariableInitialValueAssignmentOperator": {
-
+    "circuit": "module main() for $a + 2 to 2 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "= expected"
+      }
+    ]
+  },
+  "missingLoopVariableInitialValueAssignmentOperator": {
+    "circuit": "module main() for $a 2 to 2 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "= expected"
+      }
+    ]
   },
   "invalidRangeStartAndEndDelimiterIdent": {
-
+    "circuit": "module main() for $a = 0 then 2 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "to expected"
+      }
+    ]
+  },
+  "missingRangeStartAndEndDelimiterIdent": {
+    "circuit": "module main() for $a = 0 2 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "to expected"
+      }
+    ]
   },
   "invalidStepsizeIdent": {
-
+    "circuit": "module main() for 2 then 1 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "step expected"
+      }
+    ]
+  },
+  "missingStepsizeIdent": {
+    "circuit": "module main() for 2 1 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "step expected"
+      }
+    ]
   },
   "invalidNegativeStepsizeIdent": {
-
+    "circuit": "module main() for 2 step ~1 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "- expected"
+      }
+    ]
+  },
+  "missingLoopHeaderPostfixIdent": {
+    "circuit": "module main() for 2 step 1 skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "do expected"
+      }
+    ]
   },
   "invalidLoopHeaderPostfixIdent": {
-
+    "circuit": "module main() for 2 step 1 then skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "do expected"
+      }
+    ]
+  },
+  "missingRofEndDelimiter": {
+    "circuit": "module main() for 2 step 1 do skip",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "rof expected"
+      }
+    ]
   },
   "invalidRofEndDelimiter": {
-
+    "circuit": "module main() for 2 step 1 then skip then",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "rof expected"
+      }
+    ]
   },
   "assignmentToLoopVariableNotValid": {
-
+    "circuit": "module main() for $a = 0 to 2 step 1 do ++= a rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "variable 'a' is readonly"
+      }
+    ]
+  },
+  "duplicateLoopVariableNameInNestedLoop": {
+    "circuit": "module main() for $a = 0 to 2 step 1 do for $a = 0 to 5 step 1 skip rof rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "variable '$a' has already been defined or declared"
+      }
+    ]
   }
 }

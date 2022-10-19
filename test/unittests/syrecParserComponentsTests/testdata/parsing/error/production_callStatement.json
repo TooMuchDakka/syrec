@@ -1,4 +1,5 @@
 {
+  "TODO": "Can a function only be called after it was declared or can a fixup happen later ?",
   "invalidCallIdent": {
     "circuit": "",
     "errors": [
@@ -10,30 +11,148 @@
     ]
   },
   "invalidUncallIdent": {
-
+    "circuit": "",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ""
+      }
+    ]
   },
   "callWithMissingOpeningBracket": {
-
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call toCallc, d) uncall toCall(c, d)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "( expected"
+      }
+    ]
   },
   "callWithMissingClosingBracket": {
-
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call toCall(c, d uncall toCall(c, d)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ") expected"
+      }
+    ]
   },
   "callOfUndefinedModule": {
-
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call test(c, d) uncall test(c, d)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "undeclared module 'test'"
+      },
+      {
+        "line": 1,
+        "column": 1,
+        "message": "undeclared module 'test'"
+      }
+    ]
   },
   "callOfModuleWithNotEnoughParameters": {
-
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call toCall(c) uncall toCall(c, d)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "call of 'toCall' expected 2 arguments but was called with 1"
+      }
+    ]
   },
   "callOfModuleWithTooManyParameters": {
-
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, d, a) uncall toCall(c, d)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "call of 'toCall' expected 2 arguments but was called with 3"
+      }
+    ]
   },
   "callWithInvalidParameterDelimiter": {
-
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c< a) uncall toCall(c, a)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ", expected"
+      }
+    ]
   },
   "uncallWithInvalidParameterDelimiter": {
-
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) uncall toCall(c< a)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ", expected"
+      }
+    ]
+  },
+  "missingUncallAfterCall": {
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "previous call to method 'toCall' was not uncalled"
+      }
+    ]
   },
   "callAfterCallWithoutPriorUncallOfTheFormer": {
-
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) call toCall(d, a)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "previous call to method 'toCall' was not uncalled"
+      }
+    ]
+  },
+  "uncallWithDifferentParameterThanCall": {
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) uncall toCall(d, a)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "previous call to method 'toCall' was not uncalled"
+      }
+    ]
+  },
+  "uncallWithLessParameterThanCall": {
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) uncall toCall(d)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "uncall of 'toCall' expected 2 arguments but was called with 1"
+      },
+      {
+        "line": 1,
+        "column": 1,
+        "message": "previous call to method 'toCall' was not uncalled"
+      }
+    ]
+  },
+  "uncallWithMoreParametersThanCall": {
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) uncall toCall(c, a, d)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "uncall of 'toCall' expected 2 arguments but was called with 3"
+      },
+      {
+        "line": 1,
+        "column": 1,
+        "message": "previous call to method 'toCall' was not uncalled"
+      }
+    ]
   }
 }
