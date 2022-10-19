@@ -285,7 +285,23 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("number", "missingClosingBracketInExpression"),
                              std::make_pair("number", "missingClosingBracketInNestedExpression"),
                              std::make_pair("number", "invalidOperationInExpression"),
-                             std::make_pair("number", "invalidOperationInNestedExpression")
+                             std::make_pair("number", "invalidOperationInNestedExpression"),
+
+                             /* BinaryExpression production */
+                             std::make_pair("production_binaryExpression", "lhsOperandIsInvalidExpression"),
+                             std::make_pair("production_binaryExpression", "rhsOperandIsInvalidExpression"),
+                             std::make_pair("production_binaryExpression", "invalidBinaryOperation"),
+                             std::make_pair("production_binaryExpression", "missingOpeningBracket"),
+                             std::make_pair("production_binaryExpression", "invalidOpeningBracket"),
+                             std::make_pair("production_binaryExpression", "missingClosingBracket"),
+                             std::make_pair("production_binaryExpression", "invalidClosingBracket"),
+
+                             /* UnaryExpression production */
+                             std::make_pair("production_unaryExpression", "invalidUnaryOperation"),
+
+                             /* ShiftExpression production */
+                             std::make_pair("production_shiftExpression", "shiftAmountNotANumber"),
+                             std::make_pair("production_shiftExpression", "invalidNegativeShiftAmount")
                          ),
                          [](const testing::TestParamInfo<SyrecParserErrorCasesFixture::ParamType>& info) {
                              auto s = info.param.first + "_" + info.param.second;

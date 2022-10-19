@@ -1,0 +1,12 @@
+{
+  "invalidUnaryOperation": {
+    "circuit": "module main(out c) c += +2",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid unary operation"
+      }
+    ]
+  }
+}

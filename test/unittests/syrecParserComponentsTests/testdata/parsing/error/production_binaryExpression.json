@@ -1,0 +1,72 @@
+{
+  "lhsOperandIsInvalidExpression": {
+    "circuit": "module main(out c) c += (a + 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "undeclared signal 'a'"
+      }
+    ]
+  },
+  "rhsOperandIsInvalidExpression": {
+    "circuit": "module main(out c) c += (2 + a)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "undeclared signal 'a'"
+      }
+    ]
+  },
+  "invalidBinaryOperation": {
+    "circuit": "module main(out c) c += (2 ? 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "invalid binary operation"
+      }
+    ]
+  },
+  "missingOpeningBracket": {
+    "circuit": "module main(out c) c += 2 + 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "( expected"
+      }
+    ]
+  },
+  "invalidClosingBracket": {
+    "circuit": "module main(out c) c += [2 + 22)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "( expected"
+      }
+    ]
+  },
+  "missingClosingBracket": {
+    "circuit": "module main(out c) c += (2 + 2",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ") expected"
+      }
+    ]
+  },
+  "invalidClosingBracket": {
+    "circuit": "module main(out c) c += (2 + 22]",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": ") expected"
+      }
+    ]
+  }
+}
