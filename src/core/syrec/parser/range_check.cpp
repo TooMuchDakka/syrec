@@ -20,7 +20,7 @@ std::optional<IndexAccessRangeConstraint> parser::getConstraintsForValidDimensio
 }
 
 IndexAccessRangeConstraint parser::getConstraintsForValidBitRangeAccess(const syrec::Variable::ptr& variable, const bool usingZeroBasedIndex) {
-    return parser::getConstraintsForValidBitRangeAccess(variable, usingZeroBasedIndex);
+    return parser::getConstraintsForValidBitAccess(variable, usingZeroBasedIndex);
 }
 
 IndexAccessRangeConstraint parser::getConstraintsForValidBitAccess(const syrec::Variable::ptr& variable, const bool usingZeroBasedIndex) {
@@ -48,5 +48,5 @@ bool parser::isValidBitAccess(const syrec::Variable::ptr& variable, const std::s
 }
 
 bool parser::isValidBitRangeAccess(const syrec::Variable::ptr& variable, const std::pair<std::size_t, std::size_t>& accessedBitRange, const bool usingZeroBasedIndex) {
-    return parser::isValidBitAccess(variable, accessedBitRange.first, usingZeroBasedIndex) && parser::isValidBitAccess(variable, accessedBitRange.second, usingZeroBasedIndex);
+    return accessedBitRange.first <= accessedBitRange.second && parser::isValidBitAccess(variable, accessedBitRange.first, usingZeroBasedIndex) && parser::isValidBitAccess(variable, accessedBitRange.second, usingZeroBasedIndex);
 }
