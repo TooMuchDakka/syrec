@@ -62,6 +62,7 @@ namespace syrecAstDumpUtils {
 
     protected:
         [[nodiscard]] std::string stringifyModule(const syrec::Module::ptr& moduleToStringify);
+        [[nodiscard]] std::string stringifyModuleLocals(const syrec::Variable::vec& moduleLocals);
 
         [[nodiscard]] std::string stringifyStatements(const syrec::Statement::vec& statements);
         [[nodiscard]] std::string stringifyStatement(const syrec::Statement::ptr& statement);
@@ -81,6 +82,8 @@ namespace syrecAstDumpUtils {
         [[nodiscard]] static std::string stringifyVariableExpression(const syrec::VariableExpression& variableExpression);
 
         [[nodiscard]] static std::string stringifyVariable(const syrec::Variable::ptr& variable);
+        [[nodiscard]] static std::string stringifyLocal(const syrec::Variable::ptr& local, bool withTypePrefix=false);
+
         [[nodiscard]] static std::string stringifyVariableAccess(const syrec::VariableAccess::ptr& variableAccess);
         [[nodiscard]] static std::string stringifyNumber(const syrec::Number::ptr& number);
 

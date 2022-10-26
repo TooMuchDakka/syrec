@@ -452,12 +452,12 @@ SignalList <. const syrec::Module::ptr& module, bool &isValidModuleDefinition .>
 																						.)
 SignalDeclaration<signalType, declaredSignal>											(.	isValidModuleDefinition &= declaredSignal.has_value();
 																							if (isValidModuleDefinition)
-																								module->addParameter(declaredSignal.value());
+																								module->addVariable(declaredSignal.value());
 																						.)
 {																						(.	declaredSignal.reset();			.)	
 	"," SignalDeclaration<signalType, declaredSignal>									(.	isValidModuleDefinition &= declaredSignal.has_value();
 																							if (isValidModuleDefinition)
-																								module->addParameter(declaredSignal.value());
+																								module->addVariable(declaredSignal.value());
 																						.)
 }.
 

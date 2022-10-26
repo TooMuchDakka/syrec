@@ -108,10 +108,11 @@
     "expectedCircuit": "module main() wire local_1[2][1][5](32) skip"
   },
   "noParametersNLocalsSameTypeAllInOneLine_wireType": {
-    "circuit": "module main() wire local_1(10), local_2[2](5), local_3[2][4](30)"
+    "circuit": "module main() wire local_1(10), local_2[2](5), local_3[2][4](30) skip"
   },
   "noParametersNLocalsSameTypeInNLines_wireType": {
-    "circuit": "module main() wire local_1(1) wire local_2[2](5) wire local_3[2][4](30)"
+    "circuit": "module main() wire local_1(1) wire local_2[2](5) wire local_3[2][4](30) skip",
+    "expectedCircuit": "module main() wire local_1(1), local_2[2](5), local_3[2][4](30) skip"
   },
 
 
@@ -137,10 +138,11 @@
     "expectedCircuit": "module main() state local_1[2][1][5](32) skip"
   },
   "noParametersNLocalsSameTypeAllInOneLine_stateType": {
-    "circuit": "module main() state local_1(10), local_2[2](5), local_3[2][4](30)"
+    "circuit": "module main() state local_1(10), local_2[2](5), local_3[2][4](30) skip"
   },
   "noParametersNLocalsSameTypeInNLines_stateType": {
-    "circuit": "module main() state local_1(1) state local_2[2](5) state local_3[2][4](30)"
+    "circuit": "module main() state local_1(1) state local_2[2](5) state local_3[2][4](30) skip",
+    "expectedCircuit": "module main() state local_1(1), local_2[2](5), local_3[2][4](30) skip"
   },
 
   "singleStatementBody": {

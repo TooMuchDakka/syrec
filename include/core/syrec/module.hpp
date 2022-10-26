@@ -48,6 +48,15 @@ namespace syrec {
         }
 
         /**
+       * @brief Adds a variable to the module
+       *
+       * @param variable Variable
+       */
+        void addVariable(const Variable::ptr& variable) {
+            variables.emplace_back(variable);
+        }
+
+        /**
        * @brief Finds a parameter or variable in the module
        *
        * This methods tries to find a parameter or a variable

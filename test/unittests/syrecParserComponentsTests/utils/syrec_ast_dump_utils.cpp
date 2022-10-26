@@ -17,12 +17,33 @@ std::string SyrecASTDumper::stringifyModules(const syrec::Module::vec& modules) 
 
 std::string SyrecASTDumper::stringifyModule(const syrec::Module::ptr& moduleToStringify) {
     const std::string stringifiedParameters = stringifyAndJoinMany(moduleToStringify->parameters, this->dumpConfig.parameterDelimiter.c_str(), stringifyVariable);
-    const std::string stringifiedLocals     = stringifyAndJoinMany(moduleToStringify->variables, " ", stringifyVariable);
+    const std::string stringifiedLocals = stringifyModuleLocals(moduleToStringify->variables);
     const std::string stringifiedStmts      = stringifyStatements(moduleToStringify->statements);
 
     return "module " + moduleToStringify->name + "(" + stringifiedParameters + ")" + this->dumpConfig.newlineSequence
         + (!moduleToStringify->variables.empty() ? stringifiedLocals + this->dumpConfig.newlineSequence : "")
         + stringifiedStmts;
+}
+
+std::string SyrecASTDumper::stringifyModuleLocals(const syrec::Variable::vec& moduleLocals) {
+    if (moduleLocals.empty())
+        return "";
+
+    std::string stringifiedLocals = "";
+    // TODO: This now only works because the Variable type IN is compiled to 0, a more robust translation would be nice (i.e. when refactoring the type to an enum instead of the unsigned int value it currently has)
+    unsigned int currentLocalsType = 0;
+
+    for (const syrec::Variable::ptr& local : moduleLocals) {
+        if (local->type != currentLocalsType) {
+            stringifiedLocals += this->dumpConfig.newlineSequence + stringifyLocal(local, true);
+            currentLocalsType = local->type;
+        }
+        else {
+            stringifiedLocals += this->dumpConfig.parameterDelimiter + stringifyLocal(local, false);
+        }
+    }
+
+    return stringifiedLocals.substr(1, stringifiedLocals.size() - 1);
 }
 
 inline std::string SyrecASTDumper::stringifyStatements(const syrec::Statement::vec& statements) {
@@ -257,6 +278,19 @@ std::string SyrecASTDumper::stringifyVariable(const syrec::Variable::ptr& variab
         case syrec::Variable::Inout:
             variableAssignabilityStringified = "inout";
             break;
+        default:
+            variableAssignabilityStringified = "invalid";
+            break;
+    }
+    return variableAssignabilityStringified + " " + variable->name + dimensionsStringified + bitwidthStringified;
+}
+
+std::string SyrecASTDumper::stringifyLocal(const syrec::Variable::ptr& local, bool withTypePrefix) {
+    const std::string dimensionsStringified = stringifyAndJoinMany(local->dimensions, "", &SyrecASTDumper::stringifyDimension);
+    const std::string bitwidthStringified   = "(" + std::to_string(local->bitwidth) + ")";
+
+    std::string variableAssignabilityStringified;
+    switch (local->type) {
         case syrec::Variable::Wire:
             variableAssignabilityStringified = "wire";
             break;
@@ -267,8 +301,9 @@ std::string SyrecASTDumper::stringifyVariable(const syrec::Variable::ptr& variab
             variableAssignabilityStringified = "invalid";
             break;
     }
-    return variableAssignabilityStringified + " " + variable->name + dimensionsStringified + bitwidthStringified;
+    return (withTypePrefix ? variableAssignabilityStringified + " " : "") + local->name + dimensionsStringified + bitwidthStringified;
 }
+
 
 std::string SyrecASTDumper::stringifyVariableAccess(const syrec::VariableAccess::ptr& variableAccess) {
     std::string accessedDimension;

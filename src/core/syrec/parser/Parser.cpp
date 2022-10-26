@@ -250,7 +250,7 @@ void Parser::SignalList(const syrec::Module::ptr& module, bool &isValidModuleDef
 		SignalDeclaration(signalType, declaredSignal);
 		isValidModuleDefinition &= declaredSignal.has_value();
 		if (isValidModuleDefinition)
-		module->addParameter(declaredSignal.value());
+		module->addVariable(declaredSignal.value());
 		
 		while (la->kind == 12 /* "," */) {
 			declaredSignal.reset();			
@@ -258,8 +258,7 @@ void Parser::SignalList(const syrec::Module::ptr& module, bool &isValidModuleDef
 			SignalDeclaration(signalType, declaredSignal);
 			isValidModuleDefinition &= declaredSignal.has_value();
 			if (isValidModuleDefinition)
-			module->addParameter(declaredSignal.value());
-			
+			module->addVariable(declaredSignal.value());
 		}
 }
 
