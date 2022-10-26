@@ -372,39 +372,57 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		
 		if (la->kind == 21 /* "call" */) {
 			Get();
-			isCallStatement.emplace(true);	
+			isCallStatement.emplace(true);
+			if (!callStack.empty()){
+			// TODO: GEN_ERROR
+			SemErr(convertErrorMsgToRequiredFormat(PreviousCallWasNotUncalled));
+			isValidCallOperation = false;
+			}
+			
 		} else if (la->kind == 22 /* "uncall" */) {
 			Get();
-			isCallStatement.emplace(false);	
+			isCallStatement.emplace(false); 
+			if (callStack.empty()) {
+			// TODO: GEN_ERROR
+			SemErr(convertErrorMsgToRequiredFormat(UncallWithoutPreviousCall));
+			isValidCallOperation = false;
+			}
+			
 		} else SynErr(61);
 		isValidCallOperation = isCallStatement.has_value();	
 		Expect(_ident);
 		std::string methodIdent = convert_to_uniform_text_format(t->val);
 		const MethodCallGuess::ptr guessesForPossibleCall = std::make_shared<MethodCallGuess>(MethodCallGuess(currSymTabScope, methodIdent));
 		if (!guessesForPossibleCall->hasSomeMatches()) {
-		// TODO: GEN_ERROR no method for ident declared
+		SemErr(convertErrorMsgToRequiredFormat(fmt::format(UndeclaredIdent, methodIdent)));
 		isValidCallOperation = false;
+		}
+		// After the method ident is declared after the uncall is defined, check that method ident matches the one of the previous call statement
+		else if (isValidCallOperation && !isCallStatement.value() && !callStack.empty()) {
+		const std::string_view previouslyCalledMethodIdent = callStack.top().first;
+		if (previouslyCalledMethodIdent != methodIdent){
+		// TODO: GEN_ERROR
+		SemErr(convertErrorMsgToRequiredFormat(fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, previouslyCalledMethodIdent, methodIdent)));
+		isValidCallOperation = false;
+		}
 		}
 		
 		Expect(5 /* "(" */);
 		Expect(_ident);
 		std::string parameterIdent = convert_to_uniform_text_format(t->val);
-		isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent);
+		isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent) && currSymTabScope->contains(parameterIdent);
 		
 		if (isValidCallOperation) {
-		const std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent);
-		isValidCallOperation = paramSymTabEntry.has_value() && std::holds_alternative<syrec::Variable::ptr>(paramSymTabEntry.value());
+		const std::variant<syrec::Variable::ptr, syrec::Number::ptr> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent).value();
+		isValidCallOperation = std::holds_alternative<syrec::Variable::ptr>(paramSymTabEntry);
 		
 		if (isValidCallOperation) {
-		guessesForPossibleCall->refineWithNextParameter(std::get<syrec::Variable::ptr>(paramSymTabEntry.value()));
+		guessesForPossibleCall->refineWithNextParameter(std::get<syrec::Variable::ptr>(paramSymTabEntry));
 		calleeArguments.emplace_back(parameterIdent);
 		}
 		else {
 		// TODO: GEN_ERROR Declared identifier was not a variable (but a loop variable)
 		}
-		}
-		else {
-		// TODO: GEN_ERROR Use of undeclared identifier
 		}
 		numActualParameters++;
 		
@@ -412,22 +430,19 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 			Get();
 			Expect(_ident);
 			std::string parameterIdent = convert_to_uniform_text_format(t->val);
-			isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent);
+			isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent) && currSymTabScope->contains(parameterIdent);
 			
 			if (isValidCallOperation) {
-			const std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent);
-			isValidCallOperation = paramSymTabEntry.has_value() && std::holds_alternative<syrec::Variable::ptr>(paramSymTabEntry.value());
+			const std::variant<syrec::Variable::ptr, syrec::Number::ptr> paramSymTabEntry = currSymTabScope->getVariable(parameterIdent).value();
+			isValidCallOperation = std::holds_alternative<syrec::Variable::ptr>(paramSymTabEntry);
 			
 			if (isValidCallOperation) {
-			guessesForPossibleCall->refineWithNextParameter(std::get<syrec::Variable::ptr>(paramSymTabEntry.value()));
+			guessesForPossibleCall->refineWithNextParameter(std::get<syrec::Variable::ptr>(paramSymTabEntry));
 			calleeArguments.emplace_back(parameterIdent);
 			}
 			else {
 			// TODO: GEN_ERROR Declared identifier was not a variable (but a loop variable)
 			}
-			}
-			else {
-			// TODO: GEN_ERROR Use of undeclared identifier
 			}
 			numActualParameters++;
 			
@@ -438,26 +453,46 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		}
 		
 		if (!guessesForPossibleCall->hasSomeMatches()) {
+		// TODO: GEN_ERROR Not enough parameters defined
+		// TODO: Provide number of expected formal parameters
+		SemErr(convertErrorMsgToRequiredFormat(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size())));
 		return;		
 		}
 		
 		guessesForPossibleCall->discardGuessesWithMoreThanNParameters(numActualParameters);
 		if (!guessesForPossibleCall->hasSomeMatches()) {
 		// TODO: GEN_ERROR All of the declared methods that matched had more than n parameters
+		// TODO: Provide number of expected formal parameters
+		SemErr(convertErrorMsgToRequiredFormat(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size())));
 		return;
 		}
 		
-		syrec::Module::vec possibleCalls = guessesForPossibleCall->getMatchesForGuess().value();
+		const syrec::Module::vec possibleCalls = guessesForPossibleCall->getMatchesForGuess().value();
 		if (possibleCalls.size() > 1) {
 		// TODO: GEN_ERROR Ambiguous call, more than one match for current setups
 		return;
 		}
+		
+		// Check if provided arguments in call and uncall match
+		if (!callStack.empty() && !isCallStatement.value()){
+		if (!std::equal(
+		calleeArguments.cbegin(),
+		calleeArguments.cend(),
+		callStack.top().second.cbegin()
+		)){
+		SemErr(convertErrorMsgToRequiredFormat(fmt::format(CallAndUncallArgumentsMissmatch, methodIdent)));
+		return;
+		}
+		}
+		
 		const syrec::Module::ptr matchingModuleForCall = possibleCalls.at(0);
 		if (isCallStatement.value()) {
 		statement.emplace(std::make_shared<syrec::CallStatement>(syrec::CallStatement(matchingModuleForCall, calleeArguments)));
+		callStack.push(std::make_pair(methodIdent, calleeArguments));
 		}
 		else {
 		statement.emplace(std::make_shared<syrec::UncallStatement>(syrec::UncallStatement(matchingModuleForCall, calleeArguments)));
+		callStack.pop();
 		}
 		
 }

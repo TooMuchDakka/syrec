@@ -41,10 +41,11 @@ namespace parser {
     extern const std::string InvalidOrMissingNumberExpressionOperation;
 
     /* Call | uncall error messages */
-    extern const std::string CallWithInvalidNumberOfArguments;
-    extern const std::string UncallWithInvalidNumberOfArguments;
+    extern const std::string PreviousCallWasNotUncalled;
+    extern const std::string UncallWithoutPreviousCall;
+    extern const std::string MissmatchOfModuleIdentBetweenCalledAndUncall;
+    extern const std::string NumberOfFormalParametersDoesNotMatchActual;
     extern const std::string MissingUncall;
-    extern const std::string CallAndUncallNumberOfArgumentsMissmatch;
     extern const std::string CallAndUncallArgumentsMissmatch;
 
     /* Arithmetic errors */

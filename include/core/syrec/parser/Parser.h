@@ -5,6 +5,7 @@
 
 #include <fmt/format.h>
 #include <optional>
+#include <stack>
 #include <string>
 #include <vector>
 
@@ -69,6 +70,8 @@ public:
 syrec::Module::vec modules;
 	SymbolTable::ptr currSymTabScope;
 	ParserConfig config;
+
+	std::stack<std::pair<std::string, std::vector<std::string>>> callStack;
 
 	syrec::Number::loop_variable_mapping loop_variable_mapping_lookup;
 

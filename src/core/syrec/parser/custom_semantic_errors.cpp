@@ -37,11 +37,12 @@ namespace parser {
     extern const std::string InvalidOrMissingNumberExpressionOperation = "invalid or missing number expression operation";
 
     /* Call | uncall error messages */
-    extern const std::string CallWithInvalidNumberOfArguments        = "module '{0:s}' defined {1:d} formal parameters but call only provided {2:d} parameter values";
-    extern const std::string UncallWithInvalidNumberOfArguments      = "module '{0:s}' defined {1:d} formal parameters but uncall only provided {2:d} parameter values";
+    extern const std::string PreviousCallWasNotUncalled              = "Tried to issue a call with one/many previous calls not being uncalled";
+    extern const std::string UncallWithoutPreviousCall               = "Tried to uncall a module that was not previously called";
+    extern const std::string MissmatchOfModuleIdentBetweenCalledAndUncall = "Missmatch between module ident '{0:s}' used in call does not match the uncalled one '{1:s}'";
+    extern const std::string NumberOfFormalParametersDoesNotMatchActual = "module '{0:s}' defined {1:d} formal parameters but uncall/call provided {2:d} parameter values";
     extern const std::string MissingUncall                           = "missing uncall for module '{0:s}' called with arguments {1:s}";
-    extern const std::string CallAndUncallNumberOfArgumentsMissmatch = "missmatch between number of parameter values for call and uncall of module '{0:s}', call had {0:d} parameters while uncall had {1:d}";
-    extern const std::string CallAndUncallArgumentsMissmatch         = "call and uncall of module '{0:s} defined different parameter values ";
+    extern const std::string CallAndUncallArgumentsMissmatch         = "call and uncall of module '{0:s}' defined different parameter values ";
 
     /* Arithmetic errors */
     extern const std::string DivisionByZero = "invalid division by zero";
