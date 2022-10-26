@@ -231,6 +231,14 @@ syrec::Module::vec modules;
 		return true;
 	}
 
+	bool isIdentAssignableOtherwiseLogError(const syrec::VariableAccess::ptr& assignedToVariable) {
+		if (syrec::Variable::Types::In == assignedToVariable->getVar()->type){
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name)));
+			return false;
+		}
+		return true;
+	}
+
 	[[nodiscard]] std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
 		if (operation == syrec_operation::operation::division && rightOperand == 0) {
 			// TODO: GEN_ERROR

@@ -192,6 +192,14 @@ COMPILER SyReC
 		return true;
 	}
 
+	bool isIdentAssignableOtherwiseLogError(const syrec::VariableAccess::ptr& assignedToVariable) {
+		if (syrec::Variable::Types::In == assignedToVariable->getVar()->type){
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name)));
+			return false;
+		}
+		return true;
+	}
+
 	[[nodiscard]] std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
 		if (operation == syrec_operation::operation::division && rightOperand == 0) {
 			// TODO: GEN_ERROR
@@ -803,7 +811,7 @@ StatementList<trueBranch>
 UnaryStatement production
 -------------------------------------------------------------------------*/
 
-UnaryStatement<. std::optional<syrec::Statement::ptr> &statement .>			(.	SignalEvaluationResult unaryStmtOperand;
+UnaryStatement<. std::optional<syrec::Statement::ptr> &statement .>		(.	SignalEvaluationResult unaryStmtOperand;
 																			std::optional<syrec_operation::operation> unaryOperation;	
 																		.)
 =
@@ -816,6 +824,7 @@ UnaryStatement<. std::optional<syrec::Statement::ptr> &statement .>			(.	SignalE
 																			if (!unaryOperation.has_value()){
 																				allSemanticChecksOk = false;
 																				// TODO: GEN_ERROR Expected a valid unary operand
+																				SemErr(convertErrorMsgToRequiredFormat(InvalidUnaryOperation));
 																			}
 																			if (unaryStmtOperand.isValid() && !unaryStmtOperand.isVariableAccess()) {
 																				allSemanticChecksOk = false;
@@ -829,7 +838,10 @@ UnaryStatement<. std::optional<syrec::Statement::ptr> &statement .>			(.	SignalE
 																			}
 
 																			const syrec::VariableAccess::ptr unaryOperandAsVarAccess = unaryStmtOperand.getAsVariableAccess().value();
-																			statement.emplace(std::make_shared<syrec::UnaryStatement>(syrec::UnaryStatement(mappedOperation.value(), unaryOperandAsVarAccess)));
+																			if (isIdentAssignableOtherwiseLogError(unaryOperandAsVarAccess)){
+																				statement.emplace(std::make_shared<syrec::UnaryStatement>(syrec::UnaryStatement(mappedOperation.value(), unaryOperandAsVarAccess)));																			
+																			}
+
 																		.)
 .
 
@@ -839,63 +851,70 @@ AssignStatement production
 -------------------------------------------------------------------------*/
 
 AssignStatement<. std::optional<syrec::Statement::ptr> &statement .>	(.		SignalEvaluationResult assignStmtLhs;
-																		const ExpressionEvaluationResult::ptr assignStmtRhs = createExpressionEvalutionResultContainer();
-																		std::optional<syrec_operation::operation> assignOperation;
-																		unsigned int expressionBitwidth = 1u;
+																				const ExpressionEvaluationResult::ptr assignStmtRhs = createExpressionEvalutionResultContainer();
+																				std::optional<syrec_operation::operation> assignOperation;
+																				unsigned int expressionBitwidth = 1u;
 
-																		std::optional<syrec::VariableAccess::ptr> assigned_to_obj;
-																		bool allSemanticChecksOk = true;
-																.)
+																				std::optional<syrec::VariableAccess::ptr> assigned_to_obj;
+																				bool allSemanticChecksOk = true;
+																		.)
 =
-Signal<assignStmtLhs, false>									(.		allSemanticChecksOk = assignStmtLhs.isValid();
-																		if (allSemanticChecksOk){
-																			if (!assignStmtLhs.isVariableAccess()) {
-																				allSemanticChecksOk = false;
-																				// TODO: GEN_ERROR: Lhs operand must be variable access
-																			}
-																			else {
-																				expressionBitwidth = assignStmtLhs.getAsVariableAccess().value()->bitwidth();
-																			}
-																		}
-																.)
+Signal<assignStmtLhs, false>											(.		allSemanticChecksOk = assignStmtLhs.isValid();
+																				if (allSemanticChecksOk){
+																					if (!assignStmtLhs.isVariableAccess()) {
+																						allSemanticChecksOk = false;
+																						// TODO: GEN_ERROR: Lhs operand must be variable access
+																					}
+																					else {
+																						allSemanticChecksOk = isIdentAssignableOtherwiseLogError(assignStmtLhs.getAsVariableAccess().value());
+																						expressionBitwidth = assignStmtLhs.getAsVariableAccess().value()->bitwidth();
+																					}
+																				}
+																		.)
 (
-	"^"															(.		assignOperation.emplace(syrec_operation::operation::xor_assign);	.)
-	| "+"														(.		assignOperation.emplace(syrec_operation::operation::add_assign);	.)
-	| "-"														(.		assignOperation.emplace(syrec_operation::operation::minus_assign);	.)
-)					
-"=" Expression<assignStmtRhs, expressionBitwidth, false>		(.		if (!allSemanticChecksOk || !assignOperation.has_value() || !assignStmtRhs->hasValue()) {
-																			return;
-																		}
+	"^"																	(.		assignOperation.emplace(syrec_operation::operation::xor_assign);	.)
+	| "+"																(.		assignOperation.emplace(syrec_operation::operation::add_assign);	.)
+	| "-"																(.		assignOperation.emplace(syrec_operation::operation::minus_assign);	.)
+)																		(.		if (!assignOperation.has_value()){
+																					// TODO: GEN_ERROR Expected a valid unary operand
+																					SemErr(convertErrorMsgToRequiredFormat(InvalidBinaryOperation));
+																				}
+																		.)
+"=" Expression<assignStmtRhs, expressionBitwidth, false>				(.		if (!allSemanticChecksOk || !assignOperation.has_value() || !assignStmtRhs->hasValue()) {
+																					return;
+																				}
 
-																		// TODO: To not break reversability of operation, check that expression does not contain the assigned to signal 
-																		const std::optional<unsigned int> mappedOperation = map_operation_to_assign_operation(assignOperation.value());
-																		if (mappedOperation.has_value()) {
-																			statement.emplace(std::make_shared<syrec::AssignStatement>(syrec::AssignStatement(assignStmtLhs.getAsVariableAccess().value(),
-																																				mappedOperation.value(),
-																																				assignStmtRhs->getOrConvertToExpression(expressionBitwidth).value())));
-																		}
-																.)		
+																				// TODO: To not break reversability of operation, check that expression does not contain the assigned to signal 
+																				const std::optional<unsigned int> mappedOperation = map_operation_to_assign_operation(assignOperation.value());
+																				if (mappedOperation.has_value()) {
+																					statement.emplace(std::make_shared<syrec::AssignStatement>(syrec::AssignStatement(assignStmtLhs.getAsVariableAccess().value(),
+																																						mappedOperation.value(),
+																																						assignStmtRhs->getOrConvertToExpression(expressionBitwidth).value())));
+																				}
+																		.)		
 .
 
 /*-------------------------------------------------------------------------
 SwapStatement production
 -------------------------------------------------------------------------*/
 
-SwapStatement<. std::optional<syrec::Statement::ptr> &statement .>			(.	SignalEvaluationResult swapMe, swapOther;
+SwapStatement<. std::optional<syrec::Statement::ptr> &statement .>	(.	SignalEvaluationResult swapMe, swapOther;
 																		bool isSwapOperatorDefined = false;
+																		bool allSemanticChecksOk = true;
 																	.)
 =
-Signal<swapMe, false> 
+Signal<swapMe, false>												(.	if (swapMe.isValid() && !swapMe.isVariableAccess()) {
+																			allSemanticChecksOk = false;
+																			// TODO: GEN_ERROR: Lhs operand must be variable access
+																		}
+																		allSemanticChecksOk &= isIdentAssignableOtherwiseLogError(swapMe.getAsVariableAccess().value());
+																	.)
 "<=>"																(.	isSwapOperatorDefined = true;	.)
-Signal<swapOther, false>											(.	bool allSemanticChecksOk = true;
-																		if (swapMe.isValid() && !swapMe.isVariableAccess()) {
+Signal<swapOther, false>											(.	if (swapOther.isValid() && !swapOther.isVariableAccess()){
 																			allSemanticChecksOk = false;
 																			// TODO: GEN_ERROR: Lhs operand must be variable access
 																		}
-																		if (swapOther.isValid() && !swapOther.isVariableAccess()){
-																			allSemanticChecksOk = false;
-																			// TODO: GEN_ERROR: Lhs operand must be variable access
-																		}
+																		allSemanticChecksOk &= isIdentAssignableOtherwiseLogError(swapOther.getAsVariableAccess().value());
 
 																		if (isSwapOperatorDefined && allSemanticChecksOk) {
 																			statement.emplace(std::make_shared<syrec::SwapStatement>(syrec::SwapStatement(swapMe.getAsVariableAccess().value(),
