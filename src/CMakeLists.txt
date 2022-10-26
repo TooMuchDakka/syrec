@@ -19,6 +19,7 @@ add_library(${PROJECT_NAME}
 			${CMAKE_CURRENT_SOURCE_DIR}/core/truthTable/truth_table.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/io/pla_parser.cpp
             
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/custom_semantic_errors.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_evaluation_result.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/grammar_conflict_resolver.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/method_call_guess.cpp

@@ -3,11 +3,13 @@
 #if !defined(parser_COCO_PARSER_H__)
 #define parser_COCO_PARSER_H__
 
+#include <fmt/format.h>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/custom_semantic_errors.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/grammar_conflict_resolver.hpp"
 #include "core/syrec/parser/method_call_guess.hpp"
@@ -213,17 +215,23 @@ syrec::Module::vec modules;
 		return mapping_result;
 	}
 
-	bool checkIdentWasDeclaredOrLogError(const std::string_view& ident) const {
+	[[nodiscard]] const wchar_t* convertErrorMsgToRequiredFormat(const std::string& errorMsg) {
+		return std::wstring(errorMsg.begin(), errorMsg.end()).c_str();
+	}
+
+	bool checkIdentWasDeclaredOrLogError(const std::string_view& ident) {
 		if (!currSymTabScope->contains(ident)) {
-			// TOOD: GEN_ERROR
+			// TODO: GEN_ERROR
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(UndeclaredIdent, ident)));
 			return false;
 		}
 		return true;
 	}
 
-	[[nodiscard]] static std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
+	[[nodiscard]] std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
 		if (operation == syrec_operation::operation::division && rightOperand == 0) {
 			// TODO: GEN_ERROR
+			SemErr(convertErrorMsgToRequiredFormat(DivisionByZero));
 			return std::nullopt;	
 		}
 		else {
@@ -231,11 +239,12 @@ syrec::Module::vec modules;
 		}
 	}
 
-	[[nodiscard]] std::optional<unsigned int> evaluateNumberContainer(const syrec::Number::ptr &numberContainer) const {
+	[[nodiscard]] std::optional<unsigned int> evaluateNumberContainer(const syrec::Number::ptr &numberContainer) {
 		if (numberContainer->isLoopVariable()) {
 			const std::string& loopVariableIdentToResolve = numberContainer->variableName();
 			if (loop_variable_mapping_lookup.find(loopVariableIdentToResolve) == loop_variable_mapping_lookup.end()) {
 				// TODO: GEN_ERROR
+				SemErr(convertErrorMsgToRequiredFormat(fmt::format(NoMappingForLoopVariable, loopVariableIdentToResolve)));
 				return std::nullopt;
 			}
 		}
@@ -261,11 +270,11 @@ syrec::Module::vec modules;
 	void Number(std::optional<syrec::Number::ptr> &parsedNumber, const bool simplifyIfPossible );
 	void SyReC();
 	void Module(std::optional<syrec::Module::ptr> &parsedModule	);
-	void ParameterList(bool &is_valid_module_definition, const syrec::Module::ptr &module);
+	void ParameterList(const syrec::Module::ptr &module, bool &isValidModuleDefinition);
 	void SignalList(const syrec::Module::ptr& module, bool &isValidModuleDefinition );
 	void StatementList(syrec::Statement::vec &statements );
 	void Parameter(std::optional<syrec::Variable::ptr> &parameter );
-	void SignalDeclaration(const syrec::Variable::Types variableType, std::optional<syrec::Variable::ptr> &signalDeclaration );
+	void SignalDeclaration(const std::optional<syrec::Variable::Types> variableType, std::optional<syrec::Variable::ptr> &signalDeclaration );
 	void Statement(std::optional<syrec::Statement::ptr> &user_defined_statement );
 	void CallStatement(std::optional<syrec::Statement::ptr> &statement );
 	void ForStatement(std::optional<syrec::Statement::ptr> &statement );

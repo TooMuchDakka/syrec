@@ -8,11 +8,13 @@ https://ssw.jku.at/Research/Projects/Coco/Doc/UserManual.pdf
 /*-- $checkEOF=false --*/
 
 // Place includes here
+#include <fmt/format.h>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/custom_semantic_errors.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/grammar_conflict_resolver.hpp"
 #include "core/syrec/parser/method_call_guess.hpp"
@@ -174,17 +176,23 @@ COMPILER SyReC
 		return mapping_result;
 	}
 
-	bool checkIdentWasDeclaredOrLogError(const std::string_view& ident) const {
+	[[nodiscard]] const wchar_t* convertErrorMsgToRequiredFormat(const std::string& errorMsg) {
+		return std::wstring(errorMsg.begin(), errorMsg.end()).c_str();
+	}
+
+	bool checkIdentWasDeclaredOrLogError(const std::string_view& ident) {
 		if (!currSymTabScope->contains(ident)) {
-			// TOOD: GEN_ERROR
+			// TODO: GEN_ERROR
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(UndeclaredIdent, ident)));
 			return false;
 		}
 		return true;
 	}
 
-	[[nodiscard]] static std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
+	[[nodiscard]] std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
 		if (operation == syrec_operation::operation::division && rightOperand == 0) {
 			// TODO: GEN_ERROR
+			SemErr(convertErrorMsgToRequiredFormat(DivisionByZero));
 			return std::nullopt;	
 		}
 		else {
@@ -192,11 +200,12 @@ COMPILER SyReC
 		}
 	}
 
-	[[nodiscard]] std::optional<unsigned int> evaluateNumberContainer(const syrec::Number::ptr &numberContainer) const {
+	[[nodiscard]] std::optional<unsigned int> evaluateNumberContainer(const syrec::Number::ptr &numberContainer) {
 		if (numberContainer->isLoopVariable()) {
 			const std::string& loopVariableIdentToResolve = numberContainer->variableName();
 			if (loop_variable_mapping_lookup.find(loopVariableIdentToResolve) == loop_variable_mapping_lookup.end()) {
 				// TODO: GEN_ERROR
+				SemErr(convertErrorMsgToRequiredFormat(fmt::format(NoMappingForLoopVariable, loopVariableIdentToResolve)));
 				return std::nullopt;
 			}
 		}
@@ -267,7 +276,7 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 																					return;
 																				}
 																			.)
-| '$' ident																	(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
+| '$' ident																	(.	const std::string signalIdent = "$" + convert_to_uniform_text_format(t->val);
 																				if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
 																					return;
 																				}
@@ -293,6 +302,7 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 		) 
 		Number<rhsOperand, simplifyIfPossible>								(.	if (!op.has_value()) {
 																					// TODO: GEN_ERROR Expected one of n operand but not of them was specified
+																					SemErr(convertErrorMsgToRequiredFormat(InvalidOrMissingNumberExpressionOperation));
 																					return;
 																				}
 
@@ -328,16 +338,18 @@ Module<module>								(.	if (module.has_value()) {
 												}
 											.)
 {											(.	module.reset();	.)
-	Module<module>							(.	if (module.has_value()) {
-													const syrec::Module::ptr well_formed_module = module.value();
-													if (currSymTabScope->contains(well_formed_module)) {
-														// TODO: GEN_ERROR 
-														// TODO: Do not cancel parsing	
-													}
-													else {
-														currSymTabScope->addEntry(well_formed_module);
-														this->modules.emplace_back(module.value());
-													}
+	Module<module>							(.	if (!module.has_value())
+													return;
+
+												const syrec::Module::ptr userDefinedModule = module.value();
+												if (currSymTabScope->contains(userDefinedModule)){
+													// TODO: GEN_ERROR 
+													// TODO: Do not cancel parsing	
+													SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateModuleIdentDeclaration, userDefinedModule->name)));
+												}
+												else {
+													currSymTabScope->addEntry(userDefinedModule);
+													this->modules.emplace_back(module.value());
 												}
 											.)
 }
@@ -349,14 +361,14 @@ syrec::Module production
 
 Module <. std::optional<syrec::Module::ptr> &parsedModule	.>			(.	SymbolTable::openScope(currSymTabScope);
 																			std::optional<std::vector<syrec::Variable::ptr>> locals;	
-																			bool isValidModuleDefinition = false;
+																			bool isValidModuleDefinition = true;
 																			syrec::Statement::vec moduleStmts {};
 																		.)	
 =
 "module" ident															(.	const std::string moduleName = convert_to_uniform_text_format(t->val);	
 																			syrec::Module::ptr userDefinedModule = std::make_shared<syrec::Module>(syrec::Module(moduleName));
 																		.)	
-"(" [ParameterList<isValidModuleDefinition, userDefinedModule>] ")" 
+"(" [ParameterList<userDefinedModule, isValidModuleDefinition>] ")" 
 {																		
 	SignalList<userDefinedModule, isValidModuleDefinition>					
 }														
@@ -380,27 +392,17 @@ StatementList<moduleStmts>												(.	SymbolTable::closeScope(currSymTabScope
 ParameterList production
 -------------------------------------------------------------------------*/
 
-ParameterList<bool &is_valid_module_definition, const syrec::Module::ptr &module>	(.	std::optional<syrec::Variable::ptr> parameter;	.)
+ParameterList<const syrec::Module::ptr &module, bool &isValidModuleDefinition>		(.	std::optional<syrec::Variable::ptr> parameter;	.)
 =
-Parameter<parameter>																(.	is_valid_module_definition = parameter.has_value();
-																						if (is_valid_module_definition) {
+Parameter<parameter>																(.	isValidModuleDefinition &= parameter.has_value();
+																						if (isValidModuleDefinition) {
 																							module->addParameter(parameter.value());
-																							currSymTabScope->addEntry(parameter.value());
 																						}
 																					.)
 {																					(.	parameter.reset();	.)
-	"," Parameter<parameter>														(.	is_valid_module_definition = parameter.has_value();
-																						if (is_valid_module_definition) {	
-																							const syrec::Variable::ptr &well_formed_parameter = parameter.value();
-																							if (!currSymTabScope->contains(well_formed_parameter->name)) {
-																								module->addParameter(well_formed_parameter);
-																								currSymTabScope->addEntry(well_formed_parameter);
-																							}
-																							else {
-																								is_valid_module_definition = false;
-																								// TODO: GEN_ERROR 
-																							}
-																						}
+	"," Parameter<parameter>														(.	isValidModuleDefinition &= parameter.has_value();
+																						if (isValidModuleDefinition)
+																							module->addParameter(parameter.value());
 																					.)
 }															
 .
@@ -410,80 +412,41 @@ Parameter<parameter>																(.	is_valid_module_definition = parameter.ha
 Parameter production
 -------------------------------------------------------------------------*/
 
-Parameter<. std::optional<syrec::Variable::ptr> &parameter .>								(.	syrec::Variable::Types parameter_type = syrec::Variable::Wire;
-																						bool valid_variable_type = true;
-																					.)	
+Parameter<. std::optional<syrec::Variable::ptr> &parameter .>						(.	std::optional<syrec::Variable::Types> parameterType;	.)	
 = 
 (
-	"in"																			(.	parameter_type = syrec::Variable::In;	.)
-	| "out"																			(.	parameter_type = syrec::Variable::Out;	.)
-	| "inout"																		(.	parameter_type = syrec::Variable::Inout;	.)	
-)																					(.	if (syrec::Variable::Wire == parameter_type) {
-																							// TODO: GEN_ERROR 
-																							// TODO: Do not cancel parsing
-																							valid_variable_type = false;
-																						}
+	"in"																			(.	parameterType.emplace(syrec::Variable::In);	.)
+	| "out"																			(.	parameterType.emplace(syrec::Variable::Out);	.)
+	| "inout"																		(.	parameterType.emplace(syrec::Variable::Inout);	.)	
+)																					(.	if (!parameterType.has_value())
+																							// TODO: GEN_ERROR
+																							SemErr(convertErrorMsgToRequiredFormat(InvalidParameterType));
 																					.)
-SignalDeclaration<parameter_type, parameter>										(.	if (!valid_variable_type) {
-																							parameter.reset();
-																						}
-																					.)
+SignalDeclaration<parameterType, parameter>									
 .
 
 /*-------------------------------------------------------------------------
 SignalList production
 -------------------------------------------------------------------------*/
 
-SignalList <. const syrec::Module::ptr& module, bool &isValidModuleDefinition .>		(.	syrec::Variable::Types signalType = syrec::Variable::In;
+SignalList <. const syrec::Module::ptr& module, bool &isValidModuleDefinition .>		(.	std::optional<syrec::Variable::Types> signalType;
 																							std::optional<syrec::Variable::ptr> declaredSignal;
-																							bool isValidSignalType = true;
 																						.)
 =
 (
-	"wire"																				(.	signalType = syrec::Variable::Wire;		.)
-	| "state"																			(.	signalType = syrec::Variable::State;		.)
-)																						(.	if (syrec::Variable::Wire != signalType && syrec::Variable::State != signalType) {
-																								// TODO: GEN_ERROR ?
-																								// TODO: Do not cancel parsing
-																								isValidSignalType = false;
-																							}
+	"wire"																				(.	signalType.emplace(syrec::Variable::Wire);		.)
+	| "state"																			(.	signalType.emplace(syrec::Variable::State);		.)
+)																						(.	if (!signalType.has_value())
+																								SemErr(convertErrorMsgToRequiredFormat(InvalidLocalType));
 																						.)
-SignalDeclaration<signalType, declaredSignal>											(.	if (isValidSignalType && declaredSignal.has_value()) {
-																								const syrec::Variable::ptr &validSignalDeclaration = declaredSignal.value();
-																								if (currSymTabScope->contains(validSignalDeclaration->name)) {
-																									// TODO: GEN_ERROR 
-																									// TODO: Do not cancel parsing
-																									isValidModuleDefinition = false;
-																								}
-																								else {
-																									currSymTabScope->addEntry(validSignalDeclaration);
-																									if (isValidModuleDefinition) {
-																										module->variables.emplace_back(validSignalDeclaration);
-																									}
-																								}
-																							}
-																							else {
-																								isValidModuleDefinition = false;
-																							}
+SignalDeclaration<signalType, declaredSignal>											(.	isValidModuleDefinition &= declaredSignal.has_value();
+																							if (isValidModuleDefinition)
+																								module->addParameter(declaredSignal.value());
 																						.)
 {																						(.	declaredSignal.reset();			.)	
-	"," SignalDeclaration<signalType, declaredSignal>									(.	if (isValidSignalType && declaredSignal.has_value()) {
-																								const syrec::Variable::ptr &validSignalDeclaration = declaredSignal.value();
-																								if (currSymTabScope->contains(validSignalDeclaration->name)) {
-																									// TODO: GEN_ERROR 
-																									// TODO: Do not cancel parsing
-																									isValidModuleDefinition = false;
-																								}
-																								else {
-																									currSymTabScope->addEntry(validSignalDeclaration);
-																									if (isValidModuleDefinition) {
-																										module->variables.emplace_back(validSignalDeclaration);
-																									}
-																								}
-																							}
-																							else {
-																								isValidModuleDefinition = false;
-																							}
+	"," SignalDeclaration<signalType, declaredSignal>									(.	isValidModuleDefinition &= declaredSignal.has_value();
+																							if (isValidModuleDefinition)
+																								module->addParameter(declaredSignal.value());
 																						.)
 }.
 
@@ -492,38 +455,42 @@ SignalDeclaration<signalType, declaredSignal>											(.	if (isValidSignalType
 SignalDeclaration production
 -------------------------------------------------------------------------*/
 
-SignalDeclaration<. const syrec::Variable::Types variableType, std::optional<syrec::Variable::ptr> &signalDeclaration .>	(.	std::vector<unsigned int> dimensions{};
-																																unsigned int signalWidth = config.cDefaultSignalWidth;	
-																																bool isValidSignalDeclaration = true;
-																															.)
+SignalDeclaration<. const std::optional<syrec::Variable::Types> variableType, std::optional<syrec::Variable::ptr> &signalDeclaration .>	(.	std::vector<unsigned int> dimensions{};
+																																			unsigned int signalWidth = config.cDefaultSignalWidth;	
+																																			bool isValidSignalDeclaration = variableType.has_value();
+																																		.)
 =
-ident																														(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);	.)
+ident																																	(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
+																																			if (currSymTabScope->contains(signalIdent)) {
+																																				isValidSignalDeclaration = false;
+																																				SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateDeclarationOfIdent, signalIdent)));
+																																			}
+																																		.)
 {"[" 
-	int																														(.	const std::optional<unsigned int> dimension = convert_token_value_to_number(*t);
-																																if (!dimension.has_value()) {
-																																	isValidSignalDeclaration = false;
-																																	// TODO: GEN_ERROR
-																																}
-																																else {
-																																	dimensions.emplace_back(dimension.value());	
-																																}
-																															.)
+	int																																	(.	const std::optional<unsigned int> dimension = convert_token_value_to_number(*t);
+																																			if (!dimension.has_value()) {
+																																				isValidSignalDeclaration = false;
+																																			}
+																																			else {
+																																				dimensions.emplace_back(dimension.value());	
+																																			}
+																																		.)
 "]"}																										
 ["(" 
-	int																														(.	const std::optional<unsigned int> customSignalWidth = convert_token_value_to_number(*t);
-																																if (!customSignalWidth.has_value()) {
-																																	// TODO: GEN_ERROR
-																																	isValidSignalDeclaration = false;
-																																}
-																																else {
-																																	signalWidth = customSignalWidth.value();
-																																}
-																															.)
-")"]																														(.	// TODO: What if no dimensions is specified, add default dimension entry ?
-																																if (isValidSignalDeclaration) {
-																																	signalDeclaration.emplace(std::make_shared<syrec::Variable>(syrec::Variable(variableType, signalIdent, dimensions, signalWidth)));
-																																}
-																															.)	
+	int																																	(.	const std::optional<unsigned int> customSignalWidth = convert_token_value_to_number(*t);
+																																			if (!customSignalWidth.has_value()) {
+																																				isValidSignalDeclaration = false;
+																																			}
+																																			else {
+																																				signalWidth = customSignalWidth.value();
+																																			}
+																																		.)
+")"]																																	(.	if (isValidSignalDeclaration) {
+																																				signalDeclaration.emplace(std::make_shared<syrec::Variable>(syrec::Variable(variableType.value(), signalIdent, dimensions, signalWidth)));
+																																				// TODO: What should happen if there is an error here
+																																				currSymTabScope->addEntry(signalDeclaration.value());
+																																			}
+																																		.)	
 .
 
 /*-------------------------------------------------------------------------
@@ -666,7 +633,7 @@ ForStatement production
 -------------------------------------------------------------------------*/
 
 // TODO: Currently no negative numbers are supported
-ForStatement<. std::optional<syrec::Statement::ptr> &statement .>								(.	std::optional<std::string> loopVariableIdent;
+ForStatement<. std::optional<syrec::Statement::ptr> &statement .>						(.	std::optional<std::string> loopVariableIdent;
 																							std::optional<syrec::Number::ptr> iterationRangeStart;
 																							std::optional<syrec::Number::ptr> iterationRangeEnd;
 																							std::optional<syrec::Number::ptr> customStepSize;
@@ -680,12 +647,16 @@ ForStatement<. std::optional<syrec::Statement::ptr> &statement .>								(.	std:
 [IF (checkIsLoopInitialValueExplicitlyDefined(this)) (
 	[
 		IF (checkIsLoopVariableExplicitlyDefined(this)) (
-			"$" ident																	(.	const std::string &loopVarIdent = convert_to_uniform_text_format(t->val);
-																							if (!checkIdentWasDeclaredOrLogError(loopVarIdent)) {
-																								loopVariableIdent.emplace(convert_to_uniform_text_format(t->val));
+			"$" ident																	(.	// TODO: Maybe replace opening scope for loop variable with remove from symbol table
+																							const std::string &loopVarIdent = "$" + convert_to_uniform_text_format(t->val);
+																							if (!currSymTabScope->contains(loopVarIdent)) {
+																								loopVariableIdent.emplace(loopVarIdent);
 																								SymbolTable::openScope(currSymTabScope);
 																								const syrec::Number::ptr loopVariableEntry = std::make_shared<syrec::Number>(syrec::Number(loopVarIdent));
 																								currSymTabScope->addEntry(loopVariableEntry);
+																							}
+																							else {
+																								SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateDeclarationOfIdent, loopVarIdent)));
 																							}
 																						.)
 			"="

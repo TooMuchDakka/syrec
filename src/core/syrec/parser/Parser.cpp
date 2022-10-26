@@ -91,7 +91,7 @@ void Parser::Number(std::optional<syrec::Number::ptr> &parsedNumber, const bool 
 		} else if (la->kind == 4 /* "$" */) {
 			Get();
 			Expect(_ident);
-			const std::string signalIdent = convert_to_uniform_text_format(t->val);
+			const std::string signalIdent = "$" + convert_to_uniform_text_format(t->val);
 			if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
 			return;
 			}
@@ -127,6 +127,7 @@ void Parser::Number(std::optional<syrec::Number::ptr> &parsedNumber, const bool 
 			Number(rhsOperand, simplifyIfPossible);
 			if (!op.has_value()) {
 			// TODO: GEN_ERROR Expected one of n operand but not of them was specified
+			SemErr(convertErrorMsgToRequiredFormat(InvalidOrMissingNumberExpressionOperation));
 			return;
 			}
 			
@@ -161,16 +162,18 @@ void Parser::SyReC() {
 		while (la->kind == 11 /* "module" */) {
 			module.reset();	
 			Module(module);
-			if (module.has_value()) {
-			const syrec::Module::ptr well_formed_module = module.value();
-			if (currSymTabScope->contains(well_formed_module)) {
+			if (!module.has_value())
+			return;
+			
+			const syrec::Module::ptr userDefinedModule = module.value();
+			if (currSymTabScope->contains(userDefinedModule)){
 			// TODO: GEN_ERROR 
 			// TODO: Do not cancel parsing	
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateModuleIdentDeclaration, userDefinedModule->name)));
 			}
 			else {
-			currSymTabScope->addEntry(well_formed_module);
+			currSymTabScope->addEntry(userDefinedModule);
 			this->modules.emplace_back(module.value());
-			}
 			}
 			
 		}
@@ -179,7 +182,7 @@ void Parser::SyReC() {
 void Parser::Module(std::optional<syrec::Module::ptr> &parsedModule	) {
 		SymbolTable::openScope(currSymTabScope);
 		std::optional<std::vector<syrec::Variable::ptr>> locals;	
-		bool isValidModuleDefinition = false;
+		bool isValidModuleDefinition = true;
 		syrec::Statement::vec moduleStmts {};
 		
 		Expect(11 /* "module" */);
@@ -189,7 +192,7 @@ void Parser::Module(std::optional<syrec::Module::ptr> &parsedModule	) {
 		
 		Expect(5 /* "(" */);
 		if (la->kind == 13 /* "in" */ || la->kind == 14 /* "out" */ || la->kind == 15 /* "inout" */) {
-			ParameterList(isValidModuleDefinition, userDefinedModule);
+			ParameterList(userDefinedModule, isValidModuleDefinition);
 		}
 		Expect(10 /* ")" */);
 		while (la->kind == 16 /* "wire" */ || la->kind == 17 /* "state" */) {
@@ -211,93 +214,51 @@ void Parser::Module(std::optional<syrec::Module::ptr> &parsedModule	) {
 		
 }
 
-void Parser::ParameterList(bool &is_valid_module_definition, const syrec::Module::ptr &module) {
+void Parser::ParameterList(const syrec::Module::ptr &module, bool &isValidModuleDefinition) {
 		std::optional<syrec::Variable::ptr> parameter;	
 		Parameter(parameter);
-		is_valid_module_definition = parameter.has_value();
-		if (is_valid_module_definition) {
+		isValidModuleDefinition &= parameter.has_value();
+		if (isValidModuleDefinition) {
 		module->addParameter(parameter.value());
-		currSymTabScope->addEntry(parameter.value());
 		}
 		
 		while (la->kind == 12 /* "," */) {
 			parameter.reset();	
 			Get();
 			Parameter(parameter);
-			is_valid_module_definition = parameter.has_value();
-			if (is_valid_module_definition) {	
-			const syrec::Variable::ptr &well_formed_parameter = parameter.value();
-			if (!currSymTabScope->contains(well_formed_parameter->name)) {
-			module->addParameter(well_formed_parameter);
-			currSymTabScope->addEntry(well_formed_parameter);
-			}
-			else {
-			is_valid_module_definition = false;
-			// TODO: GEN_ERROR 
-			}
-			}
+			isValidModuleDefinition &= parameter.has_value();
+			if (isValidModuleDefinition)
+			module->addParameter(parameter.value());
 			
 		}
 }
 
 void Parser::SignalList(const syrec::Module::ptr& module, bool &isValidModuleDefinition ) {
-		syrec::Variable::Types signalType = syrec::Variable::In;
+		std::optional<syrec::Variable::Types> signalType;
 		std::optional<syrec::Variable::ptr> declaredSignal;
-		bool isValidSignalType = true;
 		
 		if (la->kind == 16 /* "wire" */) {
 			Get();
-			signalType = syrec::Variable::Wire;		
+			signalType.emplace(syrec::Variable::Wire);		
 		} else if (la->kind == 17 /* "state" */) {
 			Get();
-			signalType = syrec::Variable::State;		
+			signalType.emplace(syrec::Variable::State);		
 		} else SynErr(58);
-		if (syrec::Variable::Wire != signalType && syrec::Variable::State != signalType) {
-		// TODO: GEN_ERROR ?
-		// TODO: Do not cancel parsing
-		isValidSignalType = false;
-		}
+		if (!signalType.has_value())
+		SemErr(convertErrorMsgToRequiredFormat(InvalidLocalType));
 		
 		SignalDeclaration(signalType, declaredSignal);
-		if (isValidSignalType && declaredSignal.has_value()) {
-		const syrec::Variable::ptr &validSignalDeclaration = declaredSignal.value();
-		if (currSymTabScope->contains(validSignalDeclaration->name)) {
-		// TODO: GEN_ERROR 
-		// TODO: Do not cancel parsing
-		isValidModuleDefinition = false;
-		}
-		else {
-		currSymTabScope->addEntry(validSignalDeclaration);
-		if (isValidModuleDefinition) {
-		module->variables.emplace_back(validSignalDeclaration);
-		}
-		}
-		}
-		else {
-		isValidModuleDefinition = false;
-		}
+		isValidModuleDefinition &= declaredSignal.has_value();
+		if (isValidModuleDefinition)
+		module->addParameter(declaredSignal.value());
 		
 		while (la->kind == 12 /* "," */) {
 			declaredSignal.reset();			
 			Get();
 			SignalDeclaration(signalType, declaredSignal);
-			if (isValidSignalType && declaredSignal.has_value()) {
-			const syrec::Variable::ptr &validSignalDeclaration = declaredSignal.value();
-			if (currSymTabScope->contains(validSignalDeclaration->name)) {
-			// TODO: GEN_ERROR 
-			// TODO: Do not cancel parsing
-			isValidModuleDefinition = false;
-			}
-			else {
-			currSymTabScope->addEntry(validSignalDeclaration);
-			if (isValidModuleDefinition) {
-			module->variables.emplace_back(validSignalDeclaration);
-			}
-			}
-			}
-			else {
-			isValidModuleDefinition = false;
-			}
+			isValidModuleDefinition &= declaredSignal.has_value();
+			if (isValidModuleDefinition)
+			module->addParameter(declaredSignal.value());
 			
 		}
 }
@@ -321,46 +282,42 @@ void Parser::StatementList(syrec::Statement::vec &statements ) {
 }
 
 void Parser::Parameter(std::optional<syrec::Variable::ptr> &parameter ) {
-		syrec::Variable::Types parameter_type = syrec::Variable::Wire;
-		bool valid_variable_type = true;
-		
+		std::optional<syrec::Variable::Types> parameterType;	
 		if (la->kind == 13 /* "in" */) {
 			Get();
-			parameter_type = syrec::Variable::In;	
+			parameterType.emplace(syrec::Variable::In);	
 		} else if (la->kind == 14 /* "out" */) {
 			Get();
-			parameter_type = syrec::Variable::Out;	
+			parameterType.emplace(syrec::Variable::Out);	
 		} else if (la->kind == 15 /* "inout" */) {
 			Get();
-			parameter_type = syrec::Variable::Inout;	
+			parameterType.emplace(syrec::Variable::Inout);	
 		} else SynErr(59);
-		if (syrec::Variable::Wire == parameter_type) {
-		// TODO: GEN_ERROR 
-		// TODO: Do not cancel parsing
-		valid_variable_type = false;
-		}
+		if (!parameterType.has_value())
+		// TODO: GEN_ERROR
+		SemErr(convertErrorMsgToRequiredFormat(InvalidParameterType));
 		
-		SignalDeclaration(parameter_type, parameter);
-		if (!valid_variable_type) {
-		parameter.reset();
-		}
-		
+		SignalDeclaration(parameterType, parameter);
 }
 
-void Parser::SignalDeclaration(const syrec::Variable::Types variableType, std::optional<syrec::Variable::ptr> &signalDeclaration ) {
+void Parser::SignalDeclaration(const std::optional<syrec::Variable::Types> variableType, std::optional<syrec::Variable::ptr> &signalDeclaration ) {
 		std::vector<unsigned int> dimensions{};
 		unsigned int signalWidth = config.cDefaultSignalWidth;	
-		bool isValidSignalDeclaration = true;
+		bool isValidSignalDeclaration = variableType.has_value();
 		
 		Expect(_ident);
-		const std::string signalIdent = convert_to_uniform_text_format(t->val);	
+		const std::string signalIdent = convert_to_uniform_text_format(t->val);
+		if (currSymTabScope->contains(signalIdent)) {
+		isValidSignalDeclaration = false;
+		SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateDeclarationOfIdent, signalIdent)));
+		}
+		
 		while (la->kind == 18 /* "[" */) {
 			Get();
 			Expect(_int);
 			const std::optional<unsigned int> dimension = convert_token_value_to_number(*t);
 			if (!dimension.has_value()) {
 			isValidSignalDeclaration = false;
-			// TODO: GEN_ERROR
 			}
 			else {
 			dimensions.emplace_back(dimension.value());	
@@ -373,7 +330,6 @@ void Parser::SignalDeclaration(const syrec::Variable::Types variableType, std::o
 			Expect(_int);
 			const std::optional<unsigned int> customSignalWidth = convert_token_value_to_number(*t);
 			if (!customSignalWidth.has_value()) {
-			// TODO: GEN_ERROR
 			isValidSignalDeclaration = false;
 			}
 			else {
@@ -383,7 +339,9 @@ void Parser::SignalDeclaration(const syrec::Variable::Types variableType, std::o
 			Expect(10 /* ")" */);
 		}
 		if (isValidSignalDeclaration) {
-		signalDeclaration.emplace(std::make_shared<syrec::Variable>(syrec::Variable(variableType, signalIdent, dimensions, signalWidth)));
+		signalDeclaration.emplace(std::make_shared<syrec::Variable>(syrec::Variable(variableType.value(), signalIdent, dimensions, signalWidth)));
+		// TODO: What should happen if there is an error here
+		currSymTabScope->addEntry(signalDeclaration.value());
 		}
 		
 }
@@ -519,12 +477,15 @@ void Parser::ForStatement(std::optional<syrec::Statement::ptr> &statement ) {
 			if (checkIsLoopVariableExplicitlyDefined(this)) {
 				Expect(4 /* "$" */);
 				Expect(_ident);
-				const std::string &loopVarIdent = convert_to_uniform_text_format(t->val);
-				if (!checkIdentWasDeclaredOrLogError(loopVarIdent)) {
-				loopVariableIdent.emplace(convert_to_uniform_text_format(t->val));
+				const std::string &loopVarIdent = "$" + convert_to_uniform_text_format(t->val);
+				if (!currSymTabScope->contains(loopVarIdent)) {
+				loopVariableIdent.emplace(loopVarIdent);
 				SymbolTable::openScope(currSymTabScope);
 				const syrec::Number::ptr loopVariableEntry = std::make_shared<syrec::Number>(syrec::Number(loopVarIdent));
 				currSymTabScope->addEntry(loopVariableEntry);
+				}
+				else {
+				SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateDeclarationOfIdent, loopVarIdent)));
 				}
 				
 				Expect(24 /* "=" */);
