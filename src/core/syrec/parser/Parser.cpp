@@ -259,6 +259,7 @@ void Parser::SignalList(const syrec::Module::ptr& module, bool &isValidModuleDef
 			isValidModuleDefinition &= declaredSignal.has_value();
 			if (isValidModuleDefinition)
 			module->addVariable(declaredSignal.value());
+			
 		}
 }
 
@@ -751,9 +752,59 @@ void Parser::SwapStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		}
 		allSemanticChecksOk &= isIdentAssignableOtherwiseLogError(swapOther.getAsVariableAccess().value());
 		
-		if (isSwapOperatorDefined && allSemanticChecksOk) {
+		if (!isSwapOperatorDefined || !allSemanticChecksOk)
+		    return;
+		
+		const syrec::VariableAccess::ptr lhsOperand = swapMe.getAsVariableAccess().value();
+		const syrec::VariableAccess::ptr rhsOperand = swapOther.getAsVariableAccess().value();
+		
+		size_t lhsNumAccessedDimensions = lhsOperand->indexes.empty() ? lhsOperand->getVar()->dimensions.size() : 1;
+		size_t rhsNumAccessedDimensions = lhsOperand->indexes.empty() ? lhsOperand->getVar()->dimensions.size() : 1;
+		
+		if (lhsNumAccessedDimensions != rhsNumAccessedDimensions) {
+		// TODO: GEN_ERROR: lhs had x dimensions while rhs had y
+		SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAccessedDimensions, rhsNumAccessedDimensions)));
+		allSemanticChecksOk = false;
+		}
+		else if (lhsOperand->indexes.empty() && rhsOperand->indexes.empty()) {
+		// TODO: Check all dimensions match
+		const auto& lhsVariableDimensions = lhsOperand->getVar()->dimensions;
+		const auto& rhsVariableDimensions = rhsOperand->getVar()->dimensions;
+		
+		const size_t numDimensionsToCheck = lhsOperand->getVar()->dimensions.size();
+		bool continueCheck = true;
+		for (size_t dimensionIdx = 0; continueCheck && dimensionIdx < numDimensionsToCheck; ++dimensionIdx) {
+		continueCheck = lhsVariableDimensions.at(dimensionIdx) == rhsVariableDimensions.at(dimensionIdx);
+		if (!continueCheck) {
+		// TODO: GEN_ERROR: Missmatch at dimension i 
+		SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsVariableDimensions.at(dimensionIdx), rhsVariableDimensions.at(dimensionIdx))));
+		allSemanticChecksOk = false;
+		    }
+		}
+		}
+		
+		if (allSemanticChecksOk) {
+		// TODO: Evaluation of accessed range to correct size
+		size_t lhsBitwidth = lhsOperand->getVar()->bitwidth;
+		size_t rhsBitwidth = rhsOperand->getVar()->bitwidth;
+		
+		// TODO: Safe fetch of loop variable mapping, the statement below could potentially throw
+		if (lhsOperand->range.has_value()) {
+		lhsBitwidth = (lhsOperand->range.value().second->evaluate(loopVariableMappingLookup) - lhsOperand->range.value().first->evaluate(loopVariableMappingLookup)) + 1;
+		}
+		
+		if (rhsOperand->range.has_value()) {
+		rhsBitwidth = (rhsOperand->range.value().second->evaluate(loopVariableMappingLookup) - rhsOperand->range.value().first->evaluate(loopVariableMappingLookup)) + 1;
+		}
+		
+		if (lhsBitwidth != rhsBitwidth) {
+		// TODO: GEN_ERROR bitwidth does not match
+		SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapSignalWidthMissmatch, lhsBitwidth, rhsBitwidth)));
+		}
+		else {
 		statement.emplace(std::make_shared<syrec::SwapStatement>(syrec::SwapStatement(swapMe.getAsVariableAccess().value(),
-		swapOther.getAsVariableAccess().value())));
+		swapOther.getAsVariableAccess().value())));	
+		}
 		}
 		
 }

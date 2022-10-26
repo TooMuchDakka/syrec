@@ -73,7 +73,7 @@ syrec::Module::vec modules;
 
 	std::stack<std::pair<std::string, std::vector<std::string>>> callStack;
 
-	syrec::Number::loop_variable_mapping loop_variable_mapping_lookup;
+	syrec::Number::loop_variable_mapping loopVariableMappingLookup;
 
 	// This method will be called by the contructor if it exits.
 	// This support is specific to the C++ version of Coco/R.
@@ -253,13 +253,13 @@ syrec::Module::vec modules;
 	[[nodiscard]] std::optional<unsigned int> evaluateNumberContainer(const syrec::Number::ptr &numberContainer) {
 		if (numberContainer->isLoopVariable()) {
 			const std::string& loopVariableIdentToResolve = numberContainer->variableName();
-			if (loop_variable_mapping_lookup.find(loopVariableIdentToResolve) == loop_variable_mapping_lookup.end()) {
+			if (loopVariableMappingLookup.find(loopVariableIdentToResolve) == loopVariableMappingLookup.end()) {
 				// TODO: GEN_ERROR
 				SemErr(convertErrorMsgToRequiredFormat(fmt::format(NoMappingForLoopVariable, loopVariableIdentToResolve)));
 				return std::nullopt;
 			}
 		}
-		return std::optional(numberContainer->evaluate(loop_variable_mapping_lookup));
+		return std::optional(numberContainer->evaluate(loopVariableMappingLookup));
 	}
 
 	[[nodiscard]] ExpressionEvaluationResult::ptr createExpressionEvalutionResultContainer() const {

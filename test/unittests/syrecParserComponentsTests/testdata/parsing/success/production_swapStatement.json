@@ -7,7 +7,7 @@
     "circuit": "module main(out a(10), out b(1)) a.0 <=> b"
   },
   "bitRangeOfLhs": {
-    "circuit": "module main(out a(10), out b(3)) a.2:5 <=> b"
+    "circuit": "module main(out a(10), out b(3)) a.2:4 <=> b"
   },
   "oneDimensionOfLhs": {
     "circuit": "module main(out a[2](10), out b(10)) a[1] <=> b"
@@ -16,7 +16,7 @@
     "circuit": "module main(out a[2](10), out b(1)) a[1].4 <=> b"
   },
   "bitRangeOfOneDimensionOfLhs": {
-    "circuit": "module main(out a[2](10), out b(3)) a[1].2:5 <=> b"
+    "circuit": "module main(out a[2](10), out b(3)) a[1].2:4 <=> b"
   },
   "nestedDimensionOfLhs": {
     "circuit": "module main(out a[2][4][8](10), out b(10)) a[1][3][7] <=> b"
@@ -25,14 +25,14 @@
     "circuit": "module main(out a[2][4][8](10), out b(1)) a[1][3][7].8 <=> b"
   },
   "bitRangeOfNestedDimensionOfLhs": {
-    "circuit": "module main(out a[2][4][8](10), out b(3)) a[1][3][7].2:5 <=> b"
+    "circuit": "module main(out a[2][4][8](10), out b(3)) a[1][3][7].2:4 <=> b"
   },
 
   "oneBitOfRhs": {
     "circuit": "module main(out a(10), out b(1)) b <=> a.0"
   },
   "bitRangeOfRhs": {
-    "circuit": "module main(out a(10), out b(3)) b <=> a.2:5"
+    "circuit": "module main(out a(10), out b(3)) b <=> a.2:4"
   },
   "oneDimensionOfRhs": {
     "circuit": "module main(out a[2](10), out b(10)) b <=> a[1]"
@@ -41,7 +41,7 @@
     "circuit": "module main(out a[2](10), out b(1)) b <=> a[1].4"
   },
   "bitRangeOfOneDimensionOfRhs": {
-    "circuit": "module main(out a[2](10), out b(3)) b <=> a[1].2:5"
+    "circuit": "module main(out a[2](10), out b(3)) b <=> a[1].2:4"
   },
   "nestedDimensionOfRhs": {
     "circuit": "module main(out a[2][4][8](10), out b(10)) b <=> a[1][3][7]"
@@ -50,10 +50,10 @@
     "circuit": "module main(out a[2][4][8](10), out b(1)) b <=> a[1][3][7].8"
   },
   "bitRangeOfNestedDimensionOfRhs": {
-    "circuit": "module main(out a[2][4][8](10), out b(3)) b <=> a[1][3][7].2:5"
+    "circuit": "module main(out a[2][4][8](10), out b(3)) b <=> a[1][3][7].2:4"
   },
 
   "lhsAndRhsWithSameDimensions": {
-    "circuit": "module main(out a[2][3][5](10), in b[2][3][5](10)) a <=> b"
+    "circuit": "module main(out a[2][3][5](10), out b[2][3][5](10)) a <=> b"
   }
 }
