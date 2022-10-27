@@ -13,7 +13,7 @@ using json = nlohmann::json;
 
 class SyrecParserErrorCasesFixture: public ::testing::TestWithParam<std::pair<std::string, std::string>> {
 private:
-    const std::string expectedErrorMessageFormat   = "-- line %d col %d: %ls\n";
+    const std::string expectedErrorMessageFormat   = "-- line {0:d} col {1:d}: {2:s}\n";
     const std::string relativePathToTestCaseFile   = "./unittests/syrecParserComponentsTests/testdata/parsing/error/";
     const std::string cJsonErrorLineJsonKey        = "line";
     const std::string cJsonErrorColumnJsonKey      = "column";
@@ -86,10 +86,11 @@ protected:
         size_t                   previousErrorEndPosition = 0;
         size_t                   currErrorEndPosition     = rawActualErrors.find_first_of('\n', previousErrorEndPosition);
 
-        while (std::string::npos != previousErrorEndPosition) {
+        while (std::string::npos != currErrorEndPosition) {
             // TODO: Index check
-            actualErrors.emplace_back(rawActualErrors.substr(previousErrorEndPosition + 1, (currErrorEndPosition - previousErrorEndPosition - 1)));
-            previousErrorEndPosition = currErrorEndPosition;
+            actualErrors.emplace_back(rawActualErrors.substr(previousErrorEndPosition, (currErrorEndPosition - previousErrorEndPosition)));
+            previousErrorEndPosition = currErrorEndPosition + 1;
+            currErrorEndPosition     = rawActualErrors.find_first_of('\n', previousErrorEndPosition);
         }
         return actualErrors;
     }
@@ -176,6 +177,9 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_forStatement", "invalidStepsizeIdent"),
                              std::make_pair("production_forStatement", "missingStepsizeIdent"),
                              std::make_pair("production_forStatement", "invalidNegativeStepsizeIdent"),
+                             std::make_pair("production_forStatement", "startValueLargerThanEndWithPositiveStepsize"),
+                             std::make_pair("production_forStatement", "startValueSmallerThanEndWithNegativeStepsize"),
+                             std::make_pair("production_forStatement", "negativeStepSizeWithOnlyEndValueDefined"),
                              std::make_pair("production_forStatement", "missingLoopHeaderPostfixIdent"),
                              std::make_pair("production_forStatement", "invalidLoopHeaderPostfixIdent"),
                              std::make_pair("production_forStatement", "invalidRofEndDelimiter"),
@@ -219,6 +223,12 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_assignStatement", "missingAssignmentOperatorPostfix"),
                              std::make_pair("production_assignStatement", "invalidAssignmentOperatorPostfix"),
                              std::make_pair("production_assignStatement", "invalidAssignmentVariableIsUsedInRhs"),
+
+                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithTooLargeBitRange"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalWithLessDimension"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalWithTooManyDimension"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalWithMissmatchForDimensionValue"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalWithLargerSignalwidth"),
 
                              /* Do all of these cases need to be checked ? */
                              std::make_pair("production_assignStatement", "invalidAssignmentToInParameterBit"),
@@ -295,6 +305,9 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_binaryExpression", "invalidOpeningBracket"),
                              std::make_pair("production_binaryExpression", "missingClosingBracket"),
                              std::make_pair("production_binaryExpression", "invalidClosingBracket"),
+                             std::make_pair("production_binaryExpression", "operandsStructureMissmatchValueForDimensionMissmatch"),
+                             std::make_pair("production_binaryExpression", "operandsStructureMissmatchTooManyDimensions"),
+                             std::make_pair("production_binaryExpression", "operandsStructureMissmatchTooFewDimensions"),
 
                              /* UnaryExpression production */
                              std::make_pair("production_unaryExpression", "invalidUnaryOperation"),

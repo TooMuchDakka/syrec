@@ -6,7 +6,7 @@
 #include "sstream"
 
 #include "core/syrec/module.hpp"
-#include "infix_iterator.hpp"
+#include "core/syrec/parser/infix_iterator.hpp"
 
 namespace syrecAstDumpUtils {
     template<class T>
