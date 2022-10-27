@@ -23,23 +23,11 @@
 #include "core/syrec/parser/text_utils.hpp"
 
 
+#include "fmt/format.h"
 #include "core/syrec/parser/Scanner.h"
 
 namespace parser {
 
-
-class Errors {
-public:
-	int count;			// number of errors detected
-
-	Errors();
-	void SynErr(int line, int col, int n);
-	void Error(int line, int col, const wchar_t *s);
-	void Warning(int line, int col, const wchar_t *s);
-	void Warning(const wchar_t *s);
-	void Exception(const wchar_t *s);
-
-}; // Errors
 
 class Parser {
 private:
@@ -54,6 +42,8 @@ private:
 	int errDist;
 	int minErrDist;
 
+	const std::string_view errorMsgFormat = "-- line {0:d} col {1:d}: {2:s}\n";
+
 	void SynErr(int n);
 	void Get();
 	void Expect(int n);
@@ -61,9 +51,19 @@ private:
 	void ExpectWeak(int n, int follow);
 	bool WeakSeparator(int n, int syFol, int repFol);
 
+	void SynErr(int line, int col, int n);
+	void Error(int line, int col, const std::string& errMsg);
+	void Warning(int line, int col, const std::string& wrnMsg);
+	void Warning(const std::string& wrnMsg);
+	void Exception(const std::string& exceptionMsg);
+
+
 public:
+	std::vector<std::string> errors;
+	std::vector<std::string> warnings;
+
 	Scanner *scanner;
-	Errors  *errors;
+	//Errors  *errors;
 
 	Token *t;			// last recognized token
 	Token *la;			// lookahead token
@@ -219,14 +219,10 @@ syrec::Module::vec modules;
 		return mapping_result;
 	}
 
-	[[nodiscard]] const wchar_t* convertErrorMsgToRequiredFormat(const std::string& errorMsg) {
-		return (new std::wstring(errorMsg.begin(), errorMsg.end()))->c_str();
-	}
-
 	bool checkIdentWasDeclaredOrLogError(const std::string_view& ident) {
 		if (!currSymTabScope->contains(ident)) {
 			// TODO: GEN_ERROR
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(UndeclaredIdent, ident)));
+			SemErr(fmt::format(UndeclaredIdent, ident));
 			return false;
 		}
 		return true;
@@ -234,7 +230,7 @@ syrec::Module::vec modules;
 
 	bool isIdentAssignableOtherwiseLogError(const syrec::VariableAccess::ptr& assignedToVariable) {
 		if (syrec::Variable::Types::In == assignedToVariable->getVar()->type){
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name)));
+			SemErr(fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name));
 			return false;
 		}
 		return true;
@@ -243,7 +239,7 @@ syrec::Module::vec modules;
 	[[nodiscard]] std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
 		if (operation == syrec_operation::operation::division && rightOperand == 0) {
 			// TODO: GEN_ERROR
-			SemErr(convertErrorMsgToRequiredFormat(DivisionByZero));
+			SemErr(DivisionByZero);
 			return std::nullopt;	
 		}
 		else {
@@ -256,7 +252,7 @@ syrec::Module::vec modules;
 			const std::string& loopVariableIdentToResolve = numberContainer->variableName();
 			if (loopVariableMappingLookup.find(loopVariableIdentToResolve) == loopVariableMappingLookup.end()) {
 				// TODO: GEN_ERROR
-				SemErr(convertErrorMsgToRequiredFormat(fmt::format(NoMappingForLoopVariable, loopVariableIdentToResolve)));
+				SemErr(fmt::format(NoMappingForLoopVariable, loopVariableIdentToResolve));
 				return std::nullopt;
 			}
 		}
@@ -277,7 +273,10 @@ syrec::Module::vec modules;
 
 	Parser(Scanner *scanner);
 	~Parser();
-	void SemErr(const wchar_t* msg);
+
+	void SemErr(const std::string& msg);
+
+	//void SemErr(const wchar_t* msg);
 
 	void Number(std::optional<syrec::Number::ptr> &parsedNumber, const bool simplifyIfPossible );
 	void SyReC();

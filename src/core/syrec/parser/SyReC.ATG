@@ -180,14 +180,10 @@ COMPILER SyReC
 		return mapping_result;
 	}
 
-	[[nodiscard]] const wchar_t* convertErrorMsgToRequiredFormat(const std::string& errorMsg) {
-		return std::wstring(errorMsg.begin(), errorMsg.end()).c_str();
-	}
-
 	bool checkIdentWasDeclaredOrLogError(const std::string_view& ident) {
 		if (!currSymTabScope->contains(ident)) {
 			// TODO: GEN_ERROR
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(UndeclaredIdent, ident)));
+			SemErr(fmt::format(UndeclaredIdent, ident));
 			return false;
 		}
 		return true;
@@ -195,7 +191,7 @@ COMPILER SyReC
 
 	bool isIdentAssignableOtherwiseLogError(const syrec::VariableAccess::ptr& assignedToVariable) {
 		if (syrec::Variable::Types::In == assignedToVariable->getVar()->type){
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name)));
+			SemErr(fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name));
 			return false;
 		}
 		return true;
@@ -204,7 +200,7 @@ COMPILER SyReC
 	[[nodiscard]] std::optional<unsigned int> applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
 		if (operation == syrec_operation::operation::division && rightOperand == 0) {
 			// TODO: GEN_ERROR
-			SemErr(convertErrorMsgToRequiredFormat(DivisionByZero));
+			SemErr(DivisionByZero);
 			return std::nullopt;	
 		}
 		else {
@@ -217,7 +213,7 @@ COMPILER SyReC
 			const std::string& loopVariableIdentToResolve = numberContainer->variableName();
 			if (loopVariableMappingLookup.find(loopVariableIdentToResolve) == loopVariableMappingLookup.end()) {
 				// TODO: GEN_ERROR
-				SemErr(convertErrorMsgToRequiredFormat(fmt::format(NoMappingForLoopVariable, loopVariableIdentToResolve)));
+				SemErr(fmt::format(NoMappingForLoopVariable, loopVariableIdentToResolve));
 				return std::nullopt;
 			}
 		}
@@ -314,7 +310,7 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 		) 
 		Number<rhsOperand, simplifyIfPossible>								(.	if (!op.has_value()) {
 																					// TODO: GEN_ERROR Expected one of n operand but not of them was specified
-																					SemErr(convertErrorMsgToRequiredFormat(InvalidOrMissingNumberExpressionOperation));
+																					SemErr(InvalidOrMissingNumberExpressionOperation);
 																					return;
 																				}
 
@@ -357,7 +353,7 @@ Module<module>								(.	if (module.has_value()) {
 												if (currSymTabScope->contains(userDefinedModule)){
 													// TODO: GEN_ERROR 
 													// TODO: Do not cancel parsing	
-													SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateModuleIdentDeclaration, userDefinedModule->name)));
+													SemErr(fmt::format(DuplicateModuleIdentDeclaration, userDefinedModule->name));
 												}
 												else {
 													currSymTabScope->addEntry(userDefinedModule);
@@ -432,7 +428,7 @@ Parameter<. std::optional<syrec::Variable::ptr> &parameter .>						(.	std::optio
 	| "inout"																		(.	parameterType.emplace(syrec::Variable::Inout);	.)	
 )																					(.	if (!parameterType.has_value())
 																							// TODO: GEN_ERROR
-																							SemErr(convertErrorMsgToRequiredFormat(InvalidParameterType));
+																							SemErr(InvalidParameterType);
 																					.)
 SignalDeclaration<parameterType, parameter>									
 .
@@ -449,7 +445,7 @@ SignalList <. const syrec::Module::ptr& module, bool &isValidModuleDefinition .>
 	"wire"																				(.	signalType.emplace(syrec::Variable::Wire);		.)
 	| "state"																			(.	signalType.emplace(syrec::Variable::State);		.)
 )																						(.	if (!signalType.has_value())
-																								SemErr(convertErrorMsgToRequiredFormat(InvalidLocalType));
+																								SemErr(InvalidLocalType);
 																						.)
 SignalDeclaration<signalType, declaredSignal>											(.	isValidModuleDefinition &= declaredSignal.has_value();
 																							if (isValidModuleDefinition)
@@ -475,7 +471,7 @@ SignalDeclaration<. const std::optional<syrec::Variable::Types> variableType, st
 ident																																	(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
 																																			if (currSymTabScope->contains(signalIdent)) {
 																																				isValidSignalDeclaration = false;
-																																				SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateDeclarationOfIdent, signalIdent)));
+																																				SemErr(fmt::format(DuplicateDeclarationOfIdent, signalIdent));
 																																			}
 																																		.)
 {"[" 
@@ -561,14 +557,14 @@ CallStatement<. std::optional<syrec::Statement::ptr> &statement .>					(.	std::o
 	"call"																			(.	isCallStatement.emplace(true);
 																						if (!callStack.empty()){
 																							// TODO: GEN_ERROR
-																							SemErr(convertErrorMsgToRequiredFormat(PreviousCallWasNotUncalled));
+																							SemErr(PreviousCallWasNotUncalled);
 																							isValidCallOperation = false;
 																						}
 																					.)
 	| "uncall"																		(.	isCallStatement.emplace(false); 
 																						if (callStack.empty()) {
 																							// TODO: GEN_ERROR
-																							SemErr(convertErrorMsgToRequiredFormat(UncallWithoutPreviousCall));
+																							SemErr(UncallWithoutPreviousCall);
 																							isValidCallOperation = false;
 																						}
 																					.)
@@ -576,7 +572,7 @@ CallStatement<. std::optional<syrec::Statement::ptr> &statement .>					(.	std::o
 ident																				(.	std::string methodIdent = convert_to_uniform_text_format(t->val);
 																						const MethodCallGuess::ptr guessesForPossibleCall = std::make_shared<MethodCallGuess>(MethodCallGuess(currSymTabScope, methodIdent));
 																						if (!guessesForPossibleCall->hasSomeMatches()) {
-																							SemErr(convertErrorMsgToRequiredFormat(fmt::format(UndeclaredIdent, methodIdent)));
+																							SemErr(fmt::format(UndeclaredIdent, methodIdent));
 																							isValidCallOperation = false;
 																						}
 																						// After the method ident is declared after the uncall is defined, check that method ident matches the one of the previous call statement
@@ -584,7 +580,7 @@ ident																				(.	std::string methodIdent = convert_to_uniform_text_fo
 																							const std::string_view previouslyCalledMethodIdent = callStack.top().first;
 																							if (previouslyCalledMethodIdent != methodIdent){
 																								// TODO: GEN_ERROR
-																								SemErr(convertErrorMsgToRequiredFormat(fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, previouslyCalledMethodIdent, methodIdent)));
+																								SemErr(fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, previouslyCalledMethodIdent, methodIdent));
 																								isValidCallOperation = false;
 																							}
 																						}
@@ -633,7 +629,7 @@ ident																				(.	std::string methodIdent = convert_to_uniform_text_fo
 																						if (!guessesForPossibleCall->hasSomeMatches()) {
 																							// TODO: GEN_ERROR Not enough parameters defined
 																							// TODO: Provide number of expected formal parameters
-																							SemErr(convertErrorMsgToRequiredFormat(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size())));
+																							SemErr(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size()));
 																							return;		
 																						}
 																						
@@ -641,7 +637,7 @@ ident																				(.	std::string methodIdent = convert_to_uniform_text_fo
 																						if (!guessesForPossibleCall->hasSomeMatches()) {
 																							// TODO: GEN_ERROR All of the declared methods that matched had more than n parameters
 																							// TODO: Provide number of expected formal parameters
-																							SemErr(convertErrorMsgToRequiredFormat(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size())));
+																							SemErr(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size()));
 																							return;
 																						}
 
@@ -658,7 +654,7 @@ ident																				(.	std::string methodIdent = convert_to_uniform_text_fo
 																								calleeArguments.cend(),
 																								callStack.top().second.cbegin()
 																							)){
-																								SemErr(convertErrorMsgToRequiredFormat(fmt::format(CallAndUncallArgumentsMissmatch, methodIdent)));
+																								SemErr(fmt::format(CallAndUncallArgumentsMissmatch, methodIdent));
 																								return;
 																							}
 																						}
@@ -704,7 +700,7 @@ ForStatement<. std::optional<syrec::Statement::ptr> &statement .>						(.	std::o
 																								currSymTabScope->addEntry(loopVariableEntry);
 																							}
 																							else {
-																								SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateDeclarationOfIdent, loopVarIdent)));
+																								SemErr(fmt::format(DuplicateDeclarationOfIdent, loopVarIdent));
 																							}
 																						.)
 			"="
@@ -825,7 +821,7 @@ UnaryStatement<. std::optional<syrec::Statement::ptr> &statement .>		(.	SignalEv
 																			if (!unaryOperation.has_value()){
 																				allSemanticChecksOk = false;
 																				// TODO: GEN_ERROR Expected a valid unary operand
-																				SemErr(convertErrorMsgToRequiredFormat(InvalidUnaryOperation));
+																				SemErr(InvalidUnaryOperation);
 																			}
 																			if (unaryStmtOperand.isValid() && !unaryStmtOperand.isVariableAccess()) {
 																				allSemanticChecksOk = false;
@@ -878,7 +874,7 @@ Signal<assignStmtLhs, false>											(.		allSemanticChecksOk = assignStmtLhs.i
 	| "-"																(.		assignOperation.emplace(syrec_operation::operation::minus_assign);	.)
 )																		(.		if (!assignOperation.has_value()){
 																					// TODO: GEN_ERROR Expected a valid unary operand
-																					SemErr(convertErrorMsgToRequiredFormat(InvalidBinaryOperation));
+																					SemErr(InvalidBinaryOperation);
 																				}
 																		.)
 "=" Expression<assignStmtRhs, expressionBitwidth, false>				(.		if (!allSemanticChecksOk || !assignOperation.has_value() || !assignStmtRhs->hasValue()) {
@@ -928,7 +924,7 @@ Signal<swapOther, false>											(.	if (swapOther.isValid() && !swapOther.isVa
 
 																		if (lhsNumAccessedDimensions != rhsNumAccessedDimensions) {
 																			// TODO: GEN_ERROR: lhs had x dimensions while rhs had y
-																			SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAccessedDimensions, rhsNumAccessedDimensions)));
+																			SemErr(fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAccessedDimensions, rhsNumAccessedDimensions));
 																			allSemanticChecksOk = false;
 																		}
 																		else if (lhsOperand->indexes.empty() && rhsOperand->indexes.empty()) {
@@ -942,7 +938,7 @@ Signal<swapOther, false>											(.	if (swapOther.isValid() && !swapOther.isVa
 																				continueCheck = lhsVariableDimensions.at(dimensionIdx) == rhsVariableDimensions.at(dimensionIdx);
 																				if (!continueCheck) {
 																					// TODO: GEN_ERROR: Missmatch at dimension i 
-																					SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsVariableDimensions.at(dimensionIdx), rhsVariableDimensions.at(dimensionIdx))));
+																					SemErr(fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsVariableDimensions.at(dimensionIdx), rhsVariableDimensions.at(dimensionIdx)));
 																					allSemanticChecksOk = false;
 																				}
 																			}
@@ -965,7 +961,7 @@ Signal<swapOther, false>											(.	if (swapOther.isValid() && !swapOther.isVa
 
 																			if (lhsBitwidth != rhsBitwidth) {
 																				// TODO: GEN_ERROR bitwidth does not match
-																				SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapSignalWidthMissmatch, lhsBitwidth, rhsBitwidth)));
+																				SemErr(fmt::format(InvalidSwapSignalWidthMissmatch, lhsBitwidth, rhsBitwidth));
 																			}
 																			else {
 																				statement.emplace(std::make_shared<syrec::SwapStatement>(syrec::SwapStatement(swapMe.getAsVariableAccess().value(),
@@ -1025,7 +1021,7 @@ Signal<SignalEvaluationResult &signalAccess, const bool simplifyIfPossible>			(.
 																						if (accessedDimensionIdx >= accessedSignal.value()->getVar()->dimensions.size()) {
 																							indexExpressionSemanticallyOk = false;	
 																							// TODO: GEN_ERROR: Too many dimensions defined
-																							SemErr(convertErrorMsgToRequiredFormat(fmt::format(DimensionOutOfRange, accessedDimensionIdx, signalIdent, numDimensionsOfAccessedSignal)));
+																							SemErr(fmt::format(DimensionOutOfRange, accessedDimensionIdx, signalIdent, numDimensionsOfAccessedSignal));
 																						}
 
 																						if (indexExpressionSemanticallyOk) {
@@ -1039,7 +1035,7 @@ Signal<SignalEvaluationResult &signalAccess, const bool simplifyIfPossible>			(.
 																									const IndexAccessRangeConstraint constraintForCurrentDimension = getConstraintsForValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, true).value();
 																									
 																									// TODO: GEN_ERROR: Index out of range for dimension i
-																									SemErr(convertErrorMsgToRequiredFormat(fmt::format(DimensionValueOutOfRange, constantValueForAccessedDimension.value(), accessedDimensionIdx, signalIdent, constraintForCurrentDimension.minimumValidValue, constraintForCurrentDimension.maximumValidValue)));
+																									SemErr(fmt::format(DimensionValueOutOfRange, constantValueForAccessedDimension.value(), accessedDimensionIdx, signalIdent, constraintForCurrentDimension.minimumValidValue, constraintForCurrentDimension.maximumValidValue));
 																								}
 																							}
 
@@ -1069,7 +1065,7 @@ Signal<SignalEvaluationResult &signalAccess, const bool simplifyIfPossible>			(.
 
 																								if (bitRangeEvaluated.first > bitRangeEvaluated.second) {
 																									// TODO: GEN_ERROR: Bit range start larger than end
-																									SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitRangeStartLargerThanEnd, bitRangeEvaluated.first, bitRangeEvaluated.second)));
+																									SemErr(fmt::format(BitRangeStartLargerThanEnd, bitRangeEvaluated.first, bitRangeEvaluated.second));
 																								}
 																								// TODO: Using global zero_based indexing flag
 																								else if (!isValidBitRangeAccess(accessedVariable, bitRangeEvaluated, true)){
@@ -1077,7 +1073,7 @@ Signal<SignalEvaluationResult &signalAccess, const bool simplifyIfPossible>			(.
 																									
 																									const IndexAccessRangeConstraint constraintsForBitRangeAccess = getConstraintsForValidBitAccess(accessedSignal.value()->getVar(), true);
 																									// TODO: GEN_ERROR: Bit range out of range
-																									SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitRangeOutOfRange, bitRangeEvaluated.first, bitRangeEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue)));
+																									SemErr(fmt::format(BitRangeOutOfRange, bitRangeEvaluated.first, bitRangeEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue));
 																								}
 																							}
 																							else {
@@ -1087,7 +1083,7 @@ Signal<SignalEvaluationResult &signalAccess, const bool simplifyIfPossible>			(.
 
 																									const IndexAccessRangeConstraint constraintsForBitAccess = getConstraintsForValidBitAccess(accessedSignal.value()->getVar(), true);
 																									// TODO: GEN_ERROR: Bit access out of range
-																									SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitAccessOutOfRange, bitRangeEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue)));
+																									SemErr(fmt::format(BitAccessOutOfRange, bitRangeEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue));
 																								}
 																							}
 

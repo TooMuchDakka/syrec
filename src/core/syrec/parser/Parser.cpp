@@ -9,12 +9,12 @@ namespace parser {
 
 
 void Parser::SynErr(int n) {
-	if (errDist >= minErrDist) errors->SynErr(la->line, la->col, n);
+	if (errDist >= minErrDist) SynErr(la->line, la->col, n);
 	errDist = 0;
 }
 
-void Parser::SemErr(const wchar_t* msg) {
-	if (errDist >= minErrDist) errors->Error(t->line, t->col, msg);
+void Parser::SemErr(const std::string& msg) {
+	if (errDist >= minErrDist) Error(t->line, t->col, msg);
 	errDist = 0;
 }
 
@@ -127,7 +127,7 @@ void Parser::Number(std::optional<syrec::Number::ptr> &parsedNumber, const bool 
 			Number(rhsOperand, simplifyIfPossible);
 			if (!op.has_value()) {
 			// TODO: GEN_ERROR Expected one of n operand but not of them was specified
-			SemErr(convertErrorMsgToRequiredFormat(InvalidOrMissingNumberExpressionOperation));
+			SemErr(InvalidOrMissingNumberExpressionOperation);
 			return;
 			}
 			
@@ -169,7 +169,7 @@ void Parser::SyReC() {
 			if (currSymTabScope->contains(userDefinedModule)){
 			// TODO: GEN_ERROR 
 			// TODO: Do not cancel parsing	
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateModuleIdentDeclaration, userDefinedModule->name)));
+			SemErr(fmt::format(DuplicateModuleIdentDeclaration, userDefinedModule->name));
 			}
 			else {
 			currSymTabScope->addEntry(userDefinedModule);
@@ -245,7 +245,7 @@ void Parser::SignalList(const syrec::Module::ptr& module, bool &isValidModuleDef
 			signalType.emplace(syrec::Variable::State);		
 		} else SynErr(58);
 		if (!signalType.has_value())
-		SemErr(convertErrorMsgToRequiredFormat(InvalidLocalType));
+		SemErr(InvalidLocalType);
 		
 		SignalDeclaration(signalType, declaredSignal);
 		isValidModuleDefinition &= declaredSignal.has_value();
@@ -295,7 +295,7 @@ void Parser::Parameter(std::optional<syrec::Variable::ptr> &parameter ) {
 		} else SynErr(59);
 		if (!parameterType.has_value())
 		// TODO: GEN_ERROR
-		SemErr(convertErrorMsgToRequiredFormat(InvalidParameterType));
+		SemErr(InvalidParameterType);
 		
 		SignalDeclaration(parameterType, parameter);
 }
@@ -309,7 +309,7 @@ void Parser::SignalDeclaration(const std::optional<syrec::Variable::Types> varia
 		const std::string signalIdent = convert_to_uniform_text_format(t->val);
 		if (currSymTabScope->contains(signalIdent)) {
 		isValidSignalDeclaration = false;
-		SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateDeclarationOfIdent, signalIdent)));
+		SemErr(fmt::format(DuplicateDeclarationOfIdent, signalIdent));
 		}
 		
 		while (la->kind == 18 /* "[" */) {
@@ -375,7 +375,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 			isCallStatement.emplace(true);
 			if (!callStack.empty()){
 			// TODO: GEN_ERROR
-			SemErr(convertErrorMsgToRequiredFormat(PreviousCallWasNotUncalled));
+			SemErr(PreviousCallWasNotUncalled);
 			isValidCallOperation = false;
 			}
 			
@@ -384,7 +384,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 			isCallStatement.emplace(false); 
 			if (callStack.empty()) {
 			// TODO: GEN_ERROR
-			SemErr(convertErrorMsgToRequiredFormat(UncallWithoutPreviousCall));
+			SemErr(UncallWithoutPreviousCall);
 			isValidCallOperation = false;
 			}
 			
@@ -394,7 +394,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		std::string methodIdent = convert_to_uniform_text_format(t->val);
 		const MethodCallGuess::ptr guessesForPossibleCall = std::make_shared<MethodCallGuess>(MethodCallGuess(currSymTabScope, methodIdent));
 		if (!guessesForPossibleCall->hasSomeMatches()) {
-		SemErr(convertErrorMsgToRequiredFormat(fmt::format(UndeclaredIdent, methodIdent)));
+		SemErr(fmt::format(UndeclaredIdent, methodIdent));
 		isValidCallOperation = false;
 		}
 		// After the method ident is declared after the uncall is defined, check that method ident matches the one of the previous call statement
@@ -402,7 +402,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		const std::string_view previouslyCalledMethodIdent = callStack.top().first;
 		if (previouslyCalledMethodIdent != methodIdent){
 		// TODO: GEN_ERROR
-		SemErr(convertErrorMsgToRequiredFormat(fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, previouslyCalledMethodIdent, methodIdent)));
+		SemErr(fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, previouslyCalledMethodIdent, methodIdent));
 		isValidCallOperation = false;
 		}
 		}
@@ -455,7 +455,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		if (!guessesForPossibleCall->hasSomeMatches()) {
 		// TODO: GEN_ERROR Not enough parameters defined
 		// TODO: Provide number of expected formal parameters
-		SemErr(convertErrorMsgToRequiredFormat(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size())));
+		SemErr(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size()));
 		return;		
 		}
 		
@@ -463,7 +463,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		if (!guessesForPossibleCall->hasSomeMatches()) {
 		// TODO: GEN_ERROR All of the declared methods that matched had more than n parameters
 		// TODO: Provide number of expected formal parameters
-		SemErr(convertErrorMsgToRequiredFormat(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size())));
+		SemErr(fmt::format(NumberOfFormalParametersDoesNotMatchActual, methodIdent, 0, calleeArguments.size()));
 		return;
 		}
 		
@@ -480,7 +480,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		calleeArguments.cend(),
 		callStack.top().second.cbegin()
 		)){
-		SemErr(convertErrorMsgToRequiredFormat(fmt::format(CallAndUncallArgumentsMissmatch, methodIdent)));
+		SemErr(fmt::format(CallAndUncallArgumentsMissmatch, methodIdent));
 		return;
 		}
 		}
@@ -520,7 +520,7 @@ void Parser::ForStatement(std::optional<syrec::Statement::ptr> &statement ) {
 				currSymTabScope->addEntry(loopVariableEntry);
 				}
 				else {
-				SemErr(convertErrorMsgToRequiredFormat(fmt::format(DuplicateDeclarationOfIdent, loopVarIdent)));
+				SemErr(fmt::format(DuplicateDeclarationOfIdent, loopVarIdent));
 				}
 				
 				Expect(24 /* "=" */);
@@ -648,11 +648,11 @@ void Parser::UnaryStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		} else SynErr(62);
 		Expect(24 /* "=" */);
 		Signal(unaryStmtOperand, false);
-        bool allSemanticChecksOk = unaryStmtOperand.isValid();
+		bool allSemanticChecksOk = unaryStmtOperand.isValid();
 		if (!unaryOperation.has_value()){
 		allSemanticChecksOk = false;
 		// TODO: GEN_ERROR Expected a valid unary operand
-		SemErr(convertErrorMsgToRequiredFormat(InvalidUnaryOperation));
+		SemErr(InvalidUnaryOperation);
 		}
 		if (unaryStmtOperand.isValid() && !unaryStmtOperand.isVariableAccess()) {
 		allSemanticChecksOk = false;
@@ -712,7 +712,7 @@ void Parser::AssignStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		} else SynErr(63);
 		if (!assignOperation.has_value()){
 		// TODO: GEN_ERROR Expected a valid unary operand
-		SemErr(convertErrorMsgToRequiredFormat(InvalidBinaryOperation));
+		SemErr(InvalidBinaryOperation);
 		}
 		
 		Expect(24 /* "=" */);
@@ -763,7 +763,7 @@ void Parser::SwapStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		
 		if (lhsNumAccessedDimensions != rhsNumAccessedDimensions) {
 		// TODO: GEN_ERROR: lhs had x dimensions while rhs had y
-		SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAccessedDimensions, rhsNumAccessedDimensions)));
+		SemErr(fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAccessedDimensions, rhsNumAccessedDimensions));
 		allSemanticChecksOk = false;
 		}
 		else if (lhsOperand->indexes.empty() && rhsOperand->indexes.empty()) {
@@ -777,7 +777,7 @@ void Parser::SwapStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		continueCheck = lhsVariableDimensions.at(dimensionIdx) == rhsVariableDimensions.at(dimensionIdx);
 		if (!continueCheck) {
 		// TODO: GEN_ERROR: Missmatch at dimension i 
-		SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsVariableDimensions.at(dimensionIdx), rhsVariableDimensions.at(dimensionIdx))));
+		SemErr(fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsVariableDimensions.at(dimensionIdx), rhsVariableDimensions.at(dimensionIdx)));
 		allSemanticChecksOk = false;
 		}
 		}
@@ -800,7 +800,7 @@ void Parser::SwapStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		
 		if (lhsBitwidth != rhsBitwidth) {
 		// TODO: GEN_ERROR bitwidth does not match
-		SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapSignalWidthMissmatch, lhsBitwidth, rhsBitwidth)));
+		SemErr(fmt::format(InvalidSwapSignalWidthMissmatch, lhsBitwidth, rhsBitwidth));
 		}
 		else {
 		statement.emplace(std::make_shared<syrec::SwapStatement>(syrec::SwapStatement(swapMe.getAsVariableAccess().value(),
@@ -884,7 +884,7 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 			if (accessedDimensionIdx >= accessedSignal.value()->getVar()->dimensions.size()) {
 			indexExpressionSemanticallyOk = false;	
 			// TODO: GEN_ERROR: Too many dimensions defined
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(DimensionOutOfRange, accessedDimensionIdx, signalIdent, numDimensionsOfAccessedSignal)));
+			SemErr(fmt::format(DimensionOutOfRange, accessedDimensionIdx, signalIdent, numDimensionsOfAccessedSignal));
 			}
 			
 			if (indexExpressionSemanticallyOk) {
@@ -898,7 +898,7 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 			const IndexAccessRangeConstraint constraintForCurrentDimension = getConstraintsForValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, true).value();
 			
 			// TODO: GEN_ERROR: Index out of range for dimension i
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(DimensionValueOutOfRange, constantValueForAccessedDimension.value(), accessedDimensionIdx, signalIdent, constraintForCurrentDimension.minimumValidValue, constraintForCurrentDimension.maximumValidValue)));
+			SemErr(fmt::format(DimensionValueOutOfRange, constantValueForAccessedDimension.value(), accessedDimensionIdx, signalIdent, constraintForCurrentDimension.minimumValidValue, constraintForCurrentDimension.maximumValidValue));
 			}
 			}
 			
@@ -933,7 +933,7 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 			
 			if (bitRangeEvaluated.first > bitRangeEvaluated.second) {
 			// TODO: GEN_ERROR: Bit range start larger than end
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitRangeStartLargerThanEnd, bitRangeEvaluated.first, bitRangeEvaluated.second)));
+			SemErr(fmt::format(BitRangeStartLargerThanEnd, bitRangeEvaluated.first, bitRangeEvaluated.second));
 			}
 			// TODO: Using global zero_based indexing flag
 			else if (!isValidBitRangeAccess(accessedVariable, bitRangeEvaluated, true)){
@@ -941,7 +941,7 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 			
 			const IndexAccessRangeConstraint constraintsForBitRangeAccess = getConstraintsForValidBitAccess(accessedSignal.value()->getVar(), true);
 			// TODO: GEN_ERROR: Bit range out of range
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitRangeOutOfRange, bitRangeEvaluated.first, bitRangeEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue)));
+			SemErr(fmt::format(BitRangeOutOfRange, bitRangeEvaluated.first, bitRangeEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue));
 			}
 			}
 			else {
@@ -951,7 +951,7 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 			
 			const IndexAccessRangeConstraint constraintsForBitAccess = getConstraintsForValidBitAccess(accessedSignal.value()->getVar(), true);
 			// TODO: GEN_ERROR: Bit access out of range
-			SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitAccessOutOfRange, bitRangeEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue)));
+			SemErr(fmt::format(BitAccessOutOfRange, bitRangeEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue));
 			}
 			}
 			
@@ -1267,7 +1267,6 @@ Parser::Parser(Scanner *scanner) {
 	minErrDist = 2;
 	errDist = minErrDist;
 	this->scanner = scanner;
-	errors = new Errors();
 }
 
 bool Parser::StartOf(int s) {
@@ -1286,16 +1285,12 @@ bool Parser::StartOf(int s) {
 
 Parser::~Parser() {
 	ParserDestroyCaller<Parser>::CallDestroy(this);
-	delete errors;
 	delete dummyToken;
 }
 
-Errors::Errors() {
-	count = 0;
-}
-
-void Errors::SynErr(int line, int col, int n) {
+void Parser::SynErr(int line, int col, int n) {
 	wchar_t* s;
+
 	switch (n) {
 			case 0: s = coco_string_create(L"EOF expected"); break;
 			case 1: s = coco_string_create(L"ident expected"); break;
@@ -1372,28 +1367,28 @@ void Errors::SynErr(int line, int col, int n) {
 			coco_swprintf(format, 20, L"error %d", n);
 			s = coco_string_create(format);
 		}
-		break;
 	}
-	wprintf(L"-- line %d col %d: %ls\n", line, col, s);
-	coco_string_delete(s);
-	count++;
+	/* TODO: IMPORTANT
+	 * This is a very dirty hack and should be removed as soon as possible and only works if the wstring contains only ascii characters
+	 *
+	 */
+	const std::wstring test = std::wstring(s);
+	errors.emplace_back(fmt::format(errorMsgFormat, line, col, std::string(test.cbegin(), test.cend())));
 }
 
-void Errors::Error(int line, int col, const wchar_t *s) {
-	wprintf(L"-- line %d col %d: %ls\n", line, col, s);
-	count++;
+void Parser::Error(int line, int col, const std::string& errMsg) {
+	errors.emplace_back(fmt::format(errorMsgFormat, line, col, errMsg));
 }
 
-void Errors::Warning(int line, int col, const wchar_t *s) {
-	wprintf(L"-- line %d col %d: %ls\n", line, col, s);
+void Parser::Warning(int line, int col, const std::string& wrnMsg) {
+	warnings.emplace_back(fmt::format(errorMsgFormat, line, col, wrnMsg));
 }
 
-void Errors::Warning(const wchar_t *s) {
-	wprintf(L"%ls\n", s);
+void Parser::Warning(const std::string& wrnMsg) {
+	warnings.emplace_back(wrnMsg);
 }
 
-void Errors::Exception(const wchar_t* s) {
-	wprintf(L"%ls", s); 
+void Parser::Exception(const std::string& exceptionMsg) {
 	exit(1);
 }
 

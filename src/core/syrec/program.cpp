@@ -1,4 +1,6 @@
 #include "core/syrec/program.hpp"
+
+#include "core/syrec/parser/infix_iterator.hpp"
 #include "core/syrec/parser/Parser.h"
 #include "core/syrec/parser/Scanner.h"
 
@@ -53,10 +55,13 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     parser.setConfig(ParserConfig{});
     parser.Parse();
 
-    if (parser.errors->count == 0) {
+    if (parser.errors.empty()) {
         this->modulesVec = parser.modules;
         return "";
     }
-    return "ERR";
+
+    std::ostringstream errorsConcatinatedBuffer;
+    std::copy(parser.errors.cbegin(), parser.errors.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, "\n"));
+    return errorsConcatinatedBuffer.str();
 }
 
