@@ -648,7 +648,7 @@ void Parser::UnaryStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		} else SynErr(62);
 		Expect(24 /* "=" */);
 		Signal(unaryStmtOperand, false);
-		bool allSemanticChecksOk = true;
+        bool allSemanticChecksOk = unaryStmtOperand.isValid();
 		if (!unaryOperation.has_value()){
 		allSemanticChecksOk = false;
 		// TODO: GEN_ERROR Expected a valid unary operand
@@ -753,7 +753,7 @@ void Parser::SwapStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		allSemanticChecksOk &= isIdentAssignableOtherwiseLogError(swapOther.getAsVariableAccess().value());
 		
 		if (!isSwapOperatorDefined || !allSemanticChecksOk)
-		    return;
+		return;
 		
 		const syrec::VariableAccess::ptr lhsOperand = swapMe.getAsVariableAccess().value();
 		const syrec::VariableAccess::ptr rhsOperand = swapOther.getAsVariableAccess().value();
@@ -779,7 +779,7 @@ void Parser::SwapStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		// TODO: GEN_ERROR: Missmatch at dimension i 
 		SemErr(convertErrorMsgToRequiredFormat(fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsVariableDimensions.at(dimensionIdx), rhsVariableDimensions.at(dimensionIdx))));
 		allSemanticChecksOk = false;
-		    }
+		}
 		}
 		}
 		
@@ -789,6 +789,7 @@ void Parser::SwapStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		size_t rhsBitwidth = rhsOperand->getVar()->bitwidth;
 		
 		// TODO: Safe fetch of loop variable mapping, the statement below could potentially throw
+		// TODO: Overflow check
 		if (lhsOperand->range.has_value()) {
 		lhsBitwidth = (lhsOperand->range.value().second->evaluate(loopVariableMappingLookup) - lhsOperand->range.value().first->evaluate(loopVariableMappingLookup)) + 1;
 		}
@@ -848,52 +849,68 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 		std::optional<syrec::VariableAccess::ptr> accessedSignal;
 		const unsigned int defaultIndexExpressionBitwidth = 1u;
 		unsigned int indexExpressionBitwidth = defaultIndexExpressionBitwidth;
+		size_t numDimensionsOfAccessedSignal = SIZE_MAX;
 		
 		// TODO: Using global zero_based indexing flag to initialize default value
 		std::size_t accessedDimensionIdx = 0;
 		
 		Expect(_ident);
 		const std::string signalIdent = convert_to_uniform_text_format(t->val);
-		if (checkIdentWasDeclaredOrLogError(signalIdent)) {
-		const auto symbolTableEntryForSignal = currSymTabScope->getVariable(signalIdent);
-		if (symbolTableEntryForSignal.has_value() && std::holds_alternative<syrec::Variable::ptr>(symbolTableEntryForSignal.value())) {
+		bool isValidSignalAccess = checkIdentWasDeclaredOrLogError(signalIdent);
+		
+		if (isValidSignalAccess){
+		const auto signalSymTabEntry = currSymTabScope->getVariable(signalIdent);
+		isValidSignalAccess = signalSymTabEntry.has_value() && std::holds_alternative<syrec::Variable::ptr>(signalSymTabEntry.value());
+		
+		if (isValidSignalAccess){
 		const syrec::VariableAccess::ptr container = std::make_shared<syrec::VariableAccess>(syrec::VariableAccess());
-		container->setVar(std::get<syrec::Variable::ptr>(symbolTableEntryForSignal.value()));
+		container->setVar(std::get<syrec::Variable::ptr>(signalSymTabEntry.value()));
 		accessedSignal.emplace(container);
-		indexExpressionBitwidth = accessedSignal.value()->bitwidth();
+		indexExpressionBitwidth = container->bitwidth();
+		numDimensionsOfAccessedSignal = container->getVar()->dimensions.size();
 		}
 		}
-		bool isValidSignalAccess = accessedSignal.has_value();
-		bool indexExpressionsSemanticallyOk = isValidSignalAccess;
 		
 		while (la->kind == 18 /* "[" */) {
 			Get();
 			ExpressionEvaluationResult::ptr dimensionExpression = createExpressionEvalutionResultContainer(); 
 			Expression(dimensionExpression, indexExpressionBitwidth, simplifyIfPossible);
-			indexExpressionsSemanticallyOk &= dimensionExpression->hasValue();
+			bool indexExpressionSemanticallyOk = isValidSignalAccess && dimensionExpression->hasValue();
 			
-			if (indexExpressionsSemanticallyOk) {
+			/*
+			*  TODO: This call could result in a false positive in the case no valid signal was defined and
+			*  the number of user defined dimensions if equal to SIZE_MAX
+			*/
+			if (accessedDimensionIdx >= accessedSignal.value()->getVar()->dimensions.size()) {
+			indexExpressionSemanticallyOk = false;	
+			// TODO: GEN_ERROR: Too many dimensions defined
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(DimensionOutOfRange, accessedDimensionIdx, signalIdent, numDimensionsOfAccessedSignal)));
+			}
+			
+			if (indexExpressionSemanticallyOk) {
 			const std::optional<unsigned int> &constantValueForAccessedDimension = dimensionExpression->getAsConstant();
 			if (constantValueForAccessedDimension.has_value()) {
 			// TODO: Using global flag indicating zero_based indexing or not
-			indexExpressionsSemanticallyOk = isValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, constantValueForAccessedDimension.value(), true);
+			indexExpressionSemanticallyOk = isValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, constantValueForAccessedDimension.value(), true);
 			
-			if (!indexExpressionsSemanticallyOk) {
+			if (!indexExpressionSemanticallyOk) {
 			// TODO: Using global flag indicating zero_based indexing or not
 			const IndexAccessRangeConstraint constraintForCurrentDimension = getConstraintsForValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, true).value();
-			// TODO: GEN_ERROR
+			
+			// TODO: GEN_ERROR: Index out of range for dimension i
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(DimensionValueOutOfRange, constantValueForAccessedDimension.value(), accessedDimensionIdx, signalIdent, constraintForCurrentDimension.minimumValidValue, constraintForCurrentDimension.maximumValidValue)));
 			}
 			}
 			
-			if (indexExpressionsSemanticallyOk) {
+			if (indexExpressionSemanticallyOk) {
 			accessedSignal.value()->indexes.emplace_back(dimensionExpression->getOrConvertToExpression(indexExpressionBitwidth).value());
 			}
 			}
+			isValidSignalAccess &= indexExpressionSemanticallyOk;
 			accessedDimensionIdx++;
 			
 			Expect(19 /* "]" */);
 		}
-		isValidSignalAccess = indexExpressionsSemanticallyOk;	
 		if (la->kind == 39 /* "." */) {
 			std::optional<syrec::Number::ptr> bitRangeStart;
 			std::optional<syrec::Number::ptr> bitRangeEnd;
@@ -913,17 +930,28 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 			
 			const syrec::Variable::ptr &accessedVariable = accessedSignal.value()->getVar();
 			if (rangeExplicitlyDefined) {
+			
+			if (bitRangeEvaluated.first > bitRangeEvaluated.second) {
+			// TODO: GEN_ERROR: Bit range start larger than end
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitRangeStartLargerThanEnd, bitRangeEvaluated.first, bitRangeEvaluated.second)));
+			}
 			// TODO: Using global zero_based indexing flag
-			if (!isValidBitRangeAccess(accessedVariable, bitRangeEvaluated, true)){
+			else if (!isValidBitRangeAccess(accessedVariable, bitRangeEvaluated, true)){
 			isValidSignalAccess = false;
-			// TODO: GEN_ERROR
+			
+			const IndexAccessRangeConstraint constraintsForBitRangeAccess = getConstraintsForValidBitAccess(accessedSignal.value()->getVar(), true);
+			// TODO: GEN_ERROR: Bit range out of range
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitRangeOutOfRange, bitRangeEvaluated.first, bitRangeEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue)));
 			}
 			}
 			else {
 			// TODO: Using global zero_based indexing flag	
 			if (!isValidBitAccess(accessedVariable, bitRangeEvaluated.first, true)){
 			isValidSignalAccess = false;
-			// TODO: GEN_ERROR
+			
+			const IndexAccessRangeConstraint constraintsForBitAccess = getConstraintsForValidBitAccess(accessedSignal.value()->getVar(), true);
+			// TODO: GEN_ERROR: Bit access out of range
+			SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitAccessOutOfRange, bitRangeEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue)));
 			}
 			}
 			

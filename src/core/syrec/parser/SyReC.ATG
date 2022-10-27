@@ -8,6 +8,7 @@ https://ssw.jku.at/Research/Projects/Coco/Doc/UserManual.pdf
 /*-- $checkEOF=false --*/
 
 // Place includes here
+#include <cstdint>
 #include <fmt/format.h>
 #include <optional>
 #include <stack>
@@ -820,7 +821,7 @@ UnaryStatement<. std::optional<syrec::Statement::ptr> &statement .>		(.	SignalEv
 	| "++"																(.	unaryOperation.emplace(syrec_operation::operation::increment_assign);	.)
 	| "--"																(.	unaryOperation.emplace(syrec_operation::operation::decrement_assign);	.)
 ) 
-"=" Signal<unaryStmtOperand, false>										(.	bool allSemanticChecksOk = true;
+"=" Signal<unaryStmtOperand, false>										(.	bool allSemanticChecksOk = unaryStmtOperand.isValid();
 																			if (!unaryOperation.has_value()){
 																				allSemanticChecksOk = false;
 																				// TODO: GEN_ERROR Expected a valid unary operand
@@ -992,48 +993,65 @@ Signal production
 Signal<SignalEvaluationResult &signalAccess, const bool simplifyIfPossible>			(.	std::optional<syrec::VariableAccess::ptr> accessedSignal;
 																						const unsigned int defaultIndexExpressionBitwidth = 1u;
 																						unsigned int indexExpressionBitwidth = defaultIndexExpressionBitwidth;
+																						size_t numDimensionsOfAccessedSignal = SIZE_MAX;
 
 																						// TODO: Using global zero_based indexing flag to initialize default value
 																						std::size_t accessedDimensionIdx = 0;
 																					.)
 =
 	ident																			(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
-																						if (checkIdentWasDeclaredOrLogError(signalIdent)) {
-																							const auto symbolTableEntryForSignal = currSymTabScope->getVariable(signalIdent);
-																							if (symbolTableEntryForSignal.has_value() && std::holds_alternative<syrec::Variable::ptr>(symbolTableEntryForSignal.value())) {
+																						bool isValidSignalAccess = checkIdentWasDeclaredOrLogError(signalIdent);
+
+																						if (isValidSignalAccess){
+																							const auto signalSymTabEntry = currSymTabScope->getVariable(signalIdent);
+																							isValidSignalAccess = signalSymTabEntry.has_value() && std::holds_alternative<syrec::Variable::ptr>(signalSymTabEntry.value());
+
+																							if (isValidSignalAccess){
 																								const syrec::VariableAccess::ptr container = std::make_shared<syrec::VariableAccess>(syrec::VariableAccess());
-																								container->setVar(std::get<syrec::Variable::ptr>(symbolTableEntryForSignal.value()));
+																								container->setVar(std::get<syrec::Variable::ptr>(signalSymTabEntry.value()));
 																								accessedSignal.emplace(container);
-																								indexExpressionBitwidth = accessedSignal.value()->bitwidth();
+																								indexExpressionBitwidth = container->bitwidth();
+																								numDimensionsOfAccessedSignal = container->getVar()->dimensions.size();
 																							}
 																						}
-																						bool isValidSignalAccess = accessedSignal.has_value();
-																						bool indexExpressionsSemanticallyOk = isValidSignalAccess;
 																					.)
 {"["																				(.	ExpressionEvaluationResult::ptr dimensionExpression = createExpressionEvalutionResultContainer(); .)
-	Expression<dimensionExpression, indexExpressionBitwidth, simplifyIfPossible>	(.	indexExpressionsSemanticallyOk &= dimensionExpression->hasValue();
+	Expression<dimensionExpression, indexExpressionBitwidth, simplifyIfPossible>	(.	bool indexExpressionSemanticallyOk = isValidSignalAccess && dimensionExpression->hasValue();
 																			
-																						if (indexExpressionsSemanticallyOk) {
+																						/*
+																						 *  TODO: This call could result in a false positive in the case no valid signal was defined and
+																						 *  the number of user defined dimensions if equal to SIZE_MAX
+																						 */
+																						if (accessedDimensionIdx >= accessedSignal.value()->getVar()->dimensions.size()) {
+																							indexExpressionSemanticallyOk = false;	
+																							// TODO: GEN_ERROR: Too many dimensions defined
+																							SemErr(convertErrorMsgToRequiredFormat(fmt::format(DimensionOutOfRange, accessedDimensionIdx, signalIdent, numDimensionsOfAccessedSignal)));
+																						}
+
+																						if (indexExpressionSemanticallyOk) {
 																							const std::optional<unsigned int> &constantValueForAccessedDimension = dimensionExpression->getAsConstant();
 																							if (constantValueForAccessedDimension.has_value()) {
 																								// TODO: Using global flag indicating zero_based indexing or not
-																								indexExpressionsSemanticallyOk = isValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, constantValueForAccessedDimension.value(), true);
+																								indexExpressionSemanticallyOk = isValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, constantValueForAccessedDimension.value(), true);
 
-																								if (!indexExpressionsSemanticallyOk) {
+																								if (!indexExpressionSemanticallyOk) {
 																									// TODO: Using global flag indicating zero_based indexing or not
 																									const IndexAccessRangeConstraint constraintForCurrentDimension = getConstraintsForValidDimensionAccess(accessedSignal.value()->getVar(), accessedDimensionIdx, true).value();
-																									// TODO: GEN_ERROR
+																									
+																									// TODO: GEN_ERROR: Index out of range for dimension i
+																									SemErr(convertErrorMsgToRequiredFormat(fmt::format(DimensionValueOutOfRange, constantValueForAccessedDimension.value(), accessedDimensionIdx, signalIdent, constraintForCurrentDimension.minimumValidValue, constraintForCurrentDimension.maximumValidValue)));
 																								}
 																							}
 
-																							if (indexExpressionsSemanticallyOk) {
+																							if (indexExpressionSemanticallyOk) {
 																								accessedSignal.value()->indexes.emplace_back(dimensionExpression->getOrConvertToExpression(indexExpressionBitwidth).value());
 																							}
 																						}
+																						isValidSignalAccess &= indexExpressionSemanticallyOk;
 																						accessedDimensionIdx++;
 																					.)
 "]"		
-}																					(.	isValidSignalAccess = indexExpressionsSemanticallyOk;	.)
+}																					
 [																					(.	std::optional<syrec::Number::ptr> bitRangeStart;
 																						std::optional<syrec::Number::ptr> bitRangeEnd;
 																						bool rangeExplicitlyDefined = false;
@@ -1048,17 +1066,28 @@ Signal<SignalEvaluationResult &signalAccess, const bool simplifyIfPossible>			(.
 																						
 																							const syrec::Variable::ptr &accessedVariable = accessedSignal.value()->getVar();
 																							if (rangeExplicitlyDefined) {
+
+																								if (bitRangeEvaluated.first > bitRangeEvaluated.second) {
+																									// TODO: GEN_ERROR: Bit range start larger than end
+																									SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitRangeStartLargerThanEnd, bitRangeEvaluated.first, bitRangeEvaluated.second)));
+																								}
 																								// TODO: Using global zero_based indexing flag
-																								if (!isValidBitRangeAccess(accessedVariable, bitRangeEvaluated, true)){
+																								else if (!isValidBitRangeAccess(accessedVariable, bitRangeEvaluated, true)){
 																									isValidSignalAccess = false;
-																									// TODO: GEN_ERROR
+																									
+																									const IndexAccessRangeConstraint constraintsForBitRangeAccess = getConstraintsForValidBitAccess(accessedSignal.value()->getVar(), true);
+																									// TODO: GEN_ERROR: Bit range out of range
+																									SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitRangeOutOfRange, bitRangeEvaluated.first, bitRangeEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue)));
 																								}
 																							}
 																							else {
 																								// TODO: Using global zero_based indexing flag	
 																								if (!isValidBitAccess(accessedVariable, bitRangeEvaluated.first, true)){
 																									isValidSignalAccess = false;
-																									// TODO: GEN_ERROR
+
+																									const IndexAccessRangeConstraint constraintsForBitAccess = getConstraintsForValidBitAccess(accessedSignal.value()->getVar(), true);
+																									// TODO: GEN_ERROR: Bit access out of range
+																									SemErr(convertErrorMsgToRequiredFormat(fmt::format(BitAccessOutOfRange, bitRangeEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue)));
 																								}
 																							}
 

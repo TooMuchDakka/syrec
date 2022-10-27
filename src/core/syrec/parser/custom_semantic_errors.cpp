@@ -2,11 +2,11 @@
 
 namespace parser {
     /* Variable declaration and access error messages */
-    extern const std::string          UndeclaredIdent                 = "undeclared ident '{0:s}'";
+    extern const std::string UndeclaredIdent                 = "undeclared ident '{0:s}'";
     extern const std::string DuplicateDeclarationOfIdent     = "variable '{0:s}' was already declared";
     extern const std::string BitAccessOutOfRange             = "access on bit {0:d} is out of range for variable '{1:s}', valid value range is [{2:d}, {3:d}]";
     extern const std::string BitRangeOutOfRange              = "bit range {0:d}:{1:d} is out of range for variable '{2:s}', valid value range is [{3:d}, {4:d}]";
-    extern const std::string BitRangeStartLargerThanEnd      = "bit range end value {0:d} cannot be larger than the start value {0:d}";
+    extern const std::string BitRangeStartLargerThanEnd      = "bit range start value {0:d} cannot be larger than the end value {1:d}";
     extern const std::string DimensionOutOfRange             = "dimension with index {0:d} is out of range for variable '{1:s}' since it only defined {2:d} dimensions";
     extern const std::string DimensionValueOutOfRange        = "value {0:d} for dimension {1:d} is out of range for variable '{2:s}', valid value range is [{3:d}, {4:d}]";
     extern const std::string VariableIsNotLoopVariable       = "variable '{0:s}' is not a loop variable";

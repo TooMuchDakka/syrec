@@ -3,6 +3,7 @@
 #if !defined(parser_COCO_PARSER_H__)
 #define parser_COCO_PARSER_H__
 
+#include <cstdint>
 #include <fmt/format.h>
 #include <optional>
 #include <stack>
@@ -219,7 +220,7 @@ syrec::Module::vec modules;
 	}
 
 	[[nodiscard]] const wchar_t* convertErrorMsgToRequiredFormat(const std::string& errorMsg) {
-		return std::wstring(errorMsg.begin(), errorMsg.end()).c_str();
+		return (new std::wstring(errorMsg.begin(), errorMsg.end()))->c_str();
 	}
 
 	bool checkIdentWasDeclaredOrLogError(const std::string_view& ident) {
