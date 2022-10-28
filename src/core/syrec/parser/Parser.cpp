@@ -711,8 +711,8 @@ void Parser::AssignStatement(std::optional<syrec::Statement::ptr> &statement ) {
 			assignOperation.emplace(syrec_operation::operation::minus_assign);	
 		} else SynErr(63);
 		if (!assignOperation.has_value()){
-		// TODO: GEN_ERROR Expected a valid unary operand
-		SemErr(InvalidBinaryOperation);
+		// TODO: GEN_ERROR Expected a valid assign operation
+		SemErr(InvalidAssignOperation);
 		}
 		
 		Expect(24 /* "=" */);
@@ -1069,6 +1069,7 @@ void Parser::BinaryExpression(const ExpressionEvaluationResult::ptr &parsedBinar
 		}
 		if (!binaryOperation.has_value()) {
 		// TODO: GEN_ERROR Expected one of n possible operands but non was specified
+		SemErr(InvalidBinaryOperation);
 		}
 		
 		Expression(binaryExprRhs, expectedBitWidth, simplifyIfPossible);
@@ -1111,6 +1112,9 @@ void Parser::ShiftExpression(const ExpressionEvaluationResult::ptr &userDefinedS
 		} else if (la->kind == 54 /* ">>" */) {
 			Get();
 			shiftOperation.emplace(syrec_operation::operation::shift_right);	
+			if (!shiftOperation.has_value())
+			SemErr(InvalidShiftOperation);
+			
 		} else SynErr(66);
 		Number(shiftAmount, simplifyIfPossible);
 		if (!shiftExpressionLhs->hasValue() || !shiftOperation.has_value() || !shiftAmount.has_value()) {
@@ -1153,6 +1157,9 @@ void Parser::UnaryExpression(const ExpressionEvaluationResult::ptr &unaryExpress
 			Get();
 			unaryOperation.emplace(syrec_operation::operation::bitwise_negation);	
 		} else SynErr(67);
+		if (!unaryOperation.has_value())
+		SemErr(InvalidUnaryOperation);
+		
 		Expression(unaryExpressionOperand, bitwidth, simplifyIfPossible);
 		return;
 		

@@ -35,6 +35,7 @@ namespace parser {
     extern const std::string InvalidSwapValueForDimensionMissmatch;
 
     /* Invalid operation error messages */
+    extern const std::string InvalidAssignOperation;
     extern const std::string InvalidBinaryOperation;
     extern const std::string InvalidUnaryOperation;
     extern const std::string InvalidShiftOperation;

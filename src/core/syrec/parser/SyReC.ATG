@@ -873,8 +873,8 @@ Signal<assignStmtLhs, false>											(.		allSemanticChecksOk = assignStmtLhs.i
 	| "+"																(.		assignOperation.emplace(syrec_operation::operation::add_assign);	.)
 	| "-"																(.		assignOperation.emplace(syrec_operation::operation::minus_assign);	.)
 )																		(.		if (!assignOperation.has_value()){
-																					// TODO: GEN_ERROR Expected a valid unary operand
-																					SemErr(InvalidBinaryOperation);
+																					// TODO: GEN_ERROR Expected a valid assign operation
+																					SemErr(InvalidAssignOperation);
 																				}
 																		.)
 "=" Expression<assignStmtRhs, expressionBitwidth, false>				(.		if (!allSemanticChecksOk || !assignOperation.has_value() || !assignStmtRhs->hasValue()) {
@@ -1168,6 +1168,7 @@ BinaryExpression<const ExpressionEvaluationResult::ptr &parsedBinaryExpression, 
 		| ">="																																(.	binaryOperation.emplace(syrec_operation::operation::greater_equals);	.)
 	)																																		(.	if (!binaryOperation.has_value()) {
 																																					// TODO: GEN_ERROR Expected one of n possible operands but non was specified
+																																					SemErr(InvalidBinaryOperation);
 																																				}
 																																			.)
 	Expression<binaryExprRhs, expectedBitWidth, simplifyIfPossible>																
@@ -1208,7 +1209,9 @@ UnaryExpression<const ExpressionEvaluationResult::ptr &unaryExpression, const un
 (
 	"!"																																(.	unaryOperation.emplace(syrec_operation::operation::logical_negation);	.)
 	| "~"																															(.	unaryOperation.emplace(syrec_operation::operation::bitwise_negation);	.)
-)		
+)																																	(.	if (!unaryOperation.has_value())
+																																			SemErr(InvalidUnaryOperation);
+																																	.)
 Expression<unaryExpressionOperand, bitwidth, simplifyIfPossible>																	(.	// TODO: Notify user (i.e. via error) that reference parser currently does not support unary statements - we will ignore them for now
 																																		return;
 																																	.)	
@@ -1228,6 +1231,9 @@ ShiftExpression<const ExpressionEvaluationResult::ptr &userDefinedShiftExpressio
 (
 	"<<"																																		(.	shiftOperation.emplace(syrec_operation::operation::shift_left);	.)
 	| ">>"																																		(.	shiftOperation.emplace(syrec_operation::operation::shift_right);	.)
+																																				(.	if (!shiftOperation.has_value())
+																																						SemErr(InvalidShiftOperation);
+																																				.)
 ) Number<shiftAmount, simplifyIfPossible>																										(.	if (!shiftExpressionLhs->hasValue() || !shiftOperation.has_value() || !shiftAmount.has_value()) {
 																																						return;
 																																					}
