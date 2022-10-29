@@ -1,12 +1,9 @@
 {
   "TODO": "Should there be tests for the compatibility of assignability of formal and actual parameters",
-  "callWithNoParameters": {
-    "circuit": ""
-  },
   "callWithOneParameter": {
-    "circuit": ""
+    "circuit": "module increment(out a(32)) ++= a module main(inout a(32)) call increment(a); uncall increment(a)"
   },
   "callWithNParameters": {
-    "circuit": ""
+    "circuit": "module double(in a(32), out b(33)) b += (a * 2) module main(in number(32), out result(33)) call double(number, result); uncall double(number, result)"
   }
 }

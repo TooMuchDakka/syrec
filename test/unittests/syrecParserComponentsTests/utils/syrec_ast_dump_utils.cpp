@@ -108,7 +108,7 @@ std::string SyrecASTDumper::stringifyAssignStatement(const syrec::AssignStatemen
 }
 
 inline std::string SyrecASTDumper::stringifyCallStatement(const syrec::CallStatement& callStmt) const {
-    return "uncall " + callStmt.target->name + "(" + stringifyAndJoinMany<std::string>(callStmt.parameters, this->dumpConfig.parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
+    return "call " + callStmt.target->name + "(" + stringifyAndJoinMany<std::string>(callStmt.parameters, this->dumpConfig.parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
 }
 
 inline std::string SyrecASTDumper::stringifyUncallStatement(const syrec::UncallStatement& uncallStmt) const {
@@ -329,7 +329,8 @@ std::string SyrecASTDumper::stringifyVariableAccess(const syrec::VariableAccess:
 // TODO: Handling of loop variable
 inline std::string SyrecASTDumper::stringifyNumber(const syrec::Number::ptr& number) {
     if (number->isLoopVariable()) {
-        return "$" + number->variableName();
+        // TODO: Since for now a loop variable ident contains the '$' symbol we can omit printing it a second time
+        return number->variableName();
     }
     return std::to_string(number->evaluate({}));
 }

@@ -3,18 +3,23 @@
     "circuit": "module main() wire local_1(2) local_1 += 2"
   },
   "asSignalWidth": {
-    "circuit": "module main(in a(4)) wire local_1(4) local_1 += #a"
+    "circuit": "module main(in a(4)) wire local_1(4) local_1 += #a",
+    "expectedCircuit": "module main(in a(4)) wire local_1(4) local_1 += 4"
   },
   "asLoopVariable": {
-    "circuit": "module main() wire local_1(4) for $i = 0 to 2 do local_1 += $i"
+    "circuit": "module main() wire local_1(4) for $i = 0 to 2 step 1 do local_1 += $i rof",
+    "expectedCircuit": "module main() wire local_1(4) for $i = 0 to 2 step 1 do local_1 += $i rof"
   },
   "asSimpleExpression": {
-    "circuit": "module main(in a(4)) wire local_1(4) local_1(4) += (#a - 2)"
+    "circuit": "module main(in a(4)) wire local_1(4) local_1 += (#a - 2)",
+    "expectedCircuit": "module main(in a(4)) wire local_1(4) local_1 += 2"
   },
   "asExpressionWithLhsBeingNested": {
-    "circuit": "module main(in a(4)) wire local_1(4) local_1(4) += (((#a - 2) * 2) - 2)"
+    "circuit": "module main(in a(4)) wire local_1(4) local_1 += (((#a - 2) * 2) - 2)",
+    "expectedCircuit": "module main(in a(4)) wire local_1(4) local_1 += 2"
   },
   "asExpressionWithRhsBeingNested": {
-    "circuit": "module main(in a(4)) wire local_1(4) local_1(4) += (2 - (((#a - 4) * 2) + #a))"
+    "circuit": "module main(in a(4)) wire local_1(4) local_1 += (2 - (((#a - 4) * 2) + #a))",
+    "expectedCircuit": "module main(in a(4)) wire local_1(4) local_1 += 4"
   }
 }

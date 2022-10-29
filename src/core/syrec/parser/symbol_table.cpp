@@ -108,6 +108,7 @@ bool SymbolTable::doModuleSignaturesMatch(const syrec::Module::ptr& module, cons
     return signatures_match;
 }
 
+// TODO: Can this condition be relaxed (i.e. is a variable of bitwidth 32 assignable to one with a bitwidth of 16 by truncation ?)
 bool SymbolTable::isAssignableTo(const syrec::Variable::ptr& formalParameter, const syrec::Variable::ptr& actualParameter, bool mustParameterTypesMatch) {
     return (mustParameterTypesMatch ? formalParameter->type == actualParameter->type : true) 
         && formalParameter->dimensions == actualParameter->dimensions

@@ -140,7 +140,6 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_statementList", "multipleStatements"),
                             
                         /* Call and uncall production */
-                        std::make_pair("production_callStatement", "callWithNoParameters"),
                         std::make_pair("production_callStatement", "callWithOneParameter"),
                         std::make_pair("production_callStatement", "callWithNParameters"),
 
