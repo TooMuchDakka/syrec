@@ -15,7 +15,7 @@
       {
         "line": 1,
         "column": 29,
-        "message": "= expected"
+        "message": "\"=\" expected"
       }
     ]
   },
@@ -25,7 +25,7 @@
       {
         "line": 1,
         "column": 29,
-        "message": "= expected"
+        "message": "\"=\" expected"
       }
     ]
   },
@@ -39,15 +39,30 @@
       }
     ]
   },
-  "invalidAssignmentVariableIsUsedInRhs": {
-    "circuit": "module main(in a) a += (a + 2)",
-    "errors": [
-      {
-        "line": 1,
-        "column": 31,
-        "message": "reversibility of operation is broken if assigned to variable 'a' is used in rhs expression"
-      }
-    ]
+
+  "invalidAssignmentOfLhsSignalWithTooLargeBitRange": {
+
+  },
+  "invalidAssignmentOfLhsSignalWithSignalWithLessDimension": {
+
+  },
+  "invalidAssignmentOfLhsSignalWithSignalWithTooManyDimension": {
+
+  },
+  "invalidAssignmentOfLhsSignalWithSignalWithMissmatchForDimensionValue": {
+
+  },
+  "invalidAssignmentOfLhsSignalWithSignalWithLargerSignalwidth": {
+
+  },
+  "TODO:operandsStructureMissmatchValueForDimensionMissmatch": {
+
+  },
+  "TODO:operandsStructureMissmatchTooManyDimensions": {
+
+  },
+  "TODO:operandsStructureMissmatchTooFewDimensions": {
+
   },
 
   "invalidAssignmentToInParameterBit": {

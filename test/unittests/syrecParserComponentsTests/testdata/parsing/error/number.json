@@ -35,7 +35,7 @@
       {
         "line": 1,
         "column": 29,
-        "message": "( expected"
+        "message": "\"(\" expected"
       }
     ]
   },
@@ -55,7 +55,7 @@
       {
         "line": 1,
         "column": 37,
-        "message": ") expected"
+        "message": "\")\" expected"
       }
     ]
   },

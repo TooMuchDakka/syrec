@@ -39,7 +39,7 @@
       }
     ]
   },
-  "invalidClosingBracket": {
+  "invalidOpeningBracket": {
     "circuit": "module main(out c) c += [2 + 22)",
     "errors": [
       {
@@ -66,6 +66,36 @@
         "line": 1,
         "column": 1,
         "message": ") expected"
+      }
+    ]
+  },
+  "operandsStructureMissmatchValueForDimensionMissmatch": {
+    "circuit": "module main(out c, in a[2](16), in b(16)) c += (a + b)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "when applying an operation on two full signals, the number as well as the value per dimension must match"
+      }
+    ]
+  },
+  "operandsStructureMissmatchTooManyDimensions": {
+    "circuit": "module main(out c, in a[2][2](16), in b(16)) c += (a + b)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "when applying an operation on two full signals, the number as well as the value per dimension must match"
+      }
+    ]
+  },
+  "operandsStructureMissmatchTooFewDimensions": {
+    "circuit": "module main(out c, in a[1](16), in b[2][4](16)) c += (a + b)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "when applying an operation on two full signals, the number as well as the value per dimension must match"
       }
     ]
   }

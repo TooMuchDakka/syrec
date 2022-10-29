@@ -21,7 +21,7 @@
   },
   "loopVariableWithoutStepsize": {
     "circuit": "module main() for $i = 0 to 4 do skip rof",
-    "expectedCircuit": "module main() for $i to 4 step 1 do skip rof"
+    "expectedCircuit": "module main() for $i = 0 to 4 step 1 do skip rof"
   },
   "loopVariableWithPositiveStepsize": {
     "circuit": "module main() for $i = 0 to 4 step 2 do skip rof"

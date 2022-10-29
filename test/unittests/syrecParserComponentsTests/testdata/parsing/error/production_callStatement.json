@@ -1,5 +1,5 @@
 {
-  "TODO": "Can a function only be called after it was declared or can a fixup happen later ?",
+  "TODO": "Can a function only be called after it was declared or can a fixup happen later ?, Is the call toCall(a, a) valid [i.e. using the same value for two different out parameters ?]",
   "invalidCallIdent": {
     "circuit": "",
     "errors": [

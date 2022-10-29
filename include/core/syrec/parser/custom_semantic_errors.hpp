@@ -17,6 +17,7 @@ namespace parser {
     extern const std::string InvalidParameterType;
     extern const std::string InvalidLocalType;
     extern const std::string DuplicateModuleIdentDeclaration;
+    extern const std::string BrokeReversibilityOfAssignment;
 
     extern const std::string AssignmentToReadonlyVariable;
 

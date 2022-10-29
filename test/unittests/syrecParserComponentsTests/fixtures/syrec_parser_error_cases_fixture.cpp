@@ -13,7 +13,7 @@ using json = nlohmann::json;
 
 class SyrecParserErrorCasesFixture: public ::testing::TestWithParam<std::pair<std::string, std::string>> {
 private:
-    const std::string expectedErrorMessageFormat   = "-- line {0:d} col {1:d}: {2:s}\n";
+    const std::string expectedErrorMessageFormat   = "-- line {0:d} col {1:d}: {2:s}";
     const std::string relativePathToTestCaseFile   = "./unittests/syrecParserComponentsTests/testdata/parsing/error/";
     const std::string cJsonErrorLineJsonKey        = "line";
     const std::string cJsonErrorColumnJsonKey      = "column";

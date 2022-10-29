@@ -139,7 +139,9 @@ inline std::string SyrecASTDumper::stringifySkipStatement() {
 }
 
 std::string SyrecASTDumper::stringifyForStatement(const syrec::ForStatement& forStmt) {
-    const std::string loopVarStringified = forStmt.loopVariable.empty() ? "" : "$" + forStmt.loopVariable + " = ";
+
+    //const std::string loopVarStringified = forStmt.loopVariable.empty() ? "" : ("$" + forStmt.loopVariable + " = ");
+    const std::string loopVarStringified = forStmt.loopVariable.empty() ? "" : (forStmt.loopVariable + " = ");
     std::string       loopHeader = loopVarStringified;
     if (forStmt.range.first != forStmt.range.second) {
         loopHeader += stringifyNumber(forStmt.range.first) + " to ";
@@ -255,7 +257,7 @@ std::string SyrecASTDumper::stringifyNumericExpression(const syrec::NumericExpre
 }
 
 std::string SyrecASTDumper::stringifyShiftExpression(const syrec::ShiftExpression& shiftExpr) {
-    return "(" + stringifyExpression(shiftExpr.lhs) + " " + (shiftExpr.op == syrec::ShiftExpression::Left ? ">>" : "<<") + " " + stringifyNumber(shiftExpr.rhs) + ")";
+    return "(" + stringifyExpression(shiftExpr.lhs) + " " + (shiftExpr.op == syrec::ShiftExpression::Left ? "<<" : ">>") + " " + stringifyNumber(shiftExpr.rhs) + ")";
 }
 
 std::string SyrecASTDumper::stringifyVariableExpression(const syrec::VariableExpression& variableExpression) {

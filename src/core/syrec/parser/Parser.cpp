@@ -506,12 +506,15 @@ void Parser::ForStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		syrec::Statement::vec loopBody{};
 		bool explicitRangeStartDefined = false;
 		bool explicitStepSizeDefined = false;
+		bool declaredLoopVariable = false;
 		
 		Expect(23 /* "for" */);
 		if (checkIsLoopInitialValueExplicitlyDefined(this)) {
 			if (checkIsLoopVariableExplicitlyDefined(this)) {
 				Expect(4 /* "$" */);
 				Expect(_ident);
+				declaredLoopVariable = true;
+				// TODO: Maybe replace opening scope for loop variable with remove from symbol table
 				const std::string &loopVarIdent = "$" + convert_to_uniform_text_format(t->val);
 				if (!currSymTabScope->contains(loopVarIdent)) {
 				loopVariableIdent.emplace(loopVarIdent);
@@ -542,8 +545,16 @@ void Parser::ForStatement(std::optional<syrec::Statement::ptr> &statement ) {
 				negativeStepSize = true;	
 			}
 			Number(customStepSize, true);
-			if (customStepSize.has_value() && !customStepSize.value()->evaluate({})) {
+			if (customStepSize.has_value()) {
+			if (!customStepSize.value()->evaluate({})) {
 			// TODO: GEN_ERROR step size cannot be zero ?
+			}
+			else if (negativeStepSize && customStepSize.value()->isConstant()) {
+			// TODO: Currently negative step size will be represented as 2^(MAX_SIZE_UNSIGNED) - stepsize and not as - stepsize
+			syrec::Number::ptr stepSizeNegated = std::make_shared<syrec::Number>(syrec::Number(customStepSize.value()->evaluate({}) * -1));
+			customStepSize.reset();
+			customStepSize.emplace(stepSizeNegated);
+			}
 			}
 			
 		}
@@ -551,7 +562,7 @@ void Parser::ForStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		customStepSize.emplace(std::make_shared<syrec::Number>(syrec::Number(1)));
 		}
 		
-		bool validLoopHeader = loopVariableIdent.has_value() 
+		bool validLoopHeader = (declaredLoopVariable ? loopVariableIdent.has_value() : true)
 						&& (explicitRangeStartDefined ? iterationRangeStart.has_value() : true)
 						&& iterationRangeEnd.has_value()
 						&& (explicitStepSizeDefined ? customStepSize.has_value() : true);
@@ -593,7 +604,7 @@ void Parser::ForStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		}
 		
 		const std::shared_ptr<syrec::ForStatement> loopStatement = std::make_shared<syrec::ForStatement>();
-		loopStatement->loopVariable = loopVariableIdent.value();
+		loopStatement->loopVariable = loopVariableIdent.has_value() ? loopVariableIdent.value() : "";
 		loopStatement->range = std::pair(iterationRangeStart.value(), iterationRangeEnd.value());
 		loopStatement->step = customStepSize.value();
 		loopStatement->statements = loopBody;
@@ -660,7 +671,7 @@ void Parser::UnaryStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		}
 		
 		const std::optional<unsigned int> mappedOperation = map_operation_to_unary_operation(unaryOperation.value());
-		allSemanticChecksOk &= mappedOperation.has_value();
+		allSemanticChecksOk &= mappedOperation.has_value() && isIdentAssignableOtherwiseLogError(unaryStmtOperand.getAsVariableAccess().value());
 		if (!allSemanticChecksOk) {
 		return;
 		}
