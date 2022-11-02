@@ -36,6 +36,6 @@
     "circuit": "module main(in a[2](8), in b[2](16), out c[2](16)) for 2 step 1 do c[0] += (a[0].0:3 + b[0].5:8); skip; ++= c[0]; c[0] <=> c[1] rof"
   },
   "reusingLoopVariableNameInAnotherLoopAfterPreviousOneWasLeft": {
-    "circit": "module main() for $a = 0 to 2 do skip rof for $a = 0 to 5 step 1 skip; skip rof"
+    "circuit": "module main() for $a = 0 to 2 step 1 do skip rof; for $a = 0 to 5 step 1 do skip; skip rof"
   }
 }
