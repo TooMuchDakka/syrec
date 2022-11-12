@@ -11,6 +11,7 @@ https://ssw.jku.at/Research/Projects/Coco/Doc/UserManual.pdf
 #include <cstdint>
 #include <fmt/format.h>
 #include <optional>
+#include <sstream>
 #include <stack>
 #include <string>
 #include <vector>
@@ -19,10 +20,11 @@ https://ssw.jku.at/Research/Projects/Coco/Doc/UserManual.pdf
 #include "core/syrec/parser/custom_semantic_errors.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/grammar_conflict_resolver.hpp"
+#include "core/syrec/parser/infix_iterator.hpp"
 #include "core/syrec/parser/method_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
-#include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/parser_config.hpp"
+#include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/text_utils.hpp"
@@ -228,6 +230,20 @@ COMPILER SyReC
 		this->config = customConfig;
 	}
 
+	void checkAndLogMissingUncallForPreviouslyCalledModule() {
+		if (callStack.empty()) {
+			return;
+		}
+
+		std::string calledModuleName = callStack.top().first;
+	    std::vector<std::string> callArguments = callStack.top().second;
+        callStack.pop();
+		
+		std::ostringstream previousCallArgumentsStringified{};
+        std::copy(callArguments.cbegin(), callArguments.cend(), infix_ostream_iterator<std::string>(previousCallArgumentsStringified, ","));
+		SemErr(fmt::format(MissingUncall, calledModuleName, previousCallArgumentsStringified.str()));
+	}
+
 /*-------------------------------------------------------------------------*/
 
 CHARACTERS
@@ -393,6 +409,7 @@ StatementList<moduleStmts>												(.	SymbolTable::closeScope(currSymTabScope
 																				parsedModule.emplace(userDefinedModule);
 																			}
 																		.)
+																		(.	checkAndLogMissingUncallForPreviouslyCalledModule();	.)
 .
 
 
@@ -529,7 +546,10 @@ Statement<user_defined_statement>											(.	if (user_defined_statement.has_va
 syrec::Statement production
 -------------------------------------------------------------------------*/
 
-Statement<. std::optional<syrec::Statement::ptr> &user_defined_statement .>
+Statement<. std::optional<syrec::Statement::ptr> &user_defined_statement .>		(.	if (strcmp(reinterpret_cast<char*>(t->val), "call") == 1 && strcmp(reinterpret_cast<char*>(t->val), "uncall")) {
+																						checkAndLogMissingUncallForPreviouslyCalledModule();
+																					}
+																				.)
 =
 CallStatement<user_defined_statement>
 | ForStatement<user_defined_statement>
@@ -839,7 +859,7 @@ UnaryStatement<. std::optional<syrec::Statement::ptr> &statement .>		(.	SignalEv
 																				// TODO: GEN_ERROR Operand can only be variable access
 																			}
 
-																			const std::optional<unsigned int> mappedOperation = map_operation_to_unary_operation(unaryOperation.value());
+																			const std::optional<unsigned int> mappedOperation = allSemanticChecksOk ? map_operation_to_unary_operation(unaryOperation.value()) : std::nullopt;
 																			allSemanticChecksOk &= mappedOperation.has_value() && isIdentAssignableOtherwiseLogError(unaryStmtOperand.getAsVariableAccess().value());
 																			if (!allSemanticChecksOk) {
 																				return;

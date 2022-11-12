@@ -212,6 +212,7 @@ void Parser::Module(std::optional<syrec::Module::ptr> &parsedModule	) {
 		parsedModule.emplace(userDefinedModule);
 		}
 		
+		checkAndLogMissingUncallForPreviouslyCalledModule();	
 }
 
 void Parser::ParameterList(const syrec::Module::ptr &module, bool &isValidModuleDefinition) {
@@ -347,6 +348,10 @@ void Parser::SignalDeclaration(const std::optional<syrec::Variable::Types> varia
 }
 
 void Parser::Statement(std::optional<syrec::Statement::ptr> &user_defined_statement ) {
+		if (strcmp(reinterpret_cast<char*>(t->val), "call") == 1 && strcmp(reinterpret_cast<char*>(t->val), "uncall")) {
+		    checkAndLogMissingUncallForPreviouslyCalledModule();
+		}
+		
 		if (la->kind == 21 /* "call" */ || la->kind == 22 /* "uncall" */) {
 			CallStatement(user_defined_statement);
 		} else if (la->kind == 23 /* "for" */) {
@@ -670,7 +675,7 @@ void Parser::UnaryStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		// TODO: GEN_ERROR Operand can only be variable access
 		}
 		
-		const std::optional<unsigned int> mappedOperation = map_operation_to_unary_operation(unaryOperation.value());
+		const std::optional<unsigned int> mappedOperation = allSemanticChecksOk ? map_operation_to_unary_operation(unaryOperation.value()) : std::nullopt;
 		allSemanticChecksOk &= mappedOperation.has_value() && isIdentAssignableOtherwiseLogError(unaryStmtOperand.getAsVariableAccess().value());
 		if (!allSemanticChecksOk) {
 		return;

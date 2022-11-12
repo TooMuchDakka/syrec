@@ -25,8 +25,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "( expected"
+        "column": 66,
+        "message": "\"(\" expected"
       }
     ]
   },
@@ -35,8 +35,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ") expected"
+        "column": 71,
+        "message": "\")\" expected"
       }
     ]
   },
@@ -45,12 +45,12 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 59,
         "message": "undeclared module 'test'"
       },
       {
         "line": 1,
-        "column": 1,
+        "column": 77,
         "message": "undeclared module 'test'"
       }
     ]
@@ -81,7 +81,7 @@
       {
         "line": 1,
         "column": 1,
-        "message": ", expected"
+        "message": "\",\" expected"
       }
     ]
   },
@@ -91,7 +91,7 @@
       {
         "line": 1,
         "column": 1,
-        "message": ", expected"
+        "message": "\",\" expected"
       }
     ]
   },

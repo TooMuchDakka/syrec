@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <fmt/format.h>
 #include <optional>
+#include <sstream>
 #include <stack>
 #include <string>
 #include <vector>
@@ -14,10 +15,11 @@
 #include "core/syrec/parser/custom_semantic_errors.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/grammar_conflict_resolver.hpp"
+#include "core/syrec/parser/infix_iterator.hpp"
 #include "core/syrec/parser/method_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
-#include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/parser_config.hpp"
+#include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/text_utils.hpp"
@@ -265,6 +267,20 @@ syrec::Module::vec modules;
 
 	void setConfig(const ParserConfig& customConfig) {
 		this->config = customConfig;
+	}
+
+	void checkAndLogMissingUncallForPreviouslyCalledModule() {
+		if (callStack.empty()) {
+			return;
+		}
+
+		std::string calledModuleName = callStack.top().first;
+	    std::vector<std::string> callArguments = callStack.top().second;
+        callStack.pop();
+		
+		std::ostringstream previousCallArgumentsStringified{};
+        std::copy(callArguments.cbegin(), callArguments.cend(), infix_ostream_iterator<std::string>(previousCallArgumentsStringified, ","));
+		SemErr(fmt::format(MissingUncall, calledModuleName,previousCallArgumentsStringified.str()));
 	}
 
 /*-------------------------------------------------------------------------*/

@@ -5,7 +5,7 @@
       {
         "line": 1,
         "column": 30,
-        "message": "TODO"
+        "message": "EOF expected"
       }
     ]
   },
@@ -15,7 +15,7 @@
       {
         "line": 1,
         "column": 30,
-        "message": "undeclared signal 'a'"
+        "message": "undeclared ident 'a'"
       }
     ]
   },
@@ -25,7 +25,7 @@
       {
         "line": 1,
         "column": 30,
-        "message": "undeclared signal 'a'"
+        "message": "undeclared ident '$a'"
       }
     ]
   },
@@ -35,7 +35,7 @@
       {
         "line": 1,
         "column": 29,
-        "message": "\"(\" expected"
+        "message": "EOF expected"
       }
     ]
   },
@@ -45,7 +45,7 @@
       {
         "line": 1,
         "column": 29,
-        "message": "TODO"
+        "message": "EOF expected"
       }
     ]
   },
@@ -54,7 +54,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 37,
+        "column": 36,
         "message": "\")\" expected"
       }
     ]
@@ -64,8 +64,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 37,
-        "message": "TODO: invalid number expression operand"
+        "column": 38,
+        "message": "\")\" expected"
       }
     ]
   },

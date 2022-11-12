@@ -5,7 +5,7 @@
       {
         "line": 1,
         "column": 19,
-        "message": "undeclared signal 'a'"
+        "message": "undeclared ident 'a'"
       }
     ]
   },
@@ -14,8 +14,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "TODO"
+        "column": 24,
+        "message": "undeclared ident 'a23'"
       }
     ]
   },
@@ -24,18 +24,18 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "TODO"
+        "column": 33,
+        "message": "EOF expected"
       }
     ]
   },
   "missingDimensionAccessClosingBracket": {
-    "circuit": "module main(out a[2][4]) ++= a[3",
+    "circuit": "module main(out a[2][4]) ++= a[1",
     "errors": [
       {
         "line": 1,
         "column": 27,
-        "message": "] expected"
+        "message": "\"]\" expected"
       }
     ]
   },
@@ -45,7 +45,7 @@
       {
         "line": 1,
         "column": 30,
-        "message": "] expected"
+        "message": "\"]\" expected"
       }
     ]
   },
@@ -55,7 +55,7 @@
       {
         "line": 1,
         "column": 31,
-        "message": "undeclared signal 'a23'"
+        "message": "undeclared ident 'a23'"
       }
     ]
   },
@@ -65,17 +65,17 @@
       {
         "line": 1,
         "column": 32,
-        "message": ". expected"
+        "message": "EOF expected"
       }
     ]
   },
   "missingBitRangeAccessEndValuePrefixIdent": {
-    "circuit": "module main(out a[2](16)) ++= a.012",
+    "circuit": "module main(out a[2](16)) ++= a.0.12",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "TODO"
+        "column": 33,
+        "message": "EOF expected"
       }
     ]
   },
@@ -84,8 +84,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 36,
-        "message": ": expected"
+        "column": 33,
+        "message": "EOF expected"
       }
     ]
   },
@@ -95,7 +95,7 @@
       {
         "line": 1,
         "column": 35,
-        "message": "variable 'a' has only one dimension defined but tried to access the 2"
+        "message": "dimension with index 1 is out of range for variable 'a' since it only defined 1 dimensions"
       }
     ]
   },
@@ -105,7 +105,7 @@
       {
         "line": 1,
         "column": 35,
-        "message": "invalid value 4 for dimension 0 of variable 'a', valid range is [0, 1]"
+        "message": "value 4 for dimension 0 is out of range for variable 'a', valid value range is [0, 1]"
       }
     ]
   },
@@ -115,7 +115,7 @@
       {
         "line": 1,
         "column": 35,
-        "message": "bit-access out of range, actual value 32 is not within valid range of 0, 15"
+        "message": "access on bit 32 is out of range for variable 'a', valid value range is [0, 15]"
       }
     ]
   },
@@ -124,8 +124,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 40,
-        "message": "bit-range out of range, actual value 32:15 is not within valid range of 0:15"
+        "column": 37,
+        "message": "bit range start value 32 cannot be larger than the end value 15"
       }
     ]
   },
@@ -134,8 +134,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 37,
-        "message": "bit-range out of range, actual value 0:32 is not within valid range of 0:15"
+        "column": 36,
+        "message": "bit range 0:32 is out of range for variable 'a', valid value range is [0, 15]"
       }
     ]
   },
@@ -144,8 +144,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 39,
-        "message": "bit range start value cannot be larger than its end for given range 15:0"
+        "column": 36,
+        "message": "bit range start value 15 cannot be larger than the end value 0"
       }
     ]
   }
