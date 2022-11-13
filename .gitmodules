@@ -5,4 +5,4 @@
 	shallow = true
 [submodule "extern/fmt"]
 	path = extern/fmt
-	url = https://github.com/fmtlib/fmt
+	url = https://github.com/fmtlib/fmt.git
