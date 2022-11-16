@@ -20,7 +20,6 @@
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
-#include "core/syrec/parser/text_utils.hpp"
 
 
 #include "fmt/format.h"
@@ -38,9 +37,11 @@ private:
 	};
 	int maxT;
 
-	Token *dummyToken;
-	int errDist;
-	int minErrDist;
+
+	// TODO: Can be made unique ?
+	std::shared_ptr<Token> dummyToken;
+	size_t errDist;
+	size_t minErrDist;
 
 	const std::string_view errorMsgFormat = "-- line {0:d} col {1:d}: {2:s}\n";
 
@@ -51,9 +52,11 @@ private:
 	void ExpectWeak(int n, int follow);
 	bool WeakSeparator(int n, int syFol, int repFol);
 
-	void SynErr(int line, int col, int n);
-	void Error(int line, int col, const std::string& errMsg);
-	void Warning(int line, int col, const std::string& wrnMsg);
+	// TODO: instead of size_t use 'unsigned integer' also check in Scanner
+
+	void SynErr(size_t line, size_t col, int n);
+	void Error(size_t line, size_t col, const std::string& errMsg);
+	void Warning(size_t line, size_t col, const std::string& wrnMsg);
 	void Warning(const std::string& wrnMsg);
 	void Exception(const std::string& exceptionMsg);
 
@@ -61,12 +64,14 @@ private:
 public:
 	std::vector<std::string> errors;
 	std::vector<std::string> warnings;
-
-	Scanner *scanner;
+	
+	// TODO: Can be made unique ?
+	std::shared_ptr<Scanner> scanner;
 	//Errors  *errors;
 
-	Token *t;			// last recognized token
-	Token *la;			// lookahead token
+	// TODO: Can be made unique ?
+	std::shared_ptr<Token> t; // last recognized token
+	std::shared_ptr<Token> la; // lookahead token
 
 syrec::Module::vec modules;
 	SymbolTable::ptr currSymTabScope;
@@ -93,7 +98,7 @@ syrec::Module::vec modules;
 	[[nodiscard]] std::optional<unsigned int> convert_token_value_to_number(const Token &token) {
 		std::optional<unsigned int> token_as_number;
 		try {
-			token_as_number.emplace(std::stoul(convert_to_uniform_text_format(token.val)));
+			token_as_number.emplace(std::stoul(token.val));
 		} 
 		catch (std::invalid_argument const &ex) {
 			// TODO: GEN_ERROR
@@ -271,12 +276,10 @@ syrec::Module::vec modules;
 
 
 
-	Parser(Scanner *scanner);
+	Parser(const std::shared_ptr<Scanner>& scanner);
 	~Parser();
 
 	void SemErr(const std::string& msg);
-
-	//void SemErr(const wchar_t* msg);
 
 	void Number(std::optional<syrec::Number::ptr> &parsedNumber, const bool simplifyIfPossible );
 	void SyReC();

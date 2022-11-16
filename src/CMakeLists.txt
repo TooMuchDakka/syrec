@@ -43,7 +43,6 @@ add_library(${PROJECT_NAME}
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/Scanner.h
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_evaluation_result.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
-			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/text_utils.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/module.hpp
@@ -71,7 +70,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC MQT::qfr)
 # add fmt library
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/fmt" "extern/fmt")
 target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
-
 
 # add header-only part of the Boost library
 set(BOOST_USE_MULTITHREADED ON)

@@ -1,6 +1,5 @@
 
 
-#include <wchar.h>
 #include "core/syrec/parser/Parser.h"
 #include "core/syrec/parser/Scanner.h"
 
@@ -29,9 +28,8 @@ void Parser::Get() {
 			dummyToken->pos = t->pos;
 			dummyToken->col = t->col;
 			dummyToken->line = t->line;
-			dummyToken->next = NULL;
-			coco_string_delete(dummyToken->val);
-			dummyToken->val = coco_string_create(t->val);
+			dummyToken->next = nullptr;
+			dummyToken->val = t->val;
 			t = dummyToken;
 		}
 		la = t;
@@ -74,7 +72,7 @@ void Parser::Number(std::optional<syrec::Number::ptr> &parsedNumber, const bool 
 		} else if (la->kind == 3 /* "#" */) {
 			Get();
 			Expect(_ident);
-			const std::string signalIdent = convert_to_uniform_text_format(t->val);
+			const std::string signalIdent = t->val;
 			if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
 			return;
 			}
@@ -91,7 +89,7 @@ void Parser::Number(std::optional<syrec::Number::ptr> &parsedNumber, const bool 
 		} else if (la->kind == 4 /* "$" */) {
 			Get();
 			Expect(_ident);
-			const std::string signalIdent = "$" + convert_to_uniform_text_format(t->val);
+			const std::string signalIdent = "$" + t->val;
 			if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
 			return;
 			}
@@ -187,7 +185,7 @@ void Parser::Module(std::optional<syrec::Module::ptr> &parsedModule	) {
 		
 		Expect(11 /* "module" */);
 		Expect(_ident);
-		const std::string moduleName = convert_to_uniform_text_format(t->val);	
+		const std::string moduleName = t->val;	
 		syrec::Module::ptr userDefinedModule = std::make_shared<syrec::Module>(syrec::Module(moduleName));
 		
 		Expect(5 /* "(" */);
@@ -306,7 +304,7 @@ void Parser::SignalDeclaration(const std::optional<syrec::Variable::Types> varia
 		bool isValidSignalDeclaration = variableType.has_value();
 		
 		Expect(_ident);
-		const std::string signalIdent = convert_to_uniform_text_format(t->val);
+		const std::string signalIdent = t->val;
 		if (currSymTabScope->contains(signalIdent)) {
 		isValidSignalDeclaration = false;
 		SemErr(fmt::format(DuplicateDeclarationOfIdent, signalIdent));
@@ -391,7 +389,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		} else SynErr(61);
 		isValidCallOperation = isCallStatement.has_value();	
 		Expect(_ident);
-		std::string methodIdent = convert_to_uniform_text_format(t->val);
+		std::string methodIdent = t->val;
 		const MethodCallGuess::ptr guessesForPossibleCall = std::make_shared<MethodCallGuess>(MethodCallGuess(currSymTabScope, methodIdent));
 		if (!guessesForPossibleCall->hasSomeMatches()) {
 		SemErr(fmt::format(UndeclaredIdent, methodIdent));
@@ -409,7 +407,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		
 		Expect(5 /* "(" */);
 		Expect(_ident);
-		std::string parameterIdent = convert_to_uniform_text_format(t->val);
+		std::string parameterIdent = t->val;
 		isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent) && currSymTabScope->contains(parameterIdent);
 		
 		if (isValidCallOperation) {
@@ -429,7 +427,7 @@ void Parser::CallStatement(std::optional<syrec::Statement::ptr> &statement ) {
 		while (la->kind == 12 /* "," */) {
 			Get();
 			Expect(_ident);
-			std::string parameterIdent = convert_to_uniform_text_format(t->val);
+			std::string parameterIdent = t->val;
 			isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent) && currSymTabScope->contains(parameterIdent);
 			
 			if (isValidCallOperation) {
@@ -515,7 +513,7 @@ void Parser::ForStatement(std::optional<syrec::Statement::ptr> &statement ) {
 				Expect(_ident);
 				declaredLoopVariable = true;
 				// TODO: Maybe replace opening scope for loop variable with remove from symbol table
-				const std::string &loopVarIdent = "$" + convert_to_uniform_text_format(t->val);
+				const std::string &loopVarIdent = "$" + t->val;
 				if (!currSymTabScope->contains(loopVarIdent)) {
 				loopVariableIdent.emplace(loopVarIdent);
 				SymbolTable::openScope(currSymTabScope);
@@ -866,7 +864,7 @@ void Parser::Signal(SignalEvaluationResult &signalAccess, const bool simplifyIfP
 		std::size_t accessedDimensionIdx = 0;
 		
 		Expect(_ident);
-		const std::string signalIdent = convert_to_uniform_text_format(t->val);
+		const std::string signalIdent = t->val;
 		bool isValidSignalAccess = checkIdentWasDeclaredOrLogError(signalIdent);
 		
 		if (isValidSignalAccess){
@@ -1206,7 +1204,7 @@ struct ParserInitExistsRecognizer {
 	template<typename U>
 	static InitExistsType is_here(ExistsIfInitIsDefinedMarker<U>*);
 
-	enum { InitExists = (sizeof(is_here<T>(NULL)) == sizeof(InitExistsType)) };
+	enum { InitExists = (sizeof(is_here<T>(nullptr)) == sizeof(InitExistsType)) };
 };
 
 template<typename T>
@@ -1230,7 +1228,7 @@ struct ParserDestroyExistsRecognizer {
 	template<typename U>
 	static DestroyExistsType is_here(ExistsIfDestroyIsDefinedMarker<U>*);
 
-	enum { DestroyExists = (sizeof(is_here<T>(NULL)) == sizeof(DestroyExistsType)) };
+	enum { DestroyExists = (sizeof(is_here<T>(nullptr)) == sizeof(DestroyExistsType)) };
 };
 
 // The folloing templates are used to call the Init and Destroy methods if they exist.
@@ -1268,20 +1266,20 @@ struct ParserDestroyCaller<T, true> {
 };
 
 void Parser::Parse() {
-	t = NULL;
-	la = dummyToken = new Token();
-	la->val = coco_string_create(L"Dummy Token");
+	t = nullptr;
+	la = dummyToken =  std::make_shared<Token>();
+	la->val = "Dummy Token";
 	Get();
 	SyReC();
 	Expect(0);
 }
 
-Parser::Parser(Scanner *scanner) {
+Parser::Parser(const std::shared_ptr<Scanner>& scanner) {
 	maxT = 55;
 
 	ParserInitCaller<Parser>::CallInit(this);
-	dummyToken = NULL;
-	t = la = NULL;
+	dummyToken = nullptr;
+	t = la = nullptr;
 	minErrDist = 2;
 	errDist = minErrDist;
 	this->scanner = scanner;
@@ -1303,11 +1301,11 @@ bool Parser::StartOf(int s) {
 
 Parser::~Parser() {
 	ParserDestroyCaller<Parser>::CallDestroy(this);
-	delete dummyToken;
 }
 
-void Parser::SynErr(int line, int col, int n) {
-	wchar_t* s;
+void Parser::SynErr(size_t line, size_t col, int n) {
+	// Leave this variable named s since the generated cases will assign to a variable named 's'
+	std::string s;
 
 	switch (n) {
 			case 0: s = coco_string_create(L"EOF expected"); break;
@@ -1381,24 +1379,18 @@ void Parser::SynErr(int line, int col, int n) {
 
 		default:
 		{
-			wchar_t format[20];
-			coco_swprintf(format, 20, L"error %d", n);
-			s = coco_string_create(format);
+			s = fmt::format("error {0:d}", n);
 		}
 	}
-	/* TODO: IMPORTANT
-	 * This is a very dirty hack and should be removed as soon as possible and only works if the wstring contains only ascii characters
-	 *
-	 */
-	const std::wstring test = std::wstring(s);
-	errors.emplace_back(fmt::format(errorMsgFormat, line, col, std::string(test.cbegin(), test.cend())));
+
+	errors.emplace_back(fmt::format(errorMsgFormat, line, col, s));
 }
 
-void Parser::Error(int line, int col, const std::string& errMsg) {
+void Parser::Error(size_t line, size_t col, const std::string& errMsg) {
 	errors.emplace_back(fmt::format(errorMsgFormat, line, col, errMsg));
 }
 
-void Parser::Warning(int line, int col, const std::string& wrnMsg) {
+void Parser::Warning(size_t line, size_t col, const std::string& wrnMsg) {
 	warnings.emplace_back(fmt::format(errorMsgFormat, line, col, wrnMsg));
 }
 

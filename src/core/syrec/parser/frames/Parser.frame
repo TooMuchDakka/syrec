@@ -45,9 +45,11 @@ Parser.h Specification
 class Parser {
 private:
 -->constantsheader
-	Token *dummyToken;
-	int errDist;
-	int minErrDist;
+
+	// TODO: Can be made unique ?
+	std::shared_ptr<Token> dummyToken;
+	size_t errDist;
+	size_t minErrDist;
 
 	const std::string_view errorMsgFormat = "-- line {0:d} col {1:d}: {2:s}\n";
 
@@ -58,9 +60,11 @@ private:
 	void ExpectWeak(int n, int follow);
 	bool WeakSeparator(int n, int syFol, int repFol);
 
-	void SynErr(int line, int col, int n);
-	void Error(int line, int col, const std::string& errMsg);
-	void Warning(int line, int col, const std::string& wrnMsg);
+	// TODO: instead of size_t use 'unsigned integer' also check in Scanner
+
+	void SynErr(size_t line, size_t col, int n);
+	void Error(size_t line, size_t col, const std::string& errMsg);
+	void Warning(size_t line, size_t col, const std::string& wrnMsg);
 	void Warning(const std::string& wrnMsg);
 	void Exception(const std::string& exceptionMsg);
 
@@ -68,21 +72,21 @@ private:
 public:
 	std::vector<std::string> errors;
 	std::vector<std::string> warnings;
-
-	Scanner *scanner;
+	
+	// TODO: Can be made unique ?
+	std::shared_ptr<Scanner> scanner;
 	//Errors  *errors;
 
-	Token *t;			// last recognized token
-	Token *la;			// lookahead token
+	// TODO: Can be made unique ?
+	std::shared_ptr<Token> t; // last recognized token
+	std::shared_ptr<Token> la; // lookahead token
 
 -->declarations
 
-	Parser(Scanner *scanner);
+	Parser(const std::shared_ptr<Scanner>& scanner);
 	~Parser();
 
 	void SemErr(const std::string& msg);
-
-	//void SemErr(const wchar_t* msg);
 
 -->productionsheader
 	void Parse();
@@ -101,7 +105,6 @@ Parser.cpp Specification
 
 -->begin
 
-#include <wchar.h>
 #include "core/syrec/parser/Parser.h"
 #include "core/syrec/parser/Scanner.h"
 
@@ -129,9 +132,8 @@ void Parser::Get() {
 			dummyToken->pos = t->pos;
 			dummyToken->col = t->col;
 			dummyToken->line = t->line;
-			dummyToken->next = NULL;
-			coco_string_delete(dummyToken->val);
-			dummyToken->val = coco_string_create(t->val);
+			dummyToken->next = nullptr;
+			dummyToken->val = t->val;
 			t = dummyToken;
 		}
 		la = t;
@@ -192,7 +194,7 @@ struct ParserInitExistsRecognizer {
 	template<typename U>
 	static InitExistsType is_here(ExistsIfInitIsDefinedMarker<U>*);
 
-	enum { InitExists = (sizeof(is_here<T>(NULL)) == sizeof(InitExistsType)) };
+	enum { InitExists = (sizeof(is_here<T>(nullptr)) == sizeof(InitExistsType)) };
 };
 
 template<typename T>
@@ -216,7 +218,7 @@ struct ParserDestroyExistsRecognizer {
 	template<typename U>
 	static DestroyExistsType is_here(ExistsIfDestroyIsDefinedMarker<U>*);
 
-	enum { DestroyExists = (sizeof(is_here<T>(NULL)) == sizeof(DestroyExistsType)) };
+	enum { DestroyExists = (sizeof(is_here<T>(nullptr)) == sizeof(DestroyExistsType)) };
 };
 
 // The folloing templates are used to call the Init and Destroy methods if they exist.
@@ -254,18 +256,18 @@ struct ParserDestroyCaller<T, true> {
 };
 
 void Parser::Parse() {
-	t = NULL;
-	la = dummyToken = new Token();
-	la->val = coco_string_create(L"Dummy Token");
+	t = nullptr;
+	la = dummyToken =  std::make_shared<Token>();
+	la->val = "Dummy Token";
 	Get();
 -->parseRoot
 }
 
-Parser::Parser(Scanner *scanner) {
+Parser::Parser(const std::shared_ptr<Scanner>& scanner) {
 -->constants
 	ParserInitCaller<Parser>::CallInit(this);
-	dummyToken = NULL;
-	t = la = NULL;
+	dummyToken = nullptr;
+	t = la = nullptr;
 	minErrDist = 2;
 	errDist = minErrDist;
 	this->scanner = scanner;
@@ -282,34 +284,28 @@ bool Parser::StartOf(int s) {
 
 Parser::~Parser() {
 	ParserDestroyCaller<Parser>::CallDestroy(this);
-	delete dummyToken;
 }
 
-void Parser::SynErr(int line, int col, int n) {
-	wchar_t* s;
+void Parser::SynErr(size_t line, size_t col, int n) {
+	// Leave this variable named s since the generated cases will assign to a variable named 's'
+	std::string s;
 
 	switch (n) {
 -->errors
 		default:
 		{
-			wchar_t format[20];
-			coco_swprintf(format, 20, L"error %d", n);
-			s = coco_string_create(format);
+			s = fmt::format("error {0:d}", n);
 		}
 	}
-	/* TODO: IMPORTANT
-	 * This is a very dirty hack and should be removed as soon as possible and only works if the wstring contains only ascii characters
-	 *
-	 */
-	const std::wstring test = std::wstring(s);
-	errors.emplace_back(fmt::format(errorMsgFormat, line, col, std::string(test.cbegin(), test.cend())));
+
+	errors.emplace_back(fmt::format(errorMsgFormat, line, col, s));
 }
 
-void Parser::Error(int line, int col, const std::string& errMsg) {
+void Parser::Error(size_t line, size_t col, const std::string& errMsg) {
 	errors.emplace_back(fmt::format(errorMsgFormat, line, col, errMsg));
 }
 
-void Parser::Warning(int line, int col, const std::string& wrnMsg) {
+void Parser::Warning(size_t line, size_t col, const std::string& wrnMsg) {
 	warnings.emplace_back(fmt::format(errorMsgFormat, line, col, wrnMsg));
 }
 

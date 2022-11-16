@@ -25,7 +25,6 @@ https://ssw.jku.at/Research/Projects/Coco/Doc/UserManual.pdf
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
-#include "core/syrec/parser/text_utils.hpp"
 
 COMPILER SyReC
 	// Place declarations of objects referenced in this ATG
@@ -54,7 +53,7 @@ COMPILER SyReC
 	[[nodiscard]] std::optional<unsigned int> convert_token_value_to_number(const Token &token) {
 		std::optional<unsigned int> token_as_number;
 		try {
-			token_as_number.emplace(std::stoul(convert_to_uniform_text_format(token.val)));
+			token_as_number.emplace(std::stoul(token.val));
 		} 
 		catch (std::invalid_argument const &ex) {
 			// TODO: GEN_ERROR
@@ -270,7 +269,7 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 																					parsedNumber.emplace(result);
 																				}
 																			.)
-| '#' ident																	(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
+| '#' ident																	(.	const std::string signalIdent = t->val;
 																				if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
 																					return;
 																				}
@@ -284,7 +283,7 @@ int																			(.	const std::optional<unsigned int> conversion_result = c
 																					return;
 																				}
 																			.)
-| '$' ident																	(.	const std::string signalIdent = "$" + convert_to_uniform_text_format(t->val);
+| '$' ident																	(.	const std::string signalIdent = "$" + t->val;
 																				if (!checkIdentWasDeclaredOrLogError(signalIdent)) {
 																					return;
 																				}
@@ -373,7 +372,7 @@ Module <. std::optional<syrec::Module::ptr> &parsedModule	.>			(.	SymbolTable::o
 																			syrec::Statement::vec moduleStmts {};
 																		.)	
 =
-"module" ident															(.	const std::string moduleName = convert_to_uniform_text_format(t->val);	
+"module" ident															(.	const std::string moduleName = t->val;	
 																			syrec::Module::ptr userDefinedModule = std::make_shared<syrec::Module>(syrec::Module(moduleName));
 																		.)	
 "(" [ParameterList<userDefinedModule, isValidModuleDefinition>] ")" 
@@ -468,7 +467,7 @@ SignalDeclaration<. const std::optional<syrec::Variable::Types> variableType, st
 																																			bool isValidSignalDeclaration = variableType.has_value();
 																																		.)
 =
-ident																																	(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
+ident																																	(.	const std::string signalIdent = t->val;
 																																			if (currSymTabScope->contains(signalIdent)) {
 																																				isValidSignalDeclaration = false;
 																																				SemErr(fmt::format(DuplicateDeclarationOfIdent, signalIdent));
@@ -569,7 +568,7 @@ CallStatement<. std::optional<syrec::Statement::ptr> &statement .>					(.	std::o
 																						}
 																					.)
 )																					(.	isValidCallOperation = isCallStatement.has_value();	.)
-ident																				(.	std::string methodIdent = convert_to_uniform_text_format(t->val);
+ident																				(.	std::string methodIdent = t->val;
 																						const MethodCallGuess::ptr guessesForPossibleCall = std::make_shared<MethodCallGuess>(MethodCallGuess(currSymTabScope, methodIdent));
 																						if (!guessesForPossibleCall->hasSomeMatches()) {
 																							SemErr(fmt::format(UndeclaredIdent, methodIdent));
@@ -586,7 +585,7 @@ ident																				(.	std::string methodIdent = convert_to_uniform_text_fo
 																						}
 																					.)
 "(" 
-	ident																			(.	std::string parameterIdent = convert_to_uniform_text_format(t->val);
+	ident																			(.	std::string parameterIdent = t->val;
 																						isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent) && currSymTabScope->contains(parameterIdent);
 
 																						if (isValidCallOperation) {
@@ -604,7 +603,7 @@ ident																				(.	std::string methodIdent = convert_to_uniform_text_fo
 																						numActualParameters++;
 																					.)
 	{
-		"," ident																	(.	std::string parameterIdent = convert_to_uniform_text_format(t->val);
+		"," ident																	(.	std::string parameterIdent = t->val;
 																						isValidCallOperation &= checkIdentWasDeclaredOrLogError(parameterIdent) && currSymTabScope->contains(parameterIdent);
 
 																						if (isValidCallOperation) {
@@ -695,7 +694,7 @@ ForStatement<. std::optional<syrec::Statement::ptr> &statement .>						(.	std::o
 		IF (checkIsLoopVariableExplicitlyDefined(this)) (
 			"$" ident																	(.	declaredLoopVariable = true;
 																							// TODO: Maybe replace opening scope for loop variable with remove from symbol table
-																							const std::string &loopVarIdent = "$" + convert_to_uniform_text_format(t->val);
+																							const std::string &loopVarIdent = "$" + t->val;
 																							if (!currSymTabScope->contains(loopVarIdent)) {
 																								loopVariableIdent.emplace(loopVarIdent);
 																								SymbolTable::openScope(currSymTabScope);
@@ -1006,7 +1005,7 @@ Signal<SignalEvaluationResult &signalAccess, const bool simplifyIfPossible>			(.
 																						std::size_t accessedDimensionIdx = 0;
 																					.)
 =
-	ident																			(.	const std::string signalIdent = convert_to_uniform_text_format(t->val);
+	ident																			(.	const std::string signalIdent = t->val;
 																						bool isValidSignalAccess = checkIdentWasDeclaredOrLogError(signalIdent);
 
 																						if (isValidSignalAccess){

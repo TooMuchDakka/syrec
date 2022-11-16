@@ -50,8 +50,8 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
         return "Cannot parse invalid buffer";
     }
 
-    auto scanner = Scanner(buffer, bufferSizeInBytes);
-    auto parser  = Parser(&scanner);
+    const auto scanner = std::make_shared<Scanner>(buffer, bufferSizeInBytes);
+    auto parser  = Parser(scanner);
     parser.setConfig(ParserConfig{});
     parser.Parse();
 

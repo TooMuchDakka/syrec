@@ -1,6 +1,5 @@
 #include "core/syrec/parser/grammar_conflict_resolver.hpp"
 #include "core/syrec/parser/Parser.h"
-#include "core/syrec/parser/text_utils.hpp"
 
 using namespace parser;
 
@@ -19,10 +18,10 @@ bool parser::shouldTakeBinaryInsteadOfShiftAlternative(const Parser* parser) noe
     bool foundMatchingTokenValue = false;
     size_t expressionNestingLevel = 0;
 
-    const Token* peekedToken = parser->scanner->Peek();
+    std::shared_ptr<Token> peekedToken = parser->scanner->Peek();
     
     while (!canCancelSearch && peekedToken->kind != 0) {
-        const std::string tokenValue = convert_to_uniform_text_format(peekedToken->val);
+        const std::string tokenValue = peekedToken->val;
         if (tokenValue == "(") {
             expressionNestingLevel++;
         }
@@ -53,19 +52,19 @@ bool parser::checkIsLoopInitialValueExplicitlyDefined(const Parser* parser) noex
     return parser::peekUntilTokenValuesMatchesOrEOF(parser, {"to"}, {"rof"});
 }
 
-bool parser::doesTokenValueMatchAny(const Token* token, const std::vector<std::string>& possibleTokenValues) noexcept {
+bool parser::doesTokenValueMatchAny(const std::shared_ptr<Token>& token, const std::vector<std::string>& possibleTokenValues) noexcept {
     if (nullptr == token) {
         return false;
     }
 
-    const std::string tokenValue = convert_to_uniform_text_format(token->val);
+    const std::string tokenValue = token->val;
     return std::find_if(
         cbegin(possibleTokenValues),
         cend(possibleTokenValues),
         [tokenValue](const std::string_view& possibleTokenValue) { return possibleTokenValue == tokenValue; }) != cend(possibleTokenValues);
 }
 
-bool parser::peekUntilTokenValuesMatchesOrEOF(const Parser*                        parser,
+bool parser::peekUntilTokenValuesMatchesOrEOF(const Parser* parser,
     const std::vector<std::string>& valuesToLookFor,
     const std::vector<std::string>& valuesCancellingSearch) noexcept {
 
@@ -79,25 +78,22 @@ bool parser::peekUntilTokenValuesMatchesOrEOF(const Parser*                     
     const std::set<std::string, std::less<>> valueLookup             = parser::createLookupForValues(valuesToLookFor);
     const std::set<std::string, std::less<>> alternativeValuesLookup = parser::createLookupForValues(valuesCancellingSearch);
 
-    const Token* peekedToken = parser->scanner->Peek();
+    std::shared_ptr<Token> peekedToken = parser->scanner->Peek();
     while (!canCancelSearch && peekedToken->kind != 0) {
-        const std::string tokenValue = convert_to_uniform_text_format(peekedToken->val);
-
-        foundMatchingValue = valueLookup.count(tokenValue);
-        canCancelSearch                     = foundMatchingValue || peekedToken->kind == 0 || alternativeValuesLookup.count(tokenValue);
+        foundMatchingValue = valueLookup.count(peekedToken->val);
+        canCancelSearch                     = foundMatchingValue || peekedToken->kind == 0 || alternativeValuesLookup.count(peekedToken->val);
         peekedToken = !canCancelSearch ? parser->scanner->Peek() : nullptr;
     }
     return foundMatchingValue;
 }
 
-bool parser::isTokenSequenceNumberProduction(Scanner* scanner, const Token* token) {
+bool parser::isTokenSequenceNumberProduction(const std::shared_ptr<Scanner>& scanner, const std::shared_ptr<Token>& token) {
     if (nullptr == token || 0 == token->kind) {
         return false;
     }
     
-    const std::string           valueOfCurrentToken          = convert_to_uniform_text_format(token->val);
-    if ("(" == valueOfCurrentToken) {
-        const Token* peekedToken = scanner->Peek();
+    if ("(" == token->val) {
+        const std::shared_ptr<Token> peekedToken = scanner->Peek();
         return parser::isTokenSequenceNumberProduction(scanner, peekedToken)
             && parser::doesTokenValueMatchAny(scanner->Peek(), {"^", "+", "-", "*"})
             && parser::isTokenSequenceNumberProduction(scanner, scanner->Peek())
@@ -106,13 +102,8 @@ bool parser::isTokenSequenceNumberProduction(Scanner* scanner, const Token* toke
     return parser::isTokenStartOfNonRecursiveNumber(token);
 }
 
-bool parser::isTokenStartOfNonRecursiveNumber(const Token* token) noexcept {
-    if (nullptr == token) {
-        return false;
-    }
-
-    const std::string tokenValue = convert_to_uniform_text_format(token->val);
-    return token->kind == 2 || tokenValue == "#" || tokenValue == "$";
+bool parser::isTokenStartOfNonRecursiveNumber(const std::shared_ptr<Token>& token) noexcept {
+    return token != nullptr && (token->kind == 2 || token->val == "#" || token->val == "$");
 }
 
 std::set<std::string, std::less<>> parser::createLookupForValues(const std::vector<std::string>& values) noexcept {
