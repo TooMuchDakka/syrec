@@ -56,7 +56,7 @@ package_add_test(
   unittests/test_huffman.cpp
   unittests/test_pla_parser.cpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_error_cases_fixture.cpp
-  unittests/syrecParserComponentsTests/fixtures/syrec_parser_success_cases_fixture.cpp unittests/syrecParserComponentsTests/utils/syrec_ast_dump_utils.hpp unittests/syrecParserComponentsTests/utils/infix_iterator.hpp unittests/syrecParserComponentsTests/utils/syrec_ast_dump_utils.cpp 
+  unittests/syrecParserComponentsTests/fixtures/syrec_parser_success_cases_fixture.cpp unittests/syrecParserComponentsTests/utils/syrec_ast_dump_utils.hpp unittests/syrecParserComponentsTests/utils/syrec_ast_dump_utils.cpp 
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_symbol_table_fixture.cpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_range_check_fixture.cpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_method_call_guess_fixture.cpp

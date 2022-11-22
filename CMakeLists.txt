@@ -53,6 +53,7 @@ macro(CHECK_SUBMODULE_PRESENT modulename)
 endmacro()
 
 check_submodule_present(qfr)
+check_submodule_present(fmt)
 
 # add main library code
 add_subdirectory(src)

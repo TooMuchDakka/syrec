@@ -1,8 +1,11 @@
 #include "core/syrec/program.hpp"
 
+#include "CommonTokenStream.h"
 #include "core/syrec/parser/infix_iterator.hpp"
 #include "core/syrec/parser/Parser.h"
 #include "core/syrec/parser/Scanner.h"
+#include "parser/antlr/SyReCLexer.h"
+#include "parser/antlr/SyReCParser.h"
 
 using parser::Parser;
 using parser::Scanner;
@@ -54,6 +57,14 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     auto parser  = Parser(&scanner);
     parser.setConfig(ParserConfig{});
     parser.Parse();
+    
+    const char*               tmp = (char *)(buffer);
+    antlr4::ANTLRInputStream  input(tmp, bufferSizeInBytes);
+    SyReCLexer            lexer(&input);
+    antlr4::CommonTokenStream tokens(&lexer);
+    SyReCParser           antlrParser(&tokens);
+
+    antlrParser.Parse();
 
     if (parser.errors.empty()) {
         this->modulesVec = parser.modules;
