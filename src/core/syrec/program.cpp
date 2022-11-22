@@ -2,16 +2,10 @@
 
 #include "CommonTokenStream.h"
 #include "core/syrec/parser/infix_iterator.hpp"
-#include "core/syrec/parser/Parser.h"
-#include "core/syrec/parser/Scanner.h"
 #include "parser/antlr/SyReCLexer.h"
 #include "parser/antlr/SyReCParser.h"
 
-using parser::Parser;
-using parser::Scanner;
-using parser::ParserConfig;
 using namespace syrec;
-
 
 std::string program::read(const std::string& filename, const ReadProgramSettings settings) {
     std::size_t fileContentLength = 0;
@@ -52,11 +46,7 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     if (nullptr == buffer) {
         return "Cannot parse invalid buffer";
     }
-
-    auto scanner = Scanner(buffer, bufferSizeInBytes);
-    auto parser  = Parser(&scanner);
-    parser.setConfig(ParserConfig{});
-    parser.Parse();
+    
     
     const char*               tmp = (char *)(buffer);
     antlr4::ANTLRInputStream  input(tmp, bufferSizeInBytes);
@@ -65,7 +55,8 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     SyReCParser           antlrParser(&tokens);
 
     antlrParser.Parse();
-
+    return "";
+    /*
     if (parser.errors.empty()) {
         this->modulesVec = parser.modules;
         return "";
@@ -74,5 +65,6 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     std::ostringstream errorsConcatinatedBuffer;
     std::copy(parser.errors.cbegin(), parser.errors.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, "\n"));
     return errorsConcatinatedBuffer.str();
+    */
 }
 
