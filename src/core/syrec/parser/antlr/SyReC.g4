@@ -5,7 +5,7 @@ fragment LETTER : [a-zA-Z] ;
 fragment DIGIT : [0-9] ;
 IDENT : ( '_' | LETTER ) ( '_' | LETTER | DIGIT )* ;
 INT : DIGIT+ ;
-SKIPABLEWHITSPACES : [\t\r\n]+ ->skip ;	// Skip newline, tabulator and carriage return symbols
+SKIPABLEWHITSPACES : [ \t\r\n]+ -> skip ;	// Skip newline, tabulator and carriage return symbols
 
 /* Number production */
 number: 

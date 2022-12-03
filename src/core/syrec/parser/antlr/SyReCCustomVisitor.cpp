@@ -1,5 +1,7 @@
+#include <climits>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <fmt/format.h>
 #include "core/syrec/parser/custom_semantic_errors.hpp"
 
@@ -8,8 +10,9 @@
 using namespace parser;
 
 std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) {
+    SymbolTable::openScope(currentSymbolTableScope);
     for (const auto& module : context->module()) {
-        const auto moduleParseResult = std::any_cast<std::optional<syrec::Module::ptr>>(visit(module));
+        const auto moduleParseResult = tryConvertProductionReturnValue<syrec::Module::ptr>(visit(module));
         if (moduleParseResult.has_value()) {
             if (currentSymbolTableScope->contains(moduleParseResult.value())) {
                 createError(fmt::format(DuplicateModuleIdentDeclaration, moduleParseResult.value()->name));   
@@ -19,13 +22,14 @@ std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) 
             }
         }
     }
-    return modules;
+
+    return errors.empty();
 }
 
 std::any SyReCCustomVisitor::visitModule(SyReCParser::ModuleContext* context) {
     SymbolTable::openScope(this->currentSymbolTableScope);
     const std::string moduleIdent = context->IDENT()->getText();
-    const auto declaredParameters = std::any_cast<std::optional<syrec::Variable::vec>>(visit(context->parameterList()));
+    const auto declaredParameters = tryConvertProductionReturnValue<syrec::Variable::vec>(visit(context->parameterList()));
     bool              isDeclaredModuleValid = true;
 
     syrec::Module::ptr module = std::make_shared<syrec::Module>(moduleIdent);
@@ -37,7 +41,7 @@ std::any SyReCCustomVisitor::visitModule(SyReCParser::ModuleContext* context) {
     }
 
     for (const auto& declaredSignals: context->signalList()) {
-        const auto parsedDeclaredSignals = std::any_cast<std::optional<syrec::Variable::vec>>(visit(declaredSignals));
+        const auto parsedDeclaredSignals = tryConvertProductionReturnValue<syrec::Variable::vec>(visit(declaredSignals));
         isDeclaredModuleValid &= parsedDeclaredSignals.has_value();
         if (isDeclaredModuleValid) {
             for (const auto& declaredSignal : parsedDeclaredSignals.value()) {
@@ -58,7 +62,7 @@ std::any SyReCCustomVisitor::visitParameterList(SyReCParser::ParameterListContex
     std::optional<syrec::Variable::vec>              parameters;
 
     for (const auto& parameter : context->parameter()) {
-        const auto parsedParameterDefinition = std::any_cast<std::optional<syrec::Variable::ptr>>(visit(parameter));
+        const auto parsedParameterDefinition = tryConvertProductionReturnValue<syrec::Variable::ptr>(visit(parameter));
         allParametersValid &= parsedParameterDefinition.has_value();
         if (allParametersValid) {
             parametersContainer.emplace_back(parsedParameterDefinition.value());
@@ -73,12 +77,12 @@ std::any SyReCCustomVisitor::visitParameterList(SyReCParser::ParameterListContex
 }
 
 std::any SyReCCustomVisitor::visitParameter(SyReCParser::ParameterContext* context) {
-    const auto parameterType = std::any_cast<std::optional<syrec::Variable::Types>>(visit(context->parameterType()));
+    const auto parameterType = tryConvertProductionReturnValue<syrec::Variable::Types>(visit(context->parameterType())); //std::any_cast<std::optional<syrec::Variable::Types>>(visit(context->parameterType()));
     if (!parameterType.has_value()) {
         createError(InvalidParameterType);
     } 
 
-    auto declaredParameter = std::any_cast<std::optional<syrec::Variable::ptr>>(visit(context->signalDeclaration()));
+    auto declaredParameter = tryConvertProductionReturnValue<syrec::Variable::ptr>(visit(context->signalDeclaration()));
     if (declaredParameter.has_value()) {
         //declaredParameter.value()->type = parameterType;
         declaredParameter.value()->type = 0;
@@ -88,21 +92,21 @@ std::any SyReCCustomVisitor::visitParameter(SyReCParser::ParameterContext* conte
 }
 
 std::any SyReCCustomVisitor::visitInSignalType(SyReCParser::InSignalTypeContext* context) {
-    return syrec::Variable::Types::In;
+    return std::make_optional(syrec::Variable::Types::In);
 }
 
 std::any SyReCCustomVisitor::visitOutSignalType(SyReCParser::OutSignalTypeContext* context) {
-    return syrec::Variable::Types::Out;
+    return std::make_optional(syrec::Variable::Types::Out);
 }
 
 std::any SyReCCustomVisitor::visitInoutSignalType(SyReCParser::InoutSignalTypeContext* context) {
-    return syrec::Variable::Types::Inout;
+    return std::make_optional(syrec::Variable::Types::Inout);
 }
 
 std::any SyReCCustomVisitor::visitSignalList(SyReCParser::SignalListContext* context) {
     bool                                isValidSignalListDeclaration = true;
 
-    const auto declaredSignalsType = std::any_cast<std::optional<syrec::Variable::Types>>(visit(context->signalType()));
+    const auto declaredSignalsType = tryConvertProductionReturnValue<syrec::Variable::Types>(visit(context->signalType()));
     if (!declaredSignalsType.has_value()) {
         createError(InvalidLocalType);
         isValidSignalListDeclaration = false;
@@ -110,7 +114,7 @@ std::any SyReCCustomVisitor::visitSignalList(SyReCParser::SignalListContext* con
 
     syrec::Variable::vec declaredSignalsOfType{};
     for (const auto& signal : context->signalDeclaration()) {
-        const auto declaredSignal = std::any_cast<std::optional<syrec::Variable::ptr>>(visit(signal));
+        const auto declaredSignal = tryConvertProductionReturnValue<syrec::Variable::ptr>(visit(signal));
         isValidSignalListDeclaration &= declaredSignal.has_value();
 
         if (isValidSignalListDeclaration) {
@@ -136,7 +140,7 @@ std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
     std::optional<syrec::Variable::ptr> signal;
     std::vector<unsigned int> dimensions {};
     unsigned int              signalWidth = this->config.cDefaultSignalWidth;
-    bool              isValidSignalDeclaration = false;
+    bool              isValidSignalDeclaration = true;
 
     const std::string signalIdent = context->IDENT()->getText();
     if (currentSymbolTableScope->contains(signalIdent)) {
@@ -170,27 +174,37 @@ std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
 
 // TODO:
 void SyReCCustomVisitor::createError(size_t line, size_t column, const std::string& errorMessage) {
-    
+    this->errors.emplace_back(fmt::format(messageFormat, line, column, errorMessage));
 }
 
 // TODO:
 void SyReCCustomVisitor::createError(const std::string& errorMessage) {
-    
+    createError(0, 0, errorMessage);
 }
 
 // TODO:
 void SyReCCustomVisitor::createWarning(const std::string& warningMessage) {
-    
+    createWarning(0, 0, warningMessage);
 }
 
 // TODO:
 void SyReCCustomVisitor::createWarning(size_t line, size_t column, const std::string& warningMessage) {
-    
+    this->warnings.emplace_back(fmt::format(messageFormat, line, column, warningMessage));
 }
 
 // TODO:
 std::optional<unsigned> SyReCCustomVisitor::convertToNumber(const antlr4::Token* token) const {
-    return std::nullopt;
+    if (token == nullptr) {
+        return std::nullopt;
+    }
+
+    try {
+        return std::stoul(token->getText()) & UINT_MAX;
+    } catch (std::invalid_argument&) {
+        return std::nullopt;
+    } catch (std::out_of_range&) {
+        return std::nullopt;    
+    }
 }
 
 

@@ -31,6 +31,20 @@ private:
 
     [[nodiscard]] std::optional<unsigned int> convertToNumber(const antlr4::Token* token) const;
 
+    template<typename T>
+    [[nodiscard]] std::optional<T>            tryConvertProductionReturnValue(std::any productionReturnType) const {
+        if (!productionReturnType.has_value()) {
+            return std::nullopt;
+        }
+
+        try {
+            return std::any_cast<std::optional<T>>(productionReturnType);
+        }
+        catch (std::bad_any_cast&) {
+            return std::nullopt;
+        }
+    }
+
 public:
     syrec::Module::vec modules;
     std::vector<std::string> errors;

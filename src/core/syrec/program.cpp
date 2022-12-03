@@ -47,8 +47,7 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     if (nullptr == buffer) {
         return "Cannot parse invalid buffer";
     }
-    
-    
+
     const char*               tmp = (char *)(buffer);
     antlr4::ANTLRInputStream  input(tmp, bufferSizeInBytes);
     ::parser::SyReCLexer      lexer(&input);
@@ -56,9 +55,8 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     ::parser::SyReCParser     antlrParser(&tokens);
 
     const auto& customVisitor = std::make_unique<::parser::SyReCCustomVisitor>();
-    customVisitor->visitProgram(antlrParser.program());
 
-    if (customVisitor->errors.empty()) {
+    if (std::any_cast<bool>(customVisitor->visitProgram(antlrParser.program()))) {
         this->modulesVec = customVisitor->modules;
         return "";
     }
@@ -66,15 +64,5 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     std::ostringstream errorsConcatinatedBuffer;
     std::copy(customVisitor->errors.cbegin(), customVisitor->errors.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, "\n"));
     return errorsConcatinatedBuffer.str();
-    /*
-    if (parser.errors.empty()) {
-        this->modulesVec = parser.modules;
-        return "";
-    }
-
-    std::ostringstream errorsConcatinatedBuffer;
-    std::copy(parser.errors.cbegin(), parser.errors.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, "\n"));
-    return errorsConcatinatedBuffer.str();
-    */
 }
 
