@@ -2,6 +2,7 @@
 
 #include "CommonTokenStream.h"
 #include "core/syrec/parser/infix_iterator.hpp"
+#include "parser/antlr/SyReCCustomVisitor.h"
 #include "parser/antlr/SyReCLexer.h"
 #include "parser/antlr/SyReCParser.h"
 
@@ -50,12 +51,21 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     
     const char*               tmp = (char *)(buffer);
     antlr4::ANTLRInputStream  input(tmp, bufferSizeInBytes);
-    SyReCLexer            lexer(&input);
+    ::parser::SyReCLexer      lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
-    SyReCParser           antlrParser(&tokens);
+    ::parser::SyReCParser     antlrParser(&tokens);
 
-    antlrParser.Parse();
-    return "";
+    const auto& customVisitor = std::make_unique<::parser::SyReCCustomVisitor>();
+    customVisitor->visitProgram(antlrParser.program());
+
+    if (customVisitor->errors.empty()) {
+        this->modulesVec = customVisitor->modules;
+        return "";
+    }
+
+    std::ostringstream errorsConcatinatedBuffer;
+    std::copy(customVisitor->errors.cbegin(), customVisitor->errors.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, "\n"));
+    return errorsConcatinatedBuffer.str();
     /*
     if (parser.errors.empty()) {
         this->modulesVec = parser.modules;

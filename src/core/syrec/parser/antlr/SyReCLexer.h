@@ -1,8 +1,4 @@
 
-#include <vector>
-#include <string>
-
-
 // Generated from ..\syrec_antlr\src\core\syrec\parser\antlr\SyReC.g4 by ANTLR 4.11.1
 
 #pragma once
@@ -11,7 +7,7 @@
 #include "antlr4-runtime.h"
 
 
-namespace syrec {
+namespace parser {
 
 
 class  SyReCLexer : public antlr4::Lexer {
@@ -60,4 +56,4 @@ private:
 
 };
 
-}  // namespace syrec
+}  // namespace parser

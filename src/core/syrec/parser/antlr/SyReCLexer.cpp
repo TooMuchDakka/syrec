@@ -1,8 +1,4 @@
 
-#include <vector>
-#include <string>
-
-
 // Generated from ..\syrec_antlr\src\core\syrec\parser\antlr\SyReC.g4 by ANTLR 4.11.1
 
 
@@ -11,7 +7,7 @@
 
 using namespace antlr4;
 
-using namespace syrec;
+using namespace parser;
 
 
 using namespace antlr4;

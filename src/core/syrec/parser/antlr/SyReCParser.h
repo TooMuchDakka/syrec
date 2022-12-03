@@ -1,8 +1,4 @@
 
-#include <vector>
-#include <string>
-
-
 // Generated from ..\syrec_antlr\src\core\syrec\parser\antlr\SyReC.g4 by ANTLR 4.11.1
 
 #pragma once
@@ -11,7 +7,7 @@
 #include "antlr4-runtime.h"
 
 
-namespace syrec {
+namespace parser {
 
 
 class  SyReCParser : public antlr4::Parser {
@@ -30,11 +26,12 @@ public:
 
   enum {
     RuleNumber = 0, RuleProgram = 1, RuleModule = 2, RuleParameterList = 3, 
-    RuleParameter = 4, RuleSignalList = 5, RuleSignalDeclaration = 6, RuleStatementList = 7, 
-    RuleStatement = 8, RuleCallStatement = 9, RuleForStatement = 10, RuleIfStatement = 11, 
-    RuleUnaryStatement = 12, RuleAssignStatement = 13, RuleSwapStatement = 14, 
-    RuleSkipStatement = 15, RuleSignal = 16, RuleExpression = 17, RuleBinaryExpression = 18, 
-    RuleUnaryExpression = 19, RuleShiftExpression = 20
+    RuleParameter = 4, RuleParameterType = 5, RuleSignalList = 6, RuleSignalType = 7, 
+    RuleSignalDeclaration = 8, RuleStatementList = 9, RuleStatement = 10, 
+    RuleCallStatement = 11, RuleForStatement = 12, RuleIfStatement = 13, 
+    RuleUnaryStatement = 14, RuleAssignStatement = 15, RuleSwapStatement = 16, 
+    RuleSkipStatement = 17, RuleSignal = 18, RuleExpression = 19, RuleBinaryExpression = 20, 
+    RuleUnaryExpression = 21, RuleShiftExpression = 22
   };
 
   explicit SyReCParser(antlr4::TokenStream *input);
@@ -54,19 +51,14 @@ public:
   antlr4::atn::SerializedATNView getSerializedATN() const override;
 
 
-  public:
-  	void Parse() {}
-
-  private:
-  	void Test() {}
-
-
   class NumberContext;
   class ProgramContext;
   class ModuleContext;
   class ParameterListContext;
   class ParameterContext;
+  class ParameterTypeContext;
   class SignalListContext;
+  class SignalTypeContext;
   class SignalDeclarationContext;
   class StatementListContext;
   class StatementContext;
@@ -92,6 +84,8 @@ public:
     std::vector<NumberContext *> number();
     NumberContext* number(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -104,6 +98,8 @@ public:
     std::vector<ModuleContext *> module();
     ModuleContext* module(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -119,6 +115,8 @@ public:
     std::vector<SignalListContext *> signalList();
     SignalListContext* signalList(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -131,6 +129,8 @@ public:
     std::vector<ParameterContext *> parameter();
     ParameterContext* parameter(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -140,33 +140,114 @@ public:
   public:
     ParameterContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
+    ParameterTypeContext *parameterType();
     SignalDeclarationContext *signalDeclaration();
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
   ParameterContext* parameter();
 
+  class  ParameterTypeContext : public antlr4::ParserRuleContext {
+  public:
+    ParameterTypeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    ParameterTypeContext() = default;
+    void copyFrom(ParameterTypeContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  InSignalTypeContext : public ParameterTypeContext {
+  public:
+    InSignalTypeContext(ParameterTypeContext *ctx);
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  class  OutSignalTypeContext : public ParameterTypeContext {
+  public:
+    OutSignalTypeContext(ParameterTypeContext *ctx);
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  class  InoutSignalTypeContext : public ParameterTypeContext {
+  public:
+    InoutSignalTypeContext(ParameterTypeContext *ctx);
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  ParameterTypeContext* parameterType();
+
   class  SignalListContext : public antlr4::ParserRuleContext {
   public:
     SignalListContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
+    SignalTypeContext *signalType();
     std::vector<SignalDeclarationContext *> signalDeclaration();
     SignalDeclarationContext* signalDeclaration(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
   SignalListContext* signalList();
 
+  class  SignalTypeContext : public antlr4::ParserRuleContext {
+  public:
+    SignalTypeContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    SignalTypeContext() = default;
+    void copyFrom(SignalTypeContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  StateSignalTypeContext : public SignalTypeContext {
+  public:
+    StateSignalTypeContext(SignalTypeContext *ctx);
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  class  WireSignalTypeContext : public SignalTypeContext {
+  public:
+    WireSignalTypeContext(SignalTypeContext *ctx);
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  SignalTypeContext* signalType();
+
   class  SignalDeclarationContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *intToken = nullptr;
+    std::vector<antlr4::Token *> dimensionTokens;
+    antlr4::Token *signalWidthToken = nullptr;
     SignalDeclarationContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *IDENT();
     std::vector<antlr4::tree::TerminalNode *> INT();
     antlr4::tree::TerminalNode* INT(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -179,6 +260,8 @@ public:
     std::vector<StatementContext *> statement();
     StatementContext* statement(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -196,6 +279,8 @@ public:
     SwapStatementContext *swapStatement();
     SkipStatementContext *skipStatement();
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -208,6 +293,8 @@ public:
     std::vector<antlr4::tree::TerminalNode *> IDENT();
     antlr4::tree::TerminalNode* IDENT(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -222,6 +309,8 @@ public:
     StatementListContext *statementList();
     antlr4::tree::TerminalNode *IDENT();
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -236,6 +325,8 @@ public:
     std::vector<StatementListContext *> statementList();
     StatementListContext* statementList(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -247,6 +338,8 @@ public:
     virtual size_t getRuleIndex() const override;
     SignalContext *signal();
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -259,6 +352,8 @@ public:
     SignalContext *signal();
     ExpressionContext *expression();
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -271,6 +366,8 @@ public:
     std::vector<SignalContext *> signal();
     SignalContext* signal(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -281,6 +378,8 @@ public:
     SkipStatementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -296,6 +395,8 @@ public:
     std::vector<NumberContext *> number();
     NumberContext* number(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -311,6 +412,8 @@ public:
     UnaryExpressionContext *unaryExpression();
     ShiftExpressionContext *shiftExpression();
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -323,6 +426,8 @@ public:
     std::vector<ExpressionContext *> expression();
     ExpressionContext* expression(size_t i);
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -334,6 +439,8 @@ public:
     virtual size_t getRuleIndex() const override;
     ExpressionContext *expression();
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -346,6 +453,8 @@ public:
     ExpressionContext *expression();
     NumberContext *number();
 
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
   };
 
@@ -360,4 +469,4 @@ public:
 private:
 };
 
-}  // namespace syrec
+}  // namespace parser

@@ -1,18 +1,5 @@
 grammar SyReC;
 
-@header {
-#include <vector>
-#include <string>
-}
-
-@parser::members {
-public:
-	void Parse() {}
-
-private:
-	void Test() {}
-}
-
 /* Token defintions */
 fragment LETTER : [a-zA-Z] ;
 fragment DIGIT : [0-9] ;
@@ -32,15 +19,60 @@ number:
 
 program: module+ ;
 
-module: 'module' IDENT '(' parameterList ')' signalList* statementList ;
+module :
+	'module' 
+	IDENT													
+	'(' 
+		parameterList
+	')' 
+	signalList*										
+	statementList										
+	;
 
-parameterList: parameter (',' parameter )* ;
+parameterList:
+	parameter
+	(													
+		',' parameter
+	)* 
+	;
 
-parameter: ( 'in' | 'out' | 'inout' ) signalDeclaration ;
+parameter:
+	parameterType														
+	signalDeclaration
+	;
 
-signalList: ( 'wire' | 'state' ) signalDeclaration ( ',' signalDeclaration )* ;
+parameterType:
+	'in'			# InSignalType
+	| 'out'			# OutSignalType
+	| 'inout'		# InoutSignalType
+	;
 
-signalDeclaration: IDENT ( '[' INT ']' )* ( '(' INT ')' )? ;
+signalList: 
+	signalType
+	signalDeclaration
+	(															
+		',' signalDeclaration
+	)* 
+	;
+
+signalType:
+	'wire'			# WireSignalType
+	| 'state'		# StateSignalType
+	;
+
+signalDeclaration:	
+IDENT																		
+( 
+	'[' 
+		dimensionTokens+=INT						
+	']' 
+)* 
+(
+	'(' 
+		signalWidthToken=INT												
+	')' 
+)?															
+;
 
 /* Statements productions */
 
@@ -108,9 +140,3 @@ binaryExpression:
 unaryExpression: ( '!' | '~' ) expression ;
 
 shiftExpression: '(' expression ( '<<' | '>>' ) number ')' ;
-
-/*
-module[std::vector<std::string>>, int x inputStrings] returns [std::vector<int> x] locals [int t = 0] :
-	IDENT 'Test' '=' INT ';'
-	;
-*/

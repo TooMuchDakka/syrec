@@ -27,11 +27,17 @@ add_library(${PROJECT_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/signal_evaluation_result.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/symbol_table.cpp
 			
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.h
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.h
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.h
 
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.cpp
 
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
