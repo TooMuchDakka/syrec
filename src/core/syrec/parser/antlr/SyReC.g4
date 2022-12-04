@@ -1,12 +1,6 @@
 grammar SyReC;
 
 /* Token defintions */
-fragment LETTER : [a-zA-Z] ;
-fragment DIGIT : [0-9] ;
-IDENT : ( '_' | LETTER ) ( '_' | LETTER | DIGIT )* ;
-INT : DIGIT+ ;
-SKIPABLEWHITSPACES : [ \t\r\n]+ -> skip ;	// Skip newline, tabulator and carriage return symbols
-
 OP_PLUS : '+' ;
 OP_MINUS : '-' ;
 OP_MULTIPLY: '*' ;
@@ -47,6 +41,12 @@ SIGNAL_WIDTH_PREFIX: '#' ;
 
 STATEMENT_DELIMITER: ';' ;
 PARAMETER_DELIMITER: ',' ;
+
+fragment LETTER : 'a'..'z' | 'A'..'Z' ;
+fragment DIGIT : '0'..'9' ;
+IDENT : ( '_' | LETTER ) ( '_' | LETTER | DIGIT )* ;
+INT : DIGIT+ ;
+SKIPABLEWHITSPACES : [ \t\r\n]+ -> skip ;	// Skip newline, tabulator and carriage return symbols
 
 
 /* Number production */

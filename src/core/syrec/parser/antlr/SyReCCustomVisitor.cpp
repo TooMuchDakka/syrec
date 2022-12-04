@@ -79,7 +79,7 @@ std::any SyReCCustomVisitor::visitParameterList(SyReCParser::ParameterListContex
 }
 
 std::any SyReCCustomVisitor::visitParameter(SyReCParser::ParameterContext* context) {
-     const auto parameterType = tryConvertProductionReturnValue<syrec::Variable::Types>(getSignalType(context->start));
+     const auto parameterType = tryConvertProductionReturnValue<syrec::Variable::Types>(getParameterType(context->start));
     if (!parameterType.has_value()) {
         createError(InvalidParameterType);
     } 
@@ -95,7 +95,7 @@ std::any SyReCCustomVisitor::visitParameter(SyReCParser::ParameterContext* conte
 std::any SyReCCustomVisitor::visitSignalList(SyReCParser::SignalListContext* context) {
     bool                                isValidSignalListDeclaration = true;
 
-    const auto declaredSignalsType = tryConvertProductionReturnValue<syrec::Variable::Types>(getParameterType(context->start));
+    const auto declaredSignalsType = tryConvertProductionReturnValue<syrec::Variable::Types>(getSignalType(context->start));
     if (!declaredSignalsType.has_value()) {
         createError(InvalidLocalType);
         isValidSignalListDeclaration = false;
