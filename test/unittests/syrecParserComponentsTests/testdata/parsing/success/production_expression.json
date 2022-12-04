@@ -7,7 +7,7 @@
     "expectedCircuit": "module main() wire test(16) test += 16"
   },
   "isLoopVariable": {
-    "circuit": "module main() wire test(16) for $i = 0 to 2 step 1 do test += $i"
+    "circuit": "module main() wire test(16) for $i = 0 to 2 step 1 do test += $i rof"
   },
   "isExpressionWithoutNesting": {
     "circuit": "module main() wire test(16) test += (#test + 6)",

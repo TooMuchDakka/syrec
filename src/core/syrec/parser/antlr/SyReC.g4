@@ -65,7 +65,7 @@ module :
 	'module' 
 	IDENT													
 	'(' 
-		parameterList
+		parameterList?
 	')' 
 	signalList*										
 	statementList										
@@ -90,7 +90,7 @@ parameter:
 signalList: 
 	(
 		VAR_TYPE_WIRE
-		VAR_TYPE_STATE
+		| VAR_TYPE_STATE
 	)
 	signalDeclaration
 	(															
@@ -128,7 +128,7 @@ statement:
 
 callStatement: ( 'call' | 'uncall' ) moduleIdent=IDENT '(' calleArguments+=IDENT ( ',' calleeArguments+=IDENT )* ')' ;
 
-forStatement: 'for' ( ( LOOP_VARIABLE_PREFIX variableIdent=IDENT OP_EQUAL )? startValue=number 'to' )? endValue=number ( 'step' ( OP_MINUS )? stepSize=number )? statementList 'rof' ;
+forStatement: 'for' ( ( LOOP_VARIABLE_PREFIX variableIdent=IDENT OP_EQUAL )? startValue=number 'to' )? endValue=number ( 'step' ( OP_MINUS )? stepSize=number )? 'do' statementList 'rof' ;
 
 ifStatement: 
 	'if' guardCondition=expression 'then' 

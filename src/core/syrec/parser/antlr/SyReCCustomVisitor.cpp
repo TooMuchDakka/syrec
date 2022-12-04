@@ -31,12 +31,16 @@ std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) 
 std::any SyReCCustomVisitor::visitModule(SyReCParser::ModuleContext* context) {
     SymbolTable::openScope(this->currentSymbolTableScope);
     const std::string moduleIdent = context->IDENT()->getText();
-    const auto declaredParameters = tryConvertProductionReturnValue<syrec::Variable::vec>(visit(context->parameterList()));
-    bool              isDeclaredModuleValid = true;
+    syrec::Module::ptr                  module      = std::make_shared<syrec::Module>(moduleIdent);
 
-    syrec::Module::ptr module = std::make_shared<syrec::Module>(moduleIdent);
-    isDeclaredModuleValid &= declaredParameters.has_value();
-    if (isDeclaredModuleValid) {
+    bool                                isDeclaredModuleValid = true;
+    std::optional<syrec::Variable::vec> declaredParameters;
+    if (context->parameterList() != nullptr) {
+        declaredParameters = tryConvertProductionReturnValue<syrec::Variable::vec>(visit(context->parameterList()));
+        isDeclaredModuleValid &= declaredParameters.has_value();
+    }
+    
+    if (isDeclaredModuleValid && declaredParameters.has_value()) {
         for (const auto& declaredParameter : declaredParameters.value()) {
             module->addParameter(declaredParameter);
         }
