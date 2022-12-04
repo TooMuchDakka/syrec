@@ -37,27 +37,7 @@ public:
     return visitChildren(ctx);
   }
 
-  virtual std::any visitInSignalType(SyReCParser::InSignalTypeContext *ctx) override {
-    return visitChildren(ctx);
-  }
-
-  virtual std::any visitOutSignalType(SyReCParser::OutSignalTypeContext *ctx) override {
-    return visitChildren(ctx);
-  }
-
-  virtual std::any visitInoutSignalType(SyReCParser::InoutSignalTypeContext *ctx) override {
-    return visitChildren(ctx);
-  }
-
   virtual std::any visitSignalList(SyReCParser::SignalListContext *ctx) override {
-    return visitChildren(ctx);
-  }
-
-  virtual std::any visitWireSignalType(SyReCParser::WireSignalTypeContext *ctx) override {
-    return visitChildren(ctx);
-  }
-
-  virtual std::any visitStateSignalType(SyReCParser::StateSignalTypeContext *ctx) override {
     return visitChildren(ctx);
   }
 

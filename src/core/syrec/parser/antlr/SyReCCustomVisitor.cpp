@@ -9,6 +9,8 @@
 
 using namespace parser;
 
+// https://stackoverflow.com/questions/60420005/programmatically-access-antlr-grammar-rule-string-literals-outside-of-a-parse-co
+
 std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) {
     SymbolTable::openScope(currentSymbolTableScope);
     for (const auto& module : context->module()) {
@@ -77,36 +79,23 @@ std::any SyReCCustomVisitor::visitParameterList(SyReCParser::ParameterListContex
 }
 
 std::any SyReCCustomVisitor::visitParameter(SyReCParser::ParameterContext* context) {
-    const auto parameterType = tryConvertProductionReturnValue<syrec::Variable::Types>(visit(context->parameterType())); //std::any_cast<std::optional<syrec::Variable::Types>>(visit(context->parameterType()));
+     const auto parameterType = tryConvertProductionReturnValue<syrec::Variable::Types>(getSignalType(context->start));
     if (!parameterType.has_value()) {
         createError(InvalidParameterType);
     } 
 
     auto declaredParameter = tryConvertProductionReturnValue<syrec::Variable::ptr>(visit(context->signalDeclaration()));
     if (declaredParameter.has_value()) {
-        //declaredParameter.value()->type = parameterType;
-        declaredParameter.value()->type = 0;
+        declaredParameter.value()->type = parameterType.value();
         currentSymbolTableScope->addEntry(declaredParameter.value());
     }
     return declaredParameter;
 }
 
-std::any SyReCCustomVisitor::visitInSignalType(SyReCParser::InSignalTypeContext* context) {
-    return std::make_optional(syrec::Variable::Types::In);
-}
-
-std::any SyReCCustomVisitor::visitOutSignalType(SyReCParser::OutSignalTypeContext* context) {
-    return std::make_optional(syrec::Variable::Types::Out);
-}
-
-std::any SyReCCustomVisitor::visitInoutSignalType(SyReCParser::InoutSignalTypeContext* context) {
-    return std::make_optional(syrec::Variable::Types::Inout);
-}
-
 std::any SyReCCustomVisitor::visitSignalList(SyReCParser::SignalListContext* context) {
     bool                                isValidSignalListDeclaration = true;
 
-    const auto declaredSignalsType = tryConvertProductionReturnValue<syrec::Variable::Types>(visit(context->signalType()));
+    const auto declaredSignalsType = tryConvertProductionReturnValue<syrec::Variable::Types>(getParameterType(context->start));
     if (!declaredSignalsType.has_value()) {
         createError(InvalidLocalType);
         isValidSignalListDeclaration = false;
@@ -118,22 +107,13 @@ std::any SyReCCustomVisitor::visitSignalList(SyReCParser::SignalListContext* con
         isValidSignalListDeclaration &= declaredSignal.has_value();
 
         if (isValidSignalListDeclaration) {
-            //declaredSignal.value()       = declaredSignalsOfType.value();
-            declaredSignal.value()->type = 0;
+            declaredSignal.value()->type = declaredSignalsType.value();
             declaredSignalsOfType.emplace_back(declaredSignal.value());
             currentSymbolTableScope->addEntry(declaredSignal.value());
         }
     }
     
     return declaredSignalsOfType;
-}
-
-std::any SyReCCustomVisitor::visitWireSignalType(SyReCParser::WireSignalTypeContext* context) {
-    return syrec::Variable::Types::Wire;
-}
-
-std::any SyReCCustomVisitor::visitStateSignalType(SyReCParser::StateSignalTypeContext* context) {
-    return syrec::Variable::Types::State;
 }
 
 std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarationContext* context) {
@@ -172,6 +152,16 @@ std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
     return signal;
 }
 
+/*
+std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementContext* context) {
+    context->start->getType() == SyReCParser::
+}
+*/
+std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementContext* context) {
+ // TODO:
+}
+
+
 // TODO:
 void SyReCCustomVisitor::createError(size_t line, size_t column, const std::string& errorMessage) {
     this->errors.emplace_back(fmt::format(messageFormat, line, column, errorMessage));
@@ -207,5 +197,45 @@ std::optional<unsigned> SyReCCustomVisitor::convertToNumber(const antlr4::Token*
     }
 }
 
+std::optional<syrec::Variable::Types> SyReCCustomVisitor::getParameterType(const antlr4::Token* token) {
+    std::optional<syrec::Variable::Types> parameterType;
+    if (token == nullptr) {
+        return parameterType;
+    }
 
+    switch (token->getType()) {
+        case SyReCParser::VAR_TYPE_IN:
+            parameterType.emplace(syrec::Variable::Types::In);
+            break;
+        case SyReCParser::VAR_TYPE_OUT:
+            parameterType.emplace(syrec::Variable::Types::Out);
+            break;
+        case SyReCParser::VAR_TYPE_INOUT:
+            parameterType.emplace(syrec::Variable::Types::Inout);
+            break;
+        default:
+            createError(InvalidParameterType);
+            break;
+    }
+    return parameterType;
+}
+
+std::optional<syrec::Variable::Types> SyReCCustomVisitor::getSignalType(const antlr4::Token* token) {
+    std::optional<syrec::Variable::Types> signalType;
+    if (token == nullptr) {
+        return signalType;
+    }
+
+    switch (token->getType()) {
+        case SyReCParser::VAR_TYPE_WIRE:
+            signalType.emplace(syrec::Variable::Types::Wire);
+            break;
+        case SyReCParser::VAR_TYPE_STATE:
+            signalType.emplace(syrec::Variable::Types::State);
+            break;
+        default:
+            break;
+    }
+    return signalType;
+}
 

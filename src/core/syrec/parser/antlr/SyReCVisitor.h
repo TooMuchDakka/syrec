@@ -30,17 +30,7 @@ public:
 
     virtual std::any visitParameter(SyReCParser::ParameterContext *context) = 0;
 
-    virtual std::any visitInSignalType(SyReCParser::InSignalTypeContext *context) = 0;
-
-    virtual std::any visitOutSignalType(SyReCParser::OutSignalTypeContext *context) = 0;
-
-    virtual std::any visitInoutSignalType(SyReCParser::InoutSignalTypeContext *context) = 0;
-
     virtual std::any visitSignalList(SyReCParser::SignalListContext *context) = 0;
-
-    virtual std::any visitWireSignalType(SyReCParser::WireSignalTypeContext *context) = 0;
-
-    virtual std::any visitStateSignalType(SyReCParser::StateSignalTypeContext *context) = 0;
 
     virtual std::any visitSignalDeclaration(SyReCParser::SignalDeclarationContext *context) = 0;
 

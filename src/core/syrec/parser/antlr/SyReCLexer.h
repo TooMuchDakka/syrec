@@ -15,13 +15,16 @@ public:
   enum {
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, T__5 = 6, T__6 = 7, 
     T__7 = 8, T__8 = 9, T__9 = 10, T__10 = 11, T__11 = 12, T__12 = 13, T__13 = 14, 
-    T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
-    T__20 = 21, T__21 = 22, T__22 = 23, T__23 = 24, T__24 = 25, T__25 = 26, 
-    T__26 = 27, T__27 = 28, T__28 = 29, T__29 = 30, T__30 = 31, T__31 = 32, 
-    T__32 = 33, T__33 = 34, T__34 = 35, T__35 = 36, T__36 = 37, T__37 = 38, 
-    T__38 = 39, T__39 = 40, T__40 = 41, T__41 = 42, T__42 = 43, T__43 = 44, 
-    T__44 = 45, T__45 = 46, T__46 = 47, T__47 = 48, T__48 = 49, T__49 = 50, 
-    T__50 = 51, IDENT = 52, INT = 53, SKIPABLEWHITSPACES = 54
+    T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, IDENT = 20, 
+    INT = 21, SKIPABLEWHITSPACES = 22, OP_PLUS = 23, OP_MINUS = 24, OP_MULTIPLY = 25, 
+    OP_XOR = 26, OP_UPPER_BIT_MULTIPLY = 27, OP_DIVISION = 28, OP_MODULO = 29, 
+    OP_GREATER_THAN = 30, OP_GREATER_OR_EQUAL = 31, OP_LESS_THAN = 32, OP_LESS_OR_EQUAL = 33, 
+    OP_EQUAL = 34, OP_NOT_EQUAL = 35, OP_BITWISE_AND = 36, OP_BITWISE_OR = 37, 
+    OP_BITWISE_NEGATION = 38, OP_LOGICAL_AND = 39, OP_LOGICAL_OR = 40, OP_LOGICAL_NEGATION = 41, 
+    OP_LEFT_SHIFT = 42, OP_RIGHT_SHIFT = 43, OP_INCREMENT = 44, OP_DECREMENT = 45, 
+    VAR_TYPE_IN = 46, VAR_TYPE_OUT = 47, VAR_TYPE_INOUT = 48, VAR_TYPE_WIRE = 49, 
+    VAR_TYPE_STATE = 50, LOOP_VARIABLE_PREFIX = 51, SIGNAL_WIDTH_PREFIX = 52, 
+    STATEMENT_DELIMITER = 53, PARAMETER_DELIMITER = 54
   };
 
   explicit SyReCLexer(antlr4::CharStream *input);

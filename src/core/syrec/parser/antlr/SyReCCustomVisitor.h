@@ -45,6 +45,9 @@ private:
         }
     }
 
+    std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
+    std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);
+
 public:
     syrec::Module::vec modules;
     std::vector<std::string> errors;
@@ -69,16 +72,10 @@ public:
     std::any visitModule(SyReCParser::ModuleContext* context) override;
     std::any visitParameterList(SyReCParser::ParameterListContext* context) override;
     std::any visitParameter(SyReCParser::ParameterContext* context) override;
-
-    std::any visitInSignalType(SyReCParser::InSignalTypeContext* context) override;
-    std::any visitOutSignalType(SyReCParser::OutSignalTypeContext* context) override;
-    std::any visitInoutSignalType(SyReCParser::InoutSignalTypeContext* context) override;
-
     std::any visitSignalList(SyReCParser::SignalListContext* context) override;
-    std::any visitWireSignalType(SyReCParser::WireSignalTypeContext* context) override;
-    std::any visitStateSignalType(SyReCParser::StateSignalTypeContext* context) override;
-    
     std::any visitSignalDeclaration(SyReCParser::SignalDeclarationContext* context) override;
+
+    std::any visitUnaryStatement(SyReCParser::UnaryStatementContext* context) override;
     
 };
     
