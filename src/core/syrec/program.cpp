@@ -55,7 +55,6 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     ::parser::SyReCParser     antlrParser(&tokens);
 
     const auto& customVisitor = std::make_unique<::parser::SyReCCustomVisitor>();
-
     if (std::any_cast<bool>(customVisitor->visitProgram(antlrParser.program()))) {
         this->modulesVec = customVisitor->modules;
         return "";
