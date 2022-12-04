@@ -363,6 +363,8 @@ public:
 
   class  SignalContext : public antlr4::ParserRuleContext {
   public:
+    SyReCParser::ExpressionContext *expressionContext = nullptr;
+    std::vector<ExpressionContext *> accessedDimensions;
     SyReCParser::NumberContext *bitStart = nullptr;
     SyReCParser::NumberContext *bitRangeEnd = nullptr;
     SignalContext(antlr4::ParserRuleContext *parent, size_t invokingState);

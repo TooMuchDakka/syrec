@@ -7,6 +7,9 @@
 
 #include "SyReCCustomVisitor.h"
 
+#include "core/syrec/parser/expression_evaluation_result.hpp"
+#include "core/syrec/parser/range_check.hpp"
+
 using namespace parser;
 
 // https://stackoverflow.com/questions/60420005/programmatically-access-antlr-grammar-rule-string-literals-outside-of-a-parse-co
@@ -156,15 +159,98 @@ std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
     return signal;
 }
 
+
 /*
-std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementContext* context) {
-    context->start->getType() == SyReCParser::
-}
-*/
-std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementContext* context) {
- // TODO:
+ * Signal production
+ */
+std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
+    std::string signalIdent;
+    std::optional<syrec::VariableAccess::ptr> accessedSignal;
+    bool isValidSignalAccess = context->IDENT() != nullptr && checkIfSignalWasDeclaredOrLogError(context->IDENT()->getText());
+
+    
+    if (isValidSignalAccess) {
+        signalIdent = context->IDENT()->getText();
+        const auto signalSymTabEntry = currentSymbolTableScope->getVariable(signalIdent);
+        isValidSignalAccess          = signalSymTabEntry.has_value() && std::holds_alternative<syrec::Variable::ptr>(signalSymTabEntry.value());
+
+        if (isValidSignalAccess) {
+            const syrec::VariableAccess::ptr container = std::make_shared<syrec::VariableAccess>();
+            container->setVar(std::get<syrec::Variable::ptr>(signalSymTabEntry.value()));
+            accessedSignal.emplace(container);
+        }
+    }
+
+    const size_t numDimensionsOfAccessSignal = accessedSignal.has_value() ? accessedSignal.value()->getVar()->dimensions.size() : SIZE_MAX;
+    const size_t numUserDefinedDimensions    = context->accessedDimensions.size();
+    if (isValidSignalAccess) {
+        const size_t numElementsWithinRange = std::min(numUserDefinedDimensions, numDimensionsOfAccessSignal);
+        for (size_t dimensionIdx = 0; dimensionIdx < numElementsWithinRange; ++dimensionIdx) {
+            const auto& definedDimensionAccess      = context->accessedDimensions.at(dimensionIdx);
+            const auto accessedDimensionExpression = std::any_cast<ExpressionEvaluationResult::ptr>(visit(definedDimensionAccess));
+
+            if (accessedSignal.has_value()) {
+                isValidSignalAccess = validateSemanticChecksIfDimensionExpressionIsConstant(dimensionIdx, accessedSignal.value()->getVar(), accessedDimensionExpression);
+                if (isValidSignalAccess) {
+                    // TODO: Set correct bit width of expression
+                    accessedSignal.value()->indexes.emplace_back(accessedDimensionExpression->getOrConvertToExpression(0).value());
+                }
+            }
+        }
+
+        isValidSignalAccess &= numUserDefinedDimensions > numElementsWithinRange;
+        for (size_t dimensionOutOfRangeIdx = numElementsWithinRange; dimensionOutOfRangeIdx < numUserDefinedDimensions; ++dimensionOutOfRangeIdx) {
+            createError(fmt::format(DimensionOutOfRange, dimensionOutOfRangeIdx, signalIdent, numDimensionsOfAccessSignal));
+        }
+    }
+
+    const auto bitOrRangeAccessEvaluated = isBitOrRangeAccessDefined(context->bitStart, context->bitRangeEnd);
+    if (accessedSignal.has_value() && bitOrRangeAccessEvaluated.has_value()) {
+        const auto  accessVariable                = accessedSignal.value()->getVar();
+        const auto& bitOrRangeAccessPair = bitOrRangeAccessEvaluated.value();
+        const auto& bitOrRangeAccessPairEvaluated = std::make_pair(bitOrRangeAccessPair.first->evaluate({}), bitOrRangeAccessPair.second->evaluate({}));
+
+        if (bitOrRangeAccessPair.first == bitOrRangeAccessPair.second) {
+            if (!isValidBitAccess(accessVariable, bitOrRangeAccessPairEvaluated.first, true)) {
+                isValidSignalAccess                                      = false;
+                const IndexAccessRangeConstraint constraintsForBitAccess = getConstraintsForValidBitAccess(accessVariable, true);
+                // TODO: GEN_ERROR: Bit access out of range
+                createError(fmt::format(BitAccessOutOfRange, bitOrRangeAccessPairEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue));
+            }
+        }
+        else {
+            if (bitOrRangeAccessPairEvaluated.first > bitOrRangeAccessPairEvaluated.second) {
+                isValidSignalAccess = false;
+                // TODO: GEN_ERROR: Bit range start larger than end
+                createError(fmt::format(BitRangeStartLargerThanEnd, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second));
+            }
+            else if (!isValidBitRangeAccess(accessVariable, bitOrRangeAccessPairEvaluated, true)) {
+                isValidSignalAccess                                           = false;
+                const IndexAccessRangeConstraint constraintsForBitRangeAccess = getConstraintsForValidBitAccess(accessedSignal.value()->getVar(), true);
+                // TODO: GEN_ERROR: Bit range out of range
+                createError(fmt::format(BitRangeOutOfRange, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue));
+            }
+        }
+
+        if (isValidSignalAccess) {
+            accessedSignal.value()->range.emplace(bitOrRangeAccessPair);
+        }
+    }
+
+    SignalEvaluationResult::ptr result = std::make_shared<SignalEvaluationResult>();
+    if (isValidSignalAccess) {
+        result->updateResultToVariableAccess(accessedSignal.value());   
+    }
+    return result;
 }
 
+std::any SyReCCustomVisitor::visitNumber(SyReCParser::NumberContext* context) {
+    return std::nullopt;
+}
+
+/*
+ * Utility functions for error and warning creation
+ */
 
 // TODO:
 void SyReCCustomVisitor::createError(size_t line, size_t column, const std::string& errorMessage) {
@@ -243,3 +329,54 @@ std::optional<syrec::Variable::Types> SyReCCustomVisitor::getSignalType(const an
     return signalType;
 }
 
+/*
+ * Utility functions performing semantic checks, can be maybe refactoring into separate class
+ */
+
+bool SyReCCustomVisitor::checkIfSignalWasDeclaredOrLogError(const std::string_view& signalIdent) {
+    if (!currentSymbolTableScope->contains(signalIdent)) {
+        createError(fmt::format(UndeclaredIdent, signalIdent));
+        return false;
+    }
+    return true;
+}
+
+[[nodiscard]] bool SyReCCustomVisitor::validateSemanticChecksIfDimensionExpressionIsConstant(const size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const ExpressionEvaluationResult::ptr& expressionEvaluationResult) {
+    if (!expressionEvaluationResult->hasValue()) {
+        return false;
+    }
+
+    if (!expressionEvaluationResult->evaluatedToConstant()) {
+        return true;
+    }
+
+    const auto expressionResultAsConstant = expressionEvaluationResult->getAsConstant().value();
+    const bool accessOnCurrentDimensionOk = isValidDimensionAccess(accessedSignal, accessedDimensionIdx, expressionResultAsConstant, true);
+    if (!accessOnCurrentDimensionOk) {
+        // TODO: Using global flag indicating zero_based indexing or not
+        const auto constraintForCurrentDimension = getConstraintsForValidDimensionAccess(accessedSignal, accessedDimensionIdx, true).value();
+
+        // TODO: GEN_ERROR: Index out of range for dimension i
+        createError(
+                fmt::format(
+                        DimensionValueOutOfRange,
+                        expressionResultAsConstant,
+                        accessedDimensionIdx,
+                        accessedSignal->name,
+                        constraintForCurrentDimension.minimumValidValue, constraintForCurrentDimension.maximumValidValue)
+                );
+    }
+
+    return accessOnCurrentDimensionOk;
+}
+
+[[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> SyReCCustomVisitor::isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStart, SyReCParser::NumberContext* bitRangeEnd) {
+    if (bitRangeStart == nullptr && bitRangeEnd == nullptr) {
+        return std::nullopt;
+    }
+
+    const auto bitRangeStartEvaluated = tryConvertProductionReturnValue<syrec::Number::ptr>(visit(bitRangeStart));
+    const auto bitRangeEndEvaluated = bitRangeEnd != nullptr ? tryConvertProductionReturnValue<syrec::Number::ptr>(visit(bitRangeEnd)) : bitRangeStartEvaluated;
+
+    return (bitRangeStartEvaluated.has_value() && bitRangeEndEvaluated.has_value()) ? std::make_optional(std::make_pair(bitRangeStartEvaluated.value(), bitRangeEndEvaluated.value())) : std::nullopt;
+}

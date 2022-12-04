@@ -12,6 +12,7 @@
 #include "core/syrec/parser/symbol_table.hpp"
 
 #include "SyReCBaseVisitor.h"
+#include "core/syrec/parser/expression_evaluation_result.hpp"
 
 namespace parser {
 class SyReCCustomVisitor: public SyReCBaseVisitor {
@@ -48,6 +49,10 @@ private:
     std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
     std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);
 
+    bool checkIfSignalWasDeclaredOrLogError(const std::string_view& signalIdent);
+    [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const ExpressionEvaluationResult::ptr& expressionEvaluationResult);
+    [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
+
 public:
     syrec::Module::vec modules;
     std::vector<std::string> errors;
@@ -75,7 +80,8 @@ public:
     std::any visitSignalList(SyReCParser::SignalListContext* context) override;
     std::any visitSignalDeclaration(SyReCParser::SignalDeclarationContext* context) override;
 
-    std::any visitUnaryStatement(SyReCParser::UnaryStatementContext* context) override;
+    std::any visitSignal(SyReCParser::SignalContext* context) override;
+    std::any visitNumber(SyReCParser::NumberContext* context) override;
     
 };
     

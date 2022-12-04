@@ -146,7 +146,7 @@ swapStatement:
 
 skipStatement: 'skip' ;
 
-signal: IDENT ( '[' expression ']' )* ( '.' bitStart=number ( ':' bitRangeEnd=number )? )? ;
+signal: IDENT ( '[' accessedDimensions+=expression ']' )* ( '.' bitStart=number ( ':' bitRangeEnd=number )? )? ;
 
 /* Expression productions */
 

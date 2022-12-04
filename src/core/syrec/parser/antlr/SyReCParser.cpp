@@ -1635,7 +1635,8 @@ SyReCParser::SignalContext* SyReCParser::signal() {
       setState(187);
       match(SyReCParser::T__3);
       setState(188);
-      expression();
+      antlrcpp::downCast<SignalContext *>(_localctx)->expressionContext = expression();
+      antlrcpp::downCast<SignalContext *>(_localctx)->accessedDimensions.push_back(antlrcpp::downCast<SignalContext *>(_localctx)->expressionContext);
       setState(189);
       match(SyReCParser::T__4);
       setState(195);
