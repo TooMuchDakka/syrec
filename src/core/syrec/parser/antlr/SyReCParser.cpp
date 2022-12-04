@@ -199,59 +199,103 @@ SyReCParser::NumberContext::NumberContext(ParserRuleContext *parent, size_t invo
   : ParserRuleContext(parent, invokingState) {
 }
 
-tree::TerminalNode* SyReCParser::NumberContext::INT() {
-  return getToken(SyReCParser::INT, 0);
-}
-
-tree::TerminalNode* SyReCParser::NumberContext::SIGNAL_WIDTH_PREFIX() {
-  return getToken(SyReCParser::SIGNAL_WIDTH_PREFIX, 0);
-}
-
-tree::TerminalNode* SyReCParser::NumberContext::IDENT() {
-  return getToken(SyReCParser::IDENT, 0);
-}
-
-tree::TerminalNode* SyReCParser::NumberContext::LOOP_VARIABLE_PREFIX() {
-  return getToken(SyReCParser::LOOP_VARIABLE_PREFIX, 0);
-}
-
-std::vector<SyReCParser::NumberContext *> SyReCParser::NumberContext::number() {
-  return getRuleContexts<SyReCParser::NumberContext>();
-}
-
-SyReCParser::NumberContext* SyReCParser::NumberContext::number(size_t i) {
-  return getRuleContext<SyReCParser::NumberContext>(i);
-}
-
-tree::TerminalNode* SyReCParser::NumberContext::OP_PLUS() {
-  return getToken(SyReCParser::OP_PLUS, 0);
-}
-
-tree::TerminalNode* SyReCParser::NumberContext::OP_MINUS() {
-  return getToken(SyReCParser::OP_MINUS, 0);
-}
-
-tree::TerminalNode* SyReCParser::NumberContext::OP_MULTIPLY() {
-  return getToken(SyReCParser::OP_MULTIPLY, 0);
-}
-
-tree::TerminalNode* SyReCParser::NumberContext::OP_DIVISION() {
-  return getToken(SyReCParser::OP_DIVISION, 0);
-}
-
 
 size_t SyReCParser::NumberContext::getRuleIndex() const {
   return SyReCParser::RuleNumber;
 }
 
+void SyReCParser::NumberContext::copyFrom(NumberContext *ctx) {
+  ParserRuleContext::copyFrom(ctx);
+}
 
-std::any SyReCParser::NumberContext::accept(tree::ParseTreeVisitor *visitor) {
+//----------------- NumberFromSignalwidthContext ------------------------------------------------------------------
+
+tree::TerminalNode* SyReCParser::NumberFromSignalwidthContext::SIGNAL_WIDTH_PREFIX() {
+  return getToken(SyReCParser::SIGNAL_WIDTH_PREFIX, 0);
+}
+
+tree::TerminalNode* SyReCParser::NumberFromSignalwidthContext::IDENT() {
+  return getToken(SyReCParser::IDENT, 0);
+}
+
+SyReCParser::NumberFromSignalwidthContext::NumberFromSignalwidthContext(NumberContext *ctx) { copyFrom(ctx); }
+
+
+std::any SyReCParser::NumberFromSignalwidthContext::accept(tree::ParseTreeVisitor *visitor) {
   if (auto parserVisitor = dynamic_cast<SyReCVisitor*>(visitor))
-    return parserVisitor->visitNumber(this);
+    return parserVisitor->visitNumberFromSignalwidth(this);
   else
     return visitor->visitChildren(this);
 }
+//----------------- NumberFromLoopVariableContext ------------------------------------------------------------------
 
+tree::TerminalNode* SyReCParser::NumberFromLoopVariableContext::LOOP_VARIABLE_PREFIX() {
+  return getToken(SyReCParser::LOOP_VARIABLE_PREFIX, 0);
+}
+
+tree::TerminalNode* SyReCParser::NumberFromLoopVariableContext::IDENT() {
+  return getToken(SyReCParser::IDENT, 0);
+}
+
+SyReCParser::NumberFromLoopVariableContext::NumberFromLoopVariableContext(NumberContext *ctx) { copyFrom(ctx); }
+
+
+std::any SyReCParser::NumberFromLoopVariableContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<SyReCVisitor*>(visitor))
+    return parserVisitor->visitNumberFromLoopVariable(this);
+  else
+    return visitor->visitChildren(this);
+}
+//----------------- NumberFromConstantContext ------------------------------------------------------------------
+
+tree::TerminalNode* SyReCParser::NumberFromConstantContext::INT() {
+  return getToken(SyReCParser::INT, 0);
+}
+
+SyReCParser::NumberFromConstantContext::NumberFromConstantContext(NumberContext *ctx) { copyFrom(ctx); }
+
+
+std::any SyReCParser::NumberFromConstantContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<SyReCVisitor*>(visitor))
+    return parserVisitor->visitNumberFromConstant(this);
+  else
+    return visitor->visitChildren(this);
+}
+//----------------- NumberFromExpressionContext ------------------------------------------------------------------
+
+std::vector<SyReCParser::NumberContext *> SyReCParser::NumberFromExpressionContext::number() {
+  return getRuleContexts<SyReCParser::NumberContext>();
+}
+
+SyReCParser::NumberContext* SyReCParser::NumberFromExpressionContext::number(size_t i) {
+  return getRuleContext<SyReCParser::NumberContext>(i);
+}
+
+tree::TerminalNode* SyReCParser::NumberFromExpressionContext::OP_PLUS() {
+  return getToken(SyReCParser::OP_PLUS, 0);
+}
+
+tree::TerminalNode* SyReCParser::NumberFromExpressionContext::OP_MINUS() {
+  return getToken(SyReCParser::OP_MINUS, 0);
+}
+
+tree::TerminalNode* SyReCParser::NumberFromExpressionContext::OP_MULTIPLY() {
+  return getToken(SyReCParser::OP_MULTIPLY, 0);
+}
+
+tree::TerminalNode* SyReCParser::NumberFromExpressionContext::OP_DIVISION() {
+  return getToken(SyReCParser::OP_DIVISION, 0);
+}
+
+SyReCParser::NumberFromExpressionContext::NumberFromExpressionContext(NumberContext *ctx) { copyFrom(ctx); }
+
+
+std::any SyReCParser::NumberFromExpressionContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<SyReCVisitor*>(visitor))
+    return parserVisitor->visitNumberFromExpression(this);
+  else
+    return visitor->visitChildren(this);
+}
 SyReCParser::NumberContext* SyReCParser::number() {
   NumberContext *_localctx = _tracker.createInstance<NumberContext>(_ctx, getState());
   enterRule(_localctx, 0, SyReCParser::RuleNumber);
@@ -265,17 +309,20 @@ SyReCParser::NumberContext* SyReCParser::number() {
     exitRule();
   });
   try {
-    enterOuterAlt(_localctx, 1);
     setState(53);
     _errHandler->sync(this);
     switch (_input->LA(1)) {
       case SyReCParser::INT: {
+        _localctx = _tracker.createInstance<SyReCParser::NumberFromConstantContext>(_localctx);
+        enterOuterAlt(_localctx, 1);
         setState(42);
         match(SyReCParser::INT);
         break;
       }
 
       case SyReCParser::SIGNAL_WIDTH_PREFIX: {
+        _localctx = _tracker.createInstance<SyReCParser::NumberFromSignalwidthContext>(_localctx);
+        enterOuterAlt(_localctx, 2);
         setState(43);
         match(SyReCParser::SIGNAL_WIDTH_PREFIX);
         setState(44);
@@ -284,6 +331,8 @@ SyReCParser::NumberContext* SyReCParser::number() {
       }
 
       case SyReCParser::LOOP_VARIABLE_PREFIX: {
+        _localctx = _tracker.createInstance<SyReCParser::NumberFromLoopVariableContext>(_localctx);
+        enterOuterAlt(_localctx, 3);
         setState(45);
         match(SyReCParser::LOOP_VARIABLE_PREFIX);
         setState(46);
@@ -292,22 +341,25 @@ SyReCParser::NumberContext* SyReCParser::number() {
       }
 
       case SyReCParser::T__0: {
+        _localctx = _tracker.createInstance<SyReCParser::NumberFromExpressionContext>(_localctx);
+        enterOuterAlt(_localctx, 4);
         setState(47);
         match(SyReCParser::T__0);
         setState(48);
-        antlrcpp::downCast<NumberContext *>(_localctx)->lhsOperand = number();
+        antlrcpp::downCast<NumberFromExpressionContext *>(_localctx)->lhsOperand = number();
         setState(49);
+        antlrcpp::downCast<NumberFromExpressionContext *>(_localctx)->op = _input->LT(1);
         _la = _input->LA(1);
         if (!(((_la & ~ 0x3fULL) == 0) &&
           ((1ULL << _la) & 81788928) != 0)) {
-        _errHandler->recoverInline(this);
+          antlrcpp::downCast<NumberFromExpressionContext *>(_localctx)->op = _errHandler->recoverInline(this);
         }
         else {
           _errHandler->reportMatch(this);
           consume();
         }
         setState(50);
-        antlrcpp::downCast<NumberContext *>(_localctx)->rhsOperand = number();
+        antlrcpp::downCast<NumberFromExpressionContext *>(_localctx)->rhsOperand = number();
         setState(51);
         match(SyReCParser::T__1);
         break;

@@ -20,7 +20,13 @@ public:
   /**
    * Visit parse trees produced by SyReCParser.
    */
-    virtual std::any visitNumber(SyReCParser::NumberContext *context) = 0;
+    virtual std::any visitNumberFromConstant(SyReCParser::NumberFromConstantContext *context) = 0;
+
+    virtual std::any visitNumberFromSignalwidth(SyReCParser::NumberFromSignalwidthContext *context) = 0;
+
+    virtual std::any visitNumberFromLoopVariable(SyReCParser::NumberFromLoopVariableContext *context) = 0;
+
+    virtual std::any visitNumberFromExpression(SyReCParser::NumberFromExpressionContext *context) = 0;
 
     virtual std::any visitProgram(SyReCParser::ProgramContext *context) = 0;
 

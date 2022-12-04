@@ -13,6 +13,7 @@
 
 #include "SyReCBaseVisitor.h"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
+#include "core/syrec/parser/operation.hpp"
 
 namespace parser {
 class SyReCCustomVisitor: public SyReCBaseVisitor {
@@ -31,6 +32,7 @@ private:
     void createWarning(size_t line, size_t column, const std::string& warningMessage);
 
     [[nodiscard]] std::optional<unsigned int> convertToNumber(const antlr4::Token* token) const;
+    [[nodiscard]] std::optional<unsigned int> convertToNumber(const std::string& tokenText) const;
 
     template<typename T>
     [[nodiscard]] std::optional<T>            tryConvertProductionReturnValue(std::any productionReturnType) const {
@@ -52,6 +54,9 @@ private:
     bool checkIfSignalWasDeclaredOrLogError(const std::string_view& signalIdent);
     [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const ExpressionEvaluationResult::ptr& expressionEvaluationResult);
     [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
+    [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
+    [[nodiscard]] std::optional<unsigned int> evaluateNumber(const syrec::Number::ptr& numberContainer);
+    [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
 
 public:
     syrec::Module::vec modules;
@@ -81,8 +86,11 @@ public:
     std::any visitSignalDeclaration(SyReCParser::SignalDeclarationContext* context) override;
 
     std::any visitSignal(SyReCParser::SignalContext* context) override;
-    std::any visitNumber(SyReCParser::NumberContext* context) override;
-    
+
+    std::any visitNumberFromConstant(SyReCParser::NumberFromConstantContext* context) override;
+    std::any visitNumberFromSignalwidth(SyReCParser::NumberFromSignalwidthContext* context) override;
+    std::any visitNumberFromExpression(SyReCParser::NumberFromExpressionContext* context) override;
+    std::any visitNumberFromLoopVariable(SyReCParser::NumberFromLoopVariableContext* context) override;
 };
     
 } // namespace parser

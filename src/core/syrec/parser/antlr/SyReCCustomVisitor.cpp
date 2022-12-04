@@ -120,7 +120,7 @@ std::any SyReCCustomVisitor::visitSignalList(SyReCParser::SignalListContext* con
         }
     }
     
-    return declaredSignalsOfType;
+    return std::make_optional(declaredSignalsOfType);
 }
 
 std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarationContext* context) {
@@ -244,7 +244,86 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
     return result;
 }
 
-std::any SyReCCustomVisitor::visitNumber(SyReCParser::NumberContext* context) {
+/*
+ * Number production variants
+ */
+std::any SyReCCustomVisitor::visitNumberFromConstant(SyReCParser::NumberFromConstantContext* context) {
+    if (context->INT() == nullptr) {
+        return std::nullopt;   
+    }
+
+    return std::make_optional(std::make_shared<syrec::Number>(convertToNumber(context->INT()->getText()).value()));
+}
+
+std::any SyReCCustomVisitor::visitNumberFromSignalwidth(SyReCParser::NumberFromSignalwidthContext* context) {
+    if (context->IDENT() == nullptr) {
+        return std::nullopt;
+    }
+    
+    const std::string                 signalIdent = context->IDENT()->getText();
+    if (!checkIfSignalWasDeclaredOrLogError(context->IDENT()->getText())) {
+        return std::nullopt;
+    }
+
+    std::optional<syrec::Number::ptr> signalWidthOfSignal;
+    const auto& symTableEntryForSignal = currentSymbolTableScope->getVariable(signalIdent);
+    if (symTableEntryForSignal.has_value() && std::holds_alternative<syrec::Variable::ptr>(symTableEntryForSignal.value())) {
+        signalWidthOfSignal.emplace(std::make_shared<syrec::Number>(std::get<syrec::Variable::ptr>(symTableEntryForSignal.value())->bitwidth));
+    }
+    else {
+        // TODO: GEN_ERROR, this should not happen
+        createError("TODO");
+    }
+
+    return signalWidthOfSignal;
+}
+
+std::any SyReCCustomVisitor::visitNumberFromLoopVariable(SyReCParser::NumberFromLoopVariableContext* context) {
+    if (context->IDENT() == nullptr) {
+        return std::nullopt;
+    }
+
+    const std::string signalIdent = "$" + context->IDENT()->getText();
+    if (!checkIfSignalWasDeclaredOrLogError(context->IDENT()->getText())) {
+        return std::nullopt;
+    }
+
+    std::optional<syrec::Number::ptr> valueOfLoopVariable;
+    const auto&                       symTableEntryForSignal = currentSymbolTableScope->getVariable(signalIdent);
+    if (symTableEntryForSignal.has_value() && std::holds_alternative<syrec::Number::ptr>(symTableEntryForSignal.value())) {
+        valueOfLoopVariable.emplace(std::get<syrec::Number::ptr>(symTableEntryForSignal.value()));
+    } else {
+        // TODO: GEN_ERROR, this should not happen but check anyways
+        createError("TODO");
+    }
+
+    return valueOfLoopVariable;
+}
+
+std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromExpressionContext* context) {
+    const auto lhsOperand = context->lhsOperand != nullptr ? tryConvertProductionReturnValue<syrec::Number::ptr>(visit(context->lhsOperand)) : std::nullopt;
+
+    const auto operation  = getDefinedOperation(context->op);
+    if (!operation.has_value()) {
+        createError(InvalidOrMissingNumberExpressionOperation);
+    }
+
+    const auto rhsOperand = context->rhsOperand != nullptr ? tryConvertProductionReturnValue<syrec::Number::ptr > (visit(context->rhsOperand)) : std::nullopt;
+        if (!lhsOperand.has_value() || !operation.has_value() || !rhsOperand.has_value()) {
+        return std::nullopt;    
+    }
+
+    const auto lhsOperandEvaluated = evaluateNumber(lhsOperand.value());
+    const auto rhsOperandEvaluated = evaluateNumber(rhsOperand.value());
+
+    if (lhsOperandEvaluated.has_value() && rhsOperandEvaluated.has_value()) {
+        const auto binaryOperationResult = applyBinaryOperation(operation.value(), lhsOperandEvaluated.value(), rhsOperandEvaluated.value());
+        if (binaryOperationResult.has_value()) {
+            const auto resultContainer = std::make_shared<syrec::Number>(binaryOperationResult.value());
+            return std::make_optional<syrec::Number::ptr>(resultContainer);
+        }
+    }
+
     return std::nullopt;
 }
 
@@ -278,12 +357,16 @@ std::optional<unsigned> SyReCCustomVisitor::convertToNumber(const antlr4::Token*
         return std::nullopt;
     }
 
+    return convertToNumber(token->getText());
+}
+
+std::optional<unsigned int> SyReCCustomVisitor::convertToNumber(const std::string& tokenText) const {
     try {
-        return std::stoul(token->getText()) & UINT_MAX;
+        return std::stoul(tokenText) & UINT_MAX;
     } catch (std::invalid_argument&) {
         return std::nullopt;
     } catch (std::out_of_range&) {
-        return std::nullopt;    
+        return std::nullopt;
     }
 }
 
@@ -379,4 +462,53 @@ bool SyReCCustomVisitor::checkIfSignalWasDeclaredOrLogError(const std::string_vi
     const auto bitRangeEndEvaluated = bitRangeEnd != nullptr ? tryConvertProductionReturnValue<syrec::Number::ptr>(visit(bitRangeEnd)) : bitRangeStartEvaluated;
 
     return (bitRangeStartEvaluated.has_value() && bitRangeEndEvaluated.has_value()) ? std::make_optional(std::make_pair(bitRangeStartEvaluated.value(), bitRangeEndEvaluated.value())) : std::nullopt;
+}
+
+std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperation(const antlr4::Token* definedOperationToken) {
+    if (definedOperationToken == nullptr) {
+        return std::nullopt;
+    }
+
+    std::optional<syrec_operation::operation> definedOperation;
+    switch (definedOperationToken->getType()) {
+        case SyReCParser::OP_PLUS:
+            definedOperation.emplace(syrec_operation::operation::addition);
+            break;
+        case SyReCParser::OP_MINUS:
+            definedOperation.emplace(syrec_operation::operation::subtraction);
+            break;
+        case SyReCParser::OP_MULTIPLY:
+            definedOperation.emplace(syrec_operation::operation::multiplication);
+            break;
+        case SyReCParser::OP_DIVISION:
+            definedOperation.emplace(syrec_operation::operation::division);
+            break;
+        default:
+            createError("TODO: No mapping for operation");
+            break;
+    }
+    return definedOperation;
+}
+
+// TODO: Naming
+[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::evaluateNumber(const syrec::Number::ptr& numberContainer) {
+    if (numberContainer->isLoopVariable()) {
+        const std::string& loopVariableIdent = numberContainer->variableName();
+        if (loopVariableMappingLookup.find(loopVariableIdent) == loopVariableMappingLookup.end()) {
+            createError(fmt::format(NoMappingForLoopVariable, loopVariableIdent));
+            return std::nullopt;
+        }
+    }
+
+    return std::make_optional(numberContainer->evaluate(loopVariableMappingLookup));
+}
+
+[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
+    if (operation == syrec_operation::operation::division && rightOperand == 0) {
+        // TODO: GEN_ERROR
+        createError(DivisionByZero);
+        return std::nullopt;
+    } else {
+        return apply(operation, leftOperand, rightOperand);
+    }
 }

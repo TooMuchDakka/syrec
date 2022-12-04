@@ -77,14 +77,53 @@ public:
 
   class  NumberContext : public antlr4::ParserRuleContext {
   public:
-    SyReCParser::NumberContext *lhsOperand = nullptr;
-    SyReCParser::NumberContext *rhsOperand = nullptr;
     NumberContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    NumberContext() = default;
+    void copyFrom(NumberContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *INT();
+
+   
+  };
+
+  class  NumberFromSignalwidthContext : public NumberContext {
+  public:
+    NumberFromSignalwidthContext(NumberContext *ctx);
+
     antlr4::tree::TerminalNode *SIGNAL_WIDTH_PREFIX();
     antlr4::tree::TerminalNode *IDENT();
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  class  NumberFromLoopVariableContext : public NumberContext {
+  public:
+    NumberFromLoopVariableContext(NumberContext *ctx);
+
     antlr4::tree::TerminalNode *LOOP_VARIABLE_PREFIX();
+    antlr4::tree::TerminalNode *IDENT();
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  class  NumberFromConstantContext : public NumberContext {
+  public:
+    NumberFromConstantContext(NumberContext *ctx);
+
+    antlr4::tree::TerminalNode *INT();
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  class  NumberFromExpressionContext : public NumberContext {
+  public:
+    NumberFromExpressionContext(NumberContext *ctx);
+
+    SyReCParser::NumberContext *lhsOperand = nullptr;
+    antlr4::Token *op = nullptr;
+    SyReCParser::NumberContext *rhsOperand = nullptr;
     std::vector<NumberContext *> number();
     NumberContext* number(size_t i);
     antlr4::tree::TerminalNode *OP_PLUS();
@@ -92,9 +131,7 @@ public:
     antlr4::tree::TerminalNode *OP_MULTIPLY();
     antlr4::tree::TerminalNode *OP_DIVISION();
 
-
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
-   
   };
 
   NumberContext* number();

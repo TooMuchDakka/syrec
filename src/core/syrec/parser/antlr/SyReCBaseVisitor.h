@@ -17,7 +17,19 @@ namespace parser {
 class  SyReCBaseVisitor : public SyReCVisitor {
 public:
 
-  virtual std::any visitNumber(SyReCParser::NumberContext *ctx) override {
+  virtual std::any visitNumberFromConstant(SyReCParser::NumberFromConstantContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitNumberFromSignalwidth(SyReCParser::NumberFromSignalwidthContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitNumberFromLoopVariable(SyReCParser::NumberFromLoopVariableContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitNumberFromExpression(SyReCParser::NumberFromExpressionContext *ctx) override {
     return visitChildren(ctx);
   }
 

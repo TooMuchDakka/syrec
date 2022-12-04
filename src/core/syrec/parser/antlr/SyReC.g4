@@ -51,10 +51,11 @@ SKIPABLEWHITSPACES : [ \t\r\n]+ -> skip ;	// Skip newline, tabulator and carriag
 
 /* Number production */
 number: 
-	( INT 
-	| SIGNAL_WIDTH_PREFIX IDENT 
-	| LOOP_VARIABLE_PREFIX IDENT 
-	| ( '(' lhsOperand=number ( OP_PLUS | OP_MINUS | OP_MULTIPLY | OP_DIVISION ) rhsOperand=number ')' ) ) ;
+	INT								# NumberFromConstant
+	| SIGNAL_WIDTH_PREFIX IDENT		# NumberFromSignalwidth
+	| LOOP_VARIABLE_PREFIX IDENT	# NumberFromLoopVariable
+	| ( '(' lhsOperand=number op=( OP_PLUS | OP_MINUS | OP_MULTIPLY | OP_DIVISION ) rhsOperand=number ')' ) # NumberFromExpression
+	;
 
 
 /* Program and modules productions */
