@@ -422,16 +422,59 @@ public:
   class  ExpressionContext : public antlr4::ParserRuleContext {
   public:
     ExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
-    virtual size_t getRuleIndex() const override;
-    NumberContext *number();
-    SignalContext *signal();
-    BinaryExpressionContext *binaryExpression();
-    UnaryExpressionContext *unaryExpression();
-    ShiftExpressionContext *shiftExpression();
+   
+    ExpressionContext() = default;
+    void copyFrom(ExpressionContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
 
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  ExpressionFromSignalContext : public ExpressionContext {
+  public:
+    ExpressionFromSignalContext(ExpressionContext *ctx);
+
+    SignalContext *signal();
 
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
-   
+  };
+
+  class  ExpressionFromBinaryExpressionContext : public ExpressionContext {
+  public:
+    ExpressionFromBinaryExpressionContext(ExpressionContext *ctx);
+
+    BinaryExpressionContext *binaryExpression();
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  class  ExpressionFromNumberContext : public ExpressionContext {
+  public:
+    ExpressionFromNumberContext(ExpressionContext *ctx);
+
+    NumberContext *number();
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  class  ExpressionFromUnaryExpressionContext : public ExpressionContext {
+  public:
+    ExpressionFromUnaryExpressionContext(ExpressionContext *ctx);
+
+    UnaryExpressionContext *unaryExpression();
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+  };
+
+  class  ExpressionFromShiftExpressionContext : public ExpressionContext {
+  public:
+    ExpressionFromShiftExpressionContext(ExpressionContext *ctx);
+
+    ShiftExpressionContext *shiftExpression();
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
   };
 
   ExpressionContext* expression();
@@ -439,6 +482,7 @@ public:
   class  BinaryExpressionContext : public antlr4::ParserRuleContext {
   public:
     SyReCParser::ExpressionContext *lhsOperand = nullptr;
+    antlr4::Token *binaryOperation = nullptr;
     SyReCParser::ExpressionContext *rhsOperand = nullptr;
     BinaryExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
@@ -471,6 +515,7 @@ public:
 
   class  UnaryExpressionContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *unaryOperation = nullptr;
     UnaryExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     ExpressionContext *expression();
@@ -486,6 +531,7 @@ public:
 
   class  ShiftExpressionContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *shiftOperation = nullptr;
     ShiftExpressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     ExpressionContext *expression();

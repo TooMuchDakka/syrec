@@ -97,7 +97,23 @@ public:
     return visitChildren(ctx);
   }
 
-  virtual std::any visitExpression(SyReCParser::ExpressionContext *ctx) override {
+  virtual std::any visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitExpressionFromSignal(SyReCParser::ExpressionFromSignalContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitExpressionFromBinaryExpression(SyReCParser::ExpressionFromBinaryExpressionContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitExpressionFromUnaryExpression(SyReCParser::ExpressionFromUnaryExpressionContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitExpressionFromShiftExpression(SyReCParser::ExpressionFromShiftExpressionContext *ctx) override {
     return visitChildren(ctx);
   }
 

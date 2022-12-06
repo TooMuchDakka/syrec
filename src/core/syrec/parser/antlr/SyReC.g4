@@ -152,16 +152,16 @@ signal: IDENT ( '[' accessedDimensions+=expression ']' )* ( '.' bitStart=number 
 /* Expression productions */
 
 expression: 
-	number
-	| signal
-	| binaryExpression
-	| unaryExpression
-	| shiftExpression
+	number						# ExpressionFromNumber
+	| signal					# ExpressionFromSignal
+	| binaryExpression			# ExpressionFromBinaryExpression
+	| unaryExpression			# ExpressionFromUnaryExpression
+	| shiftExpression			# ExpressionFromShiftExpression
 	;
 
 binaryExpression:
 	'(' lhsOperand=expression
-		( OP_PLUS
+		binaryOperation=( OP_PLUS
 		| OP_MINUS
 		| OP_XOR
 		| OP_MULTIPLY
@@ -182,6 +182,6 @@ binaryExpression:
 	rhsOperand=expression  ')' 
 	;
 
-unaryExpression: ( OP_LOGICAL_NEGATION | OP_BITWISE_NEGATION ) expression ;
+unaryExpression: unaryOperation=( OP_LOGICAL_NEGATION | OP_BITWISE_NEGATION ) expression ;
 
-shiftExpression: '(' expression ( OP_RIGHT_SHIFT | OP_LEFT_SHIFT ) number ')' ;
+shiftExpression: '(' expression shiftOperation=( OP_RIGHT_SHIFT | OP_LEFT_SHIFT ) number ')' ;

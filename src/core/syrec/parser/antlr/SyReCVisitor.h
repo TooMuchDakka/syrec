@@ -60,7 +60,15 @@ public:
 
     virtual std::any visitSignal(SyReCParser::SignalContext *context) = 0;
 
-    virtual std::any visitExpression(SyReCParser::ExpressionContext *context) = 0;
+    virtual std::any visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext *context) = 0;
+
+    virtual std::any visitExpressionFromSignal(SyReCParser::ExpressionFromSignalContext *context) = 0;
+
+    virtual std::any visitExpressionFromBinaryExpression(SyReCParser::ExpressionFromBinaryExpressionContext *context) = 0;
+
+    virtual std::any visitExpressionFromUnaryExpression(SyReCParser::ExpressionFromUnaryExpressionContext *context) = 0;
+
+    virtual std::any visitExpressionFromShiftExpression(SyReCParser::ExpressionFromShiftExpressionContext *context) = 0;
 
     virtual std::any visitBinaryExpression(SyReCParser::BinaryExpressionContext *context) = 0;
 

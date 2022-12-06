@@ -193,7 +193,7 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
                 isValidSignalAccess = validateSemanticChecksIfDimensionExpressionIsConstant(dimensionIdx, accessedSignal.value()->getVar(), accessedDimensionExpression);
                 if (isValidSignalAccess) {
                     // TODO: Set correct bit width of expression
-                    accessedSignal.value()->indexes.emplace_back(accessedDimensionExpression->getOrConvertToExpression(0).value());
+                    accessedSignal.value()->indexes.emplace_back(accessedDimensionExpression->getAsExpression().value());
                 }
             }
         }
@@ -327,6 +327,129 @@ std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromEx
     return std::nullopt;
 }
 
+
+/*
+ * Expression production visitors
+ */
+
+std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext* context) {
+    const auto definedNumber = context->number() != nullptr ? tryConvertProductionReturnValue<syrec::Number::ptr>(visit(context->number())) : std::nullopt;
+    if (definedNumber.has_value()) {
+        // TODO: Is this the correct calculation and is it both safe and does it return the expected result
+        const auto valueOfDefinedNumber = definedNumber.value()->evaluate(loopVariableMappingLookup);
+        const auto numericExpression = std::make_shared<syrec::NumericExpression>(definedNumber.value(), ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(valueOfDefinedNumber));
+        return std::make_optional(ExpressionEvaluationResult::createFromExpression(numericExpression));
+    }
+
+    return std::nullopt;
+}
+
+std::any SyReCCustomVisitor::visitExpressionFromSignal(SyReCParser::ExpressionFromSignalContext* context) {
+    std::optional<ExpressionEvaluationResult::ptr> expressionFromSignal;
+
+    const auto definedSignal = context->signal() != nullptr ? tryConvertProductionReturnValue<SignalEvaluationResult::ptr>(visit(context->signal())) : std::nullopt;
+    if (!definedSignal.has_value() || !definedSignal.value()->isValid()) {
+        return expressionFromSignal;   
+    }
+
+    syrec::expression::ptr expressionWrapperForSignal;
+    if (definedSignal.value()->isVariableAccess()) {
+        expressionWrapperForSignal = std::make_shared<syrec::VariableExpression>(definedSignal.value()->getAsVariableAccess().value());
+        expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal));
+    } else if (definedSignal.value()->isConstant()) {
+        // TODO: Is this the correct calculation and is it both safe and does it return the expected result
+        const auto constantValueOfDefinedSignal = definedSignal.value()->getAsNumber().value()->evaluate(loopVariableMappingLookup);
+        expressionWrapperForSignal = std::make_shared<syrec::NumericExpression>(definedSignal.value()->getAsNumber().value(), ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(constantValueOfDefinedSignal));
+        expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal));
+    }
+
+    return expressionFromSignal;
+}
+
+std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpressionContext* context) {
+    const auto lhsOperand = context->lhsOperand != nullptr ? tryConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(visit(context->lhsOperand)) : std::nullopt;
+    const auto userDefinedOperation = getDefinedOperation(context->binaryOperation);
+    if (!userDefinedOperation.has_value() || !isValidBinaryOperation(userDefinedOperation.value())) {
+        createError(InvalidBinaryOperation);
+    }
+
+    const auto rhsOperand = context->rhsOperand != nullptr ? tryConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->rhsOperand) : std::nullopt;
+
+    if (!lhsOperand.has_value() || !userDefinedOperation.has_value() || !rhsOperand.has_value()) {
+        return std::nullopt;
+    }
+
+    const auto lhsOperandConversionToConstant = lhsOperand.value()->getAsConstant();
+    const auto rhsOperandConversionToConstant = rhsOperand.value()->getAsConstant();
+
+    std::optional<syrec::expression::ptr> finalBinaryExpression;
+    if (lhsOperandConversionToConstant.has_value() && rhsOperandConversionToConstant.has_value()) {
+        const auto binaryExpressionEvaluated = applyBinaryOperation(userDefinedOperation.value(), *lhsOperandConversionToConstant, *rhsOperandConversionToConstant);
+        if (binaryExpressionEvaluated.has_value()) {
+            // TODO
+            return ExpressionEvaluationResult::createFromConstantValue(binaryExpressionEvaluated.value());
+        }
+        else {
+            // TODO: Error creation
+            createError("TODO: Calculation of binary expression for constant values failed");
+            return std::nullopt;
+        }
+    } else {
+        const auto lhsOperandAsExpression = lhsOperand.value()->getAsExpression().value();
+        const auto rhsOperandAsExpression = rhsOperand.value()->getAsExpression().value();
+        
+        // TODO: Add mapping from enum to internal "operation" flag value
+        return std::make_optional(ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::BinaryExpression>(lhsOperandAsExpression, 0, rhsOperandAsExpression)));
+    }
+}
+
+std::any SyReCCustomVisitor::visitUnaryExpression(SyReCParser::UnaryExpressionContext* context) {
+    const auto userDefinedOperation = getDefinedOperation(context->unaryOperation);
+    if (!userDefinedOperation.has_value() || (* userDefinedOperation != syrec_operation::operation::bitwise_negation && *userDefinedOperation != syrec_operation::operation::logical_negation)) { 
+        createError(InvalidUnaryOperation);
+    }
+    
+    const auto userDefinedExpression = context->expression() != nullptr ? tryConvertProductionReturnValue<ExpressionEvaluationResult>(visit(context->expression())) : std::nullopt;
+    return std::nullopt;
+}
+
+std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionContext* context) {
+    std::optional<ExpressionEvaluationResult::ptr> parsedShiftExpression;
+
+    const auto expressionToShift = context->expression() != nullptr ? tryConvertProductionReturnValue<ExpressionEvaluationResult>(visit(context->expression())) : std::nullopt;
+    const auto definedShiftOperation    = context->shiftOperation != nullptr ? getDefinedOperation(context->shiftOperation) : std::nullopt;
+
+    if (!definedShiftOperation.has_value() || (definedShiftOperation.value() != syrec_operation::operation::shift_left && definedShiftOperation.value() != syrec_operation::operation::shift_right)) {
+        createError(InvalidShiftOperation);
+    }
+
+    const auto shiftAmount = context->number() != nullptr ? tryConvertProductionReturnValue<syrec::Number::ptr>(visit(context->number())) : std::nullopt;
+
+    if (!expressionToShift.has_value() || !definedShiftOperation.has_value() || !shiftAmount.has_value()) {
+        return parsedShiftExpression;
+    }
+
+    const auto shiftAmountEvaluated = evaluateNumber(shiftAmount.value());
+    const auto expressionToShiftEvaluated = expressionToShift->getAsConstant();
+
+    if (shiftAmountEvaluated.has_value() && expressionToShiftEvaluated.has_value()) {
+        const auto shiftOperationApplicationResult = apply(definedShiftOperation.value(), expressionToShiftEvaluated.value(), shiftAmountEvaluated.value());
+        if (shiftOperationApplicationResult.has_value()) {
+            parsedShiftExpression.emplace(ExpressionEvaluationResult::createFromConstantValue(shiftOperationApplicationResult.value()));
+        } else {
+            // TODO: GEN_ERROR
+            createError("TODO: SHIFT CALC ERROR");
+            return std::nullopt;
+        }
+    } else {
+        // TODO: Mapping from operation to internal operation 'integer' value
+        const auto createdShiftExpression = std::make_shared<syrec::ShiftExpression>(expressionToShift->getAsExpression().value(), 0, shiftAmount.value());
+        parsedShiftExpression.emplace(ExpressionEvaluationResult::createFromExpression(createdShiftExpression));
+    }
+
+    return parsedShiftExpression;
+}
+
 /*
  * Utility functions for error and warning creation
  */
@@ -424,16 +547,16 @@ bool SyReCCustomVisitor::checkIfSignalWasDeclaredOrLogError(const std::string_vi
     return true;
 }
 
-[[nodiscard]] bool SyReCCustomVisitor::validateSemanticChecksIfDimensionExpressionIsConstant(const size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const ExpressionEvaluationResult::ptr& expressionEvaluationResult) {
-    if (!expressionEvaluationResult->hasValue()) {
+[[nodiscard]] bool SyReCCustomVisitor::validateSemanticChecksIfDimensionExpressionIsConstant(const size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult) {
+    if (!expressionEvaluationResult.has_value()) {
         return false;
     }
 
-    if (!expressionEvaluationResult->evaluatedToConstant()) {
+    if (!expressionEvaluationResult.value()->isConstantValue()) {
         return true;
     }
 
-    const auto expressionResultAsConstant = expressionEvaluationResult->getAsConstant().value();
+    const auto expressionResultAsConstant = expressionEvaluationResult.value()->getAsConstant().value();
     const bool accessOnCurrentDimensionOk = isValidDimensionAccess(accessedSignal, accessedDimensionIdx, expressionResultAsConstant, true);
     if (!accessOnCurrentDimensionOk) {
         // TODO: Using global flag indicating zero_based indexing or not
@@ -511,4 +634,33 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
     } else {
         return apply(operation, leftOperand, rightOperand);
     }
+}
+
+bool SyReCCustomVisitor::isValidBinaryOperation(syrec_operation::operation userDefinedOperation) const {
+    bool isValid;
+    switch (userDefinedOperation) {
+        case syrec_operation::operation::addition:
+        case syrec_operation::operation::subtraction:
+        case syrec_operation::operation::bitwise_xor:
+        case syrec_operation::operation::multiplication:
+        case syrec_operation::operation::division:
+        case syrec_operation::operation::modulo:
+        case syrec_operation::operation::upper_bits_multiplication:
+        case syrec_operation::operation::logical_and:
+        case syrec_operation::operation::logical_or:
+        case syrec_operation::operation::bitwise_and:
+        case syrec_operation::operation::bitwise_or:
+        case syrec_operation::operation::less_than:
+        case syrec_operation::operation::greater_than:
+        case syrec_operation::operation::equals:
+        case syrec_operation::operation::not_equals:
+        case syrec_operation::operation::less_equals:
+        case syrec_operation::operation::greater_equals:
+            isValid = true;
+            break;
+        default:
+            isValid = false;
+            break;
+    }
+    return isValid;
 }

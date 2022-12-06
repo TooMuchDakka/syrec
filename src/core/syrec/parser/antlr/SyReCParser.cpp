@@ -1732,39 +1732,90 @@ SyReCParser::ExpressionContext::ExpressionContext(ParserRuleContext *parent, siz
   : ParserRuleContext(parent, invokingState) {
 }
 
-SyReCParser::NumberContext* SyReCParser::ExpressionContext::number() {
-  return getRuleContext<SyReCParser::NumberContext>(0);
-}
-
-SyReCParser::SignalContext* SyReCParser::ExpressionContext::signal() {
-  return getRuleContext<SyReCParser::SignalContext>(0);
-}
-
-SyReCParser::BinaryExpressionContext* SyReCParser::ExpressionContext::binaryExpression() {
-  return getRuleContext<SyReCParser::BinaryExpressionContext>(0);
-}
-
-SyReCParser::UnaryExpressionContext* SyReCParser::ExpressionContext::unaryExpression() {
-  return getRuleContext<SyReCParser::UnaryExpressionContext>(0);
-}
-
-SyReCParser::ShiftExpressionContext* SyReCParser::ExpressionContext::shiftExpression() {
-  return getRuleContext<SyReCParser::ShiftExpressionContext>(0);
-}
-
 
 size_t SyReCParser::ExpressionContext::getRuleIndex() const {
   return SyReCParser::RuleExpression;
 }
 
+void SyReCParser::ExpressionContext::copyFrom(ExpressionContext *ctx) {
+  ParserRuleContext::copyFrom(ctx);
+}
 
-std::any SyReCParser::ExpressionContext::accept(tree::ParseTreeVisitor *visitor) {
+//----------------- ExpressionFromSignalContext ------------------------------------------------------------------
+
+SyReCParser::SignalContext* SyReCParser::ExpressionFromSignalContext::signal() {
+  return getRuleContext<SyReCParser::SignalContext>(0);
+}
+
+SyReCParser::ExpressionFromSignalContext::ExpressionFromSignalContext(ExpressionContext *ctx) { copyFrom(ctx); }
+
+
+std::any SyReCParser::ExpressionFromSignalContext::accept(tree::ParseTreeVisitor *visitor) {
   if (auto parserVisitor = dynamic_cast<SyReCVisitor*>(visitor))
-    return parserVisitor->visitExpression(this);
+    return parserVisitor->visitExpressionFromSignal(this);
   else
     return visitor->visitChildren(this);
 }
+//----------------- ExpressionFromBinaryExpressionContext ------------------------------------------------------------------
 
+SyReCParser::BinaryExpressionContext* SyReCParser::ExpressionFromBinaryExpressionContext::binaryExpression() {
+  return getRuleContext<SyReCParser::BinaryExpressionContext>(0);
+}
+
+SyReCParser::ExpressionFromBinaryExpressionContext::ExpressionFromBinaryExpressionContext(ExpressionContext *ctx) { copyFrom(ctx); }
+
+
+std::any SyReCParser::ExpressionFromBinaryExpressionContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<SyReCVisitor*>(visitor))
+    return parserVisitor->visitExpressionFromBinaryExpression(this);
+  else
+    return visitor->visitChildren(this);
+}
+//----------------- ExpressionFromNumberContext ------------------------------------------------------------------
+
+SyReCParser::NumberContext* SyReCParser::ExpressionFromNumberContext::number() {
+  return getRuleContext<SyReCParser::NumberContext>(0);
+}
+
+SyReCParser::ExpressionFromNumberContext::ExpressionFromNumberContext(ExpressionContext *ctx) { copyFrom(ctx); }
+
+
+std::any SyReCParser::ExpressionFromNumberContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<SyReCVisitor*>(visitor))
+    return parserVisitor->visitExpressionFromNumber(this);
+  else
+    return visitor->visitChildren(this);
+}
+//----------------- ExpressionFromUnaryExpressionContext ------------------------------------------------------------------
+
+SyReCParser::UnaryExpressionContext* SyReCParser::ExpressionFromUnaryExpressionContext::unaryExpression() {
+  return getRuleContext<SyReCParser::UnaryExpressionContext>(0);
+}
+
+SyReCParser::ExpressionFromUnaryExpressionContext::ExpressionFromUnaryExpressionContext(ExpressionContext *ctx) { copyFrom(ctx); }
+
+
+std::any SyReCParser::ExpressionFromUnaryExpressionContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<SyReCVisitor*>(visitor))
+    return parserVisitor->visitExpressionFromUnaryExpression(this);
+  else
+    return visitor->visitChildren(this);
+}
+//----------------- ExpressionFromShiftExpressionContext ------------------------------------------------------------------
+
+SyReCParser::ShiftExpressionContext* SyReCParser::ExpressionFromShiftExpressionContext::shiftExpression() {
+  return getRuleContext<SyReCParser::ShiftExpressionContext>(0);
+}
+
+SyReCParser::ExpressionFromShiftExpressionContext::ExpressionFromShiftExpressionContext(ExpressionContext *ctx) { copyFrom(ctx); }
+
+
+std::any SyReCParser::ExpressionFromShiftExpressionContext::accept(tree::ParseTreeVisitor *visitor) {
+  if (auto parserVisitor = dynamic_cast<SyReCVisitor*>(visitor))
+    return parserVisitor->visitExpressionFromShiftExpression(this);
+  else
+    return visitor->visitChildren(this);
+}
 SyReCParser::ExpressionContext* SyReCParser::expression() {
   ExpressionContext *_localctx = _tracker.createInstance<ExpressionContext>(_ctx, getState());
   enterRule(_localctx, 34, SyReCParser::RuleExpression);
@@ -1781,6 +1832,7 @@ SyReCParser::ExpressionContext* SyReCParser::expression() {
     _errHandler->sync(this);
     switch (getInterpreter<atn::ParserATNSimulator>()->adaptivePredict(_input, 18, _ctx)) {
     case 1: {
+      _localctx = _tracker.createInstance<SyReCParser::ExpressionFromNumberContext>(_localctx);
       enterOuterAlt(_localctx, 1);
       setState(204);
       number();
@@ -1788,6 +1840,7 @@ SyReCParser::ExpressionContext* SyReCParser::expression() {
     }
 
     case 2: {
+      _localctx = _tracker.createInstance<SyReCParser::ExpressionFromSignalContext>(_localctx);
       enterOuterAlt(_localctx, 2);
       setState(205);
       signal();
@@ -1795,6 +1848,7 @@ SyReCParser::ExpressionContext* SyReCParser::expression() {
     }
 
     case 3: {
+      _localctx = _tracker.createInstance<SyReCParser::ExpressionFromBinaryExpressionContext>(_localctx);
       enterOuterAlt(_localctx, 3);
       setState(206);
       binaryExpression();
@@ -1802,6 +1856,7 @@ SyReCParser::ExpressionContext* SyReCParser::expression() {
     }
 
     case 4: {
+      _localctx = _tracker.createInstance<SyReCParser::ExpressionFromUnaryExpressionContext>(_localctx);
       enterOuterAlt(_localctx, 4);
       setState(207);
       unaryExpression();
@@ -1809,6 +1864,7 @@ SyReCParser::ExpressionContext* SyReCParser::expression() {
     }
 
     case 5: {
+      _localctx = _tracker.createInstance<SyReCParser::ExpressionFromShiftExpressionContext>(_localctx);
       enterOuterAlt(_localctx, 5);
       setState(208);
       shiftExpression();
@@ -1943,10 +1999,11 @@ SyReCParser::BinaryExpressionContext* SyReCParser::binaryExpression() {
     setState(212);
     antlrcpp::downCast<BinaryExpressionContext *>(_localctx)->lhsOperand = expression();
     setState(213);
+    antlrcpp::downCast<BinaryExpressionContext *>(_localctx)->binaryOperation = _input->LT(1);
     _la = _input->LA(1);
     if (!(((_la & ~ 0x3fULL) == 0) &&
       ((1ULL << _la) & 481034240000) != 0)) {
-    _errHandler->recoverInline(this);
+      antlrcpp::downCast<BinaryExpressionContext *>(_localctx)->binaryOperation = _errHandler->recoverInline(this);
     }
     else {
       _errHandler->reportMatch(this);
@@ -2013,11 +2070,12 @@ SyReCParser::UnaryExpressionContext* SyReCParser::unaryExpression() {
   try {
     enterOuterAlt(_localctx, 1);
     setState(217);
+    antlrcpp::downCast<UnaryExpressionContext *>(_localctx)->unaryOperation = _input->LT(1);
     _la = _input->LA(1);
     if (!(_la == SyReCParser::OP_BITWISE_NEGATION
 
     || _la == SyReCParser::OP_LOGICAL_NEGATION)) {
-    _errHandler->recoverInline(this);
+      antlrcpp::downCast<UnaryExpressionContext *>(_localctx)->unaryOperation = _errHandler->recoverInline(this);
     }
     else {
       _errHandler->reportMatch(this);
@@ -2090,11 +2148,12 @@ SyReCParser::ShiftExpressionContext* SyReCParser::shiftExpression() {
     setState(221);
     expression();
     setState(222);
+    antlrcpp::downCast<ShiftExpressionContext *>(_localctx)->shiftOperation = _input->LT(1);
     _la = _input->LA(1);
     if (!(_la == SyReCParser::OP_LEFT_SHIFT
 
     || _la == SyReCParser::OP_RIGHT_SHIFT)) {
-    _errHandler->recoverInline(this);
+      antlrcpp::downCast<ShiftExpressionContext *>(_localctx)->shiftOperation = _errHandler->recoverInline(this);
     }
     else {
       _errHandler->reportMatch(this);

@@ -52,32 +52,20 @@ private:
     std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);
 
     bool checkIfSignalWasDeclaredOrLogError(const std::string_view& signalIdent);
-    [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const ExpressionEvaluationResult::ptr& expressionEvaluationResult);
+    [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult);
     [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
     [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
     [[nodiscard]] std::optional<unsigned int> evaluateNumber(const syrec::Number::ptr& numberContainer);
     [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
+    bool                                                                           isValidBinaryOperation(syrec_operation::operation userDefinedOperation) const;
+
 
 public:
     syrec::Module::vec modules;
     std::vector<std::string> errors;
     std::vector<std::string> warnings;
 
-    /**
-     * @brief Sets the number of line
-     *
-     * This method sets the number of lines of the circuit.
-     *
-     * Changing this number will not affect the data in the gates.
-     * For example: If there is a gate with a control on line 3,
-     * and the number of lines is reduced to 2 in the circuit, then
-     * the control is still on line 3 but not visible in this circuit.
-     *
-     * So, changing the lines after already adding gates can lead
-     * to invalid gates.
-     *
-     * @param context test
-     */
+
     std::any visitProgram(SyReCParser::ProgramContext* context) override;
     std::any visitModule(SyReCParser::ModuleContext* context) override;
     std::any visitParameterList(SyReCParser::ParameterListContext* context) override;
@@ -91,6 +79,16 @@ public:
     std::any visitNumberFromSignalwidth(SyReCParser::NumberFromSignalwidthContext* context) override;
     std::any visitNumberFromExpression(SyReCParser::NumberFromExpressionContext* context) override;
     std::any visitNumberFromLoopVariable(SyReCParser::NumberFromLoopVariableContext* context) override;
+
+    /*
+     * Expression production visitors
+     */
+    std::any visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext* context) override;
+    std::any visitExpressionFromSignal(SyReCParser::ExpressionFromSignalContext* context) override;
+    std::any visitBinaryExpression(SyReCParser::BinaryExpressionContext* context) override;
+    std::any visitUnaryExpression(SyReCParser::UnaryExpressionContext* context) override;
+    std::any visitShiftExpression(SyReCParser::ShiftExpressionContext* context) override;
+    
 };
     
 } // namespace parser
