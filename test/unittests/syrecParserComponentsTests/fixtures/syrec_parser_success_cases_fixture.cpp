@@ -322,6 +322,8 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("number", "asExpressionWithLhsBeingNested"),
                         std::make_pair("number", "asExpressionWithRhsBeingNested"),
 
+                        // TODO: Should there be tests checking that line comments are correctly skipped
+
                         /* Complete benchmarks */
                         std::make_pair("complete_circuits", "test_circuit")
                         ),

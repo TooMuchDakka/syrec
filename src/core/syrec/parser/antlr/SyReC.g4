@@ -42,6 +42,8 @@ SIGNAL_WIDTH_PREFIX: '#' ;
 STATEMENT_DELIMITER: ';' ;
 PARAMETER_DELIMITER: ',' ;
 
+LINE_COMMENT: '#' ~[\r\n]* -> skip ;
+
 fragment LETTER : 'a'..'z' | 'A'..'Z' ;
 fragment DIGIT : '0'..'9' ;
 IDENT : ( '_' | LETTER ) ( '_' | LETTER | DIGIT )* ;
@@ -60,7 +62,7 @@ number:
 
 /* Program and modules productions */
 
-program: module+ ;
+program: module+ EOF;
 
 module :
 	'module' 

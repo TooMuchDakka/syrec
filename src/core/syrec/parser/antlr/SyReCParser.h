@@ -24,7 +24,7 @@ public:
     OP_INCREMENT = 42, OP_DECREMENT = 43, VAR_TYPE_IN = 44, VAR_TYPE_OUT = 45, 
     VAR_TYPE_INOUT = 46, VAR_TYPE_WIRE = 47, VAR_TYPE_STATE = 48, LOOP_VARIABLE_PREFIX = 49, 
     SIGNAL_WIDTH_PREFIX = 50, STATEMENT_DELIMITER = 51, PARAMETER_DELIMITER = 52, 
-    IDENT = 53, INT = 54, SKIPABLEWHITSPACES = 55
+    LINE_COMMENT = 53, IDENT = 54, INT = 55, SKIPABLEWHITSPACES = 56
   };
 
   enum {
@@ -140,6 +140,7 @@ public:
   public:
     ProgramContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *EOF();
     std::vector<ModuleContext *> module();
     ModuleContext* module(size_t i);
 

@@ -1,19 +1,18 @@
 #ifndef SYREC_CUSTOM_VISITOR_H
 #define SYREC_CUSTOM_VISITOR_H
-    
+
+#include "SyReCBaseVisitor.h"    
 
 #include <stack>
 #include <string>
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/expression_evaluation_result.hpp"
+#include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
-
-#include "SyReCBaseVisitor.h"
-#include "core/syrec/parser/expression_evaluation_result.hpp"
-#include "core/syrec/parser/operation.hpp"
 
 namespace parser {
 class SyReCCustomVisitor: public SyReCBaseVisitor {
@@ -23,16 +22,9 @@ private:
     syrec::Number::loop_variable_mapping                         loopVariableMappingLookup;
 
     ParserConfig     config;
-    const std::string messageFormat = "-- line {0:d} col {1:d}: {2:s}";
 
     void createError(const std::string& errorMessage);
-    void createError(size_t line, size_t column, const std::string& errorMessage);
-
     void createWarning(const std::string& warningMessage);
-    void createWarning(size_t line, size_t column, const std::string& warningMessage);
-
-    [[nodiscard]] std::optional<unsigned int> convertToNumber(const antlr4::Token* token) const;
-    [[nodiscard]] std::optional<unsigned int> convertToNumber(const std::string& tokenText) const;
 
     template<typename T>
     [[nodiscard]] std::optional<T>            tryConvertProductionReturnValue(std::any productionReturnType) const {
@@ -48,6 +40,14 @@ private:
         }
     }
 
+    template<typename T>
+    [[nodiscard]] std::optional<T> tryVisitAndConvertProductionReturnValue(antlr4::tree::ParseTree* production) {
+        if (production == nullptr) {
+            return std::nullopt;
+        }
+        return tryConvertProductionReturnValue<T>(visit(production));
+    }
+
     std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
     std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);
 
@@ -57,7 +57,8 @@ private:
     [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
     [[nodiscard]] std::optional<unsigned int> evaluateNumber(const syrec::Number::ptr& numberContainer);
     [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
-    bool                                                                           isValidBinaryOperation(syrec_operation::operation userDefinedOperation) const;
+
+    static bool isValidBinaryOperation(syrec_operation::operation userDefinedOperation);
 
 
 public:
@@ -65,7 +66,24 @@ public:
     std::vector<std::string> errors;
     std::vector<std::string> warnings;
 
-
+    /*
+     * TODO: Visitor can be split into parts with error containers being shared
+     * I.Module declaration visitor
+     * II. Expression visitor
+     * III. Statement visitor
+     *
+     * Class structure could look like
+     *
+     * CustomParser
+     *  offers parser function and holds internal data structures (symbol table, errors-, warnings container) that
+     *  are passed to the visitiors
+     *  - offers utility functions to create errors, warnings (basically reusing utility functions)
+     *
+     * ModuleVisitor(customParser)
+     *  -> Statement visitor(customParser)
+     *      -> Expression visitor(customParser)
+     */
+    
     std::any visitProgram(SyReCParser::ProgramContext* context) override;
     std::any visitModule(SyReCParser::ModuleContext* context) override;
     std::any visitParameterList(SyReCParser::ParameterListContext* context) override;
@@ -88,7 +106,19 @@ public:
     std::any visitBinaryExpression(SyReCParser::BinaryExpressionContext* context) override;
     std::any visitUnaryExpression(SyReCParser::UnaryExpressionContext* context) override;
     std::any visitShiftExpression(SyReCParser::ShiftExpressionContext* context) override;
-    
+
+    /*
+     * Statement production visitors
+     */
+    std::any visitStatementList(SyReCParser::StatementListContext* context) override;
+    std::any visitStatement(SyReCParser::StatementContext* context) override;
+    std::any visitCallStatement(SyReCParser::CallStatementContext* context) override;
+    std::any visitForStatement(SyReCParser::ForStatementContext* context) override;
+    std::any visitIfStatement(SyReCParser::IfStatementContext* context) override;
+    std::any visitUnaryStatement(SyReCParser::UnaryStatementContext* context) override;
+    std::any visitAssignStatement(SyReCParser::AssignStatementContext* context) override;
+    std::any visitSwapStatement(SyReCParser::SwapStatementContext* context) override;
+    std::any visitSkipStatement(SyReCParser::SkipStatementContext* context) override;
 };
     
 } // namespace parser
