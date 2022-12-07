@@ -46,6 +46,10 @@ public:
 
     virtual std::any visitCallStatement(SyReCParser::CallStatementContext *context) = 0;
 
+    virtual std::any visitLoopVariableDefinition(SyReCParser::LoopVariableDefinitionContext *context) = 0;
+
+    virtual std::any visitLoopStepsizeDefinition(SyReCParser::LoopStepsizeDefinitionContext *context) = 0;
+
     virtual std::any visitForStatement(SyReCParser::ForStatementContext *context) = 0;
 
     virtual std::any visitIfStatement(SyReCParser::IfStatementContext *context) = 0;

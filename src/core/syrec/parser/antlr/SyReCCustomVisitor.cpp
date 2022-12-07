@@ -56,7 +56,12 @@ std::any SyReCCustomVisitor::visitModule(SyReCParser::ModuleContext* context) {
         }
     } 
 
-    // TODO: Parsed statements
+    const auto validUserDefinedModuleStatements = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
+    if (!validUserDefinedModuleStatements.has_value()) {
+        isDeclaredModuleValid = false;
+    } else {
+        module->statements = *validUserDefinedModuleStatements;
+    }
 
     SymbolTable::closeScope(this->currentSymbolTableScope);
     return isDeclaredModuleValid ? std::make_optional(module) : std::nullopt;
@@ -198,7 +203,7 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
             }
         }
 
-        isValidSignalAccess &= numUserDefinedDimensions > numElementsWithinRange;
+        isValidSignalAccess &= numUserDefinedDimensions <= numElementsWithinRange;
         for (size_t dimensionOutOfRangeIdx = numElementsWithinRange; dimensionOutOfRangeIdx < numUserDefinedDimensions; ++dimensionOutOfRangeIdx) {
             createError(fmt::format(DimensionOutOfRange, dimensionOutOfRangeIdx, signalIdent, numDimensionsOfAccessSignal));
         }
@@ -237,11 +242,7 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
         }
     }
 
-    SignalEvaluationResult::ptr result = std::make_shared<SignalEvaluationResult>();
-    if (isValidSignalAccess) {
-        result->updateResultToVariableAccess(accessedSignal.value());   
-    }
-    return result;
+    return isValidSignalAccess ? std::make_optional(std::make_shared<SignalEvaluationResult>(*accessedSignal)) : std::nullopt;
 }
 
 /*
@@ -348,7 +349,7 @@ std::any SyReCCustomVisitor::visitExpressionFromSignal(SyReCParser::ExpressionFr
     std::optional<ExpressionEvaluationResult::ptr> expressionFromSignal;
 
     const auto definedSignal = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->signal());
-    if (!definedSignal.has_value() || !(*definedSignal)->isValid()) {
+    if (!definedSignal.has_value()) {
         return expressionFromSignal;   
     }
     
@@ -453,31 +454,189 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
  * Statment production visitors
  */
 std::any SyReCCustomVisitor::visitStatementList(SyReCParser::StatementListContext* context) {
-    return std::nullopt;
+    // TODO: If custom casting utility function supports polymorphism as described in the description of the function, this stack is no longer needed
+    statementListContainerStack.push({});
+    //std::vector<syrec::Statement::ptr> validUserDefinedStatements;
+    for (const auto& userDefinedStatement : context->stmts) {
+        if (userDefinedStatement != nullptr) {
+            visit(userDefinedStatement);   
+        }
+        /*
+         * TODO: The current implementation of our utility functions does not support polymorphism when casting the value of std::any, thats why we need this workaround with the stack of statements
+        const auto validatedUserDefinedStatement = tryVisitAndConvertProductionReturnValue<syrec::Statement::ptr>(userDefinedStatement);
+        if (validatedUserDefinedStatement.has_value()) {
+            validUserDefinedStatements.emplace_back(*validatedUserDefinedStatement);
+        }
+        */
+    }
+    
+    const auto validUserDefinedStatements = statementListContainerStack.top();
+    statementListContainerStack.pop();
+
+    // TOOD: Could refactor
+    // Wrapping into std::optional is only needed because helper function to cast return type of production required this wrapper
+    return std::make_optional(validUserDefinedStatements);
 }
-std::any SyReCCustomVisitor::visitStatement(SyReCParser::StatementContext* context) {
-    return std::nullopt;
-}
+
+// TODO:
 std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContext* context) {
-    return std::nullopt;
+    return 0;
 }
+
 std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext* context) {
-    return std::nullopt;
+    const auto loopVariableIdent = tryVisitAndConvertProductionReturnValue<std::string>(context->loopVariableDefinition());
+    bool       loopHeaderValid   = context->loopVariableDefinition() != nullptr ? loopVariableIdent.has_value() : true;
+
+    const bool       wasStartValueExplicitlyDefined = context->startValue != nullptr;
+    const auto rangeStartValue = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->startValue);
+    loopHeaderValid &= wasStartValueExplicitlyDefined ? rangeStartValue.has_value() : true;
+
+    const auto rangeEndValue = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->endValue);
+    loopHeaderValid &= rangeEndValue.has_value();
+
+    const bool       wasStepSizeExplicitlyDefined = context->loopStepsizeDefinition() != nullptr;
+    std::optional <syrec::Number::ptr> stepSize;
+    if (wasStepSizeExplicitlyDefined) {
+        stepSize = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->loopStepsizeDefinition());
+        loopHeaderValid &= stepSize.has_value();
+    } else {
+        stepSize.emplace(std::make_shared<syrec::Number>(1));
+    }
+    
+    if (loopHeaderValid) {
+        const unsigned int iterationRangeEndValueEvaluated   = (*rangeEndValue)->evaluate(loopVariableMappingLookup);
+        const unsigned int iterationRangeStartValueEvaluated = wasStartValueExplicitlyDefined ? (*rangeStartValue)->evaluate(loopVariableMappingLookup) : iterationRangeEndValueEvaluated;
+        const unsigned int stepSizeEvaluated                 = (*stepSize)->evaluate(loopVariableMappingLookup);
+        const bool         negativeStepSizeDefined           = wasStepSizeExplicitlyDefined ? stepSizeEvaluated < 0 : false;
+
+        // TODO: Error generation if semantic range check fails
+        unsigned int numIterations = 0;
+        if ((negativeStepSizeDefined && iterationRangeStartValueEvaluated < iterationRangeEndValueEvaluated) || (!negativeStepSizeDefined && iterationRangeStartValueEvaluated > iterationRangeEndValueEvaluated) || stepSizeEvaluated == 0) {
+            createError("TODO: Error generation if semantic range check fails");
+            loopHeaderValid = false;
+        } else {
+            numIterations = (negativeStepSizeDefined ? (iterationRangeStartValueEvaluated - iterationRangeEndValueEvaluated) : (iterationRangeEndValueEvaluated - iterationRangeStartValueEvaluated)) + 1;
+            numIterations /= stepSizeEvaluated;
+        }
+    }
+
+    const auto loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
+    const bool       isValidLoopBody = loopBody.has_value() && !(*loopBody).empty();
+    if (!isValidLoopBody) {
+        createError("TODO: Loop body cannot be empty ? (If skip statements are optimized away then it could be empty");
+    }
+
+    // TODO: Instead of opening and closing a new scope simply insert and remove the entry from the symbol table
+    if (loopVariableIdent.has_value()) {
+        SymbolTable::closeScope(currentSymbolTableScope);
+    }
+
+    // TODO: If a statement must be generated, one could create a skip statement instead of simply returning 
+    if (loopHeaderValid && isValidLoopBody) {
+        const auto loopStatement    = std::make_shared<syrec::ForStatement>();
+        loopStatement->loopVariable = loopVariableIdent.has_value() ? *loopVariableIdent : "";
+        loopStatement->range        = std::pair(*rangeStartValue, *rangeEndValue);
+        loopStatement->step         = *stepSize;
+        loopStatement->statements   = *loopBody;
+        addStatementToOpenContainer(loopStatement);
+    }
+
+    return 0;
 }
+
+std::any SyReCCustomVisitor::visitLoopStepsizeDefinition(SyReCParser::LoopStepsizeDefinitionContext* context) {
+    // TODO: Handling of negative step size
+    bool isNegativeStepSize = context->OP_MINUS() != nullptr;
+    return tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->number());
+}
+
+std::any SyReCCustomVisitor::visitLoopVariableDefinition(SyReCParser::LoopVariableDefinitionContext* context) {
+    return context->variableIdent != nullptr ? std::make_optional("$" + context->IDENT()->getText()) : std::nullopt;
+}
+
+
 std::any SyReCCustomVisitor::visitIfStatement(SyReCParser::IfStatementContext* context) {
-    return std::nullopt;
+    const auto guardExpression = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->guardCondition);
+    const auto trueBranchStmts = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->trueBranchStmts);
+    const auto falseBranchStmts = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->falseBranchStmts);
+    const auto closingGuardExpression = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->matchingGuardExpression);
+
+    // TODO: Replace pointer comparison with actual equality check of expressions
+    if (!guardExpression.has_value() 
+        || (!trueBranchStmts.has_value() || (*trueBranchStmts).empty()) 
+        || (!falseBranchStmts.has_value() || (*falseBranchStmts).empty()) 
+        || !closingGuardExpression.has_value()
+        || *guardExpression != closingGuardExpression) {
+        return 0;        
+    }
+
+    const auto ifStatement = std::make_shared<syrec::IfStatement>();
+    ifStatement->condition      = (*guardExpression)->getAsExpression().value();
+    ifStatement->thenStatements = *trueBranchStmts;
+    ifStatement->elseStatements = *falseBranchStmts;
+    ifStatement->fiCondition    = (*closingGuardExpression)->getAsExpression().value();
+    addStatementToOpenContainer(ifStatement);
+    return 0;
 }
+
 std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementContext* context) {
-    return std::nullopt;
+    bool       allSemanticChecksOk = true;
+    const auto unaryOperation = getDefinedOperation(context->unaryOp);
+
+    if (!unaryOperation.has_value() 
+        || (syrec_operation::operation::bitwise_negation != *unaryOperation
+            && syrec_operation::operation::increment_assign != *unaryOperation
+            && syrec_operation::operation::decrement_assign != *unaryOperation)
+        ) {
+        allSemanticChecksOk = false;
+        createError(InvalidUnaryOperation);
+    }
+
+    const auto accessedSignal = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->signal());
+    allSemanticChecksOk &= accessedSignal.has_value() && (*accessedSignal)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(*(*accessedSignal)->getAsVariableAccess());
+    if (allSemanticChecksOk) {
+        // TODO: Add mapping from custom operation enum to internal "numeric" flag
+        addStatementToOpenContainer(std::make_shared<syrec::UnaryStatement>(0, *(*accessedSignal)->getAsVariableAccess()));
+    }
+
+    return 0;
 }
+
 std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementContext* context) {
-    return std::nullopt;
+    const auto assignedToSignal = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->signal());
+    bool       allSemanticChecksOk = assignedToSignal.has_value()
+        && (*assignedToSignal)->isVariableAccess()
+        && isSignalAssignableOtherwiseCreateError(*(*assignedToSignal)->getAsVariableAccess());
+
+
+    const auto definedAssignmentOperation = getDefinedOperation(context->assignmentOp);
+    if (!definedAssignmentOperation.has_value()
+        || (syrec_operation::operation::xor_assign != *definedAssignmentOperation
+            && syrec_operation::operation::add_assign != *definedAssignmentOperation
+            && syrec_operation::operation::minus_assign != *definedAssignmentOperation)) {
+        createError(InvalidAssignOperation);
+        allSemanticChecksOk = false;
+    }
+
+    const auto assignmentOpRhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->expression());
+    allSemanticChecksOk &= assignmentOpRhsOperand.has_value();
+
+    if (allSemanticChecksOk) {
+        // TODO: Add mapping from custom operation enum to internal "numeric" 
+        addStatementToOpenContainer(std::make_shared<syrec::AssignStatement>(*(*assignedToSignal)->getAsVariableAccess(), 0, (*assignmentOpRhsOperand)->getAsExpression().value()));
+    }
+
+    return 0;
 }
+
+// TODO:
 std::any SyReCCustomVisitor::visitSwapStatement(SyReCParser::SwapStatementContext* context) {
-    return std::nullopt;
+    return 0;
 }
+
 std::any SyReCCustomVisitor::visitSkipStatement(SyReCParser::SkipStatementContext* context) {
-    return std::nullopt;
+    addStatementToOpenContainer(std::make_shared<syrec::SkipStatement>());
+    return 0;
 }
 
 /*
@@ -604,8 +763,77 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
         case SyReCParser::OP_MULTIPLY:
             definedOperation.emplace(syrec_operation::operation::multiplication);
             break;
+        case SyReCParser::OP_UPPER_BIT_MULTIPLY:
+            definedOperation.emplace(syrec_operation::operation::upper_bits_multiplication);
+            break;
         case SyReCParser::OP_DIVISION:
             definedOperation.emplace(syrec_operation::operation::division);
+            break;
+        case SyReCParser::OP_MODULO:
+            definedOperation.emplace(syrec_operation::operation::modulo);
+            break;
+        case SyReCParser::OP_GREATER_THAN:
+            definedOperation.emplace(syrec_operation::operation::greater_than);
+            break;
+        case SyReCParser::OP_GREATER_OR_EQUAL:
+            definedOperation.emplace(syrec_operation::operation::greater_equals);
+            break;
+        case SyReCParser::OP_LESS_THAN:
+            definedOperation.emplace(syrec_operation::operation::less_than);
+            break;
+        case SyReCParser::OP_LESS_OR_EQUAL:
+            definedOperation.emplace(syrec_operation::operation::less_equals);
+            break;
+        case SyReCParser::OP_EQUAL:
+            definedOperation.emplace(syrec_operation::operation::equals);
+            break;
+        case SyReCParser::OP_NOT_EQUAL:
+            definedOperation.emplace(syrec_operation::operation::not_equals);
+            break;
+        case SyReCParser::OP_BITWISE_AND:
+            definedOperation.emplace(syrec_operation::operation::bitwise_and);
+            break;
+        case SyReCParser::OP_BITWISE_NEGATION:
+            definedOperation.emplace(syrec_operation::operation::bitwise_negation);
+            break;
+        case SyReCParser::OP_BITWISE_OR:
+            definedOperation.emplace(syrec_operation::operation::bitwise_or);
+            break;
+        case SyReCParser::OP_BITWISE_XOR:
+            definedOperation.emplace(syrec_operation::operation::bitwise_xor);
+            break;
+        case SyReCParser::OP_LOGICAL_AND:
+            definedOperation.emplace(syrec_operation::operation::logical_and);
+            break;
+        case SyReCParser::OP_LOGICAL_OR:
+            definedOperation.emplace(syrec_operation::operation::logical_or);
+            break;
+        case SyReCParser::OP_LOGICAL_NEGATION:
+            definedOperation.emplace(syrec_operation::operation::logical_negation);
+            break;
+        case SyReCParser::OP_LEFT_SHIFT:
+            definedOperation.emplace(syrec_operation::operation::shift_left);
+            break;
+        case SyReCParser::OP_RIGHT_SHIFT:
+            definedOperation.emplace(syrec_operation::operation::shift_right);
+            break;
+        case SyReCParser::OP_INCREMENT_ASSIGN:
+            definedOperation.emplace(syrec_operation::operation::increment_assign);
+            break;
+        case SyReCParser::OP_DECREMENT_ASSIGN:
+            definedOperation.emplace(syrec_operation::operation::decrement_assign);
+            break;
+        case SyReCParser::OP_BITWISE_NEGATION_ASSIGN:
+            definedOperation.emplace(syrec_operation::operation::negate_assign);
+            break;
+        case SyReCParser::OP_ADD_ASSIGN:
+            definedOperation.emplace(syrec_operation::operation::add_assign);
+            break;
+        case SyReCParser::OP_SUB_ASSIGN:
+            definedOperation.emplace(syrec_operation::operation::minus_assign);
+            break;
+        case SyReCParser::OP_XOR_ASSIGN:
+            definedOperation.emplace(syrec_operation::operation::xor_assign);
             break;
         default:
             createError("TODO: No mapping for operation");
@@ -664,4 +892,18 @@ bool SyReCCustomVisitor::isValidBinaryOperation(syrec_operation::operation userD
             break;
     }
     return isValid;
+}
+
+// TODO:
+[[nodiscard]] bool SyReCCustomVisitor::isSignalAssignableOtherwiseCreateError(const syrec::VariableAccess::ptr& assignedToVariable) {
+    if (syrec::Variable::Types::In == assignedToVariable->getVar()->type) {
+        createError(fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name));
+        return false;
+    }
+    return true;
+}
+
+
+void SyReCCustomVisitor::addStatementToOpenContainer(const syrec::Statement::ptr& statement) {
+    statementListContainerStack.top().emplace_back(statement);
 }

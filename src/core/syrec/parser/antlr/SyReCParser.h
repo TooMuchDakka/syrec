@@ -16,24 +16,27 @@ public:
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, T__5 = 6, T__6 = 7, 
     T__7 = 8, T__8 = 9, T__9 = 10, T__10 = 11, T__11 = 12, T__12 = 13, T__13 = 14, 
     T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
-    OP_PLUS = 21, OP_MINUS = 22, OP_MULTIPLY = 23, OP_XOR = 24, OP_UPPER_BIT_MULTIPLY = 25, 
-    OP_DIVISION = 26, OP_MODULO = 27, OP_GREATER_THAN = 28, OP_GREATER_OR_EQUAL = 29, 
-    OP_LESS_THAN = 30, OP_LESS_OR_EQUAL = 31, OP_EQUAL = 32, OP_NOT_EQUAL = 33, 
-    OP_BITWISE_AND = 34, OP_BITWISE_OR = 35, OP_BITWISE_NEGATION = 36, OP_LOGICAL_AND = 37, 
-    OP_LOGICAL_OR = 38, OP_LOGICAL_NEGATION = 39, OP_LEFT_SHIFT = 40, OP_RIGHT_SHIFT = 41, 
-    OP_INCREMENT = 42, OP_DECREMENT = 43, VAR_TYPE_IN = 44, VAR_TYPE_OUT = 45, 
-    VAR_TYPE_INOUT = 46, VAR_TYPE_WIRE = 47, VAR_TYPE_STATE = 48, LOOP_VARIABLE_PREFIX = 49, 
-    SIGNAL_WIDTH_PREFIX = 50, STATEMENT_DELIMITER = 51, PARAMETER_DELIMITER = 52, 
-    LINE_COMMENT = 53, IDENT = 54, INT = 55, SKIPABLEWHITSPACES = 56
+    OP_PLUS = 21, OP_MINUS = 22, OP_MULTIPLY = 23, OP_UPPER_BIT_MULTIPLY = 24, 
+    OP_DIVISION = 25, OP_MODULO = 26, OP_GREATER_THAN = 27, OP_GREATER_OR_EQUAL = 28, 
+    OP_LESS_THAN = 29, OP_LESS_OR_EQUAL = 30, OP_EQUAL = 31, OP_NOT_EQUAL = 32, 
+    OP_BITWISE_AND = 33, OP_BITWISE_NEGATION = 34, OP_BITWISE_OR = 35, OP_BITWISE_XOR = 36, 
+    OP_LOGICAL_AND = 37, OP_LOGICAL_OR = 38, OP_LOGICAL_NEGATION = 39, OP_LEFT_SHIFT = 40, 
+    OP_RIGHT_SHIFT = 41, OP_INCREMENT_ASSIGN = 42, OP_DECREMENT_ASSIGN = 43, 
+    OP_BITWISE_NEGATION_ASSIGN = 44, OP_ADD_ASSIGN = 45, OP_SUB_ASSIGN = 46, 
+    OP_XOR_ASSIGN = 47, VAR_TYPE_IN = 48, VAR_TYPE_OUT = 49, VAR_TYPE_INOUT = 50, 
+    VAR_TYPE_WIRE = 51, VAR_TYPE_STATE = 52, LOOP_VARIABLE_PREFIX = 53, 
+    SIGNAL_WIDTH_PREFIX = 54, STATEMENT_DELIMITER = 55, PARAMETER_DELIMITER = 56, 
+    LINE_COMMENT = 57, IDENT = 58, INT = 59, SKIPABLEWHITSPACES = 60
   };
 
   enum {
     RuleNumber = 0, RuleProgram = 1, RuleModule = 2, RuleParameterList = 3, 
     RuleParameter = 4, RuleSignalList = 5, RuleSignalDeclaration = 6, RuleStatementList = 7, 
-    RuleStatement = 8, RuleCallStatement = 9, RuleForStatement = 10, RuleIfStatement = 11, 
-    RuleUnaryStatement = 12, RuleAssignStatement = 13, RuleSwapStatement = 14, 
-    RuleSkipStatement = 15, RuleSignal = 16, RuleExpression = 17, RuleBinaryExpression = 18, 
-    RuleUnaryExpression = 19, RuleShiftExpression = 20
+    RuleStatement = 8, RuleCallStatement = 9, RuleLoopVariableDefinition = 10, 
+    RuleLoopStepsizeDefinition = 11, RuleForStatement = 12, RuleIfStatement = 13, 
+    RuleUnaryStatement = 14, RuleAssignStatement = 15, RuleSwapStatement = 16, 
+    RuleSkipStatement = 17, RuleSignal = 18, RuleExpression = 19, RuleBinaryExpression = 20, 
+    RuleUnaryExpression = 21, RuleShiftExpression = 22
   };
 
   explicit SyReCParser(antlr4::TokenStream *input);
@@ -63,6 +66,8 @@ public:
   class StatementListContext;
   class StatementContext;
   class CallStatementContext;
+  class LoopVariableDefinitionContext;
+  class LoopStepsizeDefinitionContext;
   class ForStatementContext;
   class IfStatementContext;
   class UnaryStatementContext;
@@ -275,6 +280,7 @@ public:
 
   class  CallStatementContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *callOp = nullptr;
     antlr4::Token *moduleIdent = nullptr;
     antlr4::Token *identToken = nullptr;
     std::vector<antlr4::Token *> calleArguments;
@@ -293,21 +299,47 @@ public:
 
   CallStatementContext* callStatement();
 
-  class  ForStatementContext : public antlr4::ParserRuleContext {
+  class  LoopVariableDefinitionContext : public antlr4::ParserRuleContext {
   public:
     antlr4::Token *variableIdent = nullptr;
+    LoopVariableDefinitionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    antlr4::tree::TerminalNode *LOOP_VARIABLE_PREFIX();
+    antlr4::tree::TerminalNode *OP_EQUAL();
+    antlr4::tree::TerminalNode *IDENT();
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  LoopVariableDefinitionContext* loopVariableDefinition();
+
+  class  LoopStepsizeDefinitionContext : public antlr4::ParserRuleContext {
+  public:
+    LoopStepsizeDefinitionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    NumberContext *number();
+    antlr4::tree::TerminalNode *OP_MINUS();
+
+
+    virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
+   
+  };
+
+  LoopStepsizeDefinitionContext* loopStepsizeDefinition();
+
+  class  ForStatementContext : public antlr4::ParserRuleContext {
+  public:
     SyReCParser::NumberContext *startValue = nullptr;
     SyReCParser::NumberContext *endValue = nullptr;
-    SyReCParser::NumberContext *stepSize = nullptr;
     ForStatementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     StatementListContext *statementList();
     std::vector<NumberContext *> number();
     NumberContext* number(size_t i);
-    antlr4::tree::TerminalNode *LOOP_VARIABLE_PREFIX();
-    antlr4::tree::TerminalNode *OP_EQUAL();
-    antlr4::tree::TerminalNode *OP_MINUS();
-    antlr4::tree::TerminalNode *IDENT();
+    LoopStepsizeDefinitionContext *loopStepsizeDefinition();
+    LoopVariableDefinitionContext *loopVariableDefinition();
 
 
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -338,13 +370,13 @@ public:
 
   class  UnaryStatementContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *unaryOp = nullptr;
     UnaryStatementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    antlr4::tree::TerminalNode *OP_EQUAL();
     SignalContext *signal();
-    antlr4::tree::TerminalNode *OP_BITWISE_NEGATION();
-    antlr4::tree::TerminalNode *OP_INCREMENT();
-    antlr4::tree::TerminalNode *OP_DECREMENT();
+    antlr4::tree::TerminalNode *OP_BITWISE_NEGATION_ASSIGN();
+    antlr4::tree::TerminalNode *OP_INCREMENT_ASSIGN();
+    antlr4::tree::TerminalNode *OP_DECREMENT_ASSIGN();
 
 
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -355,14 +387,14 @@ public:
 
   class  AssignStatementContext : public antlr4::ParserRuleContext {
   public:
+    antlr4::Token *assignmentOp = nullptr;
     AssignStatementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     SignalContext *signal();
-    antlr4::tree::TerminalNode *OP_EQUAL();
     ExpressionContext *expression();
-    antlr4::tree::TerminalNode *OP_XOR();
-    antlr4::tree::TerminalNode *OP_PLUS();
-    antlr4::tree::TerminalNode *OP_MINUS();
+    antlr4::tree::TerminalNode *OP_ADD_ASSIGN();
+    antlr4::tree::TerminalNode *OP_SUB_ASSIGN();
+    antlr4::tree::TerminalNode *OP_XOR_ASSIGN();
 
 
     virtual std::any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -491,7 +523,6 @@ public:
     ExpressionContext* expression(size_t i);
     antlr4::tree::TerminalNode *OP_PLUS();
     antlr4::tree::TerminalNode *OP_MINUS();
-    antlr4::tree::TerminalNode *OP_XOR();
     antlr4::tree::TerminalNode *OP_MULTIPLY();
     antlr4::tree::TerminalNode *OP_DIVISION();
     antlr4::tree::TerminalNode *OP_MODULO();
@@ -500,6 +531,7 @@ public:
     antlr4::tree::TerminalNode *OP_LOGICAL_OR();
     antlr4::tree::TerminalNode *OP_BITWISE_AND();
     antlr4::tree::TerminalNode *OP_BITWISE_OR();
+    antlr4::tree::TerminalNode *OP_BITWISE_XOR();
     antlr4::tree::TerminalNode *OP_LESS_THAN();
     antlr4::tree::TerminalNode *OP_GREATER_THAN();
     antlr4::tree::TerminalNode *OP_EQUAL();

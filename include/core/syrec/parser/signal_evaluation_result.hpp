@@ -11,19 +11,18 @@ namespace parser {
     public:
         typedef std::shared_ptr<SignalEvaluationResult> ptr;
 
-        SignalEvaluationResult() = default;
-        void updateResultToVariableAccess(const syrec::VariableAccess::ptr& variableAccess);
+        [[nodiscard]] bool isConstant() const;
+        [[nodiscard]] bool isVariableAccess() const;
 
-        bool isValid() const;
-        bool isConstant() const;
-        bool isVariableAccess() const;
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr> getAsVariableAccess();
+        [[nodiscard]] std::optional<syrec::Number::ptr>         getAsNumber();
 
-        std::optional<syrec::VariableAccess::ptr> getAsVariableAccess();
-        std::optional<syrec::Number::ptr> getAsNumber();
-
+        SignalEvaluationResult(const syrec::Number::ptr& number) : evaluationResult(number) {}
+        SignalEvaluationResult(const syrec::VariableAccess::ptr& variableAccess) : evaluationResult(variableAccess) {}
     private:
         typedef std::variant<syrec::VariableAccess::ptr, syrec::Number::ptr>        availableValueOptions;
-        std::optional<availableValueOptions> evaluationResult;
+        availableValueOptions evaluationResult;
+
     };
 }
 

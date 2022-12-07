@@ -4,7 +4,6 @@ grammar SyReC;
 OP_PLUS : '+' ;
 OP_MINUS : '-' ;
 OP_MULTIPLY: '*' ;
-OP_XOR: '^' ;
 OP_UPPER_BIT_MULTIPLY: '>*' ;
 OP_DIVISION: '/' ;
 OP_MODULO: '%' ;
@@ -17,8 +16,9 @@ OP_EQUAL: '=';
 OP_NOT_EQUAL: '!=';
 
 OP_BITWISE_AND: '&' ;
-OP_BITWISE_OR: '|' ;
 OP_BITWISE_NEGATION: '~' ;
+OP_BITWISE_OR: '|' ;
+OP_BITWISE_XOR: '^' ;
 
 OP_LOGICAL_AND: '&&' ;
 OP_LOGICAL_OR: '||' ;
@@ -27,8 +27,13 @@ OP_LOGICAL_NEGATION: '!' ;
 OP_LEFT_SHIFT: '>>' ;
 OP_RIGHT_SHIFT: '<<' ;
 
-OP_INCREMENT: '++' ;
-OP_DECREMENT: '--' ;
+OP_INCREMENT_ASSIGN: '++=' ;
+OP_DECREMENT_ASSIGN: '--=' ;
+OP_BITWISE_NEGATION_ASSIGN: '~=' ;
+
+OP_ADD_ASSIGN: '+=' ;
+OP_SUB_ASSIGN: '-=' ;
+OP_XOR_ASSIGN: '^=' ;
 
 VAR_TYPE_IN: 'in' ;
 VAR_TYPE_OUT: 'out' ;
@@ -129,9 +134,11 @@ statement:
 	| skipStatement	
 	;
 
-callStatement: ( 'call' | 'uncall' ) moduleIdent=IDENT '(' calleArguments+=IDENT ( ',' calleeArguments+=IDENT )* ')' ;
+callStatement: callOp=( 'call' | 'uncall' ) moduleIdent=IDENT '(' calleArguments+=IDENT ( ',' calleeArguments+=IDENT )* ')' ;
 
-forStatement: 'for' ( ( LOOP_VARIABLE_PREFIX variableIdent=IDENT OP_EQUAL )? startValue=number 'to' )? endValue=number ( 'step' ( OP_MINUS )? stepSize=number )? 'do' statementList 'rof' ;
+loopVariableDefinition: LOOP_VARIABLE_PREFIX variableIdent=IDENT OP_EQUAL ;
+loopStepsizeDefinition: 'step' OP_MINUS? number ;
+forStatement: 'for' ( loopVariableDefinition? startValue=number 'to' )? endValue=number loopStepsizeDefinition? 'do' statementList 'rof' ;
 
 ifStatement: 
 	'if' guardCondition=expression 'then' 
@@ -140,9 +147,9 @@ ifStatement:
 		falseBranchStmts=statementList 
 	'fi' matchingGuardExpression=expression ;
 
-unaryStatement:  ( OP_BITWISE_NEGATION | OP_INCREMENT | OP_DECREMENT ) OP_EQUAL signal ;
+unaryStatement:  unaryOp=( OP_BITWISE_NEGATION_ASSIGN | OP_INCREMENT_ASSIGN | OP_DECREMENT_ASSIGN ) signal ;
 
-assignStatement: signal ( OP_XOR | OP_PLUS | OP_MINUS ) OP_EQUAL expression ;
+assignStatement: signal assignmentOp=( OP_ADD_ASSIGN | OP_SUB_ASSIGN | OP_XOR_ASSIGN ) expression ;
 
 swapStatement: 
 	lhsOperand=signal '<=>' rhsOperand=signal ;
@@ -165,7 +172,6 @@ binaryExpression:
 	'(' lhsOperand=expression
 		binaryOperation=( OP_PLUS
 		| OP_MINUS
-		| OP_XOR
 		| OP_MULTIPLY
 		| OP_DIVISION
 		| OP_MODULO
@@ -174,6 +180,7 @@ binaryExpression:
 		| OP_LOGICAL_OR
 		| OP_BITWISE_AND
 		| OP_BITWISE_OR
+		| OP_BITWISE_XOR
 		| OP_LESS_THAN
 		| OP_GREATER_THAN
 		| OP_EQUAL

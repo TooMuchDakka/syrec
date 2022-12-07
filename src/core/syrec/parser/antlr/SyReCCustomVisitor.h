@@ -20,12 +20,19 @@ private:
     SymbolTable::ptr                                             currentSymbolTableScope;
     std::stack<std::pair<std::string, std::vector<std::string>>> callStack;
     syrec::Number::loop_variable_mapping                         loopVariableMappingLookup;
+    std::stack<syrec::Statement::vec>               statementListContainerStack;
 
     ParserConfig     config;
 
     void createError(const std::string& errorMessage);
     void createWarning(const std::string& warningMessage);
 
+    /**
+     * \brief Try to convert the return value of the given production to an instance of std::optional<T>.
+     * \tparam T The expected type of the value wrapped inside of a std::optional returned by the production. IMPORTANT: This must be the exact type of the class, currently polymorphism does not work with std::any because of type erasure by std::any (see https://stackoverflow.com/questions/70313749/combining-static-cast-and-stdany-cast)
+     * \param productionReturnType The expected type of the value wrapped inside of a std::optional returned by the production
+     * \return A std::optional<T> object containing the casted return value of the production
+     */
     template<typename T>
     [[nodiscard]] std::optional<T>            tryConvertProductionReturnValue(std::any productionReturnType) const {
         if (!productionReturnType.has_value()) {
@@ -36,10 +43,17 @@ private:
             return std::any_cast<std::optional<T>>(productionReturnType);
         }
         catch (std::bad_any_cast&) {
+            // TODO: Better error handling, i.e. logging or returning C-style error code to check whether cast or something else failed
             return std::nullopt;
         }
     }
 
+    /**
+     * \brief If the context is not null, try to call the corresponding visitor and try to convert the return value of the given production to an instance of std::optional<T>.
+     * \tparam T The expected type of the value wrapped inside of a std::optional returned by the production. IMPORTANT: This must be the exact type of the class, currently polymorphism does not work with std::any because of type erasure by std::any (see https://stackoverflow.com/questions/70313749/combining-static-cast-and-stdany-cast)
+     * \param productionReturnType The expected type of the value wrapped inside of a std::optional returned by the production
+     * \return A std::optional<T> object containing the casted return value of the production
+     */
     template<typename T>
     [[nodiscard]] std::optional<T> tryVisitAndConvertProductionReturnValue(antlr4::tree::ParseTree* production) {
         if (production == nullptr) {
@@ -57,8 +71,9 @@ private:
     [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
     [[nodiscard]] std::optional<unsigned int> evaluateNumber(const syrec::Number::ptr& numberContainer);
     [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
-
+    [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const syrec::VariableAccess::ptr& assignedToVariable);
     static bool isValidBinaryOperation(syrec_operation::operation userDefinedOperation);
+    void                                                                           addStatementToOpenContainer(const syrec::Statement::ptr& statement);
 
 
 public:
@@ -111,9 +126,11 @@ public:
      * Statement production visitors
      */
     std::any visitStatementList(SyReCParser::StatementListContext* context) override;
-    std::any visitStatement(SyReCParser::StatementContext* context) override;
     std::any visitCallStatement(SyReCParser::CallStatementContext* context) override;
     std::any visitForStatement(SyReCParser::ForStatementContext* context) override;
+    std::any visitLoopStepsizeDefinition(SyReCParser::LoopStepsizeDefinitionContext* context) override;
+    std::any visitLoopVariableDefinition(SyReCParser::LoopVariableDefinitionContext* context) override;
+
     std::any visitIfStatement(SyReCParser::IfStatementContext* context) override;
     std::any visitUnaryStatement(SyReCParser::UnaryStatementContext* context) override;
     std::any visitAssignStatement(SyReCParser::AssignStatementContext* context) override;

@@ -69,6 +69,14 @@ public:
     return visitChildren(ctx);
   }
 
+  virtual std::any visitLoopVariableDefinition(SyReCParser::LoopVariableDefinitionContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
+  virtual std::any visitLoopStepsizeDefinition(SyReCParser::LoopStepsizeDefinitionContext *ctx) override {
+    return visitChildren(ctx);
+  }
+
   virtual std::any visitForStatement(SyReCParser::ForStatementContext *ctx) override {
     return visitChildren(ctx);
   }

@@ -16,7 +16,7 @@ std::optional<unsigned int> ExpressionEvaluationResult::getAsConstant() const {
 }
 
 std::optional<syrec::expression::ptr> ExpressionEvaluationResult::getAsExpression() const {
-    if (this->evaluationResult.has_value()) {
+    if (!this->evaluationResult.has_value()) {
         return std::nullopt;
     }
 
