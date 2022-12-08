@@ -16,6 +16,8 @@ using namespace parser;
 
 // https://stackoverflow.com/questions/60420005/programmatically-access-antlr-grammar-rule-string-literals-outside-of-a-parse-co
 
+// TODO: Currently loop variables are not supported as arguments
+
 std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) {
     SymbolTable::openScope(currentSymbolTableScope);
     for (const auto& module : context->module()) {
@@ -335,8 +337,35 @@ std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromEx
 
 std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext* context) {
     const auto definedNumber = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->number());
+
+    /*
+
+    // TODO: Is this the correct calculation and is it both safe and does it return the expected result
     if (definedNumber.has_value()) {
-        // TODO: Is this the correct calculation and is it both safe and does it return the expected result
+        if ((*definedNumber)->isConstant()) {
+            const auto valueOfDefinedNumber = (*definedNumber)->evaluate(loopVariableMappingLookup);
+            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(valueOfDefinedNumber));
+        } 
+
+        // TODO: When the lookup of the loop variable is working correctly this branch can be replaced with the above, and also use evaluateNumber instead
+        const auto expressionFromNumber = std::make_shared<syrec::NumericExpression>(*definedNumber, ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(0));
+        return std::make_optional(ExpressionEvaluationResult::createFromExpression(expressionFromNumber));    
+    }
+    */
+
+    /*
+    if (definedNumber.has_value()) {
+        const auto numberEvaluated = evaluateNumber(*definedNumber);
+        if (numberEvaluated.has_value()) {
+            if ((*definedNumber)->isLoopVariable()) {
+                return ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::NumericExpression>(*definedNumber, ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(0)));
+            }
+            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*numberEvaluated));
+        }
+    }
+    */
+
+    if (definedNumber.has_value()) {
         const auto valueOfDefinedNumber = (*definedNumber)->evaluate(loopVariableMappingLookup);
         return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(valueOfDefinedNumber));
     }
@@ -354,12 +383,14 @@ std::any SyReCCustomVisitor::visitExpressionFromSignal(SyReCParser::ExpressionFr
     
     syrec::expression::ptr expressionWrapperForSignal;
     if ((*definedSignal)->isVariableAccess()) {
-        expressionWrapperForSignal = std::make_shared<syrec::VariableExpression>((*definedSignal)->getAsVariableAccess().value());
+        expressionWrapperForSignal = std::make_shared<syrec::VariableExpression>(*(*definedSignal)->getAsVariableAccess());
         expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal));
     } else if ((*definedSignal)->isConstant()) {
         // TODO: Is this the correct calculation and is it both safe and does it return the expected result
-        const auto constantValueOfDefinedSignal = (*definedSignal)->getAsNumber().value()->evaluate(loopVariableMappingLookup);
-        expressionWrapperForSignal = std::make_shared<syrec::NumericExpression>((*definedSignal)->getAsNumber().value(), ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(constantValueOfDefinedSignal));
+        const auto constantValueOfDefinedSignal = evaluateNumber(*(*definedSignal)->getAsNumber());
+
+        // TODO: Correct handling of loop variable
+        expressionWrapperForSignal = std::make_shared<syrec::NumericExpression>(*(*definedSignal)->getAsNumber(), constantValueOfDefinedSignal.has_value() ? ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(*constantValueOfDefinedSignal) : 0);    
         expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal));
     }
 
@@ -383,10 +414,10 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
     const auto rhsOperandConversionToConstant = (*rhsOperand)->getAsConstant();
     
     if (lhsOperandConversionToConstant.has_value() && rhsOperandConversionToConstant.has_value()) {
-        const auto binaryExpressionEvaluated = applyBinaryOperation(userDefinedOperation.value(), *lhsOperandConversionToConstant, *rhsOperandConversionToConstant);
+        const auto binaryExpressionEvaluated = applyBinaryOperation(*userDefinedOperation, *lhsOperandConversionToConstant, *rhsOperandConversionToConstant);
         if (binaryExpressionEvaluated.has_value()) {
             // TODO
-            return ExpressionEvaluationResult::createFromConstantValue(binaryExpressionEvaluated.value());
+            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*binaryExpressionEvaluated));
         }
 
         // TODO: Error creation
@@ -443,8 +474,11 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
 
     // TODO: Mapping from operation to internal operation 'integer' value
     const auto lhsShiftOperationOperandExpr     = *(*expressionToShift)->getAsExpression();
+
+    /* TODO: Refactor after loop variable lookup is fixed
     const auto rhsShiftOperationOperandBitwidth = ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal((*shiftAmount)->evaluate(loopVariableMappingLookup));
     const auto shiftExpressionBitwidth          = std::max(lhsShiftOperationOperandExpr->bitwidth(), rhsShiftOperationOperandBitwidth);
+    */
 
     // TODO: Handling of shift expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
     const auto createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *ParserUtilities::mapOperationToInternalFlag(*definedShiftOperation), *shiftAmount);
@@ -677,7 +711,7 @@ std::any SyReCCustomVisitor::visitIfStatement(SyReCParser::IfStatementContext* c
         || (!trueBranchStmts.has_value() || (*trueBranchStmts).empty()) 
         || (!falseBranchStmts.has_value() || (*falseBranchStmts).empty()) 
         || !closingGuardExpression.has_value()
-        || *guardExpression != closingGuardExpression) {
+        || !areExpressionsEqual(*guardExpression, *closingGuardExpression)) {
         return 0;        
     }
 
@@ -1021,4 +1055,19 @@ bool SyReCCustomVisitor::isValidBinaryOperation(syrec_operation::operation userD
 
 void SyReCCustomVisitor::addStatementToOpenContainer(const syrec::Statement::ptr& statement) {
     statementListContainerStack.top().emplace_back(statement);
+}
+
+[[nodiscard]] bool SyReCCustomVisitor::areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr) {
+    const bool isFirstExprConstant = firstExpr->isConstantValue();
+    const bool isOtherExprConstant = otherExpr->isConstantValue();
+    if (isFirstExprConstant ^ isOtherExprConstant) {
+        return false;
+    }
+
+    if (isFirstExprConstant && isOtherExprConstant) {
+        return *firstExpr->getAsConstant() == *otherExpr->getAsConstant();
+    }
+
+    // TODO: Add comparison of expressions
+    return true;
 }

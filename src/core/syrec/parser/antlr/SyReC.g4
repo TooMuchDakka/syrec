@@ -4,7 +4,7 @@ grammar SyReC;
 OP_PLUS : '+' ;
 OP_MINUS : '-' ;
 OP_MULTIPLY: '*' ;
-OP_UPPER_BIT_MULTIPLY: '>*' ;
+OP_UPPER_BIT_MULTIPLY: '*>' ;
 OP_DIVISION: '/' ;
 OP_MODULO: '%' ;
 

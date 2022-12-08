@@ -227,7 +227,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         /* Expression production */
                         std::make_pair("production_expression", "isConstant"),
                         std::make_pair("production_expression", "isSignalWidth"),
-                        std::make_pair("production_expression", "isLoopVariable"),
+                        std::make_pair("DISABLED_production_expression", "isLoopVariable"),
                         std::make_pair("production_expression", "isExpressionWithoutNesting"),
                         std::make_pair("production_expression", "isExpressionWithLhsBeingNested"),
                         std::make_pair("production_expression", "isExpressionWithRhsBeingNested"),

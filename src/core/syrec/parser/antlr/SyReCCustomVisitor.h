@@ -65,6 +65,9 @@ private:
     std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
     std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);
 
+    [[nodiscard]] static bool isValidBinaryOperation(syrec_operation::operation userDefinedOperation);
+    [[nodiscard]] static bool areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr);
+
     bool checkIfSignalWasDeclaredOrLogError(const std::string_view& signalIdent);
     [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult);
     [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
@@ -72,8 +75,7 @@ private:
     [[nodiscard]] std::optional<unsigned int> evaluateNumber(const syrec::Number::ptr& numberContainer);
     [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
     [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const syrec::VariableAccess::ptr& assignedToVariable);
-    static bool isValidBinaryOperation(syrec_operation::operation userDefinedOperation);
-    void                                                                           addStatementToOpenContainer(const syrec::Statement::ptr& statement);
+    void addStatementToOpenContainer(const syrec::Statement::ptr& statement);
 
 
 public:
