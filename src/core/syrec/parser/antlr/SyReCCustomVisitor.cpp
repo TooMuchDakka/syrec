@@ -192,14 +192,13 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
     if (isValidSignalAccess) {
         const size_t numElementsWithinRange = std::min(numUserDefinedDimensions, numDimensionsOfAccessSignal);
         for (size_t dimensionIdx = 0; dimensionIdx < numElementsWithinRange; ++dimensionIdx) {
-            const auto& definedDimensionAccess      = context->accessedDimensions.at(dimensionIdx);
-            const auto accessedDimensionExpression = std::any_cast<ExpressionEvaluationResult::ptr>(visit(definedDimensionAccess));
+            const auto  accessedDimensionExpression = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->accessedDimensions.at(dimensionIdx));
 
             if (accessedSignal.has_value()) {
                 isValidSignalAccess = validateSemanticChecksIfDimensionExpressionIsConstant(dimensionIdx, (*accessedSignal)->getVar(), accessedDimensionExpression);
                 if (isValidSignalAccess) {
                     // TODO: Set correct bit width of expression
-                    (*accessedSignal)->indexes.emplace_back(accessedDimensionExpression->getAsExpression().value());
+                    (*accessedSignal)->indexes.emplace_back((*accessedDimensionExpression)->getAsExpression().value());
                 }
             }
         }
@@ -339,8 +338,7 @@ std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFr
     if (definedNumber.has_value()) {
         // TODO: Is this the correct calculation and is it both safe and does it return the expected result
         const auto valueOfDefinedNumber = (*definedNumber)->evaluate(loopVariableMappingLookup);
-        const auto numericExpression = std::make_shared<syrec::NumericExpression>(*definedNumber, ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(valueOfDefinedNumber));
-        return std::make_optional(ExpressionEvaluationResult::createFromExpression(numericExpression));
+        return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(valueOfDefinedNumber));
     }
 
     return std::nullopt;
@@ -416,7 +414,7 @@ std::any SyReCCustomVisitor::visitUnaryExpression(SyReCParser::UnaryExpressionCo
 }
 
 std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionContext* context) {
-    const auto expressionToShift = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult>(context->expression());
+    const auto expressionToShift = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->expression());
     const auto definedShiftOperation    = context->shiftOperation != nullptr ? getDefinedOperation(context->shiftOperation) : std::nullopt;
 
     if (!definedShiftOperation.has_value() || (*definedShiftOperation != syrec_operation::operation::shift_left && *definedShiftOperation != syrec_operation::operation::shift_right)) {
@@ -430,7 +428,7 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
     }
 
     const auto shiftAmountEvaluated = evaluateNumber(*shiftAmount);
-    const auto expressionToShiftEvaluated = expressionToShift->getAsConstant();
+    const auto expressionToShiftEvaluated = (*expressionToShift)->getAsConstant();
 
     if (shiftAmountEvaluated.has_value() && expressionToShiftEvaluated.has_value()) {
         const auto shiftOperationApplicationResult = apply(*definedShiftOperation, *expressionToShiftEvaluated, *shiftAmountEvaluated);
@@ -444,12 +442,12 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
     }
 
     // TODO: Mapping from operation to internal operation 'integer' value
-    const auto lhsShiftOperationOperandExpr     = *expressionToShift->getAsExpression();
+    const auto lhsShiftOperationOperandExpr     = *(*expressionToShift)->getAsExpression();
     const auto rhsShiftOperationOperandBitwidth = ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal((*shiftAmount)->evaluate(loopVariableMappingLookup));
     const auto shiftExpressionBitwidth          = std::max(lhsShiftOperationOperandExpr->bitwidth(), rhsShiftOperationOperandBitwidth);
 
     // TODO: Handling of shift expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
-    const auto createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*expressionToShift->getAsExpression(), *ParserUtilities::mapOperationToInternalFlag(*definedShiftOperation), *shiftAmount);
+    const auto createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *ParserUtilities::mapOperationToInternalFlag(*definedShiftOperation), *shiftAmount);
     return std::make_optional(ExpressionEvaluationResult::createFromExpression(createdShiftExpression));
 }
 
@@ -587,7 +585,17 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
 
 std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext* context) {
     const auto loopVariableIdent = tryVisitAndConvertProductionReturnValue<std::string>(context->loopVariableDefinition());
-    bool       loopHeaderValid   = context->loopVariableDefinition() != nullptr ? loopVariableIdent.has_value() : true;
+    bool       loopHeaderValid = true;
+    if (loopVariableIdent.has_value()) {
+        if (currentSymbolTableScope->contains(*loopVariableIdent)) {
+            createError(fmt::format(UndeclaredIdent, *loopVariableIdent));
+            loopHeaderValid = false;
+        }
+        else {
+            SymbolTable::openScope(currentSymbolTableScope);
+            currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(*loopVariableIdent));
+        }
+    }
 
     const bool       wasStartValueExplicitlyDefined = context->startValue != nullptr;
     const auto rangeStartValue = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->startValue);
@@ -637,7 +645,7 @@ std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext*
     if (loopHeaderValid && isValidLoopBody) {
         const auto loopStatement    = std::make_shared<syrec::ForStatement>();
         loopStatement->loopVariable = loopVariableIdent.has_value() ? *loopVariableIdent : "";
-        loopStatement->range        = std::pair(*rangeStartValue, *rangeEndValue);
+        loopStatement->range        = std::pair(wasStartValueExplicitlyDefined ? *rangeStartValue : *rangeEndValue, *rangeEndValue);
         loopStatement->step         = *stepSize;
         loopStatement->statements   = *loopBody;
         addStatementToOpenContainer(loopStatement);
@@ -652,6 +660,7 @@ std::any SyReCCustomVisitor::visitLoopStepsizeDefinition(SyReCParser::LoopStepsi
     return tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->number());
 }
 
+// TODO: Check that loop variable was not declared before
 std::any SyReCCustomVisitor::visitLoopVariableDefinition(SyReCParser::LoopVariableDefinitionContext* context) {
     return context->variableIdent != nullptr ? std::make_optional("$" + context->IDENT()->getText()) : std::nullopt;
 }
@@ -686,7 +695,7 @@ std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementCont
     const auto unaryOperation = getDefinedOperation(context->unaryOp);
 
     if (!unaryOperation.has_value() 
-        || (syrec_operation::operation::bitwise_negation != *unaryOperation
+        || (syrec_operation::operation::invert_assign != *unaryOperation
             && syrec_operation::operation::increment_assign != *unaryOperation
             && syrec_operation::operation::decrement_assign != *unaryOperation)
         ) {

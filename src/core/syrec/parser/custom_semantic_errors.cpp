@@ -53,7 +53,6 @@ namespace parser {
     extern const std::string AmbigousCall = "Ambigous call/uncall for module with ident '{0:s}'";
     extern const std::string NoMatchForGuessWithNActualParameters = "Non of the overloads accepts {0:d} parameters";
 
-
     /* Arithmetic errors */
     extern const std::string DivisionByZero = "invalid division by zero";
 

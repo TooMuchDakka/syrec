@@ -24,8 +24,8 @@ OP_LOGICAL_AND: '&&' ;
 OP_LOGICAL_OR: '||' ;
 OP_LOGICAL_NEGATION: '!' ;
 
-OP_LEFT_SHIFT: '>>' ;
-OP_RIGHT_SHIFT: '<<' ;
+OP_LEFT_SHIFT: '<<' ;
+OP_RIGHT_SHIFT: '>>' ;
 
 OP_INCREMENT_ASSIGN: '++=' ;
 OP_DECREMENT_ASSIGN: '--=' ;
@@ -47,7 +47,7 @@ SIGNAL_WIDTH_PREFIX: '#' ;
 STATEMENT_DELIMITER: ';' ;
 PARAMETER_DELIMITER: ',' ;
 
-LINE_COMMENT: '#' ~[\r\n]* -> skip ;
+/* LINE_COMMENT: '#' ~[\r\n]* -> skip ; */
 
 fragment LETTER : 'a'..'z' | 'A'..'Z' ;
 fragment DIGIT : '0'..'9' ;
