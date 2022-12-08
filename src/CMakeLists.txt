@@ -21,7 +21,7 @@ add_library(${PROJECT_NAME}
             
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/custom_semantic_errors.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_evaluation_result.cpp
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/method_call_guess.cpp
+			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/module_call_guess.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/operation.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/parser_utilities.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/range_check.cpp
@@ -46,7 +46,7 @@ add_library(${PROJECT_NAME}
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/custom_semantic_errors.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_evaluation_result.hpp
-			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/method_call_guess.hpp
+			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/module_call_guess.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/operation.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_utilities.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_config.hpp

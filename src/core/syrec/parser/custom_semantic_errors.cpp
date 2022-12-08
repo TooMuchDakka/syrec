@@ -46,7 +46,13 @@ namespace parser {
     extern const std::string MissmatchOfModuleIdentBetweenCalledAndUncall = "Missmatch between module ident '{0:s}' used in call does not match the uncalled one '{1:s}'";
     extern const std::string NumberOfFormalParametersDoesNotMatchActual = "module '{0:s}' defined {1:d} formal parameters but uncall/call provided {2:d} parameter values";
     extern const std::string MissingUncall                           = "missing uncall for module '{0:s}' called with arguments {1:s}";
-    extern const std::string CallAndUncallArgumentsMissmatch         = "call and uncall of module '{0:s}' defined different parameter values ";
+
+    extern const std::string ParameterValueMissmatch         = "Index: {0:d} - Formal: {1:s} | Actual: {2:s}";
+    extern const std::string CallAndUncallArgumentsMissmatch         = "call and uncall of module '{0:s}' defined different parameter values - {1:s} ";
+
+    extern const std::string AmbigousCall = "Ambigous call/uncall for module with ident '{0:s}'";
+    extern const std::string NoMatchForGuessWithNActualParameters = "Non of the overloads accepts {0:d} parameters";
+
 
     /* Arithmetic errors */
     extern const std::string DivisionByZero = "invalid division by zero";

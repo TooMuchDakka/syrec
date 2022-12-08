@@ -29,7 +29,7 @@ OP_RIGHT_SHIFT: '<<' ;
 
 OP_INCREMENT_ASSIGN: '++=' ;
 OP_DECREMENT_ASSIGN: '--=' ;
-OP_BITWISE_NEGATION_ASSIGN: '~=' ;
+OP_INVERT_ASSIGN: '~=' ;
 
 OP_ADD_ASSIGN: '+=' ;
 OP_SUB_ASSIGN: '-=' ;
@@ -147,7 +147,7 @@ ifStatement:
 		falseBranchStmts=statementList 
 	'fi' matchingGuardExpression=expression ;
 
-unaryStatement:  unaryOp=( OP_BITWISE_NEGATION_ASSIGN | OP_INCREMENT_ASSIGN | OP_DECREMENT_ASSIGN ) signal ;
+unaryStatement:  unaryOp=( OP_INVERT_ASSIGN | OP_INCREMENT_ASSIGN | OP_DECREMENT_ASSIGN ) signal ;
 
 assignStatement: signal assignmentOp=( OP_ADD_ASSIGN | OP_SUB_ASSIGN | OP_XOR_ASSIGN ) expression ;
 

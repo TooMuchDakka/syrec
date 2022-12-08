@@ -48,7 +48,12 @@ namespace parser {
     extern const std::string MissmatchOfModuleIdentBetweenCalledAndUncall;
     extern const std::string NumberOfFormalParametersDoesNotMatchActual;
     extern const std::string MissingUncall;
+
+    extern const std::string ParameterValueMissmatch;
     extern const std::string CallAndUncallArgumentsMissmatch;
+
+    extern const std::string AmbigousCall;
+    extern const std::string NoMatchForGuessWithNActualParameters;
 
     /* Arithmetic errors */
     extern const std::string DivisionByZero;

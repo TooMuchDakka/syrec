@@ -67,7 +67,7 @@ void syrecParserInitialize() {
       "OP_LESS_THAN", "OP_LESS_OR_EQUAL", "OP_EQUAL", "OP_NOT_EQUAL", "OP_BITWISE_AND", 
       "OP_BITWISE_NEGATION", "OP_BITWISE_OR", "OP_BITWISE_XOR", "OP_LOGICAL_AND", 
       "OP_LOGICAL_OR", "OP_LOGICAL_NEGATION", "OP_LEFT_SHIFT", "OP_RIGHT_SHIFT", 
-      "OP_INCREMENT_ASSIGN", "OP_DECREMENT_ASSIGN", "OP_BITWISE_NEGATION_ASSIGN", 
+      "OP_INCREMENT_ASSIGN", "OP_DECREMENT_ASSIGN", "OP_INVERT_ASSIGN", 
       "OP_ADD_ASSIGN", "OP_SUB_ASSIGN", "OP_XOR_ASSIGN", "VAR_TYPE_IN", 
       "VAR_TYPE_OUT", "VAR_TYPE_INOUT", "VAR_TYPE_WIRE", "VAR_TYPE_STATE", 
       "LOOP_VARIABLE_PREFIX", "SIGNAL_WIDTH_PREFIX", "STATEMENT_DELIMITER", 
@@ -1486,8 +1486,8 @@ SyReCParser::SignalContext* SyReCParser::UnaryStatementContext::signal() {
   return getRuleContext<SyReCParser::SignalContext>(0);
 }
 
-tree::TerminalNode* SyReCParser::UnaryStatementContext::OP_BITWISE_NEGATION_ASSIGN() {
-  return getToken(SyReCParser::OP_BITWISE_NEGATION_ASSIGN, 0);
+tree::TerminalNode* SyReCParser::UnaryStatementContext::OP_INVERT_ASSIGN() {
+  return getToken(SyReCParser::OP_INVERT_ASSIGN, 0);
 }
 
 tree::TerminalNode* SyReCParser::UnaryStatementContext::OP_INCREMENT_ASSIGN() {

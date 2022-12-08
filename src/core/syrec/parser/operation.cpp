@@ -98,7 +98,7 @@ namespace syrec_operation {
                 result = operand - 1;
                 break;
             // TODO: Implement correctly
-            case syrec_operation::operation::negate_assign:
+            case syrec_operation::operation::invert_assign:
                 result = ~operand;
                 break;
             default:

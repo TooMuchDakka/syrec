@@ -1,4 +1,3 @@
-#include <climits>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -8,6 +7,8 @@
 
 #include "core/syrec/parser/custom_semantic_errors.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
+#include "core/syrec/parser/infix_iterator.hpp"
+#include "core/syrec/parser/module_call_guess.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
 #include "core/syrec/parser/range_check.hpp"
 
@@ -262,7 +263,7 @@ std::any SyReCCustomVisitor::visitNumberFromSignalwidth(SyReCParser::NumberFromS
     }
     
     const std::string                 signalIdent = context->IDENT()->getText();
-    if (!checkIfSignalWasDeclaredOrLogError(context->IDENT()->getText())) {
+    if (!checkIfSignalWasDeclaredOrLogError(signalIdent)) {
         return std::nullopt;
     }
 
@@ -285,7 +286,7 @@ std::any SyReCCustomVisitor::visitNumberFromLoopVariable(SyReCParser::NumberFrom
     }
 
     const std::string signalIdent = "$" + context->IDENT()->getText();
-    if (!checkIfSignalWasDeclaredOrLogError(context->IDENT()->getText())) {
+    if (!checkIfSignalWasDeclaredOrLogError(signalIdent)) {
         return std::nullopt;
     }
 
@@ -314,8 +315,8 @@ std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromEx
         return std::nullopt;    
     }
 
-    const auto lhsOperandEvaluated = evaluateNumber(lhsOperand.value());
-    const auto rhsOperandEvaluated = evaluateNumber(rhsOperand.value());
+    const auto lhsOperandEvaluated = evaluateNumber(*lhsOperand);
+    const auto rhsOperandEvaluated = evaluateNumber(*rhsOperand);
 
     if (lhsOperandEvaluated.has_value() && rhsOperandEvaluated.has_value()) {
         const auto binaryOperationResult = applyBinaryOperation(*operation, *lhsOperandEvaluated, *rhsOperandEvaluated);
@@ -368,20 +369,20 @@ std::any SyReCCustomVisitor::visitExpressionFromSignal(SyReCParser::ExpressionFr
 }
 
 std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpressionContext* context) {
-    const auto lhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult>(context->lhsOperand);
+    const auto lhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->lhsOperand);
     const auto userDefinedOperation = getDefinedOperation(context->binaryOperation);
     if (!userDefinedOperation.has_value() || !isValidBinaryOperation(userDefinedOperation.value())) {
         createError(InvalidBinaryOperation);
     }
 
-    const auto rhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult>(context->rhsOperand);
+    const auto rhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->rhsOperand);
 
     if (!lhsOperand.has_value() || !userDefinedOperation.has_value() || !rhsOperand.has_value()) {
         return std::nullopt;
     }
 
-    const auto lhsOperandConversionToConstant = lhsOperand->getAsConstant();
-    const auto rhsOperandConversionToConstant = rhsOperand->getAsConstant();
+    const auto lhsOperandConversionToConstant = (*lhsOperand)->getAsConstant();
+    const auto rhsOperandConversionToConstant = (*rhsOperand)->getAsConstant();
     
     if (lhsOperandConversionToConstant.has_value() && rhsOperandConversionToConstant.has_value()) {
         const auto binaryExpressionEvaluated = applyBinaryOperation(userDefinedOperation.value(), *lhsOperandConversionToConstant, *rhsOperandConversionToConstant);
@@ -395,12 +396,12 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
         return std::nullopt;
     }
 
-    const auto lhsOperandAsExpression   = *lhsOperand->getAsExpression();
-    const auto rhsOperandAsExpression   = *rhsOperand->getAsExpression();
-    const auto binaryExpressionBitwidth = std::max(lhsOperandAsExpression->bitwidth(), rhsOperandAsExpression->bitwidth());
+    const auto lhsOperandAsExpression   = (*lhsOperand)->getAsExpression();
+    const auto rhsOperandAsExpression   = (*rhsOperand)->getAsExpression();
+    const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
 
-    // TODO: Add mapping from enum to internal "operation" flag value
-    return std::make_optional(ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::BinaryExpression>(lhsOperandAsExpression, binaryExpressionBitwidth, rhsOperandAsExpression)));
+    // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
+    return std::make_optional(ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression)));
 }
 
 std::any SyReCCustomVisitor::visitUnaryExpression(SyReCParser::UnaryExpressionContext* context) {
@@ -410,6 +411,7 @@ std::any SyReCCustomVisitor::visitUnaryExpression(SyReCParser::UnaryExpressionCo
     }
     
     const auto userDefinedExpression = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult>(context->expression());
+    // TOD: Add either error or warning that unary expressions are not supported
     return std::nullopt;
 }
 
@@ -446,7 +448,8 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
     const auto rhsShiftOperationOperandBitwidth = ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal((*shiftAmount)->evaluate(loopVariableMappingLookup));
     const auto shiftExpressionBitwidth          = std::max(lhsShiftOperationOperandExpr->bitwidth(), rhsShiftOperationOperandBitwidth);
 
-    const auto createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*expressionToShift->getAsExpression(), shiftExpressionBitwidth, *shiftAmount);
+    // TODO: Handling of shift expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
+    const auto createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*expressionToShift->getAsExpression(), *ParserUtilities::mapOperationToInternalFlag(*definedShiftOperation), *shiftAmount);
     return std::make_optional(ExpressionEvaluationResult::createFromExpression(createdShiftExpression));
 }
 
@@ -478,8 +481,107 @@ std::any SyReCCustomVisitor::visitStatementList(SyReCParser::StatementListContex
     return std::make_optional(validUserDefinedStatements);
 }
 
-// TODO:
+// TODO: Add tests for ambiguity, etc.
 std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContext* context) {
+
+    bool isValidCallOperationDefined = context->callOp != nullptr;
+    const std::optional<bool> isCallOperation                    = isValidCallOperationDefined ? std::make_optional(true) : std::nullopt;
+    const auto                moduleIdent                 = context->moduleIdent != nullptr ? context->moduleIdent->getText() : "<undefined>";
+    
+    // TODO: Check for previous uncalls, etc.
+    // TODO: Refactoring
+    if (isCallOperation.has_value()) {
+        if (!callStack.empty() && *isCallOperation) {
+            createError(PreviousCallWasNotUncalled);
+            isValidCallOperationDefined = false;
+        }
+        else if (!(*isCallOperation)) {
+            if (callStack.empty()) {
+                createError(UncallWithoutPreviousCall);
+                isValidCallOperationDefined = false;
+            }
+            else if (callStack.top().first != moduleIdent) {
+                createError(fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, callStack.top().first, moduleIdent));
+                isValidCallOperationDefined = false;
+            }
+        }
+    }
+
+    const auto potentialModulesToCall = ModuleCallGuess::fetchPotentialMatchesForMethodIdent(currentSymbolTableScope, moduleIdent);
+    if (!potentialModulesToCall.has_value()) {
+        createError(fmt::format(UndeclaredIdent, moduleIdent));
+        isValidCallOperationDefined = false;
+    }
+
+    std::size_t              numActualCalleeArguments = 0;
+    std::vector<std::string> calleeArguments;
+    for (const auto& userDefinedCallArgument : context->calleArguments) {
+        if (userDefinedCallArgument != nullptr && checkIfSignalWasDeclaredOrLogError(userDefinedCallArgument->getText())) {
+            const auto symTabEntryForCalleeArgument = *currentSymbolTableScope->getVariable(userDefinedCallArgument->getText());
+            isValidCallOperationDefined &= std::holds_alternative<syrec::Variable::ptr>(symTabEntryForCalleeArgument);
+            if (isValidCallOperationDefined) {
+                (*potentialModulesToCall)->refineGuessWithNextParameter(std::get<syrec::Variable::ptr>(symTabEntryForCalleeArgument));
+                calleeArguments.emplace_back(userDefinedCallArgument->getText());
+            }
+        }
+        else {
+            isValidCallOperationDefined = false;
+        }
+
+        // TODO: Handling / Error creation in else branches
+        numActualCalleeArguments++;
+    }
+
+    // TODO: What should happen with previously pushed entries on the call stack if an invalid uncall statement is defined ?
+    if (!isValidCallOperationDefined) {
+        return 0;
+    }
+
+    // TODO: Checks for correct number of arguments
+    (*potentialModulesToCall)->discardGuessesWithMoreThanNParameters(numActualCalleeArguments);
+    if (!(*potentialModulesToCall)->hasSomeMatches()) {
+        // TODO: Non of the potential calls acceps x arguments
+        createError(fmt::format(NoMatchForGuessWithNActualParameters, numActualCalleeArguments));
+        return 0;
+    }
+
+    if ((*potentialModulesToCall)->getMatchesForGuess().size() > 1) {
+        // TODO: GEN_ERROR Ambigous call, more than one match for given arguments
+        createError(fmt::format(AmbigousCall, moduleIdent));
+        return 0;
+    }
+
+    // TODO: Refactoring in own function
+    if (!callStack.empty()) {
+        const auto argumentsOfPreviousCallOperation = callStack.top().second;
+        std::vector<std::string> missmatchedParameterValues;
+        for (std::size_t parameterIdx = 0; parameterIdx < numActualCalleeArguments; ++parameterIdx) {
+            if (calleeArguments.at(parameterIdx) != argumentsOfPreviousCallOperation.at(parameterIdx)) {
+                missmatchedParameterValues.emplace_back(fmt::format(ParameterValueMissmatch, parameterIdx, calleeArguments.at(parameterIdx), argumentsOfPreviousCallOperation.at(parameterIdx)));
+            }
+        }
+
+        if (!missmatchedParameterValues.empty()) {
+            std::ostringstream errorsConcatinatedBuffer;
+            std::copy(missmatchedParameterValues.cbegin(), missmatchedParameterValues.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, ","));
+    
+            createError(fmt::format(CallAndUncallArgumentsMissmatch, moduleIdent, errorsConcatinatedBuffer.str()));
+            return 0;
+        }
+    }
+
+    const auto moduleMatchingCalleeArguments = (*potentialModulesToCall)->getMatchesForGuess().at(0);
+    if (isValidCallOperationDefined) {
+        if (isCallOperation) {
+            statementListContainerStack.top().emplace_back(std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments));
+            callStack.emplace(moduleIdent, calleeArguments);
+        }
+        else {
+            statementListContainerStack.top().emplace_back(std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments));
+            callStack.pop();
+        }
+    }
+
     return 0;
 }
 
@@ -596,7 +698,7 @@ std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementCont
     allSemanticChecksOk &= accessedSignal.has_value() && (*accessedSignal)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(*(*accessedSignal)->getAsVariableAccess());
     if (allSemanticChecksOk) {
         // TODO: Add mapping from custom operation enum to internal "numeric" flag
-        addStatementToOpenContainer(std::make_shared<syrec::UnaryStatement>(0, *(*accessedSignal)->getAsVariableAccess()));
+        addStatementToOpenContainer(std::make_shared<syrec::UnaryStatement>(*ParserUtilities::mapOperationToInternalFlag(*unaryOperation), *(*accessedSignal)->getAsVariableAccess()));
     }
 
     return 0;
@@ -623,7 +725,11 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
 
     if (allSemanticChecksOk) {
         // TODO: Add mapping from custom operation enum to internal "numeric" 
-        addStatementToOpenContainer(std::make_shared<syrec::AssignStatement>(*(*assignedToSignal)->getAsVariableAccess(), 0, (*assignmentOpRhsOperand)->getAsExpression().value()));
+        addStatementToOpenContainer(
+                std::make_shared<syrec::AssignStatement>(
+                        *(*assignedToSignal)->getAsVariableAccess(),
+                        *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
+                        (*assignmentOpRhsOperand)->getAsExpression().value()));
     }
 
     return 0;
@@ -823,8 +929,8 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
         case SyReCParser::OP_DECREMENT_ASSIGN:
             definedOperation.emplace(syrec_operation::operation::decrement_assign);
             break;
-        case SyReCParser::OP_BITWISE_NEGATION_ASSIGN:
-            definedOperation.emplace(syrec_operation::operation::negate_assign);
+        case SyReCParser::OP_INVERT_ASSIGN:
+            definedOperation.emplace(syrec_operation::operation::invert_assign);
             break;
         case SyReCParser::OP_ADD_ASSIGN:
             definedOperation.emplace(syrec_operation::operation::add_assign);

@@ -42,7 +42,7 @@ private:
         try {
             return std::any_cast<std::optional<T>>(productionReturnType);
         }
-        catch (std::bad_any_cast&) {
+        catch (std::bad_any_cast& ex) {
             // TODO: Better error handling, i.e. logging or returning C-style error code to check whether cast or something else failed
             return std::nullopt;
         }

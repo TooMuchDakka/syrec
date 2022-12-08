@@ -27,7 +27,7 @@ namespace syrec_operation {
         // Unary statement operations
         increment_assign,
         decrement_assign,
-        negate_assign,
+        invert_assign,
         //Assign statement operations
         add_assign,
         minus_assign,

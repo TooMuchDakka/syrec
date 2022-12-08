@@ -1,6 +1,7 @@
 #ifndef ANTLR_VISITOR_UTILITIES_HPP
 #define ANTLR_VISITOR_UTILITIES_HPP
 
+#include "operation.hpp"
 #include "Token.h"
 
 #include <optional>
@@ -18,7 +19,10 @@ public:
     [[nodiscard]] static std::string createWarning(size_t line, size_t column, const std::string& warningMessage);
 
     [[nodiscard]] static std::optional<unsigned int> convertToNumber(const antlr4::Token* token);
-    [[nodiscard]] static std::optional<unsigned int> convertToNumber(const std::string& tokenText);    
+    [[nodiscard]] static std::optional<unsigned int> convertToNumber(const std::string& tokenText);
+
+    // TODO: This should only be a temporary workaround, ideally these internal flags are replaced by this new enum
+    [[nodiscard]] static std::optional<unsigned int> mapOperationToInternalFlag(const syrec_operation::operation& operation);
 };
 }
 
