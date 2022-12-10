@@ -27,6 +27,7 @@ std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) 
                 createError(fmt::format(DuplicateModuleIdentDeclaration, (*moduleParseResult)->name));   
             }
             else {
+                currentSymbolTableScope->addEntry(*moduleParseResult);
                 modules.emplace_back(moduleParseResult.value());                
             }
         }
@@ -316,8 +317,8 @@ std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromEx
         return std::nullopt;    
     }
 
-    const auto lhsOperandEvaluated = evaluateNumber(*lhsOperand);
-    const auto rhsOperandEvaluated = evaluateNumber(*rhsOperand);
+    const auto lhsOperandEvaluated = tryEvaluateNumber(*lhsOperand);
+    const auto rhsOperandEvaluated = tryEvaluateNumber(*rhsOperand);
 
     if (lhsOperandEvaluated.has_value() && rhsOperandEvaluated.has_value()) {
         const auto binaryOperationResult = applyBinaryOperation(*operation, *lhsOperandEvaluated, *rhsOperandEvaluated);
@@ -387,7 +388,7 @@ std::any SyReCCustomVisitor::visitExpressionFromSignal(SyReCParser::ExpressionFr
         expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal));
     } else if ((*definedSignal)->isConstant()) {
         // TODO: Is this the correct calculation and is it both safe and does it return the expected result
-        const auto constantValueOfDefinedSignal = evaluateNumber(*(*definedSignal)->getAsNumber());
+        const auto constantValueOfDefinedSignal = tryEvaluateNumber(*(*definedSignal)->getAsNumber());
 
         // TODO: Correct handling of loop variable
         expressionWrapperForSignal = std::make_shared<syrec::NumericExpression>(*(*definedSignal)->getAsNumber(), constantValueOfDefinedSignal.has_value() ? ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(*constantValueOfDefinedSignal) : 0);    
@@ -458,7 +459,7 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
         return std::nullopt;
     }
 
-    const auto shiftAmountEvaluated = evaluateNumber(*shiftAmount);
+    const auto shiftAmountEvaluated = tryEvaluateNumber(*shiftAmount);
     const auto expressionToShiftEvaluated = (*expressionToShift)->getAsConstant();
 
     if (shiftAmountEvaluated.has_value() && expressionToShiftEvaluated.has_value()) {
@@ -516,8 +517,8 @@ std::any SyReCCustomVisitor::visitStatementList(SyReCParser::StatementListContex
 // TODO: Add tests for ambiguity, etc.
 std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContext* context) {
 
-    bool isValidCallOperationDefined = context->callOp != nullptr;
-    const std::optional<bool> isCallOperation                    = isValidCallOperationDefined ? std::make_optional(true) : std::nullopt;
+    bool isValidCallOperationDefined = context->OP_CALL() != nullptr || context->OP_UNCALL() != nullptr;
+    const std::optional<bool> isCallOperation                    = isValidCallOperationDefined ? std::make_optional(context->OP_CALL() != nullptr) : std::nullopt;
     const auto                moduleIdent                 = context->moduleIdent != nullptr ? context->moduleIdent->getText() : "<undefined>";
     
     // TODO: Check for previous uncalls, etc.
@@ -547,7 +548,7 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
 
     std::size_t              numActualCalleeArguments = 0;
     std::vector<std::string> calleeArguments;
-    for (const auto& userDefinedCallArgument : context->calleArguments) {
+    for (const auto& userDefinedCallArgument : context->calleeArguments) {
         if (userDefinedCallArgument != nullptr && checkIfSignalWasDeclaredOrLogError(userDefinedCallArgument->getText())) {
             const auto symTabEntryForCalleeArgument = *currentSymbolTableScope->getVariable(userDefinedCallArgument->getText());
             isValidCallOperationDefined &= std::holds_alternative<syrec::Variable::ptr>(symTabEntryForCalleeArgument);
@@ -604,12 +605,12 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
 
     const auto moduleMatchingCalleeArguments = (*potentialModulesToCall)->getMatchesForGuess().at(0);
     if (isValidCallOperationDefined) {
-        if (isCallOperation) {
-            statementListContainerStack.top().emplace_back(std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments));
+        if (*isCallOperation) {
+            addStatementToOpenContainer(std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments));
             callStack.emplace(moduleIdent, calleeArguments);
         }
         else {
-            statementListContainerStack.top().emplace_back(std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments));
+            addStatementToOpenContainer(std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments));
             callStack.pop();
         }
     }
@@ -780,11 +781,75 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
 
 // TODO:
 std::any SyReCCustomVisitor::visitSwapStatement(SyReCParser::SwapStatementContext* context) {
+    const auto swapLhsOperand = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->lhsOperand);
+    const bool lhsOperandOk            = swapLhsOperand.has_value() && (*swapLhsOperand)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(*(*swapLhsOperand)->getAsVariableAccess());
+    
+    const auto swapRhsOperand  = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->rhsOperand);
+    const bool rhsOperandOk               = swapRhsOperand.has_value() && (*swapRhsOperand)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(*(*swapRhsOperand)->getAsVariableAccess());
+
+    if (!lhsOperandOk || !rhsOperandOk) {
+        return 0;
+    }
+
+    const auto lhsAccessedSignal = *(*swapLhsOperand)->getAsVariableAccess();
+    const auto rhsAccessedSignal = *(*swapRhsOperand)->getAsVariableAccess();
+
+    bool         allSemanticChecksOk      = true;
+
+    size_t lhsNumAffectedDimensions = 1;
+    size_t rhsNumAffectedDimensions = 1;
+    if (lhsAccessedSignal->indexes.empty() && !lhsAccessedSignal->getVar()->dimensions.empty()) {
+        lhsNumAffectedDimensions = lhsAccessedSignal->getVar()->dimensions.size();
+    }
+
+    if (rhsAccessedSignal->indexes.empty() && !rhsAccessedSignal->getVar()->dimensions.empty()) {
+        rhsNumAffectedDimensions = rhsAccessedSignal->getVar()->dimensions.size();
+    }
+    
+    if (lhsNumAffectedDimensions != rhsNumAffectedDimensions) {
+        createError(fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAffectedDimensions, rhsNumAffectedDimensions));
+        allSemanticChecksOk = false;
+    }
+    else if (lhsAccessedSignal->indexes.empty() && rhsAccessedSignal->indexes.empty()) {
+        const auto& lhsSignalDimensions = lhsAccessedSignal->getVar()->dimensions;
+        const auto& rhsSignalDimensions = rhsAccessedSignal->getVar()->dimensions;
+
+        bool continueCheck = true;
+        for (size_t dimensionIdx = 0; continueCheck && dimensionIdx < lhsSignalDimensions.size(); ++dimensionIdx) {
+            continueCheck = lhsSignalDimensions.at(dimensionIdx) == rhsSignalDimensions.at(dimensionIdx);
+            if (!continueCheck) {
+                createError(fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsSignalDimensions.at(dimensionIdx), rhsSignalDimensions.at(dimensionIdx)));
+                allSemanticChecksOk = false;
+            }
+        }
+    }
+
+    if (!allSemanticChecksOk) {
+        return 0;
+    }
+
+    size_t lhsAccessedSignalWidth = lhsAccessedSignal->getVar()->bitwidth;
+    size_t rhsAccessedSignalWidth = rhsAccessedSignal->getVar()->bitwidth;
+    if (lhsAccessedSignal->range.has_value()) {
+        lhsAccessedSignalWidth = *tryEvaluateNumber((*lhsAccessedSignal->range).second) - *tryEvaluateNumber((*lhsAccessedSignal->range).first) + 1;
+    }
+    if (rhsAccessedSignal->range.has_value()) {
+        rhsAccessedSignalWidth = *tryEvaluateNumber((*rhsAccessedSignal->range).second) - *tryEvaluateNumber((*rhsAccessedSignal->range).first) + 1;
+    }
+
+    if (lhsAccessedSignalWidth != rhsAccessedSignalWidth) {
+        createError(fmt::format(InvalidSwapSignalWidthMissmatch, lhsAccessedSignalWidth, rhsAccessedSignalWidth));
+        return 0;
+    }
+
+    addStatementToOpenContainer(std::make_shared<syrec::SwapStatement>(lhsAccessedSignal, rhsAccessedSignal));
     return 0;
 }
 
 std::any SyReCCustomVisitor::visitSkipStatement(SyReCParser::SkipStatementContext* context) {
-    addStatementToOpenContainer(std::make_shared<syrec::SkipStatement>());
+    if (context->start != nullptr) {
+        addStatementToOpenContainer(std::make_shared<syrec::SkipStatement>());   
+    }
     return 0;
 }
 
@@ -992,11 +1057,10 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
 }
 
 // TODO: Naming
-[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::evaluateNumber(const syrec::Number::ptr& numberContainer) {
+[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryEvaluateNumber(const syrec::Number::ptr& numberContainer) {
     if (numberContainer->isLoopVariable()) {
         const std::string& loopVariableIdent = numberContainer->variableName();
         if (loopVariableMappingLookup.find(loopVariableIdent) == loopVariableMappingLookup.end()) {
-            createError(fmt::format(NoMappingForLoopVariable, loopVariableIdent));
             return std::nullopt;
         }
     }

@@ -64,7 +64,7 @@ void ModuleCallGuess::discardGuessesWhereActualParameterIsNotAssignableToFormalO
                     this->modulesMatchingSignature.end(),
                     [tmpFormalParameterIdx, actualParameter](const syrec::Module::ptr& module) {
                         const syrec::Variable::ptr& formalParameter = module->parameters.at(tmpFormalParameterIdx);
-                        return isActualParameterAssignableToFormalOne(actualParameter, formalParameter);
+                        return !isActualParameterAssignableToFormalOne(actualParameter, formalParameter);
                     }),
             this->modulesMatchingSignature.end());
 }

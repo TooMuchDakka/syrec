@@ -72,7 +72,7 @@ private:
     [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult);
     [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
     [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
-    [[nodiscard]] std::optional<unsigned int> evaluateNumber(const syrec::Number::ptr& numberContainer);
+    [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& numberContainer);
     [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
     [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const syrec::VariableAccess::ptr& assignedToVariable);
     void addStatementToOpenContainer(const syrec::Statement::ptr& statement);

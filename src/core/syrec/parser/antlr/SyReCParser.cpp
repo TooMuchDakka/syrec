@@ -52,25 +52,25 @@ void syrecParserInitialize() {
       "shiftExpression"
     },
     std::vector<std::string>{
-      "", "'('", "')'", "'module'", "'['", "']'", "'call'", "'uncall'", 
-      "'step'", "'for'", "'to'", "'do'", "'rof'", "'if'", "'then'", "'else'", 
-      "'fi'", "'<=>'", "'skip'", "'.'", "':'", "'+'", "'-'", "'*'", "'*>'", 
-      "'/'", "'%'", "'>'", "'>='", "'<'", "'<='", "'='", "'!='", "'&'", 
-      "'~'", "'|'", "'^'", "'&&'", "'||'", "'!'", "'<<'", "'>>'", "'++='", 
-      "'--='", "'~='", "'+='", "'-='", "'^='", "'in'", "'out'", "'inout'", 
-      "'wire'", "'state'", "'$'", "'#'", "';'", "','"
+      "", "'('", "')'", "'module'", "'['", "']'", "'step'", "'for'", "'to'", 
+      "'do'", "'rof'", "'if'", "'then'", "'else'", "'fi'", "'<=>'", "'skip'", 
+      "'.'", "':'", "'+'", "'-'", "'*'", "'*>'", "'/'", "'%'", "'>'", "'>='", 
+      "'<'", "'<='", "'='", "'!='", "'&'", "'~'", "'|'", "'^'", "'&&'", 
+      "'||'", "'!'", "'<<'", "'>>'", "'++='", "'--='", "'~='", "'+='", "'-='", 
+      "'^='", "'call'", "'uncall'", "'in'", "'out'", "'inout'", "'wire'", 
+      "'state'", "'$'", "'#'", "';'", "','"
     },
     std::vector<std::string>{
       "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", 
-      "", "", "", "", "OP_PLUS", "OP_MINUS", "OP_MULTIPLY", "OP_UPPER_BIT_MULTIPLY", 
+      "", "", "OP_PLUS", "OP_MINUS", "OP_MULTIPLY", "OP_UPPER_BIT_MULTIPLY", 
       "OP_DIVISION", "OP_MODULO", "OP_GREATER_THAN", "OP_GREATER_OR_EQUAL", 
       "OP_LESS_THAN", "OP_LESS_OR_EQUAL", "OP_EQUAL", "OP_NOT_EQUAL", "OP_BITWISE_AND", 
       "OP_BITWISE_NEGATION", "OP_BITWISE_OR", "OP_BITWISE_XOR", "OP_LOGICAL_AND", 
       "OP_LOGICAL_OR", "OP_LOGICAL_NEGATION", "OP_LEFT_SHIFT", "OP_RIGHT_SHIFT", 
       "OP_INCREMENT_ASSIGN", "OP_DECREMENT_ASSIGN", "OP_INVERT_ASSIGN", 
-      "OP_ADD_ASSIGN", "OP_SUB_ASSIGN", "OP_XOR_ASSIGN", "VAR_TYPE_IN", 
-      "VAR_TYPE_OUT", "VAR_TYPE_INOUT", "VAR_TYPE_WIRE", "VAR_TYPE_STATE", 
-      "LOOP_VARIABLE_PREFIX", "SIGNAL_WIDTH_PREFIX", "STATEMENT_DELIMITER", 
+      "OP_ADD_ASSIGN", "OP_SUB_ASSIGN", "OP_XOR_ASSIGN", "OP_CALL", "OP_UNCALL", 
+      "VAR_TYPE_IN", "VAR_TYPE_OUT", "VAR_TYPE_INOUT", "VAR_TYPE_WIRE", 
+      "VAR_TYPE_STATE", "LOOP_VARIABLE_PREFIX", "SIGNAL_WIDTH_PREFIX", "STATEMENT_DELIMITER", 
       "PARAMETER_DELIMITER", "IDENT", "INT", "SKIPABLEWHITSPACES"
     }
   );
@@ -93,8 +93,8 @@ void syrecParserInitialize() {
   	3,18,211,8,18,1,19,1,19,1,19,1,19,1,19,3,19,218,8,19,1,20,1,20,1,20,1,
   	20,1,20,1,20,1,21,1,21,1,21,1,22,1,22,1,22,1,22,1,22,1,22,1,22,0,0,23,
   	0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,0,9,2,
-  	0,21,23,25,25,1,0,48,50,1,0,51,52,1,0,6,7,1,0,42,44,1,0,45,47,2,0,21,
-  	33,35,38,2,0,34,34,39,39,1,0,40,41,240,0,57,1,0,0,0,2,60,1,0,0,0,4,66,
+  	0,19,21,23,23,1,0,48,50,1,0,51,52,1,0,46,47,1,0,40,42,1,0,43,45,2,0,19,
+  	31,33,36,2,0,32,32,37,37,1,0,38,39,240,0,57,1,0,0,0,2,60,1,0,0,0,4,66,
   	1,0,0,0,6,81,1,0,0,0,8,89,1,0,0,0,10,92,1,0,0,0,12,101,1,0,0,0,14,115,
   	1,0,0,0,16,130,1,0,0,0,18,132,1,0,0,0,20,145,1,0,0,0,22,149,1,0,0,0,24,
   	155,1,0,0,0,26,172,1,0,0,0,28,181,1,0,0,0,30,184,1,0,0,0,32,188,1,0,0,
@@ -125,26 +125,26 @@ void syrecParserInitialize() {
   	134,135,5,1,0,0,135,140,5,57,0,0,136,137,5,56,0,0,137,139,5,57,0,0,138,
   	136,1,0,0,0,139,142,1,0,0,0,140,138,1,0,0,0,140,141,1,0,0,0,141,143,1,
   	0,0,0,142,140,1,0,0,0,143,144,5,2,0,0,144,19,1,0,0,0,145,146,5,53,0,0,
-  	146,147,5,57,0,0,147,148,5,31,0,0,148,21,1,0,0,0,149,151,5,8,0,0,150,
-  	152,5,22,0,0,151,150,1,0,0,0,151,152,1,0,0,0,152,153,1,0,0,0,153,154,
-  	3,0,0,0,154,23,1,0,0,0,155,162,5,9,0,0,156,158,3,20,10,0,157,156,1,0,
-  	0,0,157,158,1,0,0,0,158,159,1,0,0,0,159,160,3,0,0,0,160,161,5,10,0,0,
-  	161,163,1,0,0,0,162,157,1,0,0,0,162,163,1,0,0,0,163,164,1,0,0,0,164,166,
-  	3,0,0,0,165,167,3,22,11,0,166,165,1,0,0,0,166,167,1,0,0,0,167,168,1,0,
-  	0,0,168,169,5,11,0,0,169,170,3,14,7,0,170,171,5,12,0,0,171,25,1,0,0,0,
-  	172,173,5,13,0,0,173,174,3,38,19,0,174,175,5,14,0,0,175,176,3,14,7,0,
-  	176,177,5,15,0,0,177,178,3,14,7,0,178,179,5,16,0,0,179,180,3,38,19,0,
-  	180,27,1,0,0,0,181,182,7,4,0,0,182,183,3,36,18,0,183,29,1,0,0,0,184,185,
-  	3,36,18,0,185,186,7,5,0,0,186,187,3,38,19,0,187,31,1,0,0,0,188,189,3,
-  	36,18,0,189,190,5,17,0,0,190,191,3,36,18,0,191,33,1,0,0,0,192,193,5,18,
-  	0,0,193,35,1,0,0,0,194,201,5,57,0,0,195,196,5,4,0,0,196,197,3,38,19,0,
-  	197,198,5,5,0,0,198,200,1,0,0,0,199,195,1,0,0,0,200,203,1,0,0,0,201,199,
-  	1,0,0,0,201,202,1,0,0,0,202,210,1,0,0,0,203,201,1,0,0,0,204,205,5,19,
-  	0,0,205,208,3,0,0,0,206,207,5,20,0,0,207,209,3,0,0,0,208,206,1,0,0,0,
-  	208,209,1,0,0,0,209,211,1,0,0,0,210,204,1,0,0,0,210,211,1,0,0,0,211,37,
-  	1,0,0,0,212,218,3,0,0,0,213,218,3,36,18,0,214,218,3,40,20,0,215,218,3,
-  	42,21,0,216,218,3,44,22,0,217,212,1,0,0,0,217,213,1,0,0,0,217,214,1,0,
-  	0,0,217,215,1,0,0,0,217,216,1,0,0,0,218,39,1,0,0,0,219,220,5,1,0,0,220,
+  	146,147,5,57,0,0,147,148,5,29,0,0,148,21,1,0,0,0,149,151,5,6,0,0,150,
+  	152,5,20,0,0,151,150,1,0,0,0,151,152,1,0,0,0,152,153,1,0,0,0,153,154,
+  	3,0,0,0,154,23,1,0,0,0,155,162,5,7,0,0,156,158,3,20,10,0,157,156,1,0,
+  	0,0,157,158,1,0,0,0,158,159,1,0,0,0,159,160,3,0,0,0,160,161,5,8,0,0,161,
+  	163,1,0,0,0,162,157,1,0,0,0,162,163,1,0,0,0,163,164,1,0,0,0,164,166,3,
+  	0,0,0,165,167,3,22,11,0,166,165,1,0,0,0,166,167,1,0,0,0,167,168,1,0,0,
+  	0,168,169,5,9,0,0,169,170,3,14,7,0,170,171,5,10,0,0,171,25,1,0,0,0,172,
+  	173,5,11,0,0,173,174,3,38,19,0,174,175,5,12,0,0,175,176,3,14,7,0,176,
+  	177,5,13,0,0,177,178,3,14,7,0,178,179,5,14,0,0,179,180,3,38,19,0,180,
+  	27,1,0,0,0,181,182,7,4,0,0,182,183,3,36,18,0,183,29,1,0,0,0,184,185,3,
+  	36,18,0,185,186,7,5,0,0,186,187,3,38,19,0,187,31,1,0,0,0,188,189,3,36,
+  	18,0,189,190,5,15,0,0,190,191,3,36,18,0,191,33,1,0,0,0,192,193,5,16,0,
+  	0,193,35,1,0,0,0,194,201,5,57,0,0,195,196,5,4,0,0,196,197,3,38,19,0,197,
+  	198,5,5,0,0,198,200,1,0,0,0,199,195,1,0,0,0,200,203,1,0,0,0,201,199,1,
+  	0,0,0,201,202,1,0,0,0,202,210,1,0,0,0,203,201,1,0,0,0,204,205,5,17,0,
+  	0,205,208,3,0,0,0,206,207,5,18,0,0,207,209,3,0,0,0,208,206,1,0,0,0,208,
+  	209,1,0,0,0,209,211,1,0,0,0,210,204,1,0,0,0,210,211,1,0,0,0,211,37,1,
+  	0,0,0,212,218,3,0,0,0,213,218,3,36,18,0,214,218,3,40,20,0,215,218,3,42,
+  	21,0,216,218,3,44,22,0,217,212,1,0,0,0,217,213,1,0,0,0,217,214,1,0,0,
+  	0,217,215,1,0,0,0,217,216,1,0,0,0,218,39,1,0,0,0,219,220,5,1,0,0,220,
   	221,3,38,19,0,221,222,7,6,0,0,222,223,3,38,19,0,223,224,5,2,0,0,224,41,
   	1,0,0,0,225,226,7,7,0,0,226,227,3,38,19,0,227,43,1,0,0,0,228,229,5,1,
   	0,0,229,230,3,38,19,0,230,231,7,8,0,0,231,232,3,0,0,0,232,233,5,2,0,0,
@@ -356,7 +356,7 @@ SyReCParser::NumberContext* SyReCParser::number() {
         antlrcpp::downCast<NumberFromExpressionContext *>(_localctx)->op = _input->LT(1);
         _la = _input->LA(1);
         if (!(((_la & ~ 0x3fULL) == 0) &&
-          ((1ULL << _la) & 48234496) != 0)) {
+          ((1ULL << _la) & 12058624) != 0)) {
           antlrcpp::downCast<NumberFromExpressionContext *>(_localctx)->op = _errHandler->recoverInline(this);
         }
         else {
@@ -1078,6 +1078,14 @@ SyReCParser::CallStatementContext::CallStatementContext(ParserRuleContext *paren
   : ParserRuleContext(parent, invokingState) {
 }
 
+tree::TerminalNode* SyReCParser::CallStatementContext::OP_CALL() {
+  return getToken(SyReCParser::OP_CALL, 0);
+}
+
+tree::TerminalNode* SyReCParser::CallStatementContext::OP_UNCALL() {
+  return getToken(SyReCParser::OP_UNCALL, 0);
+}
+
 std::vector<tree::TerminalNode *> SyReCParser::CallStatementContext::IDENT() {
   return getTokens(SyReCParser::IDENT);
 }
@@ -1122,12 +1130,11 @@ SyReCParser::CallStatementContext* SyReCParser::callStatement() {
   try {
     enterOuterAlt(_localctx, 1);
     setState(132);
-    antlrcpp::downCast<CallStatementContext *>(_localctx)->callOp = _input->LT(1);
     _la = _input->LA(1);
-    if (!(_la == SyReCParser::T__5
+    if (!(_la == SyReCParser::OP_CALL
 
-    || _la == SyReCParser::T__6)) {
-      antlrcpp::downCast<CallStatementContext *>(_localctx)->callOp = _errHandler->recoverInline(this);
+    || _la == SyReCParser::OP_UNCALL)) {
+    _errHandler->recoverInline(this);
     }
     else {
       _errHandler->reportMatch(this);
@@ -1139,7 +1146,7 @@ SyReCParser::CallStatementContext* SyReCParser::callStatement() {
     match(SyReCParser::T__0);
     setState(135);
     antlrcpp::downCast<CallStatementContext *>(_localctx)->identToken = match(SyReCParser::IDENT);
-    antlrcpp::downCast<CallStatementContext *>(_localctx)->calleArguments.push_back(antlrcpp::downCast<CallStatementContext *>(_localctx)->identToken);
+    antlrcpp::downCast<CallStatementContext *>(_localctx)->calleeArguments.push_back(antlrcpp::downCast<CallStatementContext *>(_localctx)->identToken);
     setState(140);
     _errHandler->sync(this);
     _la = _input->LA(1);
@@ -1269,7 +1276,7 @@ SyReCParser::LoopStepsizeDefinitionContext* SyReCParser::loopStepsizeDefinition(
   try {
     enterOuterAlt(_localctx, 1);
     setState(149);
-    match(SyReCParser::T__7);
+    match(SyReCParser::T__5);
     setState(151);
     _errHandler->sync(this);
 
@@ -1345,7 +1352,7 @@ SyReCParser::ForStatementContext* SyReCParser::forStatement() {
   try {
     enterOuterAlt(_localctx, 1);
     setState(155);
-    match(SyReCParser::T__8);
+    match(SyReCParser::T__6);
     setState(162);
     _errHandler->sync(this);
 
@@ -1367,7 +1374,7 @@ SyReCParser::ForStatementContext* SyReCParser::forStatement() {
       setState(159);
       antlrcpp::downCast<ForStatementContext *>(_localctx)->startValue = number();
       setState(160);
-      match(SyReCParser::T__9);
+      match(SyReCParser::T__7);
       break;
     }
 
@@ -1380,16 +1387,16 @@ SyReCParser::ForStatementContext* SyReCParser::forStatement() {
     _errHandler->sync(this);
 
     _la = _input->LA(1);
-    if (_la == SyReCParser::T__7) {
+    if (_la == SyReCParser::T__5) {
       setState(165);
       loopStepsizeDefinition();
     }
     setState(168);
-    match(SyReCParser::T__10);
+    match(SyReCParser::T__8);
     setState(169);
     statementList();
     setState(170);
-    match(SyReCParser::T__11);
+    match(SyReCParser::T__9);
    
   }
   catch (RecognitionException &e) {
@@ -1450,19 +1457,19 @@ SyReCParser::IfStatementContext* SyReCParser::ifStatement() {
   try {
     enterOuterAlt(_localctx, 1);
     setState(172);
-    match(SyReCParser::T__12);
+    match(SyReCParser::T__10);
     setState(173);
     antlrcpp::downCast<IfStatementContext *>(_localctx)->guardCondition = expression();
     setState(174);
-    match(SyReCParser::T__13);
+    match(SyReCParser::T__11);
     setState(175);
     antlrcpp::downCast<IfStatementContext *>(_localctx)->trueBranchStmts = statementList();
     setState(176);
-    match(SyReCParser::T__14);
+    match(SyReCParser::T__12);
     setState(177);
     antlrcpp::downCast<IfStatementContext *>(_localctx)->falseBranchStmts = statementList();
     setState(178);
-    match(SyReCParser::T__15);
+    match(SyReCParser::T__13);
     setState(179);
     antlrcpp::downCast<IfStatementContext *>(_localctx)->matchingGuardExpression = expression();
    
@@ -1529,7 +1536,7 @@ SyReCParser::UnaryStatementContext* SyReCParser::unaryStatement() {
     antlrcpp::downCast<UnaryStatementContext *>(_localctx)->unaryOp = _input->LT(1);
     _la = _input->LA(1);
     if (!(((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & 30786325577728) != 0)) {
+      ((1ULL << _la) & 7696581394432) != 0)) {
       antlrcpp::downCast<UnaryStatementContext *>(_localctx)->unaryOp = _errHandler->recoverInline(this);
     }
     else {
@@ -1608,7 +1615,7 @@ SyReCParser::AssignStatementContext* SyReCParser::assignStatement() {
     antlrcpp::downCast<AssignStatementContext *>(_localctx)->assignmentOp = _input->LT(1);
     _la = _input->LA(1);
     if (!(((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & 246290604621824) != 0)) {
+      ((1ULL << _la) & 61572651155456) != 0)) {
       antlrcpp::downCast<AssignStatementContext *>(_localctx)->assignmentOp = _errHandler->recoverInline(this);
     }
     else {
@@ -1671,7 +1678,7 @@ SyReCParser::SwapStatementContext* SyReCParser::swapStatement() {
     setState(188);
     antlrcpp::downCast<SwapStatementContext *>(_localctx)->lhsOperand = signal();
     setState(189);
-    match(SyReCParser::T__16);
+    match(SyReCParser::T__14);
     setState(190);
     antlrcpp::downCast<SwapStatementContext *>(_localctx)->rhsOperand = signal();
    
@@ -1718,7 +1725,7 @@ SyReCParser::SkipStatementContext* SyReCParser::skipStatement() {
   try {
     enterOuterAlt(_localctx, 1);
     setState(192);
-    match(SyReCParser::T__17);
+    match(SyReCParser::T__15);
    
   }
   catch (RecognitionException &e) {
@@ -1804,18 +1811,18 @@ SyReCParser::SignalContext* SyReCParser::signal() {
     _errHandler->sync(this);
 
     _la = _input->LA(1);
-    if (_la == SyReCParser::T__18) {
+    if (_la == SyReCParser::T__16) {
       setState(204);
-      match(SyReCParser::T__18);
+      match(SyReCParser::T__16);
       setState(205);
       antlrcpp::downCast<SignalContext *>(_localctx)->bitStart = number();
       setState(208);
       _errHandler->sync(this);
 
       _la = _input->LA(1);
-      if (_la == SyReCParser::T__19) {
+      if (_la == SyReCParser::T__17) {
         setState(206);
-        match(SyReCParser::T__19);
+        match(SyReCParser::T__17);
         setState(207);
         antlrcpp::downCast<SignalContext *>(_localctx)->bitRangeEnd = number();
       }
@@ -2107,7 +2114,7 @@ SyReCParser::BinaryExpressionContext* SyReCParser::binaryExpression() {
     antlrcpp::downCast<BinaryExpressionContext *>(_localctx)->binaryOperation = _input->LT(1);
     _la = _input->LA(1);
     if (!(((_la & ~ 0x3fULL) == 0) &&
-      ((1ULL << _la) & 532573847552) != 0)) {
+      ((1ULL << _la) & 133143461888) != 0)) {
       antlrcpp::downCast<BinaryExpressionContext *>(_localctx)->binaryOperation = _errHandler->recoverInline(this);
     }
     else {

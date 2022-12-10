@@ -35,6 +35,9 @@ OP_ADD_ASSIGN: '+=' ;
 OP_SUB_ASSIGN: '-=' ;
 OP_XOR_ASSIGN: '^=' ;
 
+OP_CALL: 'call' ;
+OP_UNCALL: 'uncall' ;
+
 VAR_TYPE_IN: 'in' ;
 VAR_TYPE_OUT: 'out' ;
 VAR_TYPE_INOUT: 'inout' ;
@@ -134,7 +137,7 @@ statement:
 	| skipStatement	
 	;
 
-callStatement: callOp=( 'call' | 'uncall' ) moduleIdent=IDENT '(' calleArguments+=IDENT ( ',' calleeArguments+=IDENT )* ')' ;
+callStatement: ( OP_CALL | OP_UNCALL ) moduleIdent=IDENT '(' calleeArguments+=IDENT ( ',' calleeArguments+=IDENT )* ')' ;
 
 loopVariableDefinition: LOOP_VARIABLE_PREFIX variableIdent=IDENT OP_EQUAL ;
 loopStepsizeDefinition: 'step' OP_MINUS? number ;
