@@ -21,8 +21,9 @@ private:
     std::stack<std::pair<std::string, std::vector<std::string>>> callStack;
     syrec::Number::loop_variable_mapping                         loopVariableMappingLookup;
     std::stack<syrec::Statement::vec>               statementListContainerStack;
+    const std::shared_ptr<ParserConfig>     config;
 
-    ParserConfig     config;
+    std::optional<unsigned int> optionalExpectedExpressionSignalWidth;
 
     void createError(const std::string& errorMessage);
     void createWarning(const std::string& warningMessage);
@@ -42,7 +43,7 @@ private:
         try {
             return std::any_cast<std::optional<T>>(productionReturnType);
         }
-        catch (std::bad_any_cast& ex) {
+        catch (std::bad_any_cast&) {
             // TODO: Better error handling, i.e. logging or returning C-style error code to check whether cast or something else failed
             return std::nullopt;
         }
@@ -82,6 +83,11 @@ public:
     syrec::Module::vec modules;
     std::vector<std::string> errors;
     std::vector<std::string> warnings;
+
+    explicit SyReCCustomVisitor(const std::shared_ptr<ParserConfig>& parserConfig):
+        config(parserConfig) {
+        
+    }
 
     /*
      * TODO: Visitor can be split into parts with error containers being shared

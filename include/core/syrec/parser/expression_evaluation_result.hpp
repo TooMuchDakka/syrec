@@ -21,8 +21,8 @@ namespace parser {
         // To still use this pattern, and avoid two allocations via std::shared_ptr(new T(..)) use
         // @ https://stackoverflow.com/questions/8147027/how-do-i-call-stdmake-shared-on-a-class-with-only-protected-or-private-const/8147213#8147213
         // https://stackoverflow.com/questions/45127107/private-constructor-and-make-shared
-        [[nodiscard]] static ExpressionEvaluationResult::ptr createFromConstantValue(unsigned int constantValue) {
-            return std::shared_ptr<ExpressionEvaluationResult>(new ExpressionEvaluationResult(constantValue));
+        [[nodiscard]] static ExpressionEvaluationResult::ptr createFromConstantValue(const unsigned int constantValue, const std::optional<unsigned int>& optionalExpectedSignalWidth) {
+            return std::shared_ptr<ExpressionEvaluationResult>(new ExpressionEvaluationResult(constantValue, optionalExpectedSignalWidth));
         }
         [[nodiscard]] static ExpressionEvaluationResult::ptr createFromExpression(const syrec::expression::ptr& expression) {
             return std::shared_ptr<ExpressionEvaluationResult>(new ExpressionEvaluationResult(expression));
@@ -31,8 +31,9 @@ namespace parser {
         [[nodiscard]] static unsigned int                           getRequiredBitWidthToStoreSignal(unsigned int constantValue);
 
     private:
-        ExpressionEvaluationResult(unsigned int constantValue): isConstant(true) {
-            evaluationResult = std::make_pair(constantValue, getRequiredBitWidthToStoreSignal(constantValue));
+        ExpressionEvaluationResult(unsigned int constantValue, const std::optional<unsigned int>& optionalExpectedSignalWidth):
+            isConstant(true), optionalExpectedSignalWidthForConstantValue(optionalExpectedSignalWidth) {
+            evaluationResult = std::make_pair(constantValue, optionalExpectedSignalWidth.has_value() ? *optionalExpectedSignalWidth : getRequiredBitWidthToStoreSignal(constantValue));
         }
 
         ExpressionEvaluationResult(const syrec::expression::ptr& expression): isConstant(false) {
@@ -44,6 +45,7 @@ namespace parser {
 
         bool isConstant;
         std::optional<AvailableOptions> evaluationResult;
+        std::optional<unsigned int>     optionalExpectedSignalWidthForConstantValue;
     };
 }
 

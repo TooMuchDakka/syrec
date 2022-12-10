@@ -18,6 +18,7 @@ std::string program::read(const std::string& filename, const ReadProgramSettings
     return parseBufferContent(fileContentBuffer, fileContentLength);
 }
 
+// TODO: Replace ReadProgramSettings with ParserConfig
 std::string program::readFromString(const std::string& circuitStringified, const ReadProgramSettings settings) {
     return parseBufferContent(reinterpret_cast<const unsigned char*>(circuitStringified.c_str()), circuitStringified.size());
 }
@@ -55,8 +56,8 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     ::parser::SyReCParser     antlrParser(&tokens);
 
     //const auto x = lexer.getAllTokens();
-
-    const auto& customVisitor = std::make_unique<::parser::SyReCCustomVisitor>();
+    const auto  parserConfig  = std::make_shared<::parser::ParserConfig>();
+    const auto& customVisitor = std::make_unique<::parser::SyReCCustomVisitor>(parserConfig);
     if (std::any_cast<bool>(customVisitor->visit(antlrParser.program()))) {
         this->modulesVec = customVisitor->modules;
         return "";

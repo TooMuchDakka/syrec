@@ -42,7 +42,9 @@ namespace syrec {
             return {};
         }
 
+        // TODO: Replace ReadProgramSettings with ParserConfig
         std::string read(const std::string& filename, ReadProgramSettings settings = ReadProgramSettings{});
+        // TODO: Replace ReadProgramSettings with ParserConfig
         std::string readFromString(const std::string& circuitStringified, ReadProgramSettings settings = ReadProgramSettings{});
 
     private:

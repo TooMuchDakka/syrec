@@ -17,6 +17,7 @@ using namespace parser;
 // https://stackoverflow.com/questions/60420005/programmatically-access-antlr-grammar-rule-string-literals-outside-of-a-parse-co
 
 // TODO: Currently loop variables are not supported as arguments
+// TODO: Currently the parser is not able to correctly parse assign statements such as <a> + = (...) since the operand will be split into two tokens and the assign statement production is not "found" during the parse tree creation
 
 std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) {
     SymbolTable::openScope(currentSymbolTableScope);
@@ -135,7 +136,7 @@ std::any SyReCCustomVisitor::visitSignalList(SyReCParser::SignalListContext* con
 std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarationContext* context) {
     std::optional<syrec::Variable::ptr> signal;
     std::vector<unsigned int> dimensions {};
-    unsigned int              signalWidth = this->config.cDefaultSignalWidth;
+    unsigned int              signalWidth = this->config->cDefaultSignalWidth;
     bool              isValidSignalDeclaration = true;
 
     const std::string signalIdent = context->IDENT()->getText();
@@ -378,7 +379,7 @@ std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFr
             const auto containerForLoopVariable = std::make_shared<syrec::NumericExpression>(*definedNumber, 1);
             return std::make_optional(ExpressionEvaluationResult::createFromExpression(containerForLoopVariable));   
         }
-        return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*valueOfDefinedNumber));            
+        return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*valueOfDefinedNumber, optionalExpectedExpressionSignalWidth));            
     }
 
     return std::nullopt;
@@ -415,33 +416,42 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
         createError(InvalidBinaryOperation);
     }
 
+    bool modifiedExpectedExpressionSignalWidth = !optionalExpectedExpressionSignalWidth.has_value();
+    if (lhsOperand.has_value()) {
+        optionalExpectedExpressionSignalWidth.emplace((*(*lhsOperand)->getAsExpression())->bitwidth());
+        modifiedExpectedExpressionSignalWidth = true;
+    }
+
     const auto rhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->rhsOperand);
 
-    if (!lhsOperand.has_value() || !userDefinedOperation.has_value() || !rhsOperand.has_value()) {
-        return std::nullopt;
-    }
+    std::optional<ExpressionEvaluationResult::ptr> result = std::nullopt;
+    if (lhsOperand.has_value() && userDefinedOperation.has_value() && rhsOperand.has_value()) {
+        const auto lhsOperandConversionToConstant = (*lhsOperand)->getAsConstant();
+        const auto rhsOperandConversionToConstant = (*rhsOperand)->getAsConstant();
 
-    const auto lhsOperandConversionToConstant = (*lhsOperand)->getAsConstant();
-    const auto rhsOperandConversionToConstant = (*rhsOperand)->getAsConstant();
-    
-    if (lhsOperandConversionToConstant.has_value() && rhsOperandConversionToConstant.has_value()) {
-        const auto binaryExpressionEvaluated = applyBinaryOperation(*userDefinedOperation, *lhsOperandConversionToConstant, *rhsOperandConversionToConstant);
-        if (binaryExpressionEvaluated.has_value()) {
-            // TODO
-            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*binaryExpressionEvaluated));
+        if (lhsOperandConversionToConstant.has_value() && rhsOperandConversionToConstant.has_value()) {
+            const auto binaryExpressionEvaluated = applyBinaryOperation(*userDefinedOperation, *lhsOperandConversionToConstant, *rhsOperandConversionToConstant);
+            if (binaryExpressionEvaluated.has_value()) {
+                result.emplace(ExpressionEvaluationResult::createFromConstantValue(*binaryExpressionEvaluated, (*(*lhsOperand)->getAsExpression())->bitwidth()));
+            } else {
+                // TODO: Error creation
+                createError("TODO: Calculation of binary expression for constant values failed");   
+            }
+        } else {
+            const auto lhsOperandAsExpression   = (*lhsOperand)->getAsExpression();
+            const auto rhsOperandAsExpression   = (*rhsOperand)->getAsExpression();
+            const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
+
+            // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
+            result.emplace(ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression)));
         }
-
-        // TODO: Error creation
-        createError("TODO: Calculation of binary expression for constant values failed");
-        return std::nullopt;
     }
 
-    const auto lhsOperandAsExpression   = (*lhsOperand)->getAsExpression();
-    const auto rhsOperandAsExpression   = (*rhsOperand)->getAsExpression();
-    const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
+    if (modifiedExpectedExpressionSignalWidth) {
+        optionalExpectedExpressionSignalWidth.reset();
+    }
 
-    // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
-    return std::make_optional(ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression)));
+    return result;
 }
 
 std::any SyReCCustomVisitor::visitUnaryExpression(SyReCParser::UnaryExpressionContext* context) {
@@ -475,7 +485,7 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
     if (shiftAmountEvaluated.has_value() && expressionToShiftEvaluated.has_value()) {
         const auto shiftOperationApplicationResult = apply(*definedShiftOperation, *expressionToShiftEvaluated, *shiftAmountEvaluated);
         if (shiftOperationApplicationResult.has_value()) {
-            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*shiftOperationApplicationResult));
+            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*shiftOperationApplicationResult, (*(*expressionToShift)->getAsExpression())->bitwidth()));
         }
 
         // TODO: GEN_ERROR
@@ -764,6 +774,9 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
         && (*assignedToSignal)->isVariableAccess()
         && isSignalAssignableOtherwiseCreateError(*(*assignedToSignal)->getAsVariableAccess());
 
+    if (allSemanticChecksOk) {
+        optionalExpectedExpressionSignalWidth.emplace((*(*assignedToSignal)->getAsVariableAccess())->bitwidth());
+    }
 
     const auto definedAssignmentOperation = getDefinedOperation(context->assignmentOp);
     if (!definedAssignmentOperation.has_value()
@@ -774,6 +787,7 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
         allSemanticChecksOk = false;
     }
 
+    // TODO: Check if signal widht of left and right operand of assign statement match (similar to swap statement ?)
     const auto assignmentOpRhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->expression());
     allSemanticChecksOk &= assignmentOpRhsOperand.has_value();
 
@@ -784,6 +798,10 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
                         *(*assignedToSignal)->getAsVariableAccess(),
                         *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
                         (*assignmentOpRhsOperand)->getAsExpression().value()));
+    }
+
+    if (optionalExpectedExpressionSignalWidth.has_value()) {
+        optionalExpectedExpressionSignalWidth.reset();
     }
 
     return 0;
