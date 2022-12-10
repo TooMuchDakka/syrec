@@ -367,8 +367,18 @@ std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFr
     */
 
     if (definedNumber.has_value()) {
-        const auto valueOfDefinedNumber = (*definedNumber)->evaluate(loopVariableMappingLookup);
-        return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(valueOfDefinedNumber));
+        const auto valueOfDefinedNumber = tryEvaluateNumber(*definedNumber);
+        if ((*definedNumber)->isLoopVariable()) {
+        /*
+         * TODO:
+         * If no loop unrolling is done by default and we do not know the bitwidth that the expression should have from the other operand of the operation,
+         * we would need a lookup for the maximum value possible and assume the bitwidth to be the one of the maximum value.
+         * The easiest solution would be to pass in the expected bitwidth for this expression
+         */
+            const auto containerForLoopVariable = std::make_shared<syrec::NumericExpression>(*definedNumber, 1);
+            return std::make_optional(ExpressionEvaluationResult::createFromExpression(containerForLoopVariable));   
+        }
+        return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*valueOfDefinedNumber));            
     }
 
     return std::nullopt;

@@ -1,32 +1,6 @@
 grammar SyReC;
 
 /* Token defintions */
-OP_PLUS : '+' ;
-OP_MINUS : '-' ;
-OP_MULTIPLY: '*' ;
-OP_UPPER_BIT_MULTIPLY: '*>' ;
-OP_DIVISION: '/' ;
-OP_MODULO: '%' ;
-
-OP_GREATER_THAN: '>' ;
-OP_GREATER_OR_EQUAL: '>=' ;
-OP_LESS_THAN: '<' ;
-OP_LESS_OR_EQUAL: '<=' ;
-OP_EQUAL: '=';
-OP_NOT_EQUAL: '!=';
-
-OP_BITWISE_AND: '&' ;
-OP_BITWISE_NEGATION: '~' ;
-OP_BITWISE_OR: '|' ;
-OP_BITWISE_XOR: '^' ;
-
-OP_LOGICAL_AND: '&&' ;
-OP_LOGICAL_OR: '||' ;
-OP_LOGICAL_NEGATION: '!' ;
-
-OP_LEFT_SHIFT: '<<' ;
-OP_RIGHT_SHIFT: '>>' ;
-
 OP_INCREMENT_ASSIGN: '++=' ;
 OP_DECREMENT_ASSIGN: '--=' ;
 OP_INVERT_ASSIGN: '~=' ;
@@ -34,6 +8,32 @@ OP_INVERT_ASSIGN: '~=' ;
 OP_ADD_ASSIGN: '+=' ;
 OP_SUB_ASSIGN: '-=' ;
 OP_XOR_ASSIGN: '^=' ;
+
+OP_PLUS : '+' ;
+OP_MINUS : '-' ;
+OP_MULTIPLY: '*' ;
+OP_UPPER_BIT_MULTIPLY: '*>' ;
+OP_DIVISION: '/' ;
+OP_MODULO: '%' ;
+
+OP_LEFT_SHIFT: '<<' ;
+OP_RIGHT_SHIFT: '>>' ;
+
+OP_GREATER_OR_EQUAL: '>=' ;
+OP_LESS_OR_EQUAL: '<=' ;
+OP_GREATER_THAN: '>' ;
+OP_LESS_THAN: '<' ;
+OP_EQUAL: '=';
+OP_NOT_EQUAL: '!=';
+
+OP_LOGICAL_AND: '&&' ;
+OP_LOGICAL_OR: '||' ;
+OP_LOGICAL_NEGATION: '!' ;
+
+OP_BITWISE_AND: '&' ;
+OP_BITWISE_NEGATION: '~' ;
+OP_BITWISE_OR: '|' ;
+OP_BITWISE_XOR: '^' ;
 
 OP_CALL: 'call' ;
 OP_UNCALL: 'uncall' ;
@@ -51,13 +51,15 @@ STATEMENT_DELIMITER: ';' ;
 PARAMETER_DELIMITER: ',' ;
 
 /* LINE_COMMENT: '#' ~[\r\n]* -> skip ; */
+/* unicode whitespace \u000B */
+SKIPABLEWHITSPACES : [ \t\r\n]+ -> channel(HIDDEN) ;	// Skip newline, tabulator and carriage return symbols
+LINE_COMMENT: '//' .*? ('\n'|EOF) -> channel(HIDDEN) ;
+MULTI_LINE_COMMENT: '/*' .*? '*/' -> channel(HIDDEN) ;
 
 fragment LETTER : 'a'..'z' | 'A'..'Z' ;
 fragment DIGIT : '0'..'9' ;
 IDENT : ( '_' | LETTER ) ( '_' | LETTER | DIGIT )* ;
 INT : DIGIT+ ;
-SKIPABLEWHITSPACES : [ \t\r\n]+ -> skip ;	// Skip newline, tabulator and carriage return symbols
-
 
 /* Number production */
 number: 
@@ -66,7 +68,6 @@ number:
 	| LOOP_VARIABLE_PREFIX IDENT	# NumberFromLoopVariable
 	| ( '(' lhsOperand=number op=( OP_PLUS | OP_MINUS | OP_MULTIPLY | OP_DIVISION ) rhsOperand=number ')' ) # NumberFromExpression
 	;
-
 
 /* Program and modules productions */
 

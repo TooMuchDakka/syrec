@@ -54,8 +54,10 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     antlr4::CommonTokenStream tokens(&lexer);
     ::parser::SyReCParser     antlrParser(&tokens);
 
+    //const auto x = lexer.getAllTokens();
+
     const auto& customVisitor = std::make_unique<::parser::SyReCCustomVisitor>();
-    if (std::any_cast<bool>(customVisitor->visitProgram(antlrParser.program()))) {
+    if (std::any_cast<bool>(customVisitor->visit(antlrParser.program()))) {
         this->modulesVec = customVisitor->modules;
         return "";
     }
