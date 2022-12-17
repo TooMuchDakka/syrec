@@ -19,7 +19,7 @@
     "expectedCircuit": "module main(in a(4)) wire local_1(4) local_1 += 2"
   },
   "asExpressionWithRhsBeingNested": {
-    "circuit": "module main(in a(4)) wire local_1(4) local_1 += (2 - (((#a - 4) * 2) + #a))",
+    "circuit": "module main(in a(4)) wire local_1(4) local_1 += (8 - (((#a - 4) * 2) + #a))",
     "expectedCircuit": "module main(in a(4)) wire local_1(4) local_1 += 4"
   }
 }

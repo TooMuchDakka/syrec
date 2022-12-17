@@ -147,7 +147,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_ifStatement", "numberAsCondition"),
                         std::make_pair("production_ifStatement", "signalAsCondition"),
                         std::make_pair("production_ifStatement", "binaryExpressionAsCondition"),
-                        std::make_pair("production_ifStatement", "unaryExpressionAsCondition"),
+                        std::make_pair("DISABLED_production_ifStatement", "unaryExpressionAsCondition"),
                         std::make_pair("production_ifStatement", "shiftExpressionAsCondition"),
 
                         std::make_pair("production_ifStatement", "singleStatementThenBranch"),

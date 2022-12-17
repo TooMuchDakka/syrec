@@ -56,18 +56,28 @@
     ]
   },
   "callOfModuleWithNotEnoughParameters": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call toCall(c) uncall toCall(c, d)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call toCall(c); uncall toCall(c, d)",
     "errors": [
       {
         "line": 1,
         "column": 1,
         "message": "call of 'toCall' expected 2 arguments but was called with 1"
+      },
+      {
+        "line": 1,
+        "column": 1,
+        "message": "call of 'toCall' expected 2 arguments but was called with 3"
       }
     ]
   },
   "callOfModuleWithTooManyParameters": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, d, a) uncall toCall(c, d)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, d, a); uncall toCall(c, d)",
     "errors": [
+      {
+        "line": 1,
+        "column": 1,
+        "message": "call of 'toCall' expected 2 arguments but was called with 3"
+      },
       {
         "line": 1,
         "column": 1,
@@ -76,7 +86,7 @@
     ]
   },
   "callWithInvalidParameterDelimiter": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c< a) uncall toCall(c, a)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c< a); uncall toCall(c, a)",
     "errors": [
       {
         "line": 1,
@@ -86,7 +96,7 @@
     ]
   },
   "uncallWithInvalidParameterDelimiter": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) uncall toCall(c< a)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a); uncall toCall(c< a)",
     "errors": [
       {
         "line": 1,
@@ -106,7 +116,7 @@
     ]
   },
   "callAfterCallWithoutPriorUncallOfTheFormer": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) call toCall(d, a)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a); call toCall(d, a)",
     "errors": [
       {
         "line": 1,
@@ -116,17 +126,17 @@
     ]
   },
   "uncallWithDifferentParameterThanCall": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) uncall toCall(d, a)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a); uncall toCall(d, a)",
     "errors": [
       {
         "line": 1,
         "column": 1,
-        "message": "previous call to method 'toCall' was not uncalled"
+        "message": "call and uncall of module 'toCall' defined different parameter values - Index: 0 - Formal: d | Actual: c"
       }
     ]
   },
   "uncallWithLessParameterThanCall": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) uncall toCall(d)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a); uncall toCall(d)",
     "errors": [
       {
         "line": 1,
@@ -141,7 +151,7 @@
     ]
   },
   "uncallWithMoreParametersThanCall": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a) uncall toCall(c, a, d)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d, in a) call toCall(c, a); uncall toCall(c, a, d)",
     "errors": [
       {
         "line": 1,

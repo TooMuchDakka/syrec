@@ -24,8 +24,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "then expected"
+        "column": 35,
+        "message": "missing 'then' at 'skip'"
       }
     ]
   },
@@ -34,8 +34,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "then expected"
+        "column": 35,
+        "message": "missing 'then' at 'skip'"
       }
     ]
   },
@@ -44,12 +44,12 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ") expected"
+        "column": 34,
+        "message": "missing ')' at 'then'"
       },
       {
         "line": 1,
-        "column": 1,
+        "column": 57,
         "message": "invalid if statement, missmatch between opening and closing condition"
       }
     ]
@@ -59,8 +59,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ") expected"
+        "column": 64,
+        "message": "missing ')' at '<EOF>'"
       },
       {
         "line": 1,
@@ -84,7 +84,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 50,
         "message": "TODO"
       }
     ]
@@ -94,8 +94,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "else expected"
+        "column": 45,
+        "message": "missing 'else' at 'els'"
       }
     ]
   },
@@ -104,13 +104,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "fi expected"
+        "column": 55,
+        "message": "missing 'fi' at 'test'"
       }
     ]
   },
   "missmatchBetweenIfAndFiCondition": {
-    "circuit": "module main(in a, in b) if (a > 2) then else skip fi (a < 2)",
+    "circuit": "module main(in a, in b) if (a > 2) then skip else skip fi (a < 2)",
     "errors": [
       {
         "line": 1,

@@ -25,7 +25,8 @@ private:
 
     std::optional<unsigned int> optionalExpectedExpressionSignalWidth;
 
-    void createError(const std::string& errorMessage);
+    void createErrorAtTokenPosition(const antlr4::Token* token, const std::string& errorMessage);
+    void createError(std::size_t line, std::size_t column, const std::string& errorMessage);
     void createWarning(const std::string& warningMessage);
 
     /**
@@ -43,7 +44,7 @@ private:
         try {
             return std::any_cast<std::optional<T>>(productionReturnType);
         }
-        catch (std::bad_any_cast&) {
+        catch (std::bad_any_cast& ex) {
             // TODO: Better error handling, i.e. logging or returning C-style error code to check whether cast or something else failed
             return std::nullopt;
         }
@@ -52,7 +53,7 @@ private:
     /**
      * \brief If the context is not null, try to call the corresponding visitor and try to convert the return value of the given production to an instance of std::optional<T>.
      * \tparam T The expected type of the value wrapped inside of a std::optional returned by the production. IMPORTANT: This must be the exact type of the class, currently polymorphism does not work with std::any because of type erasure by std::any (see https://stackoverflow.com/questions/70313749/combining-static-cast-and-stdany-cast)
-     * \param productionReturnType The expected type of the value wrapped inside of a std::optional returned by the production
+     * \param production The expected type of the value wrapped inside of a std::optional returned by the production
      * \return A std::optional<T> object containing the casted return value of the production
      */
     template<typename T>
@@ -69,13 +70,13 @@ private:
     [[nodiscard]] static bool isValidBinaryOperation(syrec_operation::operation userDefinedOperation);
     [[nodiscard]] static bool areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr);
 
-    bool checkIfSignalWasDeclaredOrLogError(const std::string_view& signalIdent);
-    [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult);
+    bool                                                                           checkIfSignalWasDeclaredOrLogError(const antlr4::Token* signalIdentToken, bool isLoopVariable=false);
+    [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(const antlr4::Token* dimensionToken, size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult);
     [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
     [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
     [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& numberContainer);
     [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
-    [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const syrec::VariableAccess::ptr& assignedToVariable);
+    [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable);
     void addStatementToOpenContainer(const syrec::Statement::ptr& statement);
 
 

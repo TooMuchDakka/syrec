@@ -4,7 +4,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 30,
+        "column": 29,
         "message": "EOF expected"
       }
     ]
@@ -14,7 +14,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 30,
+        "column": 29,
         "message": "undeclared ident 'a'"
       }
     ]
@@ -24,7 +24,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 30,
+        "column": 29,
         "message": "undeclared ident '$a'"
       }
     ]
@@ -34,7 +34,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 29,
+        "column": 30,
         "message": "EOF expected"
       }
     ]
@@ -44,7 +44,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 29,
+        "column": 37,
         "message": "EOF expected"
       }
     ]
@@ -54,7 +54,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 36,
+        "column": 35,
         "message": "\")\" expected"
       }
     ]
@@ -64,7 +64,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 38,
+        "column": 37,
         "message": "\")\" expected"
       }
     ]

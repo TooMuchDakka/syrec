@@ -82,16 +82,27 @@ protected:
     }
 
     static std::vector<std::string> transformActualErrors(const std::string& rawActualErrors) {
+        if (rawActualErrors.empty()) {
+            return {};
+        }
+
         std::vector<std::string> actualErrors{};
         size_t                   previousErrorEndPosition = 0;
-        size_t                   currErrorEndPosition     = rawActualErrors.find_first_of('\n', previousErrorEndPosition);
-
-        while (std::string::npos != currErrorEndPosition) {
-            // TODO: Index check
-            actualErrors.emplace_back(rawActualErrors.substr(previousErrorEndPosition, (currErrorEndPosition - previousErrorEndPosition)));
-            previousErrorEndPosition = currErrorEndPosition + 1;
-            currErrorEndPosition     = rawActualErrors.find_first_of('\n', previousErrorEndPosition);
-        }
+        size_t currErrorEndPosition  = rawActualErrors.find_first_of('\n', previousErrorEndPosition);
+        bool                     foundErrorSeparator;
+        do 
+        {
+            foundErrorSeparator = std::string::npos != currErrorEndPosition;
+            if (foundErrorSeparator) {
+                actualErrors.emplace_back(rawActualErrors.substr(previousErrorEndPosition, (currErrorEndPosition - previousErrorEndPosition)));
+                previousErrorEndPosition = currErrorEndPosition + 1;
+                currErrorEndPosition     = rawActualErrors.find_first_of('\n', previousErrorEndPosition);
+            }
+            else {
+                currErrorEndPosition = rawActualErrors.size();
+                actualErrors.emplace_back(rawActualErrors.substr(previousErrorEndPosition, (currErrorEndPosition - previousErrorEndPosition)));
+            }
+        } while (foundErrorSeparator);
         return actualErrors;
     }
     
@@ -104,6 +115,12 @@ protected:
     }
 };
 
+/*
+ *  TODO:
+ *  - Error cases for binary expression where the dimension of the operands do not match, similarily to the shift expression error cases
+ *  - What is the behaviour of a shift where the operand to be shifted is a signal with multiple dimensions (should that be possible or is that an error)
+ *
+ */
 INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                          SyrecParserErrorCasesFixture,
                          testing::Values(
@@ -132,10 +149,12 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_module", "localWithDimensionMissingOpeningBracket"),
                              std::make_pair("production_module", "localWithDimensionMissingClosingBracket"),
                              std::make_pair("production_module", "localWithDimensionNotBeingANumber"),
+                             std::make_pair("production_module", "localWithDimensionNotBeingAConstant"),
+                             std::make_pair("production_module", "localWithSignalwidthNotBeingANumber"),
+                             std::make_pair("production_module", "localWithSignalwidthNotBeingAConstant"),
                              std::make_pair("production_module", "localWithSignalwidthMissingOpeningBracket"),
                              std::make_pair("production_module", "localWithSignalwidthMissingClosingBracket"),
-
-                             std::make_pair("production_module", "localWithSignalwidthNotBeingANumber"),
+                             
                              std::make_pair("production_module", "missingLocalDelimiter"),
                              std::make_pair("production_module", "missingLocalAfterDelimiter"),
                              std::make_pair("production_module", "duplicateLocalInSameLine"),
@@ -184,7 +203,6 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_forStatement", "invalidLoopHeaderPostfixIdent"),
                              std::make_pair("production_forStatement", "invalidRofEndDelimiter"),
                              std::make_pair("production_forStatement", "missingRofEndDelimiter"),
-                             std::make_pair("production_forStatement", "assignmentToLoopVariableNotValid"),
                              std::make_pair("production_forStatement", "duplicateLoopVariableNameInNestedLoop"),
 
                              /* IfStatement production */

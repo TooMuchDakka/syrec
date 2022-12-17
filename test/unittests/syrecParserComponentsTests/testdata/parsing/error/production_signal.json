@@ -4,7 +4,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 19,
+        "column": 18,
         "message": "undeclared ident 'a'"
       }
     ]
@@ -14,7 +14,12 @@
     "errors": [
       {
         "line": 1,
-        "column": 24,
+        "column": 26,
+        "message": "extraneous input ']' expecting {<EOF>, 'module'}"
+      },
+      {
+        "line": 1,
+        "column": 23,
         "message": "undeclared ident 'a23'"
       }
     ]
@@ -25,7 +30,7 @@
       {
         "line": 1,
         "column": 33,
-        "message": "EOF expected"
+        "message": "extraneous input '3' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -34,8 +39,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 27,
-        "message": "\"]\" expected"
+        "column": 32,
+        "message": "missing ']' at '<EOF>'"
       }
     ]
   },
@@ -44,8 +49,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 30,
-        "message": "\"]\" expected"
+        "column": 35,
+        "message": "missing ']' at '<EOF>'"
       }
     ]
   },
@@ -54,7 +59,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 31,
+        "column": 30,
         "message": "undeclared ident 'a23'"
       }
     ]
@@ -64,8 +69,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 32,
-        "message": "EOF expected"
+        "column": 31,
+        "message": "extraneous input ':' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -75,7 +80,7 @@
       {
         "line": 1,
         "column": 33,
-        "message": "EOF expected"
+        "message": "extraneous input '.' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -84,8 +89,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 33,
-        "message": "EOF expected"
+        "column": 35,
+        "message": "extraneous input 'b' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -104,7 +109,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 35,
+        "column": 32,
         "message": "value 4 for dimension 0 is out of range for variable 'a', valid value range is [0, 1]"
       }
     ]
@@ -114,7 +119,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 35,
+        "column": 32,
         "message": "access on bit 32 is out of range for variable 'a', valid value range is [0, 15]"
       }
     ]
@@ -124,7 +129,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 37,
+        "column": 32,
         "message": "bit range start value 32 cannot be larger than the end value 15"
       }
     ]
@@ -134,7 +139,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 36,
+        "column": 32,
         "message": "bit range 0:32 is out of range for variable 'a', valid value range is [0, 15]"
       }
     ]
@@ -144,7 +149,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 36,
+        "column": 32,
         "message": "bit range start value 15 cannot be larger than the end value 0"
       }
     ]

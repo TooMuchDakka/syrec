@@ -5,6 +5,7 @@
 #include "parser/antlr/SyReCCustomVisitor.h"
 #include "parser/antlr/SyReCLexer.h"
 #include "parser/antlr/SyReCParser.h"
+#include "parser/antlr/SyReCErrorListener.h"
 
 using namespace syrec;
 
@@ -55,9 +56,14 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     antlr4::CommonTokenStream tokens(&lexer);
     ::parser::SyReCParser     antlrParser(&tokens);
 
+    const auto  parserConfig             = std::make_shared<::parser::ParserConfig>();
+    const auto& customVisitor            = std::make_unique<::parser::SyReCCustomVisitor>(parserConfig);
+
+    const auto antlrParserErrorListener = std::make_shared<::parser::SyReCErrorListener>(::parser::SyReCErrorListener(customVisitor->errors));
+    lexer.addErrorListener(antlrParserErrorListener.get());
+    antlrParser.addErrorListener(antlrParserErrorListener.get());
+
     //const auto x = lexer.getAllTokens();
-    const auto  parserConfig  = std::make_shared<::parser::ParserConfig>();
-    const auto& customVisitor = std::make_unique<::parser::SyReCCustomVisitor>(parserConfig);
     if (std::any_cast<bool>(customVisitor->visit(antlrParser.program()))) {
         this->modulesVec = customVisitor->modules;
         return "";

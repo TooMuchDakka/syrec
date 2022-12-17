@@ -34,7 +34,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 23,
+        "column": 22,
         "message": "variable 'a' is readonly"
       }
     ]

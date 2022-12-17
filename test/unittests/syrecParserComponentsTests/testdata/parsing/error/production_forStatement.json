@@ -54,8 +54,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "to expected"
+        "column": 25,
+        "message": "mismatched input 'then' expecting 'to'"
       }
     ]
   },
@@ -134,8 +134,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "do expected"
+        "column": 27,
+        "message": "missing 'do' at 'skip'"
       }
     ]
   },
@@ -160,32 +160,22 @@
     ]
   },
   "invalidRofEndDelimiter": {
-    "circuit": "module main() for 2 step 1 then skip then",
+    "circuit": "module main() for 2 step 1 do skip then",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "rof expected"
-      }
-    ]
-  },
-  "assignmentToLoopVariableNotValid": {
-    "circuit": "module main() for $a = 0 to 2 step 1 do ++= a rof",
-    "errors": [
-      {
-        "line": 1,
-        "column": 1,
-        "message": "variable 'a' is readonly"
+        "column": 35,
+        "message": "mismatched input 'then' expecting 'rof'"
       }
     ]
   },
   "duplicateLoopVariableNameInNestedLoop": {
-    "circuit": "module main() for $a = 0 to 2 step 1 do for $a = 0 to 5 step 1 skip rof rof",
+    "circuit": "module main() for $a = 0 to 2 step 1 do for $a = 0 to 5 step 1 do skip rof rof",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "variable '$a' has already been defined or declared"
+        "column": 45,
+        "message": "variable '$a' was already declared"
       }
     ]
   }

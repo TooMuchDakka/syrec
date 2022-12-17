@@ -5,8 +5,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "\"<=>\" expected"
+        "column": 36,
+        "message": "no viable alternative at input 'a <='"
+      },
+      {
+        "line": 1,
+        "column": 38,
+        "message": "token recognition error at: '?'"
       }
     ]
   },
@@ -15,7 +20,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 33,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 1 while the other had a signal width of 4"
       }
     ]
@@ -25,7 +30,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 36,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 1 while the other had a signal width of 5"
       }
     ]
@@ -35,7 +40,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 42,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 1 while the other had a signal width of 5"
       }
     ]
@@ -45,7 +50,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 33,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 1 while the other had a signal width of 5"
       }
     ]
@@ -56,7 +61,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 33,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 6 while the other had a signal width of 1"
       }
     ]
@@ -66,7 +71,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 33,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 4 while the other had a signal width of 16"
       }
     ]
@@ -76,7 +81,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 36,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 4 while the other had a signal width of 7"
       }
     ]
@@ -86,7 +91,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 39,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 4 while the other had a signal width of 7"
       }
     ]
@@ -97,7 +102,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 32,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 4 while the other had a signal width of 2"
       }
     ]
@@ -107,7 +112,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 35,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 4 while the other had a signal width of 2"
       }
     ]
@@ -117,7 +122,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 38,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 4 while the other had a signal width of 2"
       }
     ]
@@ -128,7 +133,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 33,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 5 while the other had a signal width of 15"
       }
     ]
@@ -138,7 +143,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 33,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 5 while the other had a signal width of 4"
       }
     ]
@@ -148,7 +153,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 42,
         "message": "invalid swap number of dimension missmatch, first operand had 2 while the other had 1"
       }
     ]
@@ -158,7 +163,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 42,
         "message": "invalid swap number of dimension missmatch, first operand had 1 while the other had 2"
       }
     ]
@@ -168,7 +173,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 39,
         "message": "invalid swap missmatch in value for dimension 0, first operand had a value of 2 while the other had a value of 1"
       }
     ]
@@ -178,7 +183,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 40,
         "message": "invalid swap missmatch in value for dimension 0, first operand had a value of 2 while the other had a value of 5"
       }
     ]
@@ -188,7 +193,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 46,
         "message": "invalid swap missmatch in value for dimension 1, first operand had a value of 4 while the other had a value of 1"
       }
     ]
@@ -198,7 +203,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 46,
         "message": "invalid swap missmatch in value for dimension 1, first operand had a value of 4 while the other had a value of 5"
       }
     ]
@@ -208,7 +213,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 45,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 5 while the other had a signal width of 16"
       }
     ]
@@ -218,7 +223,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 46,
         "message": "invalid swap signal width missmatch, first operand had a signal width of 16 while the other had a signal width of 32"
       }
     ]

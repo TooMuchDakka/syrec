@@ -31,7 +31,7 @@ namespace parser {
 
     extern const std::string InvalidSwapSignalWidthMissmatch       = "invalid swap signal width missmatch, first operand had a signal width of {0:d} while the other had a signal width of {1:d}";
     extern const std::string InvalidSwapNumDimensionsMissmatch     = "invalid swap number of dimension missmatch, first operand had {0:d} while the other had {1:d}";
-    extern const std::string InvalidSwapValueForDimensionMissmatch = "invalid swap missmatch in value for dimension {0:d}, first operand had a value of {0:d} while the other had a value of {2:d}";
+    extern const std::string InvalidSwapValueForDimensionMissmatch = "invalid swap missmatch in value for dimension {0:d}, first operand had a value of {1:d} while the other had a value of {2:d}";
 
     /* Invalid operation error messages */
     extern const std::string InvalidAssignOperation                    = "Invalid assign operation";

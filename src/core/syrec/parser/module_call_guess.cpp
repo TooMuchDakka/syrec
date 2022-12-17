@@ -31,7 +31,7 @@ void ModuleCallGuess::discardGuessesWithLessThanActualNumberOfParameters(const s
 }
 
 void ModuleCallGuess::discardGuessesWithMoreThanNParameters(const std::size_t& maxAllowedNumFormalParametersPerGuess) {
-    return discardGuessBasedOnNumberOfParameters(maxAllowedNumFormalParametersPerGuess + 1, false);
+    return discardGuessBasedOnNumberOfParameters(maxAllowedNumFormalParametersPerGuess, false);
 }
 
 void ModuleCallGuess::discardGuessBasedOnNumberOfParameters(const std::size_t& numParameterThreshold, bool filterWithLess) {

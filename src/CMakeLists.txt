@@ -32,14 +32,14 @@ add_library(${PROJECT_NAME}
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.h
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.h
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParserErrorListener.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCErrorListener.h
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.h
 
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParserErrorListener.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCErrorListener.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.cpp
 
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp

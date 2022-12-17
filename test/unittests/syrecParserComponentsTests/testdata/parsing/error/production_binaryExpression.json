@@ -20,7 +20,7 @@
     ]
   },
   "invalidBinaryOperation": {
-    "circuit": "module main(out c) c += (2 ? 2)",
+    "circuit": "module main(out c) c += (2 , 2)",
     "errors": [
       {
         "line": 1,
