@@ -7,6 +7,11 @@
         "line": 1,
         "column": 0,
         "message": "mismatched input 'main' expecting 'module'"
+      },
+      {
+        "line": 0,
+        "column": 0,
+        "message": "Entry point for program, a module named 'main', was not found"
       }
     ]
   },
@@ -21,12 +26,17 @@
     ]
   },
   "invalidSymbolInModuleIdent": {
-    "circuit": "module mai@23() skip",
+    "circuit": "module mai,23() skip",
     "errors": [
       {
         "line": 1,
-        "column": 7,
-        "message": "ident expected"
+        "column": 10,
+        "message": "mismatched input ',' expecting '('"
+      },
+      {
+        "line": 0,
+        "column": 0,
+        "message": "Entry point for program, a module named 'main', was not found"
       }
     ]
   },
@@ -55,8 +65,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "invalid parameter type 'tes'"
+        "column": 12,
+        "message": "mismatched input 'tes' expecting {')', 'in', 'out', 'inout'}"
       }
     ]
   },
@@ -65,8 +75,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 16,
-        "message": "ident expected"
+        "column": 19,
+        "message": "token recognition error at: '@'"
+      },
+      {
+        "line": 1,
+        "column": 20,
+        "message": "mismatched input '23' expecting ')'"
       }
     ]
   },
@@ -105,8 +120,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 24,
-        "message": ", expected"
+        "column": 23,
+        "message": "extraneous input '32' expecting ')'"
+      },
+      {
+        "line": 1,
+        "column": 26,
+        "message": "extraneous input ')' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       }
     ]
   },
@@ -136,7 +156,7 @@
       {
         "line": 1,
         "column": 20,
-        "message": "mismatched input ')' expecting {'in', 'out', 'inout'}"
+        "message": "mismatched input 'inout' expecting ')'"
       }
     ]
   },
@@ -146,17 +166,22 @@
       {
         "line": 1,
         "column": 21,
-        "message": "ident expected"
+        "message": "mismatched input ')' expecting {'in', 'out', 'inout'}"
+      },
+      {
+        "line": 1,
+        "column": 22,
+        "message": "extraneous input ')' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       },
       {
         "line": 1,
         "column": 21,
-        "message": "invalid parameter type 'test'"
+        "message": "invalid parameter type"
       }
     ]
   },
   "duplicateParameterOfSameType": {
-    "circuit": "module main(in test, in test[2](16))) skip",
+    "circuit": "module main(in test, in test[2](16)) skip",
     "errors": [
       {
         "line": 1,
@@ -166,11 +191,11 @@
     ]
   },
   "duplicateParameterOfDifferentType": {
-    "circuit": "module main(in test, out test[2](16))) skip",
+    "circuit": "module main(in test, out test[2](16)) skip",
     "errors": [
       {
         "line": 1,
-        "column": 24,
+        "column": 25,
         "message": "variable 'test' was already declared"
       }
     ]
@@ -180,7 +205,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 35,
+        "column": 34,
         "message": "variable 'test' was already declared"
       }
     ]
@@ -191,8 +216,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 15,
-        "message": "invalid variable type 'tes'"
+        "column": 18,
+        "message": "no viable alternative at input 'tes test'"
       }
     ]
   },
@@ -201,8 +226,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 19,
-        "message": "ident expected"
+        "column": 25,
+        "message": "token recognition error at: '@'"
+      },
+      {
+        "line": 1,
+        "column": 26,
+        "message": "extraneous input '23' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       }
     ]
   },
@@ -211,8 +241,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 26,
-        "message": "TODO: ident expected"
+        "column": 25,
+        "message": "extraneous input ']' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       }
     ]
   },
@@ -251,8 +281,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 26,
-        "message": "TODO: ident expected"
+        "column": 25,
+        "message": "extraneous input ')' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       }
     ]
   },
@@ -291,8 +321,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 25,
-        "message": "no viable alternative at 'abc skip'"
+        "column": 28,
+        "message": "no viable alternative at input 'abc skip'"
       }
     ]
   },
@@ -342,8 +372,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "TODO: Probably throws two errors, one for invalid swap statement and one for the empty module body"
+        "column": 34,
+        "message": "variable 'test' was already declared"
+      },
+      {
+        "line": 1,
+        "column": 51,
+        "message": "undeclared ident 'abc'"
       }
     ]
   },
@@ -352,8 +387,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 7,
-        "message": "TODO"
+        "column": 13,
+        "message": "mismatched input '<EOF>' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       }
     ]
   },
@@ -369,12 +404,12 @@
     ]
   },
   "missingMainModule": {
-    "circuit": "module test() wire test(15) wire x, test[2] skip",
+    "circuit": "module test() wire test(15) wire x, alpha[2] skip",
     "errors": [
       {
-        "line": 1,
-        "column": 50,
-        "message": "a module with name 'main' must be defined but was not found"
+        "line": 0,
+        "column": 0,
+        "message": "Entry point for program, a module named 'main', was not found"
       }
     ]
   }

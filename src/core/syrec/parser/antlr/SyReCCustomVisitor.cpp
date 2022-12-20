@@ -31,9 +31,14 @@ std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) 
             }
             else {
                 currentSymbolTableScope->addEntry(*moduleParseResult);
-                modules.emplace_back(moduleParseResult.value());                
+                modules.emplace_back(moduleParseResult.value());
             }
         }
+    }
+
+    // TODO: Error position (i.e. would line 1:1 or -1:-1 be more appropriate ?
+    if (!wasProgramEntryModuleDefined) {
+        createError(0, 0, fmt::format(MissingEntryModule, expectedProgramMainModuleName));
     }
 
     return errors.empty();
@@ -41,7 +46,10 @@ std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) 
 
 std::any SyReCCustomVisitor::visitModule(SyReCParser::ModuleContext* context) {
     SymbolTable::openScope(this->currentSymbolTableScope);
+    // TODO: Wrap into optional, since token could be null if no alternative rule is found and the moduleProduction is choosen instead (as the first alternative from the list of possible ones if nothing else matches)
     const std::string moduleIdent = context->IDENT()->getText();
+
+    wasProgramEntryModuleDefined |= moduleIdent == expectedProgramMainModuleName;
     syrec::Module::ptr                  module      = std::make_shared<syrec::Module>(moduleIdent);
 
     const auto declaredParameters = tryVisitAndConvertProductionReturnValue<syrec::Variable::vec>(context->parameterList());
@@ -96,7 +104,7 @@ std::any SyReCCustomVisitor::visitParameterList(SyReCParser::ParameterListContex
 }
 
 std::any SyReCCustomVisitor::visitParameter(SyReCParser::ParameterContext* context) {
-     const auto parameterType = (getParameterType(context->start));
+     const auto parameterType = getParameterType(context->start);
     if (!parameterType.has_value()) {
         createErrorAtTokenPosition(context->start, InvalidParameterType);
     } 
@@ -112,10 +120,12 @@ std::any SyReCCustomVisitor::visitParameter(SyReCParser::ParameterContext* conte
 }
 
 std::any SyReCCustomVisitor::visitSignalList(SyReCParser::SignalListContext* context) {
-
-    // TODO: Check if tryConvert... can be replace with tryVisit...
     const auto declaredSignalsType = getSignalType(context->start);
-    bool       isValidSignalListDeclaration = declaredSignalsType.has_value();
+    bool       isValidSignalListDeclaration = true;
+    if (!declaredSignalsType.has_value()) {
+        createErrorAtTokenPosition(context->start, InvalidLocalType);
+        isValidSignalListDeclaration = false;
+    }
 
     syrec::Variable::vec declaredSignalsOfType{};
     for (const auto& signal : context->signalDeclaration()) {
@@ -339,7 +349,6 @@ std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromEx
 
     return std::nullopt;
 }
-
 
 /*
  * Expression production visitors
@@ -959,8 +968,6 @@ std::optional<syrec::Variable::Types> SyReCCustomVisitor::getParameterType(const
             parameterType.emplace(syrec::Variable::Types::Inout);
             break;
         default:
-            // TODO: Error position
-            createErrorAtTokenPosition(token, InvalidParameterType);
             break;
     }
     return parameterType;
@@ -980,8 +987,6 @@ std::optional<syrec::Variable::Types> SyReCCustomVisitor::getSignalType(const an
             signalType.emplace(syrec::Variable::Types::State);
             break;
         default:
-            // TODO: Error position
-            createErrorAtTokenPosition(token, InvalidLocalType);
             break;
     }
     return signalType;

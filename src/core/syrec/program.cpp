@@ -69,6 +69,7 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
         return "";
     }
 
+    // TODO: Syntax errors will be inserted before semantic errors (i.e. the errors are not sorted according to their position)
     std::ostringstream errorsConcatinatedBuffer;
     std::copy(customVisitor->errors.cbegin(), customVisitor->errors.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, "\n"));
     return errorsConcatinatedBuffer.str();

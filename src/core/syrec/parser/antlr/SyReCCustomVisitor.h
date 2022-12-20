@@ -24,6 +24,8 @@ private:
     const std::shared_ptr<ParserConfig>     config;
 
     std::optional<unsigned int> optionalExpectedExpressionSignalWidth;
+    const std::string           expectedProgramMainModuleName = "main";
+    bool                        wasProgramEntryModuleDefined  = false;
 
     void createErrorAtTokenPosition(const antlr4::Token* token, const std::string& errorMessage);
     void createError(std::size_t line, std::size_t column, const std::string& errorMessage);

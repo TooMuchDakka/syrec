@@ -36,7 +36,7 @@ bool parser::areSyntacticallyEquivalent(const syrec::expression::ptr& referenceE
                     return isShiftExpressionAndEquivalentToReference(std::reinterpret_pointer_cast<syrec::ShiftExpression>(referenceExpr), exprToCheck);
             }
             subTypeOffset = 5;
-            [[fallthrough]];
+            //[[fallthrough]];
         }
         case 5: {
             break;   
