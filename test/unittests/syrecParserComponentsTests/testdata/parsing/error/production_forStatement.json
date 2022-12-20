@@ -144,8 +144,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "do expected"
+        "column": 27,
+        "message": "mismatched input 'then' expecting 'do'"
       }
     ]
   },

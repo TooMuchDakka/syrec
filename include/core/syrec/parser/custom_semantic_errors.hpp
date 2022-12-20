@@ -46,6 +46,7 @@ namespace parser {
     extern const std::string PreviousCallWasNotUncalled;
     extern const std::string UncallWithoutPreviousCall;
     extern const std::string MissmatchOfModuleIdentBetweenCalledAndUncall;
+    extern const std::string NumberOfParametersMissmatchBetweenCallAndUncall;
     extern const std::string NumberOfFormalParametersDoesNotMatchActual;
     extern const std::string MissingUncall;
 

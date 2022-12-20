@@ -25,8 +25,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 66,
-        "message": "\"(\" expected"
+        "column": 67,
+        "message": "mismatched input ',' expecting '('"
       }
     ]
   },
@@ -35,8 +35,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 71,
-        "message": "\")\" expected"
+        "column": 72,
+        "message": "extraneous input 'uncall' expecting {')', ','}"
       }
     ]
   },
@@ -45,12 +45,12 @@
     "errors": [
       {
         "line": 1,
-        "column": 59,
+        "column": 60,
         "message": "undeclared module 'test'"
       },
       {
         "line": 1,
-        "column": 77,
+        "column": 78,
         "message": "undeclared module 'test'"
       }
     ]
@@ -60,13 +60,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "call of 'toCall' expected 2 arguments but was called with 1"
-      },
-      {
-        "line": 1,
-        "column": 1,
-        "message": "call of 'toCall' expected 2 arguments but was called with 3"
+        "column": 60,
+        "message": "None of the overloads of the module 'toCall' accepts 1 parameters"
       }
     ]
   },
@@ -76,12 +71,7 @@
       {
         "line": 1,
         "column": 1,
-        "message": "call of 'toCall' expected 2 arguments but was called with 3"
-      },
-      {
-        "line": 1,
-        "column": 1,
-        "message": "call of 'toCall' expected 2 arguments but was called with 3"
+        "message": "None of the overloads of the module 'toCall' accepts 3 parameters"
       }
     ]
   },
@@ -90,8 +80,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "\",\" expected"
+        "column": 74,
+        "message": "mismatched input '<' expecting {')', ','}"
       }
     ]
   },
@@ -100,8 +90,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "\",\" expected"
+        "column": 95,
+        "message": "mismatched input '<' expecting {')', ','}"
       }
     ]
   },
@@ -130,7 +120,7 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
+        "column": 87,
         "message": "call and uncall of module 'toCall' defined different parameter values - Index: 0 - Formal: d | Actual: c"
       }
     ]
@@ -140,13 +130,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "uncall of 'toCall' expected 2 arguments but was called with 1"
+        "column": 87,
+        "message": "None of the overloads of the module 'toCall' accepts 1 parameters"
       },
       {
         "line": 1,
-        "column": 1,
-        "message": "previous call to method 'toCall' was not uncalled"
+        "column": 87,
+        "message": "Module 'toCall' was called with 2 parameters while the uncall was called with 1"
       }
     ]
   },
@@ -155,13 +145,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "uncall of 'toCall' expected 2 arguments but was called with 3"
+        "column": 87,
+        "message": "None of the overloads of the module 'toCall' accepts 3 parameters"
       },
       {
         "line": 1,
-        "column": 1,
-        "message": "previous call to method 'toCall' was not uncalled"
+        "column": 87,
+        "message": "Module 'toCall' was called with 2 parameters while the uncall was called with 3"
       }
     ]
   }

@@ -6,6 +6,7 @@
 #include "SyReCCustomVisitor.h"
 
 #include "core/syrec/parser/custom_semantic_errors.hpp"
+#include "core/syrec/parser/expression_comparer.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/infix_iterator.hpp"
 #include "core/syrec/parser/module_call_guess.hpp"
@@ -554,18 +555,18 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
     if (isCallOperation.has_value()) {
         if (!callStack.empty() && *isCallOperation) {
             // TODO: Error position
-            createErrorAtTokenPosition(context->start, PreviousCallWasNotUncalled);
+            createErrorAtTokenPosition(context->moduleIdent, PreviousCallWasNotUncalled);
             isValidCallOperationDefined = false;
         }
         else if (!(*isCallOperation)) {
             if (callStack.empty()) {
                 // TODO: Error position
-                createErrorAtTokenPosition(context->start, UncallWithoutPreviousCall);
+                createErrorAtTokenPosition(context->moduleIdent, UncallWithoutPreviousCall);
                 isValidCallOperationDefined = false;
             }
             else if (callStack.top().first != moduleIdent) {
                 // TODO: Error position
-                createErrorAtTokenPosition(context->identToken, fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, callStack.top().first, moduleIdent));
+                createErrorAtTokenPosition(context->moduleIdent, fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, callStack.top().first, moduleIdent));
                 isValidCallOperationDefined = false;
             }
         }
@@ -574,7 +575,7 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
     const auto potentialModulesToCall = ModuleCallGuess::fetchPotentialMatchesForMethodIdent(currentSymbolTableScope, moduleIdent);
     if (!potentialModulesToCall.has_value()) {
         // TODO: Error position
-        createErrorAtTokenPosition(context->identToken, fmt::format(UndeclaredIdent, moduleIdent));
+        createErrorAtTokenPosition(context->moduleIdent, fmt::format(UndeclaredIdent, moduleIdent));
         isValidCallOperationDefined = false;
     }
 
@@ -610,20 +611,27 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
     if (!(*potentialModulesToCall)->hasSomeMatches()) {
         // TODO: Non of the potential calls acceps x arguments
         // TODO: Error position
-        createErrorAtTokenPosition(context->stop, fmt::format(NoMatchForGuessWithNActualParameters, numActualCalleeArguments));
+        createErrorAtTokenPosition(context->moduleIdent, fmt::format(NoMatchForGuessWithNActualParameters, moduleIdent, numActualCalleeArguments));
         return 0;
     }
 
     if ((*potentialModulesToCall)->getMatchesForGuess().size() > 1) {
         // TODO: GEN_ERROR Ambigous call, more than one match for given arguments
         // TODO: Error position
-        createErrorAtTokenPosition(context->identToken, fmt::format(AmbigousCall, moduleIdent));
+        createErrorAtTokenPosition(context->moduleIdent, fmt::format(AmbigousCall, moduleIdent));
         return 0;
     }
 
     // TODO: Refactoring in own function
     if (!callStack.empty()) {
         const auto argumentsOfPreviousCallOperation = callStack.top().second;
+        bool       parametersBetweenCallAndUncalledMatched = true;
+
+        if (calleeArguments.size() != argumentsOfPreviousCallOperation.size()) {
+            createErrorAtTokenPosition(context->moduleIdent, fmt::format(NumberOfParametersMissmatchBetweenCallAndUncall, moduleIdent, argumentsOfPreviousCallOperation.size(), calleeArguments.size()));
+            parametersBetweenCallAndUncalledMatched = false;
+        }
+
         std::vector<std::string> missmatchedParameterValues;
         for (std::size_t parameterIdx = 0; parameterIdx < numActualCalleeArguments; ++parameterIdx) {
             if (calleeArguments.at(parameterIdx) != argumentsOfPreviousCallOperation.at(parameterIdx)) {
@@ -636,7 +644,11 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
             std::copy(missmatchedParameterValues.cbegin(), missmatchedParameterValues.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, ","));
     
             // TODO: Error position
-            createErrorAtTokenPosition(context->identToken, fmt::format(CallAndUncallArgumentsMissmatch, moduleIdent, errorsConcatinatedBuffer.str()));
+            createErrorAtTokenPosition(context->moduleIdent, fmt::format(CallAndUncallArgumentsMissmatch, moduleIdent, errorsConcatinatedBuffer.str()));
+            parametersBetweenCallAndUncalledMatched = false;
+        }
+
+        if (!parametersBetweenCallAndUncalledMatched) {
             return 0;
         }
     }
@@ -750,9 +762,14 @@ std::any SyReCCustomVisitor::visitIfStatement(SyReCParser::IfStatementContext* c
     if (!guardExpression.has_value() 
         || (!trueBranchStmts.has_value() || (*trueBranchStmts).empty()) 
         || (!falseBranchStmts.has_value() || (*falseBranchStmts).empty()) 
-        || !closingGuardExpression.has_value()
-        || !areExpressionsEqual(*guardExpression, *closingGuardExpression)) {
+        || !closingGuardExpression.has_value()) {
         return 0;        
+    }
+
+    // TODO: Error position
+    if (!areExpressionsEqual(*guardExpression, *closingGuardExpression)) {
+        createErrorAtTokenPosition(context->getStart(), IfAndFiConditionMissmatch);
+        return 0;
     }
 
     const auto ifStatement = std::make_shared<syrec::IfStatement>();
@@ -1191,6 +1208,7 @@ void SyReCCustomVisitor::addStatementToOpenContainer(const syrec::Statement::ptr
 [[nodiscard]] bool SyReCCustomVisitor::areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr) {
     const bool isFirstExprConstant = firstExpr->isConstantValue();
     const bool isOtherExprConstant = otherExpr->isConstantValue();
+
     if (isFirstExprConstant ^ isOtherExprConstant) {
         return false;
     }
@@ -1198,7 +1216,6 @@ void SyReCCustomVisitor::addStatementToOpenContainer(const syrec::Statement::ptr
     if (isFirstExprConstant && isOtherExprConstant) {
         return *firstExpr->getAsConstant() == *otherExpr->getAsConstant();
     }
-
-    // TODO: Add comparison of expressions
-    return true;
+    
+    return areSyntacticallyEquivalent(firstExpr->getAsExpression().value(), otherExpr->getAsExpression().value());
 }
