@@ -163,7 +163,6 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_module", "invalidStatementInvalidatesModule"),
                              std::make_pair("production_module", "emptyStatementBody"),
                              std::make_pair("production_module", "duplicateModules"),
-                             std::make_pair("production_module", "missingMainModule"),
 
                              /* StatementList production */
                              std::make_pair("production_statementList", "missingStatementDelimiter"),

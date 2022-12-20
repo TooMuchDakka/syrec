@@ -4,8 +4,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 14,
-        "message": "skip expected"
+        "column": 13,
+        "message": "mismatched input '<EOF>' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       }
     ]
   }

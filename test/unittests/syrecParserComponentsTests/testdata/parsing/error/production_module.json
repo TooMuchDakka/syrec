@@ -7,11 +7,6 @@
         "line": 1,
         "column": 0,
         "message": "mismatched input 'main' expecting 'module'"
-      },
-      {
-        "line": 0,
-        "column": 0,
-        "message": "Entry point for program, a module named 'main', was not found"
       }
     ]
   },
@@ -32,11 +27,6 @@
         "line": 1,
         "column": 10,
         "message": "mismatched input ',' expecting '('"
-      },
-      {
-        "line": 0,
-        "column": 0,
-        "message": "Entry point for program, a module named 'main', was not found"
       }
     ]
   },
@@ -400,16 +390,6 @@
         "line": 1,
         "column": 52,
         "message": "module 'main' was already declared"
-      }
-    ]
-  },
-  "missingMainModule": {
-    "circuit": "module test() wire test(15) wire x, alpha[2] skip",
-    "errors": [
-      {
-        "line": 0,
-        "column": 0,
-        "message": "Entry point for program, a module named 'main', was not found"
       }
     ]
   }

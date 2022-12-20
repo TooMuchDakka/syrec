@@ -74,4 +74,3 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     std::copy(customVisitor->errors.cbegin(), customVisitor->errors.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, "\n"));
     return errorsConcatinatedBuffer.str();
 }
-

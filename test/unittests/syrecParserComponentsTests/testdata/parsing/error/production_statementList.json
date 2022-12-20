@@ -5,7 +5,7 @@
       {
         "line": 1,
         "column": 36,
-        "message": "; expected"
+        "message": "extraneous input 'c' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -15,7 +15,7 @@
       {
         "line": 1,
         "column": 50,
-        "message": "TODO:"
+        "message": "mismatched input '<EOF>' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', IDENT}"
       }
     ]
   }

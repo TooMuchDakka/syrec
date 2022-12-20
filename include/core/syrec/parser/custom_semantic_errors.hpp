@@ -61,8 +61,6 @@ namespace parser {
 
     /* Internal parser errors */
     extern const std::string NoMappingForLoopVariable;
-
-    extern const std::string MissingEntryModule;
 }
 
 #endif

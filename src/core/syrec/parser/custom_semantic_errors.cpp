@@ -59,6 +59,4 @@ namespace parser {
 
     /* Internal parser errors */
     extern const std::string NoMappingForLoopVariable = "no mapping of loop variable {0:s} to a value was found";
-
-    extern const std::string MissingEntryModule = "Entry point for program, a module named '{0:s}', was not found";
 } // namespace parser

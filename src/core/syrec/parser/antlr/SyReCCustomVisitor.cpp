@@ -36,20 +36,14 @@ std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) 
         }
     }
 
-    // TODO: Error position (i.e. would line 1:1 or -1:-1 be more appropriate ?
-    if (!wasProgramEntryModuleDefined) {
-        createError(0, 0, fmt::format(MissingEntryModule, expectedProgramMainModuleName));
-    }
-
     return errors.empty();
 }
 
 std::any SyReCCustomVisitor::visitModule(SyReCParser::ModuleContext* context) {
     SymbolTable::openScope(this->currentSymbolTableScope);
+    
     // TODO: Wrap into optional, since token could be null if no alternative rule is found and the moduleProduction is choosen instead (as the first alternative from the list of possible ones if nothing else matches)
     const std::string moduleIdent = context->IDENT()->getText();
-
-    wasProgramEntryModuleDefined |= moduleIdent == expectedProgramMainModuleName;
     syrec::Module::ptr                  module      = std::make_shared<syrec::Module>(moduleIdent);
 
     const auto declaredParameters = tryVisitAndConvertProductionReturnValue<syrec::Variable::vec>(context->parameterList());
