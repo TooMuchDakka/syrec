@@ -4,8 +4,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "invalid unary operation"
+        "column": 24,
+        "message": "extraneous input '+' expecting {'(', '!', '~', '$', '#', IDENT, INT}"
       }
     ]
   }

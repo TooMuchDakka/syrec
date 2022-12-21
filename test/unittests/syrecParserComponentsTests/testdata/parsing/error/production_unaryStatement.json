@@ -4,8 +4,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 19,
-        "message": "invalid unary operand"
+        "column": 18,
+        "message": "mismatched input ':' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       }
     ]
   },
@@ -14,8 +14,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 20,
-        "message": "= expected"
+        "column": 18,
+        "message": "extraneous input ':' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
+      },
+      {
+        "line": 1,
+        "column": 21,
+        "message": "no viable alternative at input 'a'"
       }
     ]
   },
@@ -24,8 +29,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 21,
-        "message": "= expected"
+        "column": 18,
+        "message": "mismatched input '+' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       }
     ]
   },
@@ -40,27 +45,83 @@
     ]
   },
   "invalidAssignmentToInParameterBit": {
-
+    "circuit": "module main(in a(16)) ++= a.1",
+    "errors": [
+      {
+        "line": 1,
+        "column": 26,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   },
   "invalidAssignmentToInParameterBitRange": {
-
+    "circuit": "module main(in a(16)) ++= a.1:15",
+    "errors": [
+      {
+        "line": 1,
+        "column": 26,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   },
   "invalidAssignmentToInParameterDimension": {
-
+    "circuit": "module main(in a[2]) ++= a[1]",
+    "errors": [
+      {
+        "line": 1,
+        "column": 25,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   },
   "invalidAssignmentToInParameterDimensionBit": {
-
+    "circuit": "module main(in a[2](16)) ++= a[1].8",
+    "errors": [
+      {
+        "line": 1,
+        "column": 29,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   },
   "invalidAssignmentToInParameterDimensionBitRange": {
-
+    "circuit": "module main(in a[2](16)) ++= a[1].8:15",
+    "errors": [
+      {
+        "line": 1,
+        "column": 29,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   },
   "invalidAssignmentToInParameterNestedDimension": {
-
+    "circuit": "module main(in a[2][4]) ++= a[1][3]",
+    "errors": [
+      {
+        "line": 1,
+        "column": 28,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   },
   "invalidAssignmentToInParameterNestedDimensionBit": {
-
+    "circuit": "module main(in a[2][4](16)) ++= a[1][3].8",
+    "errors": [
+      {
+        "line": 1,
+        "column": 32,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   },
   "invalidAssignmentToInParameterNestedDimensionBitRange": {
-
+    "circuit": "module main(in a[2][4](16)) ++= a[1][3].8:15",
+    "errors": [
+      {
+        "line": 1,
+        "column": 32,
+        "message": "variable 'a' is readonly"
+      }
+    ]
   }
 }

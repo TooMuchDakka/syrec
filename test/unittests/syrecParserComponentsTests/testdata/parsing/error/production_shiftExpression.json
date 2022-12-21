@@ -4,8 +4,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "number expected"
+        "column": 30,
+        "message": "mismatched input '!' expecting {'(', '$', '#', INT}"
       }
     ]
   },

@@ -241,11 +241,10 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_assignStatement", "invalidAssignmentOperatorPostfix"),
                              std::make_pair("production_assignStatement", "invalidAssignmentVariableIsUsedInRhs"),
 
-                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithTooLargeBitRange"),
-                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalWithLessDimension"),
-                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalWithTooManyDimension"),
-                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalWithMissmatchForDimensionValue"),
-                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalWithLargerSignalwidth"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalHavingMoreOverallDimensions"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalHavingLessOverallDimensions"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalHavingSmallerValueForSpecificDimension"),
+                             std::make_pair("production_assignStatement", "invalidAssignmentOfLhsSignalWithSignalHavingLargerValueForSpecificDimension"),
 
                              /* Do all of these cases need to be checked ? */
                              std::make_pair("production_assignStatement", "invalidAssignmentToInParameterBit"),
