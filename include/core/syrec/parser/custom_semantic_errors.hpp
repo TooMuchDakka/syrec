@@ -29,7 +29,8 @@ namespace parser {
 
     extern const std::string FullSignalStructureMissmatch;
 
-    extern const std::string InvalidLoopVariableValueRange;
+    extern const std::string InvalidLoopVariableValueRangeWithPositiveStepsize;
+    extern const std::string InvalidLoopVariableValueRangeWithNegativeStepsize;
 
     extern const std::string InvalidSwapSignalWidthMissmatch;
     extern const std::string InvalidSwapNumDimensionsMissmatch;

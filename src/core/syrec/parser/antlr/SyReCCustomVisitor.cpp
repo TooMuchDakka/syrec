@@ -668,19 +668,27 @@ std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext*
         if (currentSymbolTableScope->contains(*loopVariableIdent)) {
             createErrorAtTokenPosition(context->loopVariableDefinition()->variableIdent, fmt::format(DuplicateDeclarationOfIdent, *loopVariableIdent));
             loopHeaderValid = false;
-        }
-        else {
+        } else {
             SymbolTable::openScope(currentSymbolTableScope);
             currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(*loopVariableIdent));
         }
     }
 
-    const bool       wasStartValueExplicitlyDefined = context->startValue != nullptr;
-    const auto rangeStartValue = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->startValue);
-    loopHeaderValid &= wasStartValueExplicitlyDefined ? rangeStartValue.has_value() : true;
+    const bool wasStartValueExplicitlyDefined = context->startValue != nullptr;
+    std::optional<syrec::Number::ptr> rangeStartValue;
+    if (wasStartValueExplicitlyDefined) {
+        rangeStartValue = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->startValue);
+        loopHeaderValid &= rangeStartValue.has_value();
+    }
+    if (!rangeStartValue.has_value()) {
+        rangeStartValue.emplace(std::make_shared<syrec::Number>(0));
+    }
 
-    const auto rangeEndValue = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->endValue);
+    std::optional<syrec::Number::ptr> rangeEndValue = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->endValue);
     loopHeaderValid &= rangeEndValue.has_value();
+    if (!rangeEndValue.has_value()) {
+        rangeEndValue.emplace(std::make_shared<syrec::Number>(0));
+    }
 
     const bool       wasStepSizeExplicitlyDefined = context->loopStepsizeDefinition() != nullptr;
     std::optional <syrec::Number::ptr> stepSize;
@@ -690,27 +698,39 @@ std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext*
     } else {
         stepSize.emplace(std::make_shared<syrec::Number>(1));
     }
-    
+
     if (loopHeaderValid) {
-        const unsigned int iterationRangeEndValueEvaluated   = (*rangeEndValue)->evaluate(loopVariableMappingLookup);
-        const unsigned int iterationRangeStartValueEvaluated = wasStartValueExplicitlyDefined ? (*rangeStartValue)->evaluate(loopVariableMappingLookup) : iterationRangeEndValueEvaluated;
         const unsigned int stepSizeEvaluated                 = (*stepSize)->evaluate(loopVariableMappingLookup);
         const bool         negativeStepSizeDefined           = wasStepSizeExplicitlyDefined ? stepSizeEvaluated < 0 : false;
 
-        // TODO: Error generation if semantic range check fails
+        unsigned int       iterationRangeStartValueEvaluated;
+        unsigned int       iterationRangeEndValueEvaluated;
+
+        if (wasStartValueExplicitlyDefined) {
+            iterationRangeStartValueEvaluated = (*rangeStartValue)->evaluate(loopVariableMappingLookup);
+            iterationRangeEndValueEvaluated   = (*rangeEndValue)->evaluate(loopVariableMappingLookup);
+        }
+        else {
+            iterationRangeStartValueEvaluated = (*rangeEndValue)->evaluate(loopVariableMappingLookup);
+            iterationRangeEndValueEvaluated   = (*rangeStartValue)->evaluate(loopVariableMappingLookup);
+        }
+
         unsigned int numIterations = 0;
-        if ((negativeStepSizeDefined && iterationRangeStartValueEvaluated < iterationRangeEndValueEvaluated) || (!negativeStepSizeDefined && iterationRangeStartValueEvaluated > iterationRangeEndValueEvaluated) || stepSizeEvaluated == 0) {
-            // TODO: Error position
-            createErrorAtTokenPosition(wasStartValueExplicitlyDefined ? context->startValue->start : context->endValue->start, "TODO: Error generation if semantic range check fails");
+        if (negativeStepSizeDefined && iterationRangeStartValueEvaluated < iterationRangeEndValueEvaluated) {
+            createErrorAtTokenPosition(wasStartValueExplicitlyDefined ? context->startValue->start : context->endValue->start, fmt::format(InvalidLoopVariableValueRangeWithNegativeStepsize, iterationRangeStartValueEvaluated, iterationRangeEndValueEvaluated, stepSizeEvaluated));
             loopHeaderValid = false;
-        } else {
+        }
+        else if (!negativeStepSizeDefined && iterationRangeStartValueEvaluated > iterationRangeEndValueEvaluated) {
+            createErrorAtTokenPosition(wasStartValueExplicitlyDefined ? context->startValue->start : context->endValue->start, fmt::format(InvalidLoopVariableValueRangeWithPositiveStepsize, iterationRangeStartValueEvaluated, iterationRangeEndValueEvaluated, stepSizeEvaluated));
+            loopHeaderValid = false;
+        }
+        else if (stepSizeEvaluated != 0) {
             numIterations = (negativeStepSizeDefined ? (iterationRangeStartValueEvaluated - iterationRangeEndValueEvaluated) : (iterationRangeEndValueEvaluated - iterationRangeStartValueEvaluated)) + 1;
             numIterations /= stepSizeEvaluated;
         }
     }
-
-    // TODO: Is check context->statementList() == nullptr a required check
-    // It seems like with syntax error in the components of the loop header the statementList will be null
+    
+    // TODO: It seems like with syntax error in the components of the loop header the statementList will be null
     const auto loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
     const bool       isValidLoopBody = loopBody.has_value() && !(*loopBody).empty();
 

@@ -1,11 +1,11 @@
 {
   "invalidForIdent": {
-    "circuit": "",
+    "circuit": "module main() test $a = 0 do skip rof",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ""
+        "column": 19,
+        "message": "no viable alternative at input 'test $'"
       }
     ]
   },
@@ -14,8 +14,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "$ expected"
+        "column": 18,
+        "message": "mismatched input 'a' expecting {'(', '$', '#', INT}"
       }
     ]
   },
@@ -24,8 +24,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "$ expected"
+        "column": 18,
+        "message": "mismatched input '%' expecting {'(', '$', '#', INT}"
       }
     ]
   },
@@ -34,8 +34,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "= expected"
+        "column": 21,
+        "message": "no viable alternative at input '$a +'"
       }
     ]
   },
@@ -44,8 +44,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "= expected"
+        "column": 21,
+        "message": "no viable alternative at input '$a 2'"
       }
     ]
   },
@@ -64,8 +64,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "to expected"
+        "column": 25,
+        "message": "missing 'to' at '2'"
       }
     ]
   },
@@ -74,8 +74,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "step expected"
+        "column": 20,
+        "message": "no viable alternative at input '2 then'"
       }
     ]
   },
@@ -84,18 +84,18 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "step expected"
+        "column": 20,
+        "message": "no viable alternative at input '2 1'"
       }
     ]
   },
   "invalidNegativeStepsizeIdent": {
-    "circuit": "module main() for 2 step ~1 do skip rof",
+    "circuit": "module main() for $i = 0 to 2 step ~1 do skip rof",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "- expected"
+        "column": 35,
+        "message": "extraneous input '~' expecting {'(', '-', '$', '#', INT}"
       }
     ]
   },
@@ -104,8 +104,28 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "Invalid loop variable value range for given values, start: 2, end: 0, stepsize: 1"
+        "column": 23,
+        "message": "invalid loop variable value range, start value cannot be larger than the end (start: 2, end: 0, stepsize: 1)"
+      }
+    ]
+  },
+  "startValueLargerThanEndWithPositiveStepsizeNoEndValueDefined": {
+    "circuit": "module main() for 2 step 1 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 18,
+        "message": "invalid loop variable value range, start value cannot be larger than the end (start: 2, end: 0, stepsize: 1)"
+      }
+    ]
+  },
+  "startValueLargerThanEndWithPositiveStepsizeThatWasNotDefined": {
+    "circuit": "module main() for $i = 2 to 0 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 23,
+        "message": "invalid loop variable value range, start value cannot be larger than the end (start: 2, end: 0, stepsize: 1)"
       }
     ]
   },
@@ -114,57 +134,47 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "Invalid loop variable value range for given values, start: 0, end: 5, stepsize: -1"
-      }
-    ]
-  },
-  "negativeStepSizeWithOnlyEndValueDefined": {
-    "circuit": "module main() for 5 step -1 do skip rof",
-    "errors": [
-      {
-        "line": 1,
-        "column": 1,
-        "message": "Invalid loop variable value range for given values, start: 0, end: 5, stepsize: -1"
+        "column": 18,
+        "message": "invalid loop variable value range, end value cannot be larger than the start (start: 0, end: 5, stepsize: -1)"
       }
     ]
   },
   "missingLoopHeaderPostfixIdent": {
-    "circuit": "module main() for 2 step 1 skip rof",
+    "circuit": "module main() for $i = 0 to 2 step 1 skip rof",
     "errors": [
       {
         "line": 1,
-        "column": 27,
+        "column": 37,
         "message": "missing 'do' at 'skip'"
       }
     ]
   },
   "invalidLoopHeaderPostfixIdent": {
-    "circuit": "module main() for 2 step 1 then skip rof",
+    "circuit": "module main() for $i = 0 to 5 step 1 then skip rof",
     "errors": [
       {
         "line": 1,
-        "column": 27,
+        "column": 37,
         "message": "mismatched input 'then' expecting 'do'"
       }
     ]
   },
   "missingRofEndDelimiter": {
-    "circuit": "module main() for 2 step 1 do skip",
+    "circuit": "module main() for $i = 0 to 2 step 1 do skip",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "rof expected"
+        "column": 44,
+        "message": "missing 'rof' at '<EOF>'"
       }
     ]
   },
   "invalidRofEndDelimiter": {
-    "circuit": "module main() for 2 step 1 do skip then",
+    "circuit": "module main() for $i = 0 to 2 step 1 do skip then",
     "errors": [
       {
         "line": 1,
-        "column": 35,
+        "column": 45,
         "message": "mismatched input 'then' expecting 'rof'"
       }
     ]
