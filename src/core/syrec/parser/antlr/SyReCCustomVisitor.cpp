@@ -17,10 +17,10 @@ using namespace parser;
 
 // https://stackoverflow.com/questions/60420005/programmatically-access-antlr-grammar-rule-string-literals-outside-of-a-parse-co
 
+
 // TODO: Currently loop variables are not supported as arguments
 // TODO: Currently the parser is not able to correctly parse assign statements such as <a> + = (...) since the operand will be split into two tokens and the assign statement production is not "found" during the parse tree creation
 // TODO: Refactor passing of position where error should be created in createError() and semantic checks (i.e. pass exact position as line, col and potentially an ident instead of just passing in the token)
-
 std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) {
     SymbolTable::openScope(currentSymbolTableScope);
     for (const auto& module : context->module()) {
@@ -41,7 +41,8 @@ std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) 
 
 std::any SyReCCustomVisitor::visitModule(SyReCParser::ModuleContext* context) {
     SymbolTable::openScope(this->currentSymbolTableScope);
-    
+    moduleCallNestingLevel++;
+
     // TODO: Wrap into optional, since token could be null if no alternative rule is found and the moduleProduction is choosen instead (as the first alternative from the list of possible ones if nothing else matches)
     const std::string moduleIdent = context->IDENT()->getText();
     syrec::Module::ptr                  module      = std::make_shared<syrec::Module>(moduleIdent);
@@ -74,6 +75,7 @@ std::any SyReCCustomVisitor::visitModule(SyReCParser::ModuleContext* context) {
     }
     
     SymbolTable::closeScope(this->currentSymbolTableScope);
+    moduleCallNestingLevel--;
     return isDeclaredModuleValid ? std::make_optional(module) : std::nullopt;
 }
 
@@ -522,11 +524,11 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
 /*
  * Statment production visitors
  */
-// TODO: Store number of calls done in defined statements and check if any remained open (i.e. if any uncall is missing)
 std::any SyReCCustomVisitor::visitStatementList(SyReCParser::StatementListContext* context) {
     // TODO: If custom casting utility function supports polymorphism as described in the description of the function, this stack is no longer needed
     statementListContainerStack.push({});
-    //std::vector<syrec::Statement::ptr> validUserDefinedStatements;
+    moduleCallNestingLevel++;
+    
     for (const auto& userDefinedStatement : context->stmts) {
         if (userDefinedStatement != nullptr) {
             visit(userDefinedStatement);   
@@ -543,129 +545,117 @@ std::any SyReCCustomVisitor::visitStatementList(SyReCParser::StatementListContex
     const auto validUserDefinedStatements = statementListContainerStack.top();
     statementListContainerStack.pop();
 
+    // Remove all uncalled modules from the call stack since there is no other possibility after this statement block to uncall them
+    for (const auto& notUncalledModule : moduleCallStack->popAllForCurrentNestingLevel(moduleCallNestingLevel)) {
+        std::ostringstream bufferForStringifiedParametersOfNotUncalledModule;
+        std::copy(notUncalledModule->calleeArguments.cbegin(), notUncalledModule->calleeArguments.cend(), infix_ostream_iterator<std::string>(bufferForStringifiedParametersOfNotUncalledModule, ","));
+
+        const size_t moduleIdentLinePosition = notUncalledModule->moduleIdentPosition.first;
+        const size_t moduleIdentColumnPosition = notUncalledModule->moduleIdentPosition.second;
+        createError(moduleIdentLinePosition, moduleIdentColumnPosition, fmt::format(MissingUncall, notUncalledModule->moduleIdent, bufferForStringifiedParametersOfNotUncalledModule.str()));
+    }
+    moduleCallNestingLevel--;
+
     // Wrapping into std::optional is only needed because helper function to cast return type of production required this wrapper
     return validUserDefinedStatements.empty() ? std::nullopt : std::make_optional(validUserDefinedStatements); 
 }
 
-// TODO: Add tests for ambiguity, etc.
 std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContext* context) {
-    bool isValidCallOperationDefined = context->OP_CALL() != nullptr || context->OP_UNCALL() != nullptr;
-    const std::optional<bool> isCallOperation                    = isValidCallOperationDefined ? std::make_optional(context->OP_CALL() != nullptr) : std::nullopt;
-    const auto                moduleIdent                 = context->moduleIdent != nullptr ? context->moduleIdent->getText() : "<undefined>";
+    bool                      isValidCallOperationDefined = context->OP_CALL() != nullptr || context->OP_UNCALL() != nullptr;
+    const std::optional<bool> isCallOperation             = isValidCallOperationDefined ? std::make_optional(context->OP_CALL() != nullptr) : std::nullopt;
+
+    std::optional<std::string> moduleIdent;
+    bool existsModuleForIdent = false;
+    std::optional<ModuleCallGuess::ptr> potentialModulesToCall;
+    std::pair<size_t, size_t> moduleIdentPosition;
+
+    if (context->moduleIdent != nullptr) {
+        moduleIdent.emplace(context->moduleIdent->getText());
+        moduleIdentPosition = std::make_pair<size_t, size_t>(context->moduleIdent->getLine(), context->moduleIdent->getCharPositionInLine());
+        existsModuleForIdent   = checkIfSignalWasDeclaredOrLogError(context->moduleIdent);
+        if (existsModuleForIdent) {
+            potentialModulesToCall = ModuleCallGuess::fetchPotentialMatchesForMethodIdent(currentSymbolTableScope, *moduleIdent);            
+        }
+        isValidCallOperationDefined &= existsModuleForIdent;
+    }
+    else {
+        moduleIdentPosition = std::make_pair<size_t, size_t>(context->start->getLine(), context->start->getCharPositionInLine());
+        isValidCallOperationDefined = false;
+    }
     
-    // TODO: Check for previous uncalls, etc.
-    // TODO: Refactoring
     if (isCallOperation.has_value()) {
-        if (!callStack.empty() && *isCallOperation) {
-            // TODO: Error position
-            createErrorAtTokenPosition(context->moduleIdent, PreviousCallWasNotUncalled);
-            isValidCallOperationDefined = false;
-        }
-        else if (!(*isCallOperation)) {
-            if (callStack.empty()) {
-                // TODO: Error position
-                createErrorAtTokenPosition(context->moduleIdent, UncallWithoutPreviousCall);
-                isValidCallOperationDefined = false;
-            }
-            else if (callStack.top().first != moduleIdent) {
-                // TODO: Error position
-                createErrorAtTokenPosition(context->moduleIdent, fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, callStack.top().first, moduleIdent));
-                isValidCallOperationDefined = false;
-            }
-        }
+        isValidCallOperationDefined &= areSemanticChecksForCallOrUncallDependingOnNameValid(*isCallOperation, moduleIdentPosition, moduleIdent);    
     }
 
-    const auto potentialModulesToCall = ModuleCallGuess::fetchPotentialMatchesForMethodIdent(currentSymbolTableScope, moduleIdent);
-    if (!potentialModulesToCall.has_value()) {
-        // TODO: Error position
-        createErrorAtTokenPosition(context->moduleIdent, fmt::format(UndeclaredIdent, moduleIdent));
+    std::vector<std::string> calleeArguments;
+    for (const auto& userDefinedCallArgument : context->calleeArguments) {
+        if (userDefinedCallArgument == nullptr) {
+            continue;
+        }
+
+        calleeArguments.emplace_back(userDefinedCallArgument->getText());
+        if (checkIfSignalWasDeclaredOrLogError(userDefinedCallArgument) && potentialModulesToCall.has_value()) {
+            const auto symTabEntryForCalleeArgument = *currentSymbolTableScope->getVariable(userDefinedCallArgument->getText());
+            if (std::holds_alternative<syrec::Variable::ptr>(symTabEntryForCalleeArgument)) {
+                (*potentialModulesToCall)->refineGuessWithNextParameter(std::get<syrec::Variable::ptr>(symTabEntryForCalleeArgument));
+                continue;
+            }
+        }
         isValidCallOperationDefined = false;
     }
 
-    std::size_t              numActualCalleeArguments = 0;
-    std::vector<std::string> calleeArguments;
-    for (const auto& userDefinedCallArgument : context->calleeArguments) {
-        if (userDefinedCallArgument != nullptr && checkIfSignalWasDeclaredOrLogError(userDefinedCallArgument)) {
-            const auto symTabEntryForCalleeArgument = *currentSymbolTableScope->getVariable(userDefinedCallArgument->getText());
-            isValidCallOperationDefined &= std::holds_alternative<syrec::Variable::ptr>(symTabEntryForCalleeArgument);
-            if (isValidCallOperationDefined) {
-                (*potentialModulesToCall)->refineGuessWithNextParameter(std::get<syrec::Variable::ptr>(symTabEntryForCalleeArgument));
-                calleeArguments.emplace_back(userDefinedCallArgument->getText());
-            }
-        }
-        else {
-            isValidCallOperationDefined = false;
-        }
-
-        // TODO: Handling / Error creation in else branches
-        numActualCalleeArguments++;
-    }
-
-    // TODO: What should happen with previously pushed entries on the call stack if an invalid uncall statement is defined ?
-    if (!isValidCallOperationDefined) {
+    if (!moduleIdent.has_value()) {
         return 0;
     }
 
-    // TODO: Invalid calls should still be pushed/pop from the callstack ?
-    // I.e. call test(c); uncall test(c,d) [Without pushing the first call, the uncall does not know which call is reference]
+    if (isCallOperation.has_value()) {
+        if (*isCallOperation) {
+            moduleCallStack->addNewEntry(std::make_shared<ModuleCallStack::CallStackEntry>(*moduleIdent, calleeArguments, moduleCallNestingLevel, moduleIdentPosition));   
+        }
+        else if (
+            !*isCallOperation 
+            && moduleCallStack->containsAnyUncalledModulesForNestingLevel(moduleCallNestingLevel) 
+            && (*moduleCallStack->getLastCalledModuleForNestingLevel(moduleCallNestingLevel))->moduleIdent == *moduleIdent) {
+            if (!doArgumentsBetweenCallAndUncallMatch(moduleIdentPosition, *moduleIdent, calleeArguments)) {
+                isValidCallOperationDefined = false;
+            }
+            // Since the idents of the modules in the last call and the current uncall statements matched, we can safely pop the top entry from the call stack
+            moduleCallStack->removeLastCalledModule();
+        }
+    }
 
-    // TODO: Checks for correct number of arguments
-    (*potentialModulesToCall)->discardGuessesWithMoreThanNParameters(numActualCalleeArguments);
+    // If the no module was declared for the given ident we do not want to create errors related to a missmatch between the formal and actual parameters since the former do not exist
+    if (!existsModuleForIdent) {
+        return 0;
+    }
+    
+    if (!potentialModulesToCall.has_value()) {
+        createErrorAtTokenPosition(context->moduleIdent, fmt::format(NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size()));
+        return 0;
+    }
+
+    (*potentialModulesToCall)->discardGuessesWithMoreThanNParameters(calleeArguments.size());
     if (!(*potentialModulesToCall)->hasSomeMatches()) {
-        // TODO: Non of the potential calls acceps x arguments
-        // TODO: Error position
-        createErrorAtTokenPosition(context->moduleIdent, fmt::format(NoMatchForGuessWithNActualParameters, moduleIdent, numActualCalleeArguments));
+        createErrorAtTokenPosition(context->moduleIdent, fmt::format(NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size()));
         return 0;
     }
 
     if ((*potentialModulesToCall)->getMatchesForGuess().size() > 1) {
         // TODO: GEN_ERROR Ambigous call, more than one match for given arguments
         // TODO: Error position
-        createErrorAtTokenPosition(context->moduleIdent, fmt::format(AmbigousCall, moduleIdent));
+        createErrorAtTokenPosition(context->moduleIdent, fmt::format(AmbigousCall, *moduleIdent));
         return 0;
     }
 
-    // TODO: Refactoring in own function
-    if (!callStack.empty()) {
-        const auto argumentsOfPreviousCallOperation = callStack.top().second;
-        bool       parametersBetweenCallAndUncalledMatched = true;
-
-        if (calleeArguments.size() != argumentsOfPreviousCallOperation.size()) {
-            createErrorAtTokenPosition(context->moduleIdent, fmt::format(NumberOfParametersMissmatchBetweenCallAndUncall, moduleIdent, argumentsOfPreviousCallOperation.size(), calleeArguments.size()));
-            parametersBetweenCallAndUncalledMatched = false;
-        }
-
-        std::vector<std::string> missmatchedParameterValues;
-        for (std::size_t parameterIdx = 0; parameterIdx < numActualCalleeArguments; ++parameterIdx) {
-            if (calleeArguments.at(parameterIdx) != argumentsOfPreviousCallOperation.at(parameterIdx)) {
-                missmatchedParameterValues.emplace_back(fmt::format(ParameterValueMissmatch, parameterIdx, calleeArguments.at(parameterIdx), argumentsOfPreviousCallOperation.at(parameterIdx)));
-            }
-        }
-
-        if (!missmatchedParameterValues.empty()) {
-            std::ostringstream errorsConcatinatedBuffer;
-            std::copy(missmatchedParameterValues.cbegin(), missmatchedParameterValues.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, ","));
-    
-            // TODO: Error position
-            createErrorAtTokenPosition(context->moduleIdent, fmt::format(CallAndUncallArgumentsMissmatch, moduleIdent, errorsConcatinatedBuffer.str()));
-            parametersBetweenCallAndUncalledMatched = false;
-        }
-
-        if (!parametersBetweenCallAndUncalledMatched) {
-            return 0;
-        }
+    if (!isValidCallOperationDefined) {
+        return 0;
     }
 
     const auto moduleMatchingCalleeArguments = (*potentialModulesToCall)->getMatchesForGuess().at(0);
-    if (isValidCallOperationDefined) {
-        if (*isCallOperation) {
-            addStatementToOpenContainer(std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments));
-            callStack.emplace(moduleIdent, calleeArguments);
-        }
-        else {
-            addStatementToOpenContainer(std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments));
-            callStack.pop();
-        }
+    if (*isCallOperation) {
+        addStatementToOpenContainer(std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments));
+    } else {
+        addStatementToOpenContainer(std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments));
     }
 
     return 0;
@@ -752,7 +742,6 @@ std::any SyReCCustomVisitor::visitLoopStepsizeDefinition(SyReCParser::LoopStepsi
 std::any SyReCCustomVisitor::visitLoopVariableDefinition(SyReCParser::LoopVariableDefinitionContext* context) {
     return context->variableIdent != nullptr ? std::make_optional("$" + context->IDENT()->getText()) : std::nullopt;
 }
-
 
 // TODO: Empty branches (i.e. statement lists) do not throw an error, if the statment is not syntacically correct the statement list will be null
 std::any SyReCCustomVisitor::visitIfStatement(SyReCParser::IfStatementContext* context) {
@@ -1217,4 +1206,65 @@ void SyReCCustomVisitor::addStatementToOpenContainer(const syrec::Statement::ptr
     }
     
     return areSyntacticallyEquivalent(firstExpr->getAsExpression().value(), otherExpr->getAsExpression().value());
+}
+
+bool SyReCCustomVisitor::areSemanticChecksForCallOrUncallDependingOnNameValid(bool isCallOperation, const std::pair<size_t, size_t>& moduleIdentTokenPosition, const std::optional<std::string>& moduleIdent) {
+    if (isCallOperation) {
+        if (moduleCallStack->containsAnyUncalledModulesForNestingLevel(moduleCallNestingLevel)) {
+            createError(moduleIdentTokenPosition.first, moduleIdentTokenPosition.second, PreviousCallWasNotUncalled);
+            return false;
+        }
+    } else {
+        if (!moduleCallStack->containsAnyUncalledModulesForNestingLevel(moduleCallNestingLevel)) {
+            createError(moduleIdentTokenPosition.first, moduleIdentTokenPosition.second, UncallWithoutPreviousCall);
+            return false;
+        }
+
+        if (!moduleIdent.has_value()) {
+            return false;
+        }
+
+        const auto& lastCalledModule = *moduleCallStack->getLastCalledModuleForNestingLevel(moduleCallNestingLevel);
+        if (lastCalledModule->moduleIdent != *moduleIdent) {
+            createError(moduleIdentTokenPosition.first, moduleIdentTokenPosition.second, fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, lastCalledModule->moduleIdent, *moduleIdent));
+            return false;
+        }
+    }
+    return true;
+}
+
+bool SyReCCustomVisitor::doArgumentsBetweenCallAndUncallMatch(const std::pair<size_t, size_t>& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments) {
+    const auto lastCalledModule = *moduleCallStack->getLastCalledModuleForNestingLevel(moduleCallNestingLevel);
+    if (lastCalledModule->moduleIdent != uncalledModuleIdent) {
+        return false;
+    }
+
+    bool        argumentsMatched          = true;
+    const auto& argumentsOfCall = lastCalledModule->calleeArguments;
+    size_t      numCalleeArgumentsToCheck = calleeArguments.size();
+
+    if (numCalleeArgumentsToCheck != argumentsOfCall.size()) {
+        createError(positionOfPotentialError.first, positionOfPotentialError.second, fmt::format(NumberOfParametersMissmatchBetweenCallAndUncall, uncalledModuleIdent, argumentsOfCall.size(), calleeArguments.size()));
+        numCalleeArgumentsToCheck = std::min(numCalleeArgumentsToCheck, argumentsOfCall.size());
+        argumentsMatched          = false;
+    }
+
+    std::vector<std::string> missmatchedParameterValues;
+    for (std::size_t parameterIdx = 0; parameterIdx < numCalleeArgumentsToCheck; ++parameterIdx) {
+        const auto& argumentOfCall = argumentsOfCall.at(parameterIdx);
+        const auto& argumentOfUncall = calleeArguments.at(parameterIdx);
+
+        if (argumentOfCall != argumentOfUncall) {
+            missmatchedParameterValues.emplace_back(fmt::format(ParameterValueMissmatch, parameterIdx, argumentOfUncall, argumentOfCall));
+            argumentsMatched = false;
+        }
+    }
+
+    if (!missmatchedParameterValues.empty()) {
+        std::ostringstream missmatchedParameterErrorsBuffer;
+        std::copy(missmatchedParameterValues.cbegin(), missmatchedParameterValues.cend(), infix_ostream_iterator<std::string>(missmatchedParameterErrorsBuffer, ","));
+        createError(positionOfPotentialError.first, positionOfPotentialError.second, fmt::format(CallAndUncallArgumentsMissmatch, uncalledModuleIdent, missmatchedParameterErrorsBuffer.str()));
+    }
+
+    return argumentsMatched;
 }

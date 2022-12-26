@@ -1,57 +1,77 @@
 {
   "TODO": "Can a function only be called after it was declared or can a fixup happen later ?, Is the call toCall(a, a) valid [i.e. using the same value for two different out parameters ?]",
   "invalidCallIdent": {
-    "circuit": "",
+    "circuit": "module toCall(in a) skip module main(in b) test toCall(b) uncall toCall(b)",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ""
+        "column": 48,
+        "message": "no viable alternative at input 'test toCall'"
       }
     ]
   },
   "invalidUncallIdent": {
-    "circuit": "",
+    "circuit": "module toCall(in a) skip module main(in b) call toCall(b) test toCall(b)",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ""
+        "column": 58,
+        "message": "extraneous input 'test' expecting {<EOF>, 'module'}"
+      },
+      {
+        "line": 1,
+        "column": 48,
+        "message": "missing uncall for module 'toCall' called with arguments 'b'"
       }
     ]
   },
   "callWithMissingOpeningBracket": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call toCallc, d) uncall toCall(c, d)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call toCallc, d); uncall toCall(c, d)",
     "errors": [
       {
         "line": 1,
         "column": 67,
         "message": "mismatched input ',' expecting '('"
+      },
+      {
+        "line": 1,
+        "column": 60,
+        "message": "undeclared ident 'toCallc'"
+      },
+      {
+        "line": 1,
+        "column": 80,
+        "message": "Missmatch between module ident 'toCallc' used in call does not match the uncalled one 'toCall'"
+      },
+      {
+        "line": 1,
+        "column": 60,
+        "message": "missing uncall for module 'toCallc' called with arguments ''"
       }
     ]
   },
   "callWithMissingClosingBracket": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call toCall(c, d uncall toCall(c, d)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call toCall(c, d; uncall toCall(c, d)",
     "errors": [
       {
         "line": 1,
-        "column": 72,
-        "message": "extraneous input 'uncall' expecting {')', ','}"
+        "column": 71,
+        "message": "extraneous input ';' expecting {')', ','}"
       }
     ]
   },
   "callOfUndefinedModule": {
-    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call test(c, d) uncall test(c, d)",
+    "circuit": "module toCall(in a, in b) skip module main(in c, in d) call test(c, d); uncall test(c, d)",
     "errors": [
       {
         "line": 1,
         "column": 60,
-        "message": "undeclared module 'test'"
+        "message": "undeclared ident 'test'"
       },
       {
         "line": 1,
-        "column": 78,
-        "message": "undeclared module 'test'"
+        "column": 79,
+        "message": "undeclared ident 'test'"
       }
     ]
   },
@@ -61,7 +81,12 @@
       {
         "line": 1,
         "column": 60,
-        "message": "None of the overloads of the module 'toCall' accepts 1 parameters"
+        "message": "None of the overloads for module 'toCall' accepts 1 parameters"
+      },
+      {
+        "line": 1,
+        "column": 78,
+        "message": "Module 'toCall' was called with 1 parameters while the uncall was called with 2"
       }
     ]
   },
@@ -70,8 +95,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "None of the overloads of the module 'toCall' accepts 3 parameters"
+        "column": 66,
+        "message": "None of the overloads for module 'toCall' accepts 3 parameters"
+      },
+      {
+        "line": 1,
+        "column": 90,
+        "message": "Module 'toCall' was called with 3 parameters while the uncall was called with 2"
       }
     ]
   },
@@ -82,6 +112,16 @@
         "line": 1,
         "column": 74,
         "message": "mismatched input '<' expecting {')', ','}"
+      },
+      {
+        "line": 1,
+        "column": 66,
+        "message": "None of the overloads for module 'toCall' accepts 1 parameters"
+      },
+      {
+        "line": 1,
+        "column": 87,
+        "message": "Module 'toCall' was called with 1 parameters while the uncall was called with 2"
       }
     ]
   },
@@ -92,6 +132,16 @@
         "line": 1,
         "column": 95,
         "message": "mismatched input '<' expecting {')', ','}"
+      },
+      {
+        "line": 1,
+        "column": 87,
+        "message": "Module 'toCall' was called with 2 parameters while the uncall was called with 1"
+      },
+      {
+        "line": 1,
+        "column": 87,
+        "message": "None of the overloads for module 'toCall' accepts 1 parameters"
       }
     ]
   },
@@ -100,8 +150,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "previous call to method 'toCall' was not uncalled"
+        "column": 66,
+        "message": "missing uncall for module 'toCall' called with arguments 'c,a'"
       }
     ]
   },
@@ -110,8 +160,18 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "previous call to method 'toCall' was not uncalled"
+        "column": 85,
+        "message": "Tried to issue a call with one/many previous calls not being uncalled"
+      },
+      {
+        "line": 1,
+        "column": 66,
+        "message": "missing uncall for module 'toCall' called with arguments 'c,a'"
+      },
+      {
+        "line": 1,
+        "column": 85,
+        "message": "missing uncall for module 'toCall' called with arguments 'd,a'"
       }
     ]
   },
@@ -121,7 +181,7 @@
       {
         "line": 1,
         "column": 87,
-        "message": "call and uncall of module 'toCall' defined different parameter values - Index: 0 - Formal: d | Actual: c"
+        "message": "call and uncall of module 'toCall' defined different parameter values - 'Index: 0 - Formal: d | Actual: c'"
       }
     ]
   },
@@ -131,12 +191,17 @@
       {
         "line": 1,
         "column": 87,
-        "message": "None of the overloads of the module 'toCall' accepts 1 parameters"
+        "message": "Module 'toCall' was called with 2 parameters while the uncall was called with 1"
       },
       {
         "line": 1,
         "column": 87,
-        "message": "Module 'toCall' was called with 2 parameters while the uncall was called with 1"
+        "message": "call and uncall of module 'toCall' defined different parameter values - 'Index: 0 - Formal: d | Actual: c'"
+      },
+      {
+        "line": 1,
+        "column": 87,
+        "message": "None of the overloads for module 'toCall' accepts 1 parameters"
       }
     ]
   },
@@ -146,12 +211,12 @@
       {
         "line": 1,
         "column": 87,
-        "message": "None of the overloads of the module 'toCall' accepts 3 parameters"
+        "message": "Module 'toCall' was called with 2 parameters while the uncall was called with 3"
       },
       {
         "line": 1,
         "column": 87,
-        "message": "Module 'toCall' was called with 2 parameters while the uncall was called with 3"
+        "message": "None of the overloads for module 'toCall' accepts 3 parameters"
       }
     ]
   }

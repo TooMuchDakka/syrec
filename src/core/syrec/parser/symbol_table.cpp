@@ -4,7 +4,9 @@
 
 using namespace parser;
 bool SymbolTable::contains(const std::string_view& literalIdent) const {
-    return this->locals.find(literalIdent) != this->locals.end() || (nullptr != outer && outer->contains(literalIdent));
+    return this->locals.find(literalIdent) != this->locals.end()
+        || this->modules.find(literalIdent) != this->modules.end()
+        || (nullptr != outer && outer->contains(literalIdent));
 }
 
 bool SymbolTable::contains(const syrec::Module::ptr& module) const {

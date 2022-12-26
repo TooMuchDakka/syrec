@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/module_call_stack.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_config.hpp"
@@ -18,7 +19,9 @@ namespace parser {
 class SyReCCustomVisitor: public SyReCBaseVisitor {
 private:
     SymbolTable::ptr                                             currentSymbolTableScope;
-    std::stack<std::pair<std::string, std::vector<std::string>>> callStack;
+    std::unique_ptr<ModuleCallStack>                             moduleCallStack;
+    size_t                                                       moduleCallNestingLevel;
+
     syrec::Number::loop_variable_mapping                         loopVariableMappingLookup;
     std::stack<syrec::Statement::vec>               statementListContainerStack;
     const std::shared_ptr<ParserConfig>     config;
@@ -79,6 +82,9 @@ private:
     [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable);
     void addStatementToOpenContainer(const syrec::Statement::ptr& statement);
 
+    bool areSemanticChecksForCallOrUncallDependingOnNameValid(bool isCallOperation, const std::pair<size_t, size_t>& moduleIdentTokenPosition, const std::optional<std::string>& moduleIdent);
+    bool doArgumentsBetweenCallAndUncallMatch(const std::pair<size_t, size_t>& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments);
+
 
 public:
     syrec::Module::vec modules;
@@ -86,8 +92,8 @@ public:
     std::vector<std::string> warnings;
 
     explicit SyReCCustomVisitor(const std::shared_ptr<ParserConfig>& parserConfig):
-        config(parserConfig) {
-        
+        config(parserConfig), moduleCallNestingLevel(0) {
+        moduleCallStack = std::make_unique<ModuleCallStack>();
     }
 
     /*

@@ -1,4 +1,5 @@
 #include "core/syrec/program.hpp"
+#include "core/syrec/parser/infix_iterator.hpp"
 
 #include <fmt/core.h>
 #include "gtest/gtest.h"
@@ -108,7 +109,17 @@ protected:
     
 
     static void compareExpectedAndActualErrors(const std::vector<std::string>& expectedErrors, const std::vector<std::string>& actualErrorsInUnifiedFormat) {
-        ASSERT_EQ(expectedErrors.size(), actualErrorsInUnifiedFormat.size()) << "Expected " << expectedErrors.size() << " errors but only " << actualErrorsInUnifiedFormat.size() << " were found";
+        if (expectedErrors.size() != actualErrorsInUnifiedFormat.size()) {
+            std::ostringstream expectedErrorsBuffer;
+            std::ostringstream actualErrorsBuffer;
+
+            std::copy(expectedErrors.cbegin(), expectedErrors.cend(), infix_ostream_iterator<std::string>(expectedErrorsBuffer, "\n"));
+            std::copy(actualErrorsInUnifiedFormat.cbegin(), actualErrorsInUnifiedFormat.cend(), infix_ostream_iterator<std::string>(actualErrorsBuffer, "\n"));
+
+            FAIL() << "Expected " << expectedErrors.size() << " errors but only " << actualErrorsInUnifiedFormat.size() << " were found!\nExpected: " << expectedErrorsBuffer.str() << "\nActual: " << actualErrorsBuffer.str();
+        }
+
+        //ASSERT_EQ(expectedErrors.size(), actualErrorsInUnifiedFormat.size()) << "Expected " << expectedErrors.size() << " errors but only " << actualErrorsInUnifiedFormat.size() << " were found";
         for (size_t errorIdx = 0; errorIdx < expectedErrors.size(); ++errorIdx) {
             ASSERT_EQ(expectedErrors.at(errorIdx), actualErrorsInUnifiedFormat.at(errorIdx)) << "Expected error: " << expectedErrors.at(errorIdx) << "| Actual Error: " << actualErrorsInUnifiedFormat.at(errorIdx);
         }

@@ -46,10 +46,10 @@ namespace parser {
     extern const std::string MissmatchOfModuleIdentBetweenCalledAndUncall = "Missmatch between module ident '{0:s}' used in call does not match the uncalled one '{1:s}'";
     extern const std::string NumberOfParametersMissmatchBetweenCallAndUncall = "Module '{0:s}' was called with {1:d} parameters while the uncall was called with {2:d}";
     extern const std::string NumberOfFormalParametersDoesNotMatchActual = "module '{0:s}' defined {1:d} formal parameters but uncall/call provided {2:d} parameter values";
-    extern const std::string MissingUncall                           = "missing uncall for module '{0:s}' called with arguments {1:s}";
+    extern const std::string MissingUncall                           = "missing uncall for module '{0:s}' called with arguments '{1:s}'";
 
     extern const std::string ParameterValueMissmatch         = "Index: {0:d} - Formal: {1:s} | Actual: {2:s}";
-    extern const std::string CallAndUncallArgumentsMissmatch         = "call and uncall of module '{0:s}' defined different parameter values - {1:s}";
+    extern const std::string CallAndUncallArgumentsMissmatch         = "call and uncall of module '{0:s}' defined different parameter values - '{1:s}'";
 
     extern const std::string AmbigousCall = "Ambigous call/uncall of module '{0:s}'";
     extern const std::string NoMatchForGuessWithNActualParameters = "None of the overloads for module '{0:s}' accepts {1:d} parameters";
