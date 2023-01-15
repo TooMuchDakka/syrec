@@ -74,13 +74,33 @@
       }
     ]
   },
-  "operandsStructureMissmatchValueForDimensionMissmatch": {
+  "operandsStructureMissmatchValueForSingleDimensionMissmatch": {
     "circuit": "module main(out c, in a[2](16), in b(16)) c += (a + b)",
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "when applying an operation on two full signals, the number as well as the value per dimension must match"
+        "column": 48,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 2 | 1>"
+      }
+    ]
+  },
+  "operandsStructureMissmatchValueForMultipleDimensionsMissmatch": {
+    "circuit": "module main(out c, in a[2][4](16), in b[5][7](16)) c += (a + b)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 57,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 2 | 5>,<1 | 4 | 7>"
+      }
+    ]
+  },
+  "operandsStructureMissmatchValueForMultipleDimensionsInNestedDimensionAccessMissmatch": {
+    "circuit": "module main(out c, in a[2][4][8][16](16), in b[2][4][14][28](16)) c += (a[0][3] + b[0][3])",
+    "errors": [
+      {
+        "line": 1,
+        "column": 72,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 8 | 14>,<1 | 16 | 28>"
       }
     ]
   },
@@ -89,8 +109,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "when applying an operation on two full signals, the number as well as the value per dimension must match"
+        "column": 51,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 2-d signal while the right one was a 1-d signal"
       }
     ]
   },
@@ -99,8 +119,68 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "when applying an operation on two full signals, the number as well as the value per dimension must match"
+        "column": 54,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 1-d signal while the right one was a 2-d signal"
+      }
+    ]
+  },
+  "operandsStructureMissmatchOneOperandIsBitAccessAndOtherIsFullSignal": {
+    "circuit": "module main(out c, in a[1](16), in b[2][4](16)) c += (a.0 + b)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 54,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 1-d signal while the right one was a 2-d signal"
+      }
+    ]
+  },
+  "operandsStructureMissmatchOneOperandIsBitAccessOnDimensionAndOtherIsFullSignal": {
+    "circuit": "module main(out c, in a[1](16), in b[2](16)) c += (a[0].0 + b)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 51,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 1 | 2>"
+      }
+    ]
+  },
+  "operandsStructureMissmatchOneOperandIsBitRangeAccessAndOtherIsFullSignal": {
+    "circuit": "module main(out c, in a[1](16), in b[2][4](16)) c += (a.0:5 + b)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 54,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 1-d signal while the right one was a 2-d signal"
+      }
+    ]
+  },
+  "operandsStructureMissmatchOneOperandIsBitRangeAccessOnDimensionAndOtherIsFullSignal": {
+    "circuit": "module main(out c, in a[3](16), in b[2](16)) c += (a[0].0:5 + b)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 51,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 1 | 2>"
+      }
+    ]
+  },
+  "operandsStructureMissmatchOneOperandIsSubDimensionAccessAndOtherIsFullSignal": {
+    "circuit": "module main(out c, in a[1](16), in b[2][4](16)) c += (a[0] + b)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 54,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 1-d signal while the right one was a 2-d signal"
+      }
+    ]
+  },
+  "operandsStructureMissmatchOneOperandIsFullSignalAndOtherIsNumber": {
+    "circuit": "module main(out c, in a[2](16)) c += (a + 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 38,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 2 | 1>"
       }
     ]
   }

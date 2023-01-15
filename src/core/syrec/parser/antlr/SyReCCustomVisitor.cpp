@@ -12,6 +12,7 @@
 #include "core/syrec/parser/module_call_guess.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
 #include "core/syrec/parser/range_check.hpp"
+#include "core/syrec/parser/value_broadcaster.hpp"
 
 using namespace parser;
 
@@ -257,6 +258,24 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
         }
     }
 
+
+    /*
+     * TODO: Valid accesses
+     *
+     * a[0] += a[1]
+     * a[0].5 += (a[0].6 + 2)
+     * a[0].6:11 += (a[0].0:5 + 2)
+     * a[2] += (a[0] + a[1])
+     *
+     * TODO: Prohibited accesses
+     * a[0] += a[0]
+     * a[i].0 += a[0].0
+     * a[i].0:10 += (a[0].2:5 + 5)
+     * a[0][i] += (a[0][2].2:10 + 10)
+     * a[0] += (a[i].2:10 + a[i][0])
+     *
+     */
+
     return isValidSignalAccess ? std::make_optional(std::make_shared<SignalEvaluationResult>(*accessedSignal)) : std::nullopt;
 }
 
@@ -390,7 +409,7 @@ std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFr
          * The easiest solution would be to pass in the expected bitwidth for this expression
          */
             const auto containerForLoopVariable = std::make_shared<syrec::NumericExpression>(*definedNumber, 1);
-            return std::make_optional(ExpressionEvaluationResult::createFromExpression(containerForLoopVariable));   
+        return std::make_optional(ExpressionEvaluationResult::createFromExpression(containerForLoopVariable, { 1 }));   
         }
         return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*valueOfDefinedNumber, optionalExpectedExpressionSignalWidth));            
     }
@@ -408,15 +427,16 @@ std::any SyReCCustomVisitor::visitExpressionFromSignal(SyReCParser::ExpressionFr
     
     syrec::expression::ptr expressionWrapperForSignal;
     if ((*definedSignal)->isVariableAccess()) {
-        expressionWrapperForSignal = std::make_shared<syrec::VariableExpression>(*(*definedSignal)->getAsVariableAccess());
-        expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal));
+        const auto& accessOnDefinedSignal = *(*definedSignal)->getAsVariableAccess();
+        expressionWrapperForSignal = std::make_shared<syrec::VariableExpression>(accessOnDefinedSignal);
+        expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal, getSizeOfSignalAfterAccess(accessOnDefinedSignal)));
     } else if ((*definedSignal)->isConstant()) {
         // TODO: Is this the correct calculation and is it both safe and does it return the expected result
         const auto constantValueOfDefinedSignal = tryEvaluateNumber(*(*definedSignal)->getAsNumber());
 
         // TODO: Correct handling of loop variable
         expressionWrapperForSignal = std::make_shared<syrec::NumericExpression>(*(*definedSignal)->getAsNumber(), constantValueOfDefinedSignal.has_value() ? ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(*constantValueOfDefinedSignal) : 0);    
-        expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal));
+        expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal, { 1 }));
     }
 
     return expressionFromSignal;
@@ -452,12 +472,31 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
                 createErrorAtTokenPosition(nullptr, "TODO: Calculation of binary expression for constant values failed");   
             }
         } else {
-            const auto lhsOperandAsExpression   = (*lhsOperand)->getAsExpression();
-            const auto rhsOperandAsExpression   = (*rhsOperand)->getAsExpression();
-            const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
+            const auto lhsOperandNumValuesPerDimension = (*lhsOperand)->numValuesPerDimension;
+            const auto rhsOperandNumValuesPerDimension = (*rhsOperand)->numValuesPerDimension;
 
-            // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
-            result.emplace(ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression)));
+            // TODO: Can the check and the error creation be refactored into one function
+            // TODO: Handling of broadcasting
+            if (requiresBroadcasting(lhsOperandNumValuesPerDimension, rhsOperandNumValuesPerDimension)) {
+                if (!config->supportBroadcastingExpressionOperands){
+                    createErrorAtTokenPosition(context->lhsOperand->start, fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandNumValuesPerDimension.size(), rhsOperandNumValuesPerDimension.size()));
+                } else {
+                    createErrorAtTokenPosition(context->lhsOperand->start, "Broadcasting of operands is currently not supported");
+                }
+            }
+            else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(
+                context->lhsOperand->start, 
+                lhsOperandNumValuesPerDimension, 
+                rhsOperandNumValuesPerDimension
+            )) {
+                const auto lhsOperandAsExpression   = (*lhsOperand)->getAsExpression();
+                const auto rhsOperandAsExpression   = (*rhsOperand)->getAsExpression();
+
+                const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
+
+                // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
+                result.emplace(ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression), (*lhsOperand)->numValuesPerDimension));                        
+            }
         }
     }
 
@@ -493,6 +532,21 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
         return std::nullopt;
     }
 
+    const auto numValuesPerDimensionOfExpressiontoShift = (*expressionToShift)->numValuesPerDimension;
+    // TODO: Handling of broadcasting
+    if (requiresBroadcasting(numValuesPerDimensionOfExpressiontoShift, {1})) {
+        if (!config->supportBroadcastingExpressionOperands) {
+            createErrorAtTokenPosition(context->expression()->start, fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, numValuesPerDimensionOfExpressiontoShift.size(), 1));
+        } else {
+            createErrorAtTokenPosition(context->expression()->start, "Broadcasting of operands is currently not supported");
+        }
+        return std::nullopt;
+    }
+
+    if (!checkIfNumberOfValuesPerDimensionMatchOrLogError(context->expression()->start, numValuesPerDimensionOfExpressiontoShift, {1})) {
+        return std::nullopt;
+    }
+
     const auto shiftAmountEvaluated = tryEvaluateNumber(*shiftAmount);
     const auto expressionToShiftEvaluated = (*expressionToShift)->getAsConstant();
 
@@ -518,7 +572,7 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
 
     // TODO: Handling of shift expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
     const auto createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *ParserUtilities::mapOperationToInternalFlag(*definedShiftOperation), *shiftAmount);
-    return std::make_optional(ExpressionEvaluationResult::createFromExpression(createdShiftExpression));
+    return std::make_optional(ExpressionEvaluationResult::createFromExpression(createdShiftExpression, numValuesPerDimensionOfExpressiontoShift));
 }
 
 /*
@@ -793,6 +847,7 @@ std::any SyReCCustomVisitor::visitIfStatement(SyReCParser::IfStatementContext* c
     return 0;
 }
 
+// TODO: Are broadcasting checks required for unary statement
 std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementContext* context) {
     bool       allSemanticChecksOk = true;
     const auto unaryOperation = getDefinedOperation(context->unaryOp);
@@ -807,6 +862,7 @@ std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementCont
         createErrorAtTokenPosition(context->unaryOp, InvalidUnaryOperation);
     }
 
+    // TODO: Is a sort of broadcasting check required (i.e. if a N-D signal is accessed and broadcasting is not supported an error should be created and otherwise the statement will be simplified [one will be created for every accessed dimension instead of one for the whole signal])
     const auto accessedSignal = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->signal());
     allSemanticChecksOk &= accessedSignal.has_value() && (*accessedSignal)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->signal()->IDENT()->getSymbol(), *(*accessedSignal)->getAsVariableAccess());
     if (allSemanticChecksOk) {
@@ -824,6 +880,8 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
 
     if (allSemanticChecksOk) {
         optionalExpectedExpressionSignalWidth.emplace((*(*assignedToSignal)->getAsVariableAccess())->bitwidth());
+        // TODO:
+        //binaryExpressionSignalProhibition->setProhibitedSignal(*(*assignedToSignal)->getAsVariableAccess());
     }
 
     const auto definedAssignmentOperation = getDefinedOperation(context->assignmentOp);
@@ -841,17 +899,30 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
     allSemanticChecksOk &= assignmentOpRhsOperand.has_value();
 
     if (allSemanticChecksOk) {
-        // TODO: Add mapping from custom operation enum to internal "numeric" 
-        addStatementToOpenContainer(
-                std::make_shared<syrec::AssignStatement>(
-                        *(*assignedToSignal)->getAsVariableAccess(),
-                        *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
-                        (*assignmentOpRhsOperand)->getAsExpression().value()));
+        const auto lhsOperandVariableAccess                                = *(*assignedToSignal)->getAsVariableAccess();
+        const auto lhsOperandAccessedDimensionsNumValuesPerDimension = getSizeOfSignalAfterAccess(lhsOperandVariableAccess);
+        const auto rhsOperandNumValuesPerAccessedDimension = (*assignmentOpRhsOperand)->numValuesPerDimension;
+        if (requiresBroadcasting(lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
+            if (!config->supportBroadcastingExpressionOperands) {
+                createErrorAtTokenPosition(context->signal()->start, fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandAccessedDimensionsNumValuesPerDimension.size(), rhsOperandNumValuesPerAccessedDimension.size()));
+            } else {
+                createErrorAtTokenPosition(context->signal()->start, "Broadcasting of operands is currently not supported");
+            }
+        }
+        else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(context->signal()->start, lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
+            // TODO: Add mapping from custom operation enum to internal "numeric"
+            addStatementToOpenContainer(
+                    std::make_shared<syrec::AssignStatement>(
+                            *(*assignedToSignal)->getAsVariableAccess(),
+                            *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
+                            (*assignmentOpRhsOperand)->getAsExpression().value()));            
+        }
     }
 
     if (optionalExpectedExpressionSignalWidth.has_value()) {
         optionalExpectedExpressionSignalWidth.reset();
     }
+    //binaryExpressionSignalProhibition->reset();
 
     return 0;
 }
@@ -1287,4 +1358,19 @@ bool SyReCCustomVisitor::doArgumentsBetweenCallAndUncallMatch(const std::pair<si
     }
 
     return argumentsMatched;
+}
+
+bool SyReCCustomVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(const antlr4::Token* positionOfOptionalError, const std::vector<unsigned int>& lhsOperandNumValuesPerDimension, const std::vector<unsigned int>& rhsOperandNumValuesPerDimension) {
+    if (const auto dimensionsWithMissmatchedNumValues = getDimensionsWithMissmatchedNumberOfValues(lhsOperandNumValuesPerDimension, rhsOperandNumValuesPerDimension); !dimensionsWithMissmatchedNumValues.empty()) {
+        std::vector<std::string> perDimensionErrorBuffer;
+        for (const auto& dimensionValueMissmatch: dimensionsWithMissmatchedNumValues) {
+            perDimensionErrorBuffer.emplace_back(fmt::format(MissmatchedNumberOfValuesForDimension, dimensionValueMissmatch.dimensionIdx, dimensionValueMissmatch.expectedNumberOfValues, dimensionValueMissmatch.actualNumberOfValues));
+        }
+
+        std::ostringstream errorsConcatinatedBuffer;
+        std::copy(perDimensionErrorBuffer.cbegin(), perDimensionErrorBuffer.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, ","));
+        createErrorAtTokenPosition(positionOfOptionalError, fmt::format(MissmatchedNumberOfValuesForDimensionsBetweenOperands, errorsConcatinatedBuffer.str()));
+        return false;
+    }
+    return true;
 }

@@ -19,6 +19,7 @@ add_library(${PROJECT_NAME}
 			${CMAKE_CURRENT_SOURCE_DIR}/core/truthTable/truth_table.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/io/pla_parser.cpp
             
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/binary_expression_signal_prohibition.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/custom_semantic_errors.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_comparer.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_evaluation_result.cpp
@@ -29,6 +30,7 @@ add_library(${PROJECT_NAME}
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/range_check.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/signal_evaluation_result.cpp
 			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/symbol_table.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/value_broadcaster.cpp
 			
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.h
             ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.h
@@ -46,6 +48,7 @@ add_library(${PROJECT_NAME}
 
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
+            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/binary_expression_signal_prohibition.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/custom_semantic_errors.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_comparer.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_evaluation_result.hpp
@@ -57,6 +60,7 @@ add_library(${PROJECT_NAME}
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/range_check.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_evaluation_result.hpp
 			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
+            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/value_broadcaster.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp
             ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/module.hpp

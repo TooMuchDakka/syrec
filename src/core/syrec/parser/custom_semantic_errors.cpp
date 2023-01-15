@@ -41,6 +41,12 @@ namespace parser {
     extern const std::string InvalidShiftOperation                     = "invalid shift operation";
     extern const std::string InvalidOrMissingNumberExpressionOperation = "invalid or missing number expression operation";
 
+    /* Broadcasting error messages */
+    extern const std::string MissmatchedNumberOfDimensionsBetweenOperands = "Missmatch of number of dimensions of operands, left operand was a {0:d}-d signal while the right one was a {1:d}-d signal";
+    extern const std::string MissmatchedNumberOfValuesForDimension           = "<{0:d} | {1:d} | {2:d}>";
+    // TODO: Wording of error text, index of dimensions starts after any previous access (i.e. a[0][1][3] and b[0][1][0] would result in an error at dimension 0)
+    extern const std::string MissmatchedNumberOfValuesForDimensionsBetweenOperands = "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): {0:s}";
+
     /* Call | uncall error messages */
     extern const std::string PreviousCallWasNotUncalled              = "Tried to issue a call with one/many previous calls not being uncalled";
     extern const std::string UncallWithoutPreviousCall               = "Tried to uncall a module that was not previously called";

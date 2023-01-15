@@ -34,13 +34,3 @@ std::optional<syrec::expression::ptr> ExpressionEvaluationResult::getAsExpressio
 unsigned ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(unsigned int constantValue) {
     return static_cast<unsigned int>(std::log2(constantValue) + 1);
 }
-
-/*
-ExpressionEvaluationResult::ptr createFromConstantValue(unsigned int constantValue) {
-    return std::make_shared<ExpressionEvaluationResult>(constantValue);
-}
-
-ExpressionEvaluationResult::ptr createFromExpression(const syrec::expression::ptr& expression) {
-    return std::make_shared<ExpressionEvaluationResult>(expression);
-}
-*/

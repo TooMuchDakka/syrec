@@ -40,47 +40,86 @@
     ]
   },
 
-  "invalidAssignmentOfLhsSignalWithSignalHavingMoreOverallDimensions": {
-    "circuit": "module main(out b[2], c[4][3]) b += c",
+  "invalidAssignmentOperandStructureMissmatchWithLhsSignalHavingMoreDimensions": {
+    "circuit": "module main(out b[2](16), in c[4][3](16)) b += c",
     "errors": [
       {
         "line": 1,
-        "column": 31,
-        "message": "TODO"
+        "column": 42,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 1-d signal while the right one was a 2-d signal"
       }
     ]
   },
-  "invalidAssignmentOfLhsSignalWithSignalHavingLessOverallDimensions": {
-    "circuit": "module main(out b[2][4], c[3]) b += c",
+  "invalidAssignmentOperandStructureMissmatchWithLhsSignalHavingLessDimensions": {
+    "circuit": "module main(out b[2][4](16), in c[3](16)) b += c",
     "errors": [
       {
         "line": 1,
-        "column": 31,
-        "message": "TODO"
+        "column": 42,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 2-d signal while the right one was a 1-d signal"
       }
     ]
   },
-  "invalidAssignmentOfLhsSignalWithSignalHavingSmallerValueForSpecificDimension": {
-    "circuit": "module main(out b[2], c[1]) b += c",
+  "invalidAssignmentOperandStructureMissmatchForSingleDimension": {
+    "circuit": "module main(out b[2](16), in c[1](16)) b += c",
     "errors": [
       {
         "line": 1,
-        "column": 28,
-        "message": "TODO"
+        "column": 39,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 2 | 1>"
       }
     ]
   },
-  "invalidAssignmentOfLhsSignalWithSignalHavingLargerValueForSpecificDimension": {
-    "circuit": "module main(out b[2], c[4]) b += c",
+  "invalidAssignmentOperandStructureMissmatchForMultipleDimensions": {
+    "circuit": "module main(out b[2][4][8](16), in c[4][8][16](16)) b[0][3] += c[3][7]",
     "errors": [
       {
         "line": 1,
-        "column": 28,
-        "message": "TODO"
+        "column": 52,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 8 | 16>"
       }
     ]
   },
-
+  "invalidAssignmentOperandStructureMissmatchLhsIsBitAccessOnDimension": {
+    "circuit": "module main(out b[2](16), in c[2](16)) b[0].0 += c",
+    "errors": [
+      {
+        "line": 1,
+        "column": 39,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 1 | 2>"
+      }
+    ]
+  },
+  "invalidAssignmentOperandStructureMissmatchLhsIsBitAccess": {
+    "circuit": "module main(out b[2](16), in c[3](16)) b.0 += c",
+    "errors": [
+      {
+        "line": 1,
+        "column": 39,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 2 | 3>"
+      }
+    ]
+  },
+  "invalidAssignmentOperandStructureMissmatchLhsIsBitRangeAccessOnDimension": {
+    "circuit": "module main(out b[2](16), in c[2](16)) b[0].0:15 += c",
+    "errors": [
+      {
+        "line": 1,
+        "column": 39,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 1 | 2>"
+      }
+    ]
+  },
+  "invalidAssignmentOperandStructureMissmatchLhsIsBitRangeAccess": {
+    "circuit": "module main(out b[2](16), in c[3](16)) b.0:15 += c",
+    "errors": [
+      {
+        "line": 1,
+        "column": 39,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 2 | 3>"
+      }
+    ]
+  },
   "invalidAssignmentToInParameterBit": {
     "circuit": "module main(in a(16)) a.0 += 2",
     "errors": [

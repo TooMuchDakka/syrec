@@ -43,6 +43,11 @@ namespace parser {
     extern const std::string InvalidShiftOperation;
     extern const std::string InvalidOrMissingNumberExpressionOperation;
 
+    /* Broadcasting error messages */
+    extern const std::string MissmatchedNumberOfDimensionsBetweenOperands;
+    extern const std::string MissmatchedNumberOfValuesForDimension;
+    extern const std::string MissmatchedNumberOfValuesForDimensionsBetweenOperands;
+
     /* Call | uncall error messages */
     extern const std::string PreviousCallWasNotUncalled;
     extern const std::string UncallWithoutPreviousCall;

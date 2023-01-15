@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/binary_expression_signal_prohibition.hpp"
 #include "core/syrec/parser/module_call_stack.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/operation.hpp"
@@ -18,6 +19,7 @@
 namespace parser {
 class SyReCCustomVisitor: public SyReCBaseVisitor {
 private:
+    std::unique_ptr<BinaryExpressionSignalProhibition>           binaryExpressionSignalProhibition;
     SymbolTable::ptr                                             currentSymbolTableScope;
     std::unique_ptr<ModuleCallStack>                             moduleCallStack;
     size_t                                                       moduleCallNestingLevel;
@@ -27,6 +29,7 @@ private:
     const std::shared_ptr<ParserConfig>     config;
 
     std::optional<unsigned int> optionalExpectedExpressionSignalWidth;
+    std::optional<syrec::VariableAccess::ptr> prohibitedSignalAccessAsBinaryExpressionOperand;
 
     void createErrorAtTokenPosition(const antlr4::Token* token, const std::string& errorMessage);
     void createError(std::size_t line, std::size_t column, const std::string& errorMessage);
@@ -74,6 +77,7 @@ private:
     [[nodiscard]] static bool areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr);
 
     bool                                                                           checkIfSignalWasDeclaredOrLogError(const antlr4::Token* signalIdentToken, bool isLoopVariable=false);
+    [[nodiscard]] bool                                                             isExpressionProhibitedAsBinaryOperationOperand(const syrec::VariableAccess::ptr& signalAccess);
     [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(const antlr4::Token* dimensionToken, size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult);
     [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
     [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
@@ -84,7 +88,7 @@ private:
 
     bool areSemanticChecksForCallOrUncallDependingOnNameValid(bool isCallOperation, const std::pair<size_t, size_t>& moduleIdentTokenPosition, const std::optional<std::string>& moduleIdent);
     bool doArgumentsBetweenCallAndUncallMatch(const std::pair<size_t, size_t>& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments);
-
+    bool checkIfNumberOfValuesPerDimensionMatchOrLogError(const antlr4::Token* positionOfOptionalError, const std::vector<unsigned int>& lhsOperandNumValuesPerDimension, const std::vector<unsigned int>& rhsOperandNumValuesPerDimension);
 
 public:
     syrec::Module::vec modules;
@@ -92,7 +96,8 @@ public:
     std::vector<std::string> warnings;
 
     explicit SyReCCustomVisitor(const std::shared_ptr<ParserConfig>& parserConfig):
-        config(parserConfig), moduleCallNestingLevel(0) {
+        moduleCallNestingLevel(0), config(parserConfig) {
+        binaryExpressionSignalProhibition = std::make_unique<BinaryExpressionSignalProhibition>();
         moduleCallStack = std::make_unique<ModuleCallStack>();
     }
 
