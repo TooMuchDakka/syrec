@@ -24,8 +24,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "( expected"
+        "column": 26,
+        "message": "extraneous input '<<' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -34,8 +34,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": "( expected"
+        "column": 24,
+        "message": "extraneous input '[' expecting {'(', '!', '~', '$', '#', IDENT, INT}"
+      },
+      {
+        "line": 1,
+        "column": 27,
+        "message":  "extraneous input '<<' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -44,8 +49,8 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ") expected"
+        "column": 31,
+        "message": "missing ')' at '<EOF>'"
       }
     ]
   },
@@ -54,8 +59,48 @@
     "errors": [
       {
         "line": 1,
-        "column": 1,
-        "message": ") expected"
+        "column": 31,
+        "message": "mismatched input ']' expecting ')'"
+      }
+    ]
+  },
+  "broadcastingOf1DSignalWithMoreThanOneValueRequiredButNotSupported": {
+    "circuit": "module main(out c[2](16), in a[2](16)) c += (a << 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 45,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 2 | 1>"
+      }
+    ]
+  },
+  "broadcastingOfNDSignalRequiredButNotSupported": {
+    "circuit": "module main(out c[2][4](16), in a[2][4](16)) c += (a << 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 51,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 2-d signal while the right one was a 1-d signal"
+      }
+    ]
+  },
+  "broadcastingOfNDSignalBitAccessRequiredButNotSupported": {
+    "circuit": "module main(out c[2][4](16), in a[2][4](16)) c[0].1 += (a[0].1 << 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 56,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 4 | 1>"
+      }
+    ]
+  },
+  "broadcastingOfNDSignalBitRangeAccessRequiredButNotSupported": {
+    "circuit": "module main(out c[2][4](16), in a[2][4](16)) c[0].1:5 += (a[0].1:5 << 2)",
+    "errors": [
+      {
+        "line": 1,
+        "column": 58,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 4 | 1>"
       }
     ]
   }

@@ -53,6 +53,9 @@ protected:
     }
 };
 
+// TODO: Success cases for broadcasting logic for AssignStatement, Binary- and ShiftExpression
+// TODO: Success cases for broadcasting of Call- and UncallStatements
+
 INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         SyrecParserSuccessCasesFixture,
                         testing::Values(

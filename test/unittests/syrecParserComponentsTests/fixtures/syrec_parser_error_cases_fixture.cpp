@@ -130,7 +130,7 @@ protected:
  *  TODO:
  *  - Error cases for binary expression where the dimension of the operands do not match, similarily to the shift expression error cases
  *  - What is the behaviour of a shift where the operand to be shifted is a signal with multiple dimensions (should that be possible or is that an error)
- *
+ * - // TODO: Success cases for broadcasting of Call- and UncallStatements
  */
 INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                          SyrecParserErrorCasesFixture,
@@ -354,7 +354,16 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
 
                              /* ShiftExpression production */
                              std::make_pair("production_shiftExpression", "shiftAmountNotANumber"),
-                             std::make_pair("production_shiftExpression", "invalidNegativeShiftAmount")
+                             std::make_pair("production_shiftExpression", "invalidNegativeShiftAmount"),
+                             std::make_pair("production_shiftExpression", "missingOpeningBracket"),
+                             std::make_pair("production_shiftExpression", "invalidOpeningBracket"),
+                             std::make_pair("production_shiftExpression", "missingClosingBracket"),
+                             std::make_pair("production_shiftExpression", "invalidClosingBracket"),
+
+                             std::make_pair("production_shiftExpression", "broadcastingOf1DSignalWithMoreThanOneValueRequiredButNotSupported"),
+                             std::make_pair("production_shiftExpression", "broadcastingOfNDSignalRequiredButNotSupported"),
+                             std::make_pair("production_shiftExpression", "broadcastingOfNDSignalBitAccessRequiredButNotSupported"),
+                             std::make_pair("production_shiftExpression", "broadcastingOfNDSignalBitRangeAccessRequiredButNotSupported")
                          ),
                          [](const testing::TestParamInfo<SyrecParserErrorCasesFixture::ParamType>& info) {
                              auto s = info.param.first + "_" + info.param.second;
