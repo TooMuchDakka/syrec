@@ -35,7 +35,7 @@ std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) 
         const auto moduleParseResult = tryVisitAndConvertProductionReturnValue<syrec::Module::ptr>(module);
         if (moduleParseResult.has_value()) {
             if (currentSymbolTableScope->contains(*moduleParseResult)) {
-                createErrorAtTokenPosition(module->IDENT()->getSymbol(), fmt::format(DuplicateModuleIdentDeclaration, (*moduleParseResult)->name));   
+                createError(mapAntlrTokenPosition(module->IDENT()->getSymbol()), fmt::format(DuplicateModuleIdentDeclaration, (*moduleParseResult)->name));   
             }
             else {
                 currentSymbolTableScope->addEntry(*moduleParseResult);
@@ -110,7 +110,7 @@ std::any SyReCCustomVisitor::visitParameterList(SyReCParser::ParameterListContex
 std::any SyReCCustomVisitor::visitParameter(SyReCParser::ParameterContext* context) {
      const auto parameterType = getParameterType(context->start);
     if (!parameterType.has_value()) {
-        createErrorAtTokenPosition(context->start, InvalidParameterType);
+        createError(mapAntlrTokenPosition(context->start), InvalidParameterType);
     } 
 
     auto declaredParameter = tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(context->signalDeclaration());
@@ -127,7 +127,7 @@ std::any SyReCCustomVisitor::visitSignalList(SyReCParser::SignalListContext* con
     const auto declaredSignalsType = getSignalType(context->start);
     bool       isValidSignalListDeclaration = true;
     if (!declaredSignalsType.has_value()) {
-        createErrorAtTokenPosition(context->start, InvalidLocalType);
+        createError(mapAntlrTokenPosition(context->start), InvalidLocalType);
         isValidSignalListDeclaration = false;
     }
 
@@ -155,7 +155,7 @@ std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
     const std::string signalIdent = context->IDENT()->getText();
     if (currentSymbolTableScope->contains(signalIdent)) {
         isValidSignalDeclaration = false;
-        createErrorAtTokenPosition(context->IDENT()->getSymbol(), fmt::format(DuplicateDeclarationOfIdent, signalIdent));
+        createError(mapAntlrTokenPosition(context->IDENT()->getSymbol()), fmt::format(DuplicateDeclarationOfIdent, signalIdent));
     }
 
     for (const auto& dimensionToken: context->dimensionTokens) {
@@ -237,7 +237,7 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
 
         isValidSignalAccess &= numUserDefinedDimensions <= numElementsWithinRange;
         for (size_t dimensionOutOfRangeIdx = numElementsWithinRange; dimensionOutOfRangeIdx < numUserDefinedDimensions; ++dimensionOutOfRangeIdx) {
-            createErrorAtTokenPosition(context->accessedDimensions.at(dimensionOutOfRangeIdx)->start, fmt::format(DimensionOutOfRange, dimensionOutOfRangeIdx, signalIdent, numDimensionsOfAccessSignal));
+            createError(determineContextStartTokenPositionOrUseDefaultOne(context->accessedDimensions.at(dimensionOutOfRangeIdx)), fmt::format(DimensionOutOfRange, dimensionOutOfRangeIdx, signalIdent, numDimensionsOfAccessSignal));
         }
     }
 
@@ -306,7 +306,7 @@ std::any SyReCCustomVisitor::visitNumberFromSignalwidth(SyReCParser::NumberFromS
     else {
         // TODO: GEN_ERROR, this should not happen
         // TODO: Error position
-        createErrorAtTokenPosition(nullptr, "TODO");
+        createError(TokenPosition::createFallbackPosition(), "TODO");
     }
 
     return signalWidthOfSignal;
@@ -323,7 +323,7 @@ std::any SyReCCustomVisitor::visitNumberFromLoopVariable(SyReCParser::NumberFrom
     }
 
     if (lastDeclaredLoopVariable.has_value() && *lastDeclaredLoopVariable == signalIdent) {
-        createErrorAtTokenPosition(context->IDENT()->getSymbol(), fmt::format(CannotReferenceLoopVariableInInitalValueDefinition, signalIdent));
+        createError(mapAntlrTokenPosition(context->IDENT()->getSymbol()), fmt::format(CannotReferenceLoopVariableInInitalValueDefinition, signalIdent));
         return std::nullopt;
     }
 
@@ -334,7 +334,7 @@ std::any SyReCCustomVisitor::visitNumberFromLoopVariable(SyReCParser::NumberFrom
     } else {
         // TODO: GEN_ERROR, this should not happen but check anyways
         // TODO: Error position
-        createErrorAtTokenPosition(nullptr, "TODO");
+        createError(TokenPosition::createFallbackPosition(), "TODO");
     }
 
     return valueOfLoopVariable;
@@ -347,7 +347,7 @@ std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromEx
     const auto operation  = getDefinedOperation(context->op);
     if (!operation.has_value()) {
         // TODO: Error position
-        createErrorAtTokenPosition(context->op, InvalidOrMissingNumberExpressionOperation);
+        createError(mapAntlrTokenPosition(context->op), InvalidOrMissingNumberExpressionOperation);
     }
 
     const auto rhsOperand = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->rhsOperand);
@@ -380,17 +380,17 @@ std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromEx
                 break;
             }
             default:
-                createErrorAtTokenPosition(context->op, fmt::format(NoMappingForNumberOperation, context->op->getText()));
+                createError(mapAntlrTokenPosition(context->op), fmt::format(NoMappingForNumberOperation, context->op->getText()));
                 return std::nullopt;
         }
         return std::make_optional(std::make_shared<syrec::Number>(syrec::Number::CompileTimeConstantExpression(*lhsOperand, mappedOperation, *rhsOperand)));
     }
     
-    const auto lhsOperandEvaluated = tryEvaluateNumber(*lhsOperand);
-    const auto rhsOperandEvaluated = tryEvaluateNumber(*rhsOperand);
+    const auto lhsOperandEvaluated = tryEvaluateNumber(*lhsOperand, determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand));
+    const auto rhsOperandEvaluated = tryEvaluateNumber(*rhsOperand, determineContextStartTokenPositionOrUseDefaultOne(context->rhsOperand));
 
     if (lhsOperandEvaluated.has_value() && rhsOperandEvaluated.has_value()) {
-        const auto binaryOperationResult = applyBinaryOperation(*operation, *lhsOperandEvaluated, *rhsOperandEvaluated);
+        const auto binaryOperationResult = applyBinaryOperation(*operation, *lhsOperandEvaluated, *rhsOperandEvaluated, determineContextStartTokenPositionOrUseDefaultOne(context->rhsOperand));
         if (binaryOperationResult.has_value()) {
             const auto resultContainer = std::make_shared<syrec::Number>(*binaryOperationResult);
             return std::make_optional<syrec::Number::ptr>(resultContainer);
@@ -408,7 +408,7 @@ std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFr
     const auto definedNumber = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->number());
     if (definedNumber.has_value()) {
         if (canEvaluateNumber(*definedNumber)) {
-            const auto& valueOfNumberEvaluated = tryEvaluateNumber(*definedNumber);
+            const auto& valueOfNumberEvaluated = tryEvaluateNumber(*definedNumber, determineContextStartTokenPositionOrUseDefaultOne(context->number()));
             return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*valueOfNumberEvaluated, optionalExpectedExpressionSignalWidth));
         }
 
@@ -449,7 +449,7 @@ std::any SyReCCustomVisitor::visitExpressionFromSignal(SyReCParser::ExpressionFr
 
         unsigned int bitWidthOfSignal = 0;
         if (canEvaluateNumber(constantSignalValue)) {
-            const auto constantSignalValueEvaluated = *tryEvaluateNumber(constantSignalValue);
+            const auto constantSignalValueEvaluated = *tryEvaluateNumber(constantSignalValue, determineContextStartTokenPositionOrUseDefaultOne(context->signal()));
             bitWidthOfSignal                        = ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(constantSignalValueEvaluated);
             constantSignalValue                     = std::make_shared<syrec::Number>(constantSignalValueEvaluated);
         }
@@ -465,7 +465,7 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
     const auto lhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->lhsOperand);
     const auto userDefinedOperation = getDefinedOperation(context->binaryOperation);
     if (!userDefinedOperation.has_value() || !isValidBinaryOperation(userDefinedOperation.value())) {
-        createErrorAtTokenPosition(context->binaryOperation, InvalidBinaryOperation);
+        createError(mapAntlrTokenPosition(context->binaryOperation), InvalidBinaryOperation);
     }
 
     bool modifiedExpectedExpressionSignalWidth = !optionalExpectedExpressionSignalWidth.has_value();
@@ -482,13 +482,13 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
         const auto rhsOperandConversionToConstant = (*rhsOperand)->getAsConstant();
 
         if (lhsOperandConversionToConstant.has_value() && rhsOperandConversionToConstant.has_value()) {
-            const auto binaryExpressionEvaluated = applyBinaryOperation(*userDefinedOperation, *lhsOperandConversionToConstant, *rhsOperandConversionToConstant);
+            const auto binaryExpressionEvaluated = applyBinaryOperation(*userDefinedOperation, *lhsOperandConversionToConstant, *rhsOperandConversionToConstant, determineContextStartTokenPositionOrUseDefaultOne(context->rhsOperand));
             if (binaryExpressionEvaluated.has_value()) {
                 result.emplace(ExpressionEvaluationResult::createFromConstantValue(*binaryExpressionEvaluated, (*(*lhsOperand)->getAsExpression())->bitwidth()));
             } else {
                 // TODO: Error creation
                 // TODO: Error position
-                createErrorAtTokenPosition(nullptr, "TODO: Calculation of binary expression for constant values failed");   
+                createError(TokenPosition::createFallbackPosition(), "TODO: Calculation of binary expression for constant values failed");   
             }
         } else {
             const auto lhsOperandNumValuesPerDimension = (*lhsOperand)->numValuesPerDimension;
@@ -498,13 +498,13 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
             // TODO: Handling of broadcasting
             if (requiresBroadcasting(lhsOperandNumValuesPerDimension, rhsOperandNumValuesPerDimension)) {
                 if (!config->supportBroadcastingExpressionOperands){
-                    createErrorAtTokenPosition(context->lhsOperand->start, fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandNumValuesPerDimension.size(), rhsOperandNumValuesPerDimension.size()));
+                    createError(determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand), fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandNumValuesPerDimension.size(), rhsOperandNumValuesPerDimension.size()));
                 } else {
-                    createErrorAtTokenPosition(context->lhsOperand->start, "Broadcasting of operands is currently not supported");
+                    createError(determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand), "Broadcasting of operands is currently not supported");
                 }
             }
             else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(
-                context->lhsOperand->start, 
+                determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand), 
                 lhsOperandNumValuesPerDimension, 
                 rhsOperandNumValuesPerDimension
             )) {
@@ -528,7 +528,7 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
 std::any SyReCCustomVisitor::visitUnaryExpression(SyReCParser::UnaryExpressionContext* context) {
     const auto userDefinedOperation = getDefinedOperation(context->unaryOperation);
     if (!userDefinedOperation.has_value() || (* userDefinedOperation != syrec_operation::operation::bitwise_negation && *userDefinedOperation != syrec_operation::operation::logical_negation)) { 
-        createErrorAtTokenPosition(context->unaryOperation, InvalidUnaryOperation);
+        createError(mapAntlrTokenPosition(context->unaryOperation), InvalidUnaryOperation);
     }
     
     const auto userDefinedExpression = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult>(context->expression());
@@ -541,7 +541,7 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
     const auto definedShiftOperation    = context->shiftOperation != nullptr ? getDefinedOperation(context->shiftOperation) : std::nullopt;
 
     if (!definedShiftOperation.has_value() || (*definedShiftOperation != syrec_operation::operation::shift_left && *definedShiftOperation != syrec_operation::operation::shift_right)) {
-        createErrorAtTokenPosition(context->shiftOperation,InvalidShiftOperation);
+        createError(mapAntlrTokenPosition(context->shiftOperation),InvalidShiftOperation);
     }
 
     const auto shiftAmount = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->number());
@@ -554,18 +554,18 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
     // TODO: Handling of broadcasting
     if (requiresBroadcasting(numValuesPerDimensionOfExpressiontoShift, {1})) {
         if (!config->supportBroadcastingExpressionOperands) {
-            createErrorAtTokenPosition(context->expression()->start, fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, numValuesPerDimensionOfExpressiontoShift.size(), 1));
+            createError(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, numValuesPerDimensionOfExpressiontoShift.size(), 1));
         } else {
-            createErrorAtTokenPosition(context->expression()->start, "Broadcasting of operands is currently not supported");
+            createError(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), "Broadcasting of operands is currently not supported");
         }
         return std::nullopt;
     }
 
-    if (!checkIfNumberOfValuesPerDimensionMatchOrLogError(context->expression()->start, numValuesPerDimensionOfExpressiontoShift, {1})) {
+    if (!checkIfNumberOfValuesPerDimensionMatchOrLogError(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), numValuesPerDimensionOfExpressiontoShift, {1})) {
         return std::nullopt;
     }
 
-    const auto shiftAmountEvaluated = tryEvaluateNumber(*shiftAmount);
+    const auto shiftAmountEvaluated = tryEvaluateNumber(*shiftAmount, determineContextStartTokenPositionOrUseDefaultOne(context->number()));
     // TODO: getAsConstant(...) handling of compileTimeExpression ?
     const auto expressionToShiftEvaluated = (*expressionToShift)->getAsConstant();
 
@@ -577,7 +577,7 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
 
         // TODO: GEN_ERROR
         // TODO: Error position
-        createErrorAtTokenPosition(context->expression()->start, "TODO: SHIFT CALC ERROR");
+        createError(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), "TODO: SHIFT CALC ERROR");
         return std::nullopt;   
     }
 
@@ -625,7 +625,7 @@ std::any SyReCCustomVisitor::visitStatementList(SyReCParser::StatementListContex
 
         const size_t moduleIdentLinePosition = notUncalledModule->moduleIdentPosition.first;
         const size_t moduleIdentColumnPosition = notUncalledModule->moduleIdentPosition.second;
-        createError(moduleIdentLinePosition, moduleIdentColumnPosition, fmt::format(MissingUncall, notUncalledModule->moduleIdent, bufferForStringifiedParametersOfNotUncalledModule.str()));
+        createError(TokenPosition(moduleIdentLinePosition, moduleIdentColumnPosition), fmt::format(MissingUncall, notUncalledModule->moduleIdent, bufferForStringifiedParametersOfNotUncalledModule.str()));
     }
     moduleCallNestingLevel--;
 
@@ -640,11 +640,11 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
     std::optional<std::string> moduleIdent;
     bool existsModuleForIdent = false;
     std::optional<ModuleCallGuess::ptr> potentialModulesToCall;
-    std::pair<size_t, size_t> moduleIdentPosition;
+    TokenPosition moduleIdentPosition = TokenPosition::createFallbackPosition();
 
     if (context->moduleIdent != nullptr) {
         moduleIdent.emplace(context->moduleIdent->getText());
-        moduleIdentPosition = std::make_pair<size_t, size_t>(context->moduleIdent->getLine(), context->moduleIdent->getCharPositionInLine());
+        moduleIdentPosition = TokenPosition(context->moduleIdent->getLine(), context->moduleIdent->getCharPositionInLine());
         existsModuleForIdent   = checkIfSignalWasDeclaredOrLogError(context->moduleIdent);
         if (existsModuleForIdent) {
             potentialModulesToCall = ModuleCallGuess::fetchPotentialMatchesForMethodIdent(currentSymbolTableScope, *moduleIdent);            
@@ -652,7 +652,7 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
         isValidCallOperationDefined &= existsModuleForIdent;
     }
     else {
-        moduleIdentPosition = std::make_pair<size_t, size_t>(context->start->getLine(), context->start->getCharPositionInLine());
+        moduleIdentPosition = TokenPosition(context->start->getLine(), context->start->getCharPositionInLine());
         isValidCallOperationDefined = false;
     }
     
@@ -683,7 +683,7 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
 
     if (isCallOperation.has_value()) {
         if (*isCallOperation) {
-            moduleCallStack->addNewEntry(std::make_shared<ModuleCallStack::CallStackEntry>(*moduleIdent, calleeArguments, moduleCallNestingLevel, moduleIdentPosition));   
+            moduleCallStack->addNewEntry(std::make_shared<ModuleCallStack::CallStackEntry>(*moduleIdent, calleeArguments, moduleCallNestingLevel, std::make_pair(moduleIdentPosition.line, moduleIdentPosition.column)));   
         }
         else if (
             !*isCallOperation 
@@ -703,20 +703,20 @@ std::any SyReCCustomVisitor::visitCallStatement(SyReCParser::CallStatementContex
     }
     
     if (!potentialModulesToCall.has_value()) {
-        createErrorAtTokenPosition(context->moduleIdent, fmt::format(NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size()));
+        createError(mapAntlrTokenPosition(context->moduleIdent), fmt::format(NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size()));
         return 0;
     }
 
     (*potentialModulesToCall)->discardGuessesWithMoreThanNParameters(calleeArguments.size());
     if (!(*potentialModulesToCall)->hasSomeMatches()) {
-        createErrorAtTokenPosition(context->moduleIdent, fmt::format(NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size()));
+        createError(mapAntlrTokenPosition(context->moduleIdent), fmt::format(NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size()));
         return 0;
     }
 
     if ((*potentialModulesToCall)->getMatchesForGuess().size() > 1) {
         // TODO: GEN_ERROR Ambigous call, more than one match for given arguments
         // TODO: Error position
-        createErrorAtTokenPosition(context->moduleIdent, fmt::format(AmbigousCall, *moduleIdent));
+        createError(mapAntlrTokenPosition(context->moduleIdent), fmt::format(AmbigousCall, *moduleIdent));
         return 0;
     }
 
@@ -739,7 +739,7 @@ std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext*
     bool       loopHeaderValid = true;
     if (loopVariableIdent.has_value()) {
         if (currentSymbolTableScope->contains(*loopVariableIdent)) {
-            createErrorAtTokenPosition(context->loopVariableDefinition()->variableIdent, fmt::format(DuplicateDeclarationOfIdent, *loopVariableIdent));
+            createError(mapAntlrTokenPosition(context->loopVariableDefinition()->variableIdent), fmt::format(DuplicateDeclarationOfIdent, *loopVariableIdent));
             loopHeaderValid = false;
         } else {
             SymbolTable::openScope(currentSymbolTableScope);
@@ -779,29 +779,32 @@ std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext*
         && canEvaluateNumber(*rangeEndValue)
         && (wasStepSizeExplicitlyDefined ? canEvaluateNumber(*stepSize) : true))  {
 
-        const std::optional<unsigned int> stepSizeEvaluated = tryEvaluateNumber(*stepSize);
+        const std::optional<unsigned int> stepSizeEvaluated = tryEvaluateNumber(*stepSize, determineContextStartTokenPositionOrUseDefaultOne(context->loopStepsizeDefinition()));
         if (stepSizeEvaluated.has_value()) {
             std::optional<unsigned int> iterationRangeStartValueEvaluated;
             std::optional<unsigned int> iterationRangeEndValueEvaluated;
             const bool                  negativeStepSizeDefined = *stepSizeEvaluated < 0;
-            
+
+            const auto potentialEndValueEvaluationErrorTokenStart = context->endValue->start;
+            const auto potentialStartValueEvaluationErrorTokenStart = wasStartValueExplicitlyDefined ? context->startValue->start : potentialEndValueEvaluationErrorTokenStart;
+
             if (negativeStepSizeDefined) {
-                iterationRangeStartValueEvaluated = tryEvaluateNumber(*rangeEndValue);
-                iterationRangeEndValueEvaluated   = tryEvaluateNumber(*rangeStartValue);
+                iterationRangeStartValueEvaluated = tryEvaluateNumber(*rangeEndValue, mapAntlrTokenPosition(potentialEndValueEvaluationErrorTokenStart));
+                iterationRangeEndValueEvaluated   = tryEvaluateNumber(*rangeStartValue, mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart));
             }
             else {
-                iterationRangeStartValueEvaluated = tryEvaluateNumber(*rangeStartValue);
-                iterationRangeEndValueEvaluated   = tryEvaluateNumber(*rangeEndValue);
+                iterationRangeStartValueEvaluated = tryEvaluateNumber(*rangeStartValue, mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart));
+                iterationRangeEndValueEvaluated   = tryEvaluateNumber(*rangeEndValue, mapAntlrTokenPosition(potentialEndValueEvaluationErrorTokenStart));
             }
 
             loopHeaderValid &= iterationRangeStartValueEvaluated.has_value() && iterationRangeEndValueEvaluated.has_value();
             if (loopHeaderValid) {
                 unsigned int numIterations = 0;
                 if (negativeStepSizeDefined && *iterationRangeStartValueEvaluated < *iterationRangeEndValueEvaluated) {
-                    createErrorAtTokenPosition(wasStartValueExplicitlyDefined ? context->startValue->start : context->endValue->start, fmt::format(InvalidLoopVariableValueRangeWithNegativeStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
+                    createError(mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart), fmt::format(InvalidLoopVariableValueRangeWithNegativeStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
                     loopHeaderValid = false;
                 } else if (!negativeStepSizeDefined && *iterationRangeStartValueEvaluated > *iterationRangeEndValueEvaluated) {
-                    createErrorAtTokenPosition(wasStartValueExplicitlyDefined ? context->startValue->start : context->endValue->start, fmt::format(InvalidLoopVariableValueRangeWithPositiveStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
+                    createError(mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart), fmt::format(InvalidLoopVariableValueRangeWithPositiveStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
                     loopHeaderValid = false;
                 } else if (stepSizeEvaluated != 0) {
                     numIterations = (negativeStepSizeDefined ? (*iterationRangeStartValueEvaluated - *iterationRangeEndValueEvaluated) : (*iterationRangeEndValueEvaluated - *iterationRangeStartValueEvaluated)) + 1;
@@ -864,7 +867,7 @@ std::any SyReCCustomVisitor::visitIfStatement(SyReCParser::IfStatementContext* c
 
     // TODO: Error position
     if (!areExpressionsEqual(*guardExpression, *closingGuardExpression)) {
-        createErrorAtTokenPosition(context->getStart(), IfAndFiConditionMissmatch);
+        createError(mapAntlrTokenPosition(context->getStart()), IfAndFiConditionMissmatch);
         return 0;
     }
 
@@ -889,7 +892,7 @@ std::any SyReCCustomVisitor::visitUnaryStatement(SyReCParser::UnaryStatementCont
         ) {
         allSemanticChecksOk = false;
         // TODO: Error position
-        createErrorAtTokenPosition(context->unaryOp, InvalidUnaryOperation);
+        createError(mapAntlrTokenPosition(context->unaryOp), InvalidUnaryOperation);
     }
 
     // TODO: Is a sort of broadcasting check required (i.e. if a N-D signal is accessed and broadcasting is not supported an error should be created and otherwise the statement will be simplified [one will be created for every accessed dimension instead of one for the whole signal])
@@ -909,9 +912,13 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
         && (*assignedToSignal)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->signal()->IDENT()->getSymbol(), *(*assignedToSignal)->getAsVariableAccess());
 
     if (allSemanticChecksOk) {
-        unsigned int assignedToSignalBitwidth;
-        const bool _ = tryDetermineBitwidthAfterVariableAccess(*(*assignedToSignal)->getAsVariableAccess(), &assignedToSignalBitwidth);
-        optionalExpectedExpressionSignalWidth.emplace(assignedToSignalBitwidth);
+        const auto   assignedToSignalBitWidthEvaluated = tryDetermineBitwidthAfterVariableAccess(*(*assignedToSignal)->getAsVariableAccess(), mapAntlrTokenPosition(context->start));
+        if (assignedToSignalBitWidthEvaluated.has_value()) {
+            optionalExpectedExpressionSignalWidth.emplace(*assignedToSignalBitWidthEvaluated);
+        }
+        else {
+            optionalExpectedExpressionSignalWidth.emplace((*(*assignedToSignal)->getAsVariableAccess())->getVar()->bitwidth);
+        }
         // TODO:
         //binaryExpressionSignalProhibition->setProhibitedSignal(*(*assignedToSignal)->getAsVariableAccess());
     }
@@ -922,7 +929,7 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
             && syrec_operation::operation::add_assign != *definedAssignmentOperation
             && syrec_operation::operation::minus_assign != *definedAssignmentOperation)) {
         // TODO: Error position
-        createErrorAtTokenPosition(context->assignmentOp, InvalidAssignOperation);
+        createError(mapAntlrTokenPosition(context->assignmentOp), InvalidAssignOperation);
         allSemanticChecksOk = false;
     }
 
@@ -936,12 +943,12 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
         const auto rhsOperandNumValuesPerAccessedDimension = (*assignmentOpRhsOperand)->numValuesPerDimension;
         if (requiresBroadcasting(lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
             if (!config->supportBroadcastingExpressionOperands) {
-                createErrorAtTokenPosition(context->signal()->start, fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandAccessedDimensionsNumValuesPerDimension.size(), rhsOperandNumValuesPerAccessedDimension.size()));
+                createError(determineContextStartTokenPositionOrUseDefaultOne(context->signal()), fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandAccessedDimensionsNumValuesPerDimension.size(), rhsOperandNumValuesPerAccessedDimension.size()));
             } else {
-                createErrorAtTokenPosition(context->signal()->start, "Broadcasting of operands is currently not supported");
+                createError(determineContextStartTokenPositionOrUseDefaultOne(context->signal()), "Broadcasting of operands is currently not supported");
             }
         }
-        else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(context->signal()->start, lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
+        else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(mapAntlrTokenPosition(context->signal()->start), lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
             // TODO: Add mapping from custom operation enum to internal "numeric"
             addStatementToOpenContainer(
                     std::make_shared<syrec::AssignStatement>(
@@ -988,7 +995,7 @@ std::any SyReCCustomVisitor::visitSwapStatement(SyReCParser::SwapStatementContex
     
     if (lhsNumAffectedDimensions != rhsNumAffectedDimensions) {
         // TODO: Error position
-        createErrorAtTokenPosition(context->start, fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAffectedDimensions, rhsNumAffectedDimensions));
+        createError(mapAntlrTokenPosition(context->start), fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAffectedDimensions, rhsNumAffectedDimensions));
         allSemanticChecksOk = false;
     }
     else if (lhsAccessedSignal->indexes.empty() && rhsAccessedSignal->indexes.empty()) {
@@ -1000,7 +1007,7 @@ std::any SyReCCustomVisitor::visitSwapStatement(SyReCParser::SwapStatementContex
             continueCheck = lhsSignalDimensions.at(dimensionIdx) == rhsSignalDimensions.at(dimensionIdx);
             if (!continueCheck) {
                 // TODO: Error position
-                createErrorAtTokenPosition(context->start, fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsSignalDimensions.at(dimensionIdx), rhsSignalDimensions.at(dimensionIdx)));
+                createError(mapAntlrTokenPosition(context->start), fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsSignalDimensions.at(dimensionIdx), rhsSignalDimensions.at(dimensionIdx)));
                 allSemanticChecksOk = false;
             }
         }
@@ -1010,14 +1017,12 @@ std::any SyReCCustomVisitor::visitSwapStatement(SyReCParser::SwapStatementContex
         return 0;
     }
 
-    unsigned int lhsAccessedSignalWidth;
-    unsigned int rhsAccessedSignalWidth;
+    const auto lhsAccessedSignalWidthEvaluated = tryDetermineBitwidthAfterVariableAccess(lhsAccessedSignal, determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand));
+    const auto rhsAccessedSignalWidthEvaluated = tryDetermineBitwidthAfterVariableAccess(rhsAccessedSignal, determineContextStartTokenPositionOrUseDefaultOne(context->rhsOperand));
 
-    if (tryDetermineBitwidthAfterVariableAccess(lhsAccessedSignal, &lhsAccessedSignalWidth)
-        && tryDetermineBitwidthAfterVariableAccess(rhsAccessedSignal, &rhsAccessedSignalWidth)
-        && lhsAccessedSignalWidth != rhsAccessedSignalWidth) {
+    if (lhsAccessedSignalWidthEvaluated.has_value() && rhsAccessedSignalWidthEvaluated.has_value() && *lhsAccessedSignalWidthEvaluated != *rhsAccessedSignalWidthEvaluated) {
         // TODO: Error position
-        createErrorAtTokenPosition(context->start, fmt::format(InvalidSwapSignalWidthMissmatch, lhsAccessedSignalWidth, rhsAccessedSignalWidth));
+        createError(mapAntlrTokenPosition(context->start), fmt::format(InvalidSwapSignalWidthMissmatch, *lhsAccessedSignalWidthEvaluated, *rhsAccessedSignalWidthEvaluated));
         return 0;
     }
 
@@ -1032,20 +1037,22 @@ std::any SyReCCustomVisitor::visitSkipStatement(SyReCParser::SkipStatementContex
     return 0;
 }
 
+inline SyReCCustomVisitor::TokenPosition SyReCCustomVisitor::determineContextStartTokenPositionOrUseDefaultOne(const antlr4::ParserRuleContext* context) {
+    return context == nullptr ? TokenPosition(fallbackErrorLinePosition, fallbackErrorColumnPosition) : mapAntlrTokenPosition(context->start);
+}
+
+inline SyReCCustomVisitor::TokenPosition SyReCCustomVisitor::mapAntlrTokenPosition(const antlr4::Token* token) {
+    if (token == nullptr) {
+        return TokenPosition(fallbackErrorLinePosition, fallbackErrorColumnPosition);
+    }
+    return TokenPosition(token->getLine(), token->getCharPositionInLine());
+}
+
 /*
  * Utility functions for error and warning creation
  */
-
-void SyReCCustomVisitor::createErrorAtTokenPosition(const antlr4::Token* token, const std::string& errorMessage) {
-    const std::size_t errorLine = token != nullptr ? token->getLine() : -1;
-    const std::size_t errorColumn = token != nullptr ? token->getCharPositionInLine() : -1;
-    return createError(errorLine, errorColumn, errorMessage);
-}
-
-
-// TODO:
-void SyReCCustomVisitor::createError(const std::size_t line, const std::size_t column, const std::string& errorMessage) {
-    errors.emplace_back(ParserUtilities::createError(line, column, errorMessage));
+void SyReCCustomVisitor::createError(const TokenPosition& tokenPosition, const std::string& errorMessage) {
+    errors.emplace_back(ParserUtilities::createError(tokenPosition.line, tokenPosition.column, errorMessage));
 }
 
 // TODO:
@@ -1101,7 +1108,7 @@ std::optional<syrec::Variable::Types> SyReCCustomVisitor::getSignalType(const an
 bool SyReCCustomVisitor::checkIfSignalWasDeclaredOrLogError(const antlr4::Token* signalIdentToken, bool isLoopVariable) {
     const std::string signalIdent = isLoopVariable ? "$" + signalIdentToken->getText() : signalIdentToken->getText();
     if (!currentSymbolTableScope->contains(signalIdent)) {
-        createErrorAtTokenPosition(signalIdentToken, fmt::format(UndeclaredIdent, signalIdent));
+        createError(mapAntlrTokenPosition(signalIdentToken), fmt::format(UndeclaredIdent, signalIdent));
         return false;
     }
     return true;
@@ -1125,7 +1132,7 @@ bool SyReCCustomVisitor::checkIfSignalWasDeclaredOrLogError(const antlr4::Token*
 
         // TODO: GEN_ERROR: Index out of range for dimension i
         // TODO: Error position
-        createErrorAtTokenPosition(dimensionToken,
+        createError(mapAntlrTokenPosition(dimensionToken),
                 fmt::format(
                         DimensionValueOutOfRange,
                         expressionResultAsConstant,
@@ -1159,18 +1166,18 @@ bool SyReCCustomVisitor::checkIfSignalWasDeclaredOrLogError(const antlr4::Token*
             isValidSignalAccess                                      = false;
             const IndexAccessRangeConstraint constraintsForBitAccess = getConstraintsForValidBitAccess(accessedVariable, true);
             // TODO: GEN_ERROR: Bit access out of range
-            createErrorAtTokenPosition(bitOrRangeStartToken, fmt::format(BitAccessOutOfRange, bitOrRangeAccessPairEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue));
+            createError(mapAntlrTokenPosition(bitOrRangeStartToken), fmt::format(BitAccessOutOfRange, bitOrRangeAccessPairEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue));
         }
     } else {
         if (bitOrRangeAccessPairEvaluated.first > bitOrRangeAccessPairEvaluated.second) {
             isValidSignalAccess = false;
             // TODO: GEN_ERROR: Bit range start larger than end
-            createErrorAtTokenPosition(bitOrRangeStartToken, fmt::format(BitRangeStartLargerThanEnd, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second));
+            createError(mapAntlrTokenPosition(bitOrRangeStartToken), fmt::format(BitRangeStartLargerThanEnd, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second));
         } else if (!isValidBitRangeAccess(accessedVariable, bitOrRangeAccessPairEvaluated, true)) {
             isValidSignalAccess                                           = false;
             const IndexAccessRangeConstraint constraintsForBitRangeAccess = getConstraintsForValidBitAccess(accessedVariable, true);
             // TODO: GEN_ERROR: Bit range out of range
-            createErrorAtTokenPosition(bitOrRangeStartToken, fmt::format(BitRangeOutOfRange, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue));
+            createError(mapAntlrTokenPosition(bitOrRangeStartToken), fmt::format(BitRangeOutOfRange, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue));
         }
     }
     return isValidSignalAccess;
@@ -1266,7 +1273,7 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
             break;
         default:
             // TODO: Error position
-            createErrorAtTokenPosition(definedOperationToken, "TODO: No mapping for operation");
+            createError(mapAntlrTokenPosition(definedOperationToken), "TODO: No mapping for operation");
             break;
     }
     return definedOperation;
@@ -1275,7 +1282,7 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
 // TODO: Naming
 // TODO: Handling of divison by zero
 // TODO: Handling of error creation
-[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryEvaluateNumber(const syrec::Number::ptr& numberContainer) const {
+[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryEvaluateNumber(const syrec::Number::ptr& numberContainer, const TokenPosition& evaluationErrorPositionHelper) {
     if (numberContainer->isLoopVariable()) {
         const std::string& loopVariableIdent = numberContainer->variableName();
         if (evaluableLoopVariables.find(loopVariableIdent) == evaluableLoopVariables.end() ||
@@ -1283,13 +1290,7 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
             return std::nullopt;
         }
     } else if (numberContainer->isCompileTimeConstantExpression()) {
-        bool               wasDivisionByZero                     = false;
-        const auto compileTimeExpressionEvaluationResult = tryEvaluateCompileTimeExpression(numberContainer->getExpression(), &wasDivisionByZero);
-        if (compileTimeExpressionEvaluationResult.has_value()) {
-            return std::make_optional(*compileTimeExpressionEvaluationResult);
-        }
-
-        return std::nullopt;
+        return tryEvaluateCompileTimeExpression(numberContainer->getExpression(), evaluationErrorPositionHelper);
     }
 
     return std::make_optional(numberContainer->evaluate(loopVariableMappingLookup));
@@ -1307,37 +1308,38 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
 }
 
 // TODO: Should return type be optional if evaluation fails ?
-[[nodiscard]] bool SyReCCustomVisitor::tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, unsigned int* bitwidthAfterVariableAccess) const {
-    *bitwidthAfterVariableAccess = variableAccess->getVar()->bitwidth;
+[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, const TokenPosition& evaluationErrorPositionHelper) {
+    std::optional<unsigned int> bitWidthAfterVariableAccess = std::make_optional(variableAccess->getVar()->bitwidth);
 
     if (!variableAccess->range.has_value()) {
-        return true;
+        return bitWidthAfterVariableAccess;
     }
 
     const auto& rangeStart = (*variableAccess->range).first;
     const auto& rangeEnd = (*variableAccess->range).second;
 
     if (rangeStart == rangeEnd) {
-        *bitwidthAfterVariableAccess = 1;
-        return true;
+        bitWidthAfterVariableAccess.emplace(1);
+        return bitWidthAfterVariableAccess;
     }
 
     if (canEvaluateNumber(rangeStart) && canEvaluateNumber(rangeEnd)) {
-        const unsigned int bitRangeStart = *tryEvaluateNumber(rangeStart);
-        const unsigned int bitRangeEnd = *tryEvaluateNumber(rangeEnd);
+        const unsigned int bitRangeStart = *tryEvaluateNumber(rangeStart, evaluationErrorPositionHelper);
+        const unsigned int bitRangeEnd = *tryEvaluateNumber(rangeEnd, evaluationErrorPositionHelper);
 
-        *bitwidthAfterVariableAccess = bitRangeEnd - bitRangeStart + 1;
-        return true;
+        bitWidthAfterVariableAccess.emplace(bitRangeEnd - bitRangeStart + 1);
     }
-
-    return false;
+    else {
+        bitWidthAfterVariableAccess.reset();
+    }
+    return bitWidthAfterVariableAccess;
 }
 
-[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, bool* wasDivisionByZero) const {
+[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, const TokenPosition& evaluationErrorPositionHelper) {
     std::optional<unsigned int> evaluationResult;
 
-    const auto lhsEvaluated = canEvaluateNumber(compileTimeExpression.lhsOperand) ? tryEvaluateNumber(compileTimeExpression.lhsOperand) : std::nullopt;
-    const auto rhsEvaluated = (lhsEvaluated.has_value() && canEvaluateNumber(compileTimeExpression.rhsOperand)) ? tryEvaluateNumber(compileTimeExpression.rhsOperand) : std::nullopt;
+    const auto lhsEvaluated = canEvaluateNumber(compileTimeExpression.lhsOperand) ? tryEvaluateNumber(compileTimeExpression.lhsOperand, evaluationErrorPositionHelper) : std::nullopt;
+    const auto rhsEvaluated = (lhsEvaluated.has_value() && canEvaluateNumber(compileTimeExpression.rhsOperand)) ? tryEvaluateNumber(compileTimeExpression.rhsOperand, evaluationErrorPositionHelper) : std::nullopt;
     if (rhsEvaluated.has_value()) {
         switch (compileTimeExpression.operation) {
             case syrec::Number::Addition:
@@ -1347,19 +1349,22 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
             case syrec::Number::Multiplication:
                 evaluationResult.emplace(*lhsEvaluated * *rhsEvaluated);
             default:
-                *wasDivisionByZero = *rhsEvaluated == 0;
-                if (!*wasDivisionByZero)
-                    evaluationResult.emplace(*lhsEvaluated / *rhsEvaluated);
+                if (*rhsEvaluated != 0) {
+                    evaluationResult.emplace(*lhsEvaluated / *rhsEvaluated);   
+                }
+                else {
+                    createError(evaluationErrorPositionHelper, DivisionByZero);
+                }
         }
     }
     return evaluationResult;
 }
 
-[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {
+[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand, const TokenPosition& potentialErrorPosition) {
     if (operation == syrec_operation::operation::division && rightOperand == 0) {
         // TODO: GEN_ERROR
         // TODO: Error position
-        createErrorAtTokenPosition(nullptr, DivisionByZero);
+        createError(potentialErrorPosition, DivisionByZero);
         return std::nullopt;
     }
 
@@ -1399,12 +1404,11 @@ bool SyReCCustomVisitor::isValidBinaryOperation(syrec_operation::operation userD
 [[nodiscard]] bool SyReCCustomVisitor::isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable) {
     if (syrec::Variable::Types::In == assignedToVariable->getVar()->type) {
         // TODO: Error position
-        createErrorAtTokenPosition(signalIdentToken, fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name));
+        createError(mapAntlrTokenPosition(signalIdentToken), fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name));
         return false;
     }
     return true;
 }
-
 
 void SyReCCustomVisitor::addStatementToOpenContainer(const syrec::Statement::ptr& statement) {
     statementListContainerStack.top().emplace_back(statement);
@@ -1425,15 +1429,15 @@ void SyReCCustomVisitor::addStatementToOpenContainer(const syrec::Statement::ptr
     return areSyntacticallyEquivalent(firstExpr->getAsExpression().value(), otherExpr->getAsExpression().value());
 }
 
-bool SyReCCustomVisitor::areSemanticChecksForCallOrUncallDependingOnNameValid(bool isCallOperation, const std::pair<size_t, size_t>& moduleIdentTokenPosition, const std::optional<std::string>& moduleIdent) {
+bool SyReCCustomVisitor::areSemanticChecksForCallOrUncallDependingOnNameValid(bool isCallOperation, const TokenPosition& moduleIdentTokenPosition, const std::optional<std::string>& moduleIdent) {
     if (isCallOperation) {
         if (moduleCallStack->containsAnyUncalledModulesForNestingLevel(moduleCallNestingLevel)) {
-            createError(moduleIdentTokenPosition.first, moduleIdentTokenPosition.second, PreviousCallWasNotUncalled);
+            createError(moduleIdentTokenPosition, PreviousCallWasNotUncalled);
             return false;
         }
     } else {
         if (!moduleCallStack->containsAnyUncalledModulesForNestingLevel(moduleCallNestingLevel)) {
-            createError(moduleIdentTokenPosition.first, moduleIdentTokenPosition.second, UncallWithoutPreviousCall);
+            createError(moduleIdentTokenPosition, UncallWithoutPreviousCall);
             return false;
         }
 
@@ -1443,14 +1447,14 @@ bool SyReCCustomVisitor::areSemanticChecksForCallOrUncallDependingOnNameValid(bo
 
         const auto& lastCalledModule = *moduleCallStack->getLastCalledModuleForNestingLevel(moduleCallNestingLevel);
         if (lastCalledModule->moduleIdent != *moduleIdent) {
-            createError(moduleIdentTokenPosition.first, moduleIdentTokenPosition.second, fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, lastCalledModule->moduleIdent, *moduleIdent));
+            createError(moduleIdentTokenPosition, fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, lastCalledModule->moduleIdent, *moduleIdent));
             return false;
         }
     }
     return true;
 }
 
-bool SyReCCustomVisitor::doArgumentsBetweenCallAndUncallMatch(const std::pair<size_t, size_t>& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments) {
+bool SyReCCustomVisitor::doArgumentsBetweenCallAndUncallMatch(const TokenPosition& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments) {
     const auto lastCalledModule = *moduleCallStack->getLastCalledModuleForNestingLevel(moduleCallNestingLevel);
     if (lastCalledModule->moduleIdent != uncalledModuleIdent) {
         return false;
@@ -1461,7 +1465,7 @@ bool SyReCCustomVisitor::doArgumentsBetweenCallAndUncallMatch(const std::pair<si
     size_t      numCalleeArgumentsToCheck = calleeArguments.size();
 
     if (numCalleeArgumentsToCheck != argumentsOfCall.size()) {
-        createError(positionOfPotentialError.first, positionOfPotentialError.second, fmt::format(NumberOfParametersMissmatchBetweenCallAndUncall, uncalledModuleIdent, argumentsOfCall.size(), calleeArguments.size()));
+        createError(positionOfPotentialError, fmt::format(NumberOfParametersMissmatchBetweenCallAndUncall, uncalledModuleIdent, argumentsOfCall.size(), calleeArguments.size()));
         numCalleeArgumentsToCheck = std::min(numCalleeArgumentsToCheck, argumentsOfCall.size());
         argumentsMatched          = false;
     }
@@ -1480,13 +1484,13 @@ bool SyReCCustomVisitor::doArgumentsBetweenCallAndUncallMatch(const std::pair<si
     if (!missmatchedParameterValues.empty()) {
         std::ostringstream missmatchedParameterErrorsBuffer;
         std::copy(missmatchedParameterValues.cbegin(), missmatchedParameterValues.cend(), infix_ostream_iterator<std::string>(missmatchedParameterErrorsBuffer, ","));
-        createError(positionOfPotentialError.first, positionOfPotentialError.second, fmt::format(CallAndUncallArgumentsMissmatch, uncalledModuleIdent, missmatchedParameterErrorsBuffer.str()));
+        createError(positionOfPotentialError, fmt::format(CallAndUncallArgumentsMissmatch, uncalledModuleIdent, missmatchedParameterErrorsBuffer.str()));
     }
 
     return argumentsMatched;
 }
 
-bool SyReCCustomVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(const antlr4::Token* positionOfOptionalError, const std::vector<unsigned int>& lhsOperandNumValuesPerDimension, const std::vector<unsigned int>& rhsOperandNumValuesPerDimension) {
+bool SyReCCustomVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(const TokenPosition& positionOfOptionalError, const std::vector<unsigned int>& lhsOperandNumValuesPerDimension, const std::vector<unsigned int>& rhsOperandNumValuesPerDimension) {
     if (const auto dimensionsWithMissmatchedNumValues = getDimensionsWithMissmatchedNumberOfValues(lhsOperandNumValuesPerDimension, rhsOperandNumValuesPerDimension); !dimensionsWithMissmatchedNumValues.empty()) {
         std::vector<std::string> perDimensionErrorBuffer;
         for (const auto& dimensionValueMissmatch: dimensionsWithMissmatchedNumValues) {
@@ -1495,7 +1499,7 @@ bool SyReCCustomVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(const 
 
         std::ostringstream errorsConcatinatedBuffer;
         std::copy(perDimensionErrorBuffer.cbegin(), perDimensionErrorBuffer.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, ","));
-        createErrorAtTokenPosition(positionOfOptionalError, fmt::format(MissmatchedNumberOfValuesForDimensionsBetweenOperands, errorsConcatinatedBuffer.str()));
+        createError(positionOfOptionalError, fmt::format(MissmatchedNumberOfValuesForDimensionsBetweenOperands, errorsConcatinatedBuffer.str()));
         return false;
     }
     return true;

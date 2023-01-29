@@ -32,14 +32,32 @@ private:
     std::optional<syrec::VariableAccess::ptr> prohibitedSignalAccessAsBinaryExpressionOperand;
 
     std::set<std::string> evaluableLoopVariables;
-    
+
+    static constexpr std::size_t fallbackErrorLinePosition = 0;
+    static constexpr std::size_t fallbackErrorColumnPosition = 0;
+
+    struct TokenPosition {
+        std::size_t line;
+        std::size_t column;
+
+        explicit TokenPosition(const std::size_t line, const std::size_t column):
+            line(line), column(column) {
+            
+        }
+
+        static TokenPosition createFallbackPosition() {
+            return TokenPosition(fallbackErrorLinePosition, fallbackErrorColumnPosition);
+        }
+    };
+
     /**
      * \brief We can reference the current loop variable in all expressions of the loop header expect the initial value definition.
      */
     std::optional<std::string> lastDeclaredLoopVariable;
 
-    void createErrorAtTokenPosition(const antlr4::Token* token, const std::string& errorMessage);
-    void createError(std::size_t line, std::size_t column, const std::string& errorMessage);
+    static TokenPosition determineContextStartTokenPositionOrUseDefaultOne(const antlr4::ParserRuleContext* context);
+    static TokenPosition mapAntlrTokenPosition(const antlr4::Token* token);
+    void createError(const TokenPosition& tokenPosition, const std::string& errorMessage);
     void createWarning(const std::string& warningMessage);
 
     /**
@@ -91,21 +109,21 @@ private:
     [[nodiscard]] bool validateBitOrRangeAccessOnSignal(const antlr4::Token* bitOrRangeStartToken, const syrec::Variable::ptr& accessedVariable, const std::pair<syrec::Number::ptr, syrec::Number::ptr>& bitOrRangeAccess);
 
     [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
-    [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& numberContainer) const;
-    [[nodiscard]] std::optional<unsigned int> tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, bool* wasDivisionByZero) const;
+    [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& numberContainer, const TokenPosition& evaluationErrorPositionHelper);
+    [[nodiscard]] std::optional<unsigned int>               tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, const TokenPosition& evaluationErrorPositionHelper);
 
     [[nodiscard]] bool SyReCCustomVisitor::canEvaluateNumber(const syrec::Number::ptr& number) const;
     [[nodiscard]] bool SyReCCustomVisitor::canEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression) const;
 
-    [[nodiscard]] bool SyReCCustomVisitor::tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, unsigned int* bitwidthAfterVariableAccess) const;
+    [[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, const TokenPosition& evaluationErrorPositionHelper);
 
-    [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
+    [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand, const TokenPosition& potentialErrorPosition);
     [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable);
     void addStatementToOpenContainer(const syrec::Statement::ptr& statement);
 
-    bool areSemanticChecksForCallOrUncallDependingOnNameValid(bool isCallOperation, const std::pair<size_t, size_t>& moduleIdentTokenPosition, const std::optional<std::string>& moduleIdent);
-    bool doArgumentsBetweenCallAndUncallMatch(const std::pair<size_t, size_t>& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments);
-    bool checkIfNumberOfValuesPerDimensionMatchOrLogError(const antlr4::Token* positionOfOptionalError, const std::vector<unsigned int>& lhsOperandNumValuesPerDimension, const std::vector<unsigned int>& rhsOperandNumValuesPerDimension);
+    bool areSemanticChecksForCallOrUncallDependingOnNameValid(bool isCallOperation, const TokenPosition& moduleIdentTokenPosition, const std::optional<std::string>& moduleIdent);
+    bool doArgumentsBetweenCallAndUncallMatch(const TokenPosition& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments);
+    bool checkIfNumberOfValuesPerDimensionMatchOrLogError(const TokenPosition& positionOfOptionalError, const std::vector<unsigned int>& lhsOperandNumValuesPerDimension, const std::vector<unsigned int>& rhsOperandNumValuesPerDimension);
 
 public:
     syrec::Module::vec modules;
