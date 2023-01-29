@@ -110,12 +110,12 @@
     ]
   },
   "startValueLargerThanEndWithPositiveStepsizeNoEndValueDefined": {
-    "circuit": "module main() for 2 step 1 do skip rof",
+    "circuit": "module main() for -2 step 1 do skip rof",
     "errors": [
       {
         "line": 1,
         "column": 18,
-        "message": "invalid loop variable value range, start value cannot be larger than the end (start: 2, end: 0, stepsize: 1)"
+        "message": "invalid loop variable value range, start value cannot be larger than the end (start: -2, end: 0, stepsize: 1)"
       }
     ]
   },

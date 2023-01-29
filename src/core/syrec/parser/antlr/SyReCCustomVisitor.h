@@ -31,6 +31,13 @@ private:
     std::optional<unsigned int> optionalExpectedExpressionSignalWidth;
     std::optional<syrec::VariableAccess::ptr> prohibitedSignalAccessAsBinaryExpressionOperand;
 
+    std::set<std::string> evaluableLoopVariables;
+    
+    /**
+     * \brief We can reference the current loop variable in all expressions of the loop header expect the initial value definition.
+     */
+    std::optional<std::string> lastDeclaredLoopVariable;
+
     void createErrorAtTokenPosition(const antlr4::Token* token, const std::string& errorMessage);
     void createError(std::size_t line, std::size_t column, const std::string& errorMessage);
     void createWarning(const std::string& warningMessage);
@@ -80,8 +87,18 @@ private:
     [[nodiscard]] bool                                                             isExpressionProhibitedAsBinaryOperationOperand(const syrec::VariableAccess::ptr& signalAccess);
     [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(const antlr4::Token* dimensionToken, size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult);
     [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
+
+    [[nodiscard]] bool validateBitOrRangeAccessOnSignal(const antlr4::Token* bitOrRangeStartToken, const syrec::Variable::ptr& accessedVariable, const std::pair<syrec::Number::ptr, syrec::Number::ptr>& bitOrRangeAccess);
+
     [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
-    [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& numberContainer);
+    [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& numberContainer) const;
+    [[nodiscard]] std::optional<unsigned int> tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, bool* wasDivisionByZero) const;
+
+    [[nodiscard]] bool SyReCCustomVisitor::canEvaluateNumber(const syrec::Number::ptr& number) const;
+    [[nodiscard]] bool SyReCCustomVisitor::canEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression) const;
+
+    [[nodiscard]] unsigned int SyReCCustomVisitor::determineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess) const;
+
     [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
     [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable);
     void addStatementToOpenContainer(const syrec::Statement::ptr& statement);

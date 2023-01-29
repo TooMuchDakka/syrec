@@ -127,6 +127,13 @@ protected:
 };
 
 /*
+ * TODO:
+ * - Create generic "parser" of all tests defined in a .json file instead of having to manually specify them
+ * - Add option 'optional' to possible json test data that will add the required IGNORE/IGNORED name prefix so gtest will ignore this test but it will still show up in test test explorer as skipped
+ *
+ */
+
+/*
  *  TODO:
  *  - Error cases for binary expression where the dimension of the operands do not match, similarily to the shift expression error cases
  *  - What is the behaviour of a shift where the operand to be shifted is a signal with multiple dimensions (should that be possible or is that an error)

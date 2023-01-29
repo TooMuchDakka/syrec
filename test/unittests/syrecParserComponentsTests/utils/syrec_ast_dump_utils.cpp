@@ -146,11 +146,8 @@ std::string SyrecASTDumper::stringifyForStatement(const syrec::ForStatement& for
     if (forStmt.range.first != forStmt.range.second) {
         loopHeader += stringifyNumber(forStmt.range.first) + " to ";
     }
-    loopHeader += stringifyNumber(forStmt.range.second);
-    const unsigned int stepsize            = forStmt.step->evaluate({});
-    loopHeader += std::string(" step ") + (stepsize < 0 ? "-" : "") + stringifyNumber(forStmt.step) + " do";
-
-
+    loopHeader += stringifyNumber(forStmt.range.second) + std::string(" step ") + stringifyNumber(forStmt.step) + " do";
+    
     std::string stringifiedStmt = "for " + loopHeader + this->dumpConfig.newlineSequence;
     this->identationLevel++;
     stringifiedStmt += stringifyStatements(forStmt.statements) + this->dumpConfig.newlineSequence;
@@ -266,7 +263,7 @@ std::string SyrecASTDumper::stringifyVariableExpression(const syrec::VariableExp
 
 // TODO: Throw exception on invalid signal type ?
 std::string SyrecASTDumper::stringifyVariable(const syrec::Variable::ptr& variable) {
-    const std::string dimensionsStringified = stringifyAndJoinMany(variable->dimensions, "", &SyrecASTDumper::stringifyDimension);
+    const std::string dimensionsStringified = stringifyDimensions(variable->dimensions);
     const std::string bitwidthStringified   = "(" + std::to_string(variable->bitwidth) + ")";
 
     std::string variableAssignabilityStringified;
@@ -288,7 +285,7 @@ std::string SyrecASTDumper::stringifyVariable(const syrec::Variable::ptr& variab
 }
 
 std::string SyrecASTDumper::stringifyLocal(const syrec::Variable::ptr& local, bool withTypePrefix) {
-    const std::string dimensionsStringified = stringifyAndJoinMany(local->dimensions, "", &SyrecASTDumper::stringifyDimension);
+    const std::string dimensionsStringified = stringifyDimensions(local->dimensions);
     const std::string bitwidthStringified   = "(" + std::to_string(local->bitwidth) + ")";
 
     std::string variableAssignabilityStringified;
@@ -332,11 +329,44 @@ inline std::string SyrecASTDumper::stringifyNumber(const syrec::Number::ptr& num
         // TODO: Since for now a loop variable ident contains the '$' symbol we can omit printing it a second time
         return number->variableName();
     }
+
+    if (number->isCompileTimeConstantExpression()) {
+        const auto        definedExpression     = number->getExpression();
+
+        std::string numberStringified = "(" + stringifyNumber(definedExpression.lhsOperand) + " ";
+        switch (definedExpression.operation) {
+            case syrec::Number::Operation::Addition: {
+                numberStringified += "+";
+                break;
+            }
+            case syrec::Number::Operation::Subtraction: {
+                numberStringified += "-";
+                break;
+            }
+            case syrec::Number::Operation::Multiplication: {
+                numberStringified += "*";
+                break;
+            }
+            case syrec::Number::Operation::Division: {
+                numberStringified += "/";
+                break;
+            }
+        }
+        numberStringified += " " + stringifyNumber(definedExpression.rhsOperand) + ")";
+        return numberStringified;
+    }
     return std::to_string(number->evaluate({}));
 }
 
 inline std::string SyrecASTDumper::stringifyDimensionExpression(const syrec::expression::ptr& expr) {
     return "[" + stringifyExpression(expr) + "]";
+}
+
+inline std::string SyrecASTDumper::stringifyDimensions(const std::vector<unsigned int>& dimensions) {
+    if (dimensions.empty() || (dimensions.size() == 1 && dimensions.at(0) == 1)) {
+        return "";
+    }
+    return stringifyAndJoinMany(dimensions, "", &SyrecASTDumper::stringifyDimension);
 }
 
 inline std::string SyrecASTDumper::stringifyDimension(const unsigned int& dimension) {

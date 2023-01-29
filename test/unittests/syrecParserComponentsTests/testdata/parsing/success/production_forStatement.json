@@ -9,6 +9,14 @@
   "rangeAsInitialValueWithNegativeStepSize": {
     "circuit": "module main() for 2 step -2 do skip rof"
   },
+  "rangeWithInitialValueAsExpression": {
+    "circuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for ($i - (6 + 10)) do skip rof rof",
+    "expectedCircuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for ($i - 16) step 1 do skip rof rof"
+  },
+  "rangeWithEndValueAsExpression": {
+    "circuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for $j = 0 to ($i - (6 + 10)) do skip rof rof",
+    "expectedCircuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for $j = 0 to ($i - 16) step 1 do skip rof rof"
+  },
   "fullRangeWithoutStepsize": {
     "circuit": "module main() for 0 to 2 do skip rof",
     "expectedCircuit": "module main() for 0 to 2 step 1 do skip rof"
@@ -28,6 +36,16 @@
   },
   "loopVariableWithNegativeStepsize": {
     "circuit": "module main() for $i = 4 to 0 step -2 do skip rof"
+  },
+  "stepSizeAsExpression": {
+    "circuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for 2 step (2 + ($i - #a)) do skip rof rof",
+    "expectedCircuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for 2 step (2 + ($i - 16)) do skip rof rof"
+  },
+  "parentLoopVariableUsedInNestedLoop": {
+    "circuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for $j = ($i + 1) to ($i + (2 * $i)) step 1 do skip rof rof"
+  },
+  "usageOfLoopVariableInAnyExpressionExceptInitialValueOk": {
+    "circuit": "module main() for $i = 0 to ($i + (2 + $i)) step ($i + 1) do skip rof"
   },
   "singleStatementInBody": {
     "circuit": "module main() for 2 step 1 do skip rof"

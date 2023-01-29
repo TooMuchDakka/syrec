@@ -5,7 +5,7 @@
       {
         "line": 1,
         "column": 29,
-        "message": "EOF expected"
+        "message": "extraneous input 'a2' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -35,7 +35,7 @@
       {
         "line": 1,
         "column": 30,
-        "message": "EOF expected"
+        "message": "extraneous input '+' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -45,7 +45,7 @@
       {
         "line": 1,
         "column": 37,
-        "message": "EOF expected"
+        "message": "extraneous input '+' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -55,7 +55,7 @@
       {
         "line": 1,
         "column": 35,
-        "message": "\")\" expected"
+        "message": "no viable alternative at input '(2 + #c'"
       }
     ]
   },
@@ -65,27 +65,27 @@
       {
         "line": 1,
         "column": 37,
-        "message": "\")\" expected"
+        "message": "no viable alternative at input '((2 + #c +'"
       }
     ]
   },
   "invalidOperationInExpression": {
-    "circuit": "module main(out c(16), in a[2](16)) c += a[(2 % #c)]",
+    "circuit": "module main(out c(16), in a[2](16)) c += a[1].(1 % #c)",
     "errors": [
       {
         "line": 1,
-        "column": 48,
-        "message": "invalid number expression operand"
+        "column": 49,
+        "message": "mismatched input '%' expecting {'+', '-', '*', '/'}"
       }
     ]
   },
   "invalidOperationInNestedExpression": {
-    "circuit": "module main(out c(16), in a[2](16)) c += a[((2 + #c) % 2)]",
+    "circuit": "module main(out c(16), in a[2](16)) c += a[1].((2 + #c) % 2)",
     "errors": [
       {
         "line": 1,
-        "column": 55,
-        "message": "invalid number expression operand"
+        "column": 56,
+        "message": "mismatched input '%' expecting {'+', '-', '*', '/'}"
       }
     ]
   }

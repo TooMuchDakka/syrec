@@ -29,6 +29,7 @@ namespace parser {
 
     extern const std::string InvalidLoopVariableValueRangeWithPositiveStepsize = "invalid loop variable value range, start value cannot be larger than the end (start: {0:d}, end: {1:d}, stepsize: {2:d})";
     extern const std::string InvalidLoopVariableValueRangeWithNegativeStepsize = "invalid loop variable value range, end value cannot be larger than the start (start: {0:d}, end: {1:d}, stepsize: {2:d})";
+    extern const std::string CannotReferenceLoopVariableInInitalValueDefinition = "cannot reference loop variable '{0:s}' inside of the expression defining its initial value";
 
     extern const std::string InvalidSwapSignalWidthMissmatch       = "invalid swap signal width missmatch, first operand had a signal width of {0:d} while the other had a signal width of {1:d}";
     extern const std::string InvalidSwapNumDimensionsMissmatch     = "invalid swap number of dimension missmatch, first operand had {0:d} while the other had {1:d}";
@@ -66,4 +67,7 @@ namespace parser {
 
     /* Internal parser errors */
     extern const std::string NoMappingForLoopVariable = "no mapping of loop variable {0:s} to a value was found";
+
+    extern const std::string NoMappingForNumberOperation = "no mapping for number operation '{0:s}' was defined";
+    extern const std::string InvalidOperationForNumberExpressionDefined = "invalid operation '{0:s}' for number, valid operations are: {+, -, *, /}";
 } // namespace parser

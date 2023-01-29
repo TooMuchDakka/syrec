@@ -5,6 +5,7 @@
 
 #include "SyReCCustomVisitor.h"
 
+#include "core/syrec/number.hpp"
 #include "core/syrec/parser/custom_semantic_errors.hpp"
 #include "core/syrec/parser/expression_comparer.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
@@ -18,6 +19,13 @@ using namespace parser;
 
 // https://stackoverflow.com/questions/60420005/programmatically-access-antlr-grammar-rule-string-literals-outside-of-a-parse-co
 
+
+/*
+ * TODO: Tests for shift expression with number expression as shift amount
+ * TODO: Tests for swap statement with number expressions used in both operands (either bit / range / dimension access)
+ * TODO: Tests with number expression in binary expression ?
+ *
+ */
 
 // TODO: Currently loop variables are not supported as arguments
 // TODO: Currently the parser is not able to correctly parse assign statements such as <a> + = (...) since the operand will be split into two tokens and the assign statement production is not "found" during the parse tree creation
@@ -160,6 +168,10 @@ std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
         }
     }
 
+    if (isValidSignalDeclaration && dimensions.empty()) {
+        dimensions.emplace_back(1);
+    }
+
     if (context->signalWidthToken != nullptr) {
         const std::optional<unsigned int> customSignalWidth = ParserUtilities::convertToNumber(context->signalWidthToken);
         if (customSignalWidth.has_value()) {
@@ -178,6 +190,8 @@ std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
 /*
  * Signal production
  */
+// TODO: Currently one cannot perform a dimension access on a 1D signal with not explicitly defined dimensions
+// I.e. one cannot, for the signal a(16), perform the access a[0]....| Should this be a feature ?
 std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
     std::string signalIdent;
     std::optional<syrec::VariableAccess::ptr> accessedSignal;
@@ -202,20 +216,15 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
         const size_t numElementsWithinRange = std::min(numUserDefinedDimensions, numDimensionsOfAccessSignal);
         for (size_t dimensionIdx = 0; dimensionIdx < numElementsWithinRange; ++dimensionIdx) {
             const auto  accessedDimensionExpression = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->accessedDimensions.at(dimensionIdx));
+            isValidSignalAccess  = validateSemanticChecksIfDimensionExpressionIsConstant(
+                                       context->accessedDimensions.at(dimensionIdx)->start,
+                                       dimensionIdx,
+                                       (*accessedSignal)->getVar(),
+                                       accessedDimensionExpression);
 
-            if (accessedSignal.has_value()) {
-                // TODO: Error position
-                isValidSignalAccess = validateSemanticChecksIfDimensionExpressionIsConstant(
-                    context->accessedDimensions.at(dimensionIdx)->start,
-                    dimensionIdx, 
-                    (*accessedSignal)->getVar(),
-                    accessedDimensionExpression
-                );
-
-                if (isValidSignalAccess) {
-                    // TODO: Set correct bit width of expression
-                    (*accessedSignal)->indexes.emplace_back((*accessedDimensionExpression)->getAsExpression().value());
-                }
+            if (isValidSignalAccess) {
+                // TODO: Set correct bit width of expression
+                (*accessedSignal)->indexes.emplace_back((*accessedDimensionExpression)->getAsExpression().value());
             }
         }
 
@@ -227,30 +236,12 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
 
     const auto bitOrRangeAccessEvaluated = isBitOrRangeAccessDefined(context->bitStart, context->bitRangeEnd);
     if (accessedSignal.has_value() && bitOrRangeAccessEvaluated.has_value()) {
-        const auto  accessVariable                = (*accessedSignal)->getVar();
+        const auto  accessedVariable                = (*accessedSignal)->getVar();
         const auto& bitOrRangeAccessPair = bitOrRangeAccessEvaluated.value();
-        const auto& bitOrRangeAccessPairEvaluated = std::make_pair(bitOrRangeAccessPair.first->evaluate({}), bitOrRangeAccessPair.second->evaluate({}));
 
-        if (bitOrRangeAccessPair.first == bitOrRangeAccessPair.second) {
-            if (!isValidBitAccess(accessVariable, bitOrRangeAccessPairEvaluated.first, true)) {
-                isValidSignalAccess                                      = false;
-                const IndexAccessRangeConstraint constraintsForBitAccess = getConstraintsForValidBitAccess(accessVariable, true);
-                // TODO: GEN_ERROR: Bit access out of range
-                createErrorAtTokenPosition(context->bitStart->start, fmt::format(BitAccessOutOfRange, bitOrRangeAccessPairEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue));
-            }
-        }
-        else {
-            if (bitOrRangeAccessPairEvaluated.first > bitOrRangeAccessPairEvaluated.second) {
-                isValidSignalAccess = false;
-                // TODO: GEN_ERROR: Bit range start larger than end
-                createErrorAtTokenPosition(context->bitStart->start, fmt::format(BitRangeStartLargerThanEnd, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second));
-            }
-            else if (!isValidBitRangeAccess(accessVariable, bitOrRangeAccessPairEvaluated, true)) {
-                isValidSignalAccess                                           = false;
-                const IndexAccessRangeConstraint constraintsForBitRangeAccess = getConstraintsForValidBitAccess((*accessedSignal)->getVar(), true);
-                // TODO: GEN_ERROR: Bit range out of range
-                createErrorAtTokenPosition(context->bitStart->start, fmt::format(BitRangeOutOfRange, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue));
-            }
+        const bool isBitAccess = bitOrRangeAccessPair.first == bitOrRangeAccessPair.second;
+        if (canEvaluateNumber(bitOrRangeAccessPair.first) && (!isBitAccess ? canEvaluateNumber(bitOrRangeAccessPair.second) : true)) {
+            isValidSignalAccess = validateBitOrRangeAccessOnSignal(context->bitStart->start, accessedVariable, bitOrRangeAccessPair);
         }
 
         if (isValidSignalAccess) {
@@ -324,6 +315,11 @@ std::any SyReCCustomVisitor::visitNumberFromLoopVariable(SyReCParser::NumberFrom
         return std::nullopt;
     }
 
+    if (lastDeclaredLoopVariable.has_value() && *lastDeclaredLoopVariable == signalIdent) {
+        createErrorAtTokenPosition(context->IDENT()->getSymbol(), fmt::format(CannotReferenceLoopVariableInInitalValueDefinition, signalIdent));
+        return std::nullopt;
+    }
+
     std::optional<syrec::Number::ptr> valueOfLoopVariable;
     const auto&                       symTableEntryForSignal = currentSymbolTableScope->getVariable(signalIdent);
     if (symTableEntryForSignal.has_value() && std::holds_alternative<syrec::Number::ptr>(symTableEntryForSignal.value())) {
@@ -340,6 +336,7 @@ std::any SyReCCustomVisitor::visitNumberFromLoopVariable(SyReCParser::NumberFrom
 std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromExpressionContext* context) {
     const auto lhsOperand = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->lhsOperand);
 
+    // TODO: What is the return value if an invalid number operation is defined, we know that a parsing error will be created
     const auto operation  = getDefinedOperation(context->op);
     if (!operation.has_value()) {
         // TODO: Error position
@@ -347,10 +344,41 @@ std::any SyReCCustomVisitor::visitNumberFromExpression(SyReCParser::NumberFromEx
     }
 
     const auto rhsOperand = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->rhsOperand);
-        if (!lhsOperand.has_value() || !operation.has_value() || !rhsOperand.has_value()) {
+    if (!lhsOperand.has_value() || !operation.has_value() || !rhsOperand.has_value()) {
         return std::nullopt;    
     }
 
+    /*
+     * If one of the operands is either a loop variable that currently cannot be evaluated (i.e. because it is depends on a value that is currently not known
+     * or is a compile time expression that can also not be evaluated because the condition above holds for one of its operands,
+     * we skip evaluation and instead create a new expression
+     */ 
+    if (!canEvaluateNumber(*lhsOperand) || !canEvaluateNumber(*rhsOperand)) {
+        syrec::Number::Operation mappedOperation;
+        switch (*operation) {
+            case syrec_operation::operation::addition: {
+                mappedOperation = syrec::Number::Operation::Addition;
+                break;
+            }
+            case syrec_operation::operation::subtraction: {
+                mappedOperation = syrec::Number::Operation::Subtraction;
+                break;
+            }
+            case syrec_operation::operation::multiplication: {
+                mappedOperation = syrec::Number::Operation::Multiplication;
+                break;
+            }
+            case syrec_operation::operation::division: {
+                mappedOperation = syrec::Number::Operation::Division;
+                break;
+            }
+            default:
+                createErrorAtTokenPosition(context->op, fmt::format(NoMappingForNumberOperation, context->op->getText()));
+                return std::nullopt;
+        }
+        return std::make_optional(std::make_shared<syrec::Number>(syrec::Number::CompileTimeConstantExpression(*lhsOperand, mappedOperation, *rhsOperand)));
+    }
+    
     const auto lhsOperandEvaluated = tryEvaluateNumber(*lhsOperand);
     const auto rhsOperandEvaluated = tryEvaluateNumber(*rhsOperand);
 
@@ -400,6 +428,22 @@ std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFr
     */
 
     if (definedNumber.has_value()) {
+        if (canEvaluateNumber(*definedNumber)) {
+            const auto& valueOfNumberEvaluated = tryEvaluateNumber(*definedNumber);
+            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*valueOfNumberEvaluated, optionalExpectedExpressionSignalWidth));
+        }
+
+        // TODO: Determine correct bitwidth of number
+        const unsigned int bitWidthOfNumber         = 1;
+        const auto& containerForLoopVariable = std::make_shared<syrec::NumericExpression>(*definedNumber, bitWidthOfNumber);
+        return std::make_optional(ExpressionEvaluationResult::createFromExpression(containerForLoopVariable, {1}));   
+    }
+
+    return std::nullopt;
+
+    // TODO: Remove
+    /*
+    if (definedNumber.has_value()) {
         const auto valueOfDefinedNumber = tryEvaluateNumber(*definedNumber);
         if ((*definedNumber)->isLoopVariable()) {
         /*
@@ -407,7 +451,7 @@ std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFr
          * If no loop unrolling is done by default and we do not know the bitwidth that the expression should have from the other operand of the operation,
          * we would need a lookup for the maximum value possible and assume the bitwidth to be the one of the maximum value.
          * The easiest solution would be to pass in the expected bitwidth for this expression
-         */
+         * /
             const auto containerForLoopVariable = std::make_shared<syrec::NumericExpression>(*definedNumber, 1);
         return std::make_optional(ExpressionEvaluationResult::createFromExpression(containerForLoopVariable, { 1 }));   
         }
@@ -415,6 +459,7 @@ std::any SyReCCustomVisitor::visitExpressionFromNumber(SyReCParser::ExpressionFr
     }
 
     return std::nullopt;
+    */
 }
 
 std::any SyReCCustomVisitor::visitExpressionFromSignal(SyReCParser::ExpressionFromSignalContext* context) {
@@ -429,14 +474,22 @@ std::any SyReCCustomVisitor::visitExpressionFromSignal(SyReCParser::ExpressionFr
     if ((*definedSignal)->isVariableAccess()) {
         const auto& accessOnDefinedSignal = *(*definedSignal)->getAsVariableAccess();
         expressionWrapperForSignal = std::make_shared<syrec::VariableExpression>(accessOnDefinedSignal);
+        // TODO: getSizeOfSignalAccess handling of CompileTimeConstantExpression
         expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal, getSizeOfSignalAfterAccess(accessOnDefinedSignal)));
     } else if ((*definedSignal)->isConstant()) {
         // TODO: Is this the correct calculation and is it both safe and does it return the expected result
-        const auto constantValueOfDefinedSignal = tryEvaluateNumber(*(*definedSignal)->getAsNumber());
-
         // TODO: Correct handling of loop variable
-        expressionWrapperForSignal = std::make_shared<syrec::NumericExpression>(*(*definedSignal)->getAsNumber(), constantValueOfDefinedSignal.has_value() ? ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(*constantValueOfDefinedSignal) : 0);    
-        expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal, { 1 }));
+        auto constantSignalValue = *(*definedSignal)->getAsNumber();
+
+        unsigned int bitWidthOfSignal = 0;
+        if (canEvaluateNumber(constantSignalValue)) {
+            const auto constantSignalValueEvaluated = *tryEvaluateNumber(constantSignalValue);
+            bitWidthOfSignal                        = ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(constantSignalValueEvaluated);
+            constantSignalValue                     = std::make_shared<syrec::Number>(constantSignalValueEvaluated);
+        }
+
+        expressionWrapperForSignal = std::make_shared<syrec::NumericExpression>(constantSignalValue, bitWidthOfSignal);
+        expressionFromSignal.emplace(ExpressionEvaluationResult::createFromExpression(expressionWrapperForSignal, {1}));
     }
 
     return expressionFromSignal;
@@ -491,7 +544,6 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
             )) {
                 const auto lhsOperandAsExpression   = (*lhsOperand)->getAsExpression();
                 const auto rhsOperandAsExpression   = (*rhsOperand)->getAsExpression();
-
                 const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
 
                 // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
@@ -548,6 +600,7 @@ std::any SyReCCustomVisitor::visitShiftExpression(SyReCParser::ShiftExpressionCo
     }
 
     const auto shiftAmountEvaluated = tryEvaluateNumber(*shiftAmount);
+    // TODO: getAsConstant(...) handling of compileTimeExpression ?
     const auto expressionToShiftEvaluated = (*expressionToShift)->getAsConstant();
 
     if (shiftAmountEvaluated.has_value() && expressionToShiftEvaluated.has_value()) {
@@ -725,6 +778,7 @@ std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext*
         } else {
             SymbolTable::openScope(currentSymbolTableScope);
             currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(*loopVariableIdent));
+            lastDeclaredLoopVariable.emplace(*loopVariableIdent);
         }
     }
 
@@ -737,6 +791,7 @@ std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext*
     if (!rangeStartValue.has_value()) {
         rangeStartValue.emplace(std::make_shared<syrec::Number>(0));
     }
+    lastDeclaredLoopVariable.reset();
 
     std::optional<syrec::Number::ptr> rangeEndValue = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->endValue);
     loopHeaderValid &= rangeEndValue.has_value();
@@ -752,38 +807,44 @@ std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext*
     } else {
         stepSize.emplace(std::make_shared<syrec::Number>(1));
     }
+    
+    if (loopHeaderValid 
+        && (wasStartValueExplicitlyDefined ? canEvaluateNumber(*rangeStartValue) : true) 
+        && canEvaluateNumber(*rangeEndValue)
+        && (wasStepSizeExplicitlyDefined ? canEvaluateNumber(*stepSize) : true))  {
 
-    if (loopHeaderValid) {
-        const unsigned int stepSizeEvaluated                 = (*stepSize)->evaluate(loopVariableMappingLookup);
-        const bool         negativeStepSizeDefined           = wasStepSizeExplicitlyDefined ? stepSizeEvaluated < 0 : false;
+        const std::optional<unsigned int> stepSizeEvaluated = tryEvaluateNumber(*stepSize);
+        if (stepSizeEvaluated.has_value()) {
+            std::optional<unsigned int> iterationRangeStartValueEvaluated;
+            std::optional<unsigned int> iterationRangeEndValueEvaluated;
+            const bool                  negativeStepSizeDefined = *stepSizeEvaluated < 0;
+            
+            if (negativeStepSizeDefined) {
+                iterationRangeStartValueEvaluated = tryEvaluateNumber(*rangeEndValue);
+                iterationRangeEndValueEvaluated   = tryEvaluateNumber(*rangeStartValue);
+            }
+            else {
+                iterationRangeStartValueEvaluated = tryEvaluateNumber(*rangeStartValue);
+                iterationRangeEndValueEvaluated   = tryEvaluateNumber(*rangeEndValue);
+            }
 
-        unsigned int       iterationRangeStartValueEvaluated;
-        unsigned int       iterationRangeEndValueEvaluated;
-
-        if (wasStartValueExplicitlyDefined) {
-            iterationRangeStartValueEvaluated = (*rangeStartValue)->evaluate(loopVariableMappingLookup);
-            iterationRangeEndValueEvaluated   = (*rangeEndValue)->evaluate(loopVariableMappingLookup);
-        }
-        else {
-            iterationRangeStartValueEvaluated = (*rangeEndValue)->evaluate(loopVariableMappingLookup);
-            iterationRangeEndValueEvaluated   = (*rangeStartValue)->evaluate(loopVariableMappingLookup);
-        }
-
-        unsigned int numIterations = 0;
-        if (negativeStepSizeDefined && iterationRangeStartValueEvaluated < iterationRangeEndValueEvaluated) {
-            createErrorAtTokenPosition(wasStartValueExplicitlyDefined ? context->startValue->start : context->endValue->start, fmt::format(InvalidLoopVariableValueRangeWithNegativeStepsize, iterationRangeStartValueEvaluated, iterationRangeEndValueEvaluated, stepSizeEvaluated));
-            loopHeaderValid = false;
-        }
-        else if (!negativeStepSizeDefined && iterationRangeStartValueEvaluated > iterationRangeEndValueEvaluated) {
-            createErrorAtTokenPosition(wasStartValueExplicitlyDefined ? context->startValue->start : context->endValue->start, fmt::format(InvalidLoopVariableValueRangeWithPositiveStepsize, iterationRangeStartValueEvaluated, iterationRangeEndValueEvaluated, stepSizeEvaluated));
-            loopHeaderValid = false;
-        }
-        else if (stepSizeEvaluated != 0) {
-            numIterations = (negativeStepSizeDefined ? (iterationRangeStartValueEvaluated - iterationRangeEndValueEvaluated) : (iterationRangeEndValueEvaluated - iterationRangeStartValueEvaluated)) + 1;
-            numIterations /= stepSizeEvaluated;
+            loopHeaderValid &= iterationRangeStartValueEvaluated.has_value() && iterationRangeEndValueEvaluated.has_value();
+            if (loopHeaderValid) {
+                unsigned int numIterations = 0;
+                if (negativeStepSizeDefined && *iterationRangeStartValueEvaluated < *iterationRangeEndValueEvaluated) {
+                    createErrorAtTokenPosition(wasStartValueExplicitlyDefined ? context->startValue->start : context->endValue->start, fmt::format(InvalidLoopVariableValueRangeWithNegativeStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
+                    loopHeaderValid = false;
+                } else if (!negativeStepSizeDefined && *iterationRangeStartValueEvaluated > *iterationRangeEndValueEvaluated) {
+                    createErrorAtTokenPosition(wasStartValueExplicitlyDefined ? context->startValue->start : context->endValue->start, fmt::format(InvalidLoopVariableValueRangeWithPositiveStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
+                    loopHeaderValid = false;
+                } else if (stepSizeEvaluated != 0) {
+                    numIterations = (negativeStepSizeDefined ? (*iterationRangeStartValueEvaluated - *iterationRangeEndValueEvaluated) : (*iterationRangeEndValueEvaluated - *iterationRangeStartValueEvaluated)) + 1;
+                    numIterations /= *stepSizeEvaluated;
+                }   
+            }
         }
     }
-    
+
     // TODO: It seems like with syntax error in the components of the loop header the statementList will be null
     const auto loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
     const bool       isValidLoopBody = loopBody.has_value() && !(*loopBody).empty();
@@ -801,6 +862,10 @@ std::any SyReCCustomVisitor::visitForStatement(SyReCParser::ForStatementContext*
         loopStatement->step         = *stepSize;
         loopStatement->statements   = *loopBody;
         addStatementToOpenContainer(loopStatement);
+    }
+
+    if (loopVariableIdent.has_value() && evaluableLoopVariables.find(*loopVariableIdent) != evaluableLoopVariables.end()) {
+        evaluableLoopVariables.erase(*loopVariableIdent);
     }
 
     return 0;
@@ -879,7 +944,7 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
         && (*assignedToSignal)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->signal()->IDENT()->getSymbol(), *(*assignedToSignal)->getAsVariableAccess());
 
     if (allSemanticChecksOk) {
-        optionalExpectedExpressionSignalWidth.emplace((*(*assignedToSignal)->getAsVariableAccess())->bitwidth());
+        optionalExpectedExpressionSignalWidth.emplace(determineBitwidthAfterVariableAccess(*(*assignedToSignal)->getAsVariableAccess()));
         // TODO:
         //binaryExpressionSignalProhibition->setProhibitedSignal(*(*assignedToSignal)->getAsVariableAccess());
     }
@@ -978,15 +1043,8 @@ std::any SyReCCustomVisitor::visitSwapStatement(SyReCParser::SwapStatementContex
         return 0;
     }
 
-    size_t lhsAccessedSignalWidth = lhsAccessedSignal->getVar()->bitwidth;
-    size_t rhsAccessedSignalWidth = rhsAccessedSignal->getVar()->bitwidth;
-    if (lhsAccessedSignal->range.has_value()) {
-        lhsAccessedSignalWidth = *tryEvaluateNumber((*lhsAccessedSignal->range).second) - *tryEvaluateNumber((*lhsAccessedSignal->range).first) + 1;
-    }
-    if (rhsAccessedSignal->range.has_value()) {
-        rhsAccessedSignalWidth = *tryEvaluateNumber((*rhsAccessedSignal->range).second) - *tryEvaluateNumber((*rhsAccessedSignal->range).first) + 1;
-    }
-
+    const unsigned int lhsAccessedSignalWidth = determineBitwidthAfterVariableAccess(lhsAccessedSignal);
+    const unsigned int rhsAccessedSignalWidth = determineBitwidthAfterVariableAccess(rhsAccessedSignal);
     if (lhsAccessedSignalWidth != rhsAccessedSignalWidth) {
         // TODO: Error position
         createErrorAtTokenPosition(context->start, fmt::format(InvalidSwapSignalWidthMissmatch, lhsAccessedSignalWidth, rhsAccessedSignalWidth));
@@ -1121,6 +1179,33 @@ bool SyReCCustomVisitor::checkIfSignalWasDeclaredOrLogError(const antlr4::Token*
     return (bitRangeStartEvaluated.has_value() && bitRangeEndEvaluated.has_value()) ? std::make_optional(std::make_pair(*bitRangeStartEvaluated, *bitRangeEndEvaluated)) : std::nullopt;
 }
 
+[[nodiscard]] bool SyReCCustomVisitor::validateBitOrRangeAccessOnSignal(const antlr4::Token* bitOrRangeStartToken, const syrec::Variable::ptr& accessedVariable, const std::pair<syrec::Number::ptr, syrec::Number::ptr>& bitOrRangeAccessPair) {
+    const auto& bitOrRangeAccessPairEvaluated = std::make_pair(bitOrRangeAccessPair.first->evaluate({}), bitOrRangeAccessPair.second->evaluate({}));
+    const auto  signalIdent                   = accessedVariable->name;
+
+    bool isValidSignalAccess = true;
+    if (bitOrRangeAccessPair.first == bitOrRangeAccessPair.second) {
+        if (!isValidBitAccess(accessedVariable, bitOrRangeAccessPairEvaluated.first, true)) {
+            isValidSignalAccess                                      = false;
+            const IndexAccessRangeConstraint constraintsForBitAccess = getConstraintsForValidBitAccess(accessedVariable, true);
+            // TODO: GEN_ERROR: Bit access out of range
+            createErrorAtTokenPosition(bitOrRangeStartToken, fmt::format(BitAccessOutOfRange, bitOrRangeAccessPairEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue));
+        }
+    } else {
+        if (bitOrRangeAccessPairEvaluated.first > bitOrRangeAccessPairEvaluated.second) {
+            isValidSignalAccess = false;
+            // TODO: GEN_ERROR: Bit range start larger than end
+            createErrorAtTokenPosition(bitOrRangeStartToken, fmt::format(BitRangeStartLargerThanEnd, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second));
+        } else if (!isValidBitRangeAccess(accessedVariable, bitOrRangeAccessPairEvaluated, true)) {
+            isValidSignalAccess                                           = false;
+            const IndexAccessRangeConstraint constraintsForBitRangeAccess = getConstraintsForValidBitAccess(accessedVariable, true);
+            // TODO: GEN_ERROR: Bit range out of range
+            createErrorAtTokenPosition(bitOrRangeStartToken, fmt::format(BitRangeOutOfRange, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue));
+        }
+    }
+    return isValidSignalAccess;
+}
+
 std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperation(const antlr4::Token* definedOperationToken) {
     if (definedOperationToken == nullptr) {
         return std::nullopt;
@@ -1218,15 +1303,74 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
 }
 
 // TODO: Naming
-[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryEvaluateNumber(const syrec::Number::ptr& numberContainer) {
+// TODO: Handling of divison by zero
+// TODO: Handling of error creation
+[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryEvaluateNumber(const syrec::Number::ptr& numberContainer) const {
     if (numberContainer->isLoopVariable()) {
         const std::string& loopVariableIdent = numberContainer->variableName();
-        if (loopVariableMappingLookup.find(loopVariableIdent) == loopVariableMappingLookup.end()) {
+        if (evaluableLoopVariables.find(loopVariableIdent) == evaluableLoopVariables.end() ||
+            loopVariableMappingLookup.find(loopVariableIdent) == loopVariableMappingLookup.end()) {
             return std::nullopt;
         }
+    } else if (numberContainer->isCompileTimeConstantExpression()) {
+        bool               wasDivisionByZero                     = false;
+        const auto compileTimeExpressionEvaluationResult = tryEvaluateCompileTimeExpression(numberContainer->getExpression(), &wasDivisionByZero);
+        if (compileTimeExpressionEvaluationResult.has_value()) {
+            return std::make_optional(*compileTimeExpressionEvaluationResult);
+        }
+
+        return std::nullopt;
     }
 
     return std::make_optional(numberContainer->evaluate(loopVariableMappingLookup));
+}
+
+[[nodiscard]] bool SyReCCustomVisitor::canEvaluateNumber(const syrec::Number::ptr& number) const {
+    if (number->isLoopVariable()) {
+        return evaluableLoopVariables.find(number->variableName()) != evaluableLoopVariables.end();
+    }
+    return number->isCompileTimeConstantExpression() ? canEvaluateCompileTimeExpression(number->getExpression()) : true;
+}
+
+[[nodiscard]] bool SyReCCustomVisitor::canEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression) const {
+    return canEvaluateNumber(compileTimeExpression.lhsOperand) && canEvaluateNumber(compileTimeExpression.rhsOperand);
+}
+
+// TODO: Should return type be optional if evaluation fails ?
+[[nodiscard]] unsigned int SyReCCustomVisitor::determineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess) const {
+    unsigned int variableAccessBitwidth = variableAccess->getVar()->bitwidth;
+    if (variableAccess->range.has_value() 
+        && canEvaluateNumber((*variableAccess->range).first) 
+        && canEvaluateNumber((*variableAccess->range).second)) {
+        const unsigned int bitRangeStart = *tryEvaluateNumber((*variableAccess->range).first);
+        const unsigned int bitRangeEnd = *tryEvaluateNumber((*variableAccess->range).second);
+
+        variableAccessBitwidth = bitRangeEnd - bitRangeStart + 1;
+    }
+
+    return variableAccessBitwidth;
+}
+
+[[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, bool* wasDivisionByZero) const {
+    std::optional<unsigned int> evaluationResult;
+
+    const auto lhsEvaluated = canEvaluateNumber(compileTimeExpression.lhsOperand) ? tryEvaluateNumber(compileTimeExpression.lhsOperand) : std::nullopt;
+    const auto rhsEvaluated = (lhsEvaluated.has_value() && canEvaluateNumber(compileTimeExpression.rhsOperand)) ? tryEvaluateNumber(compileTimeExpression.rhsOperand) : std::nullopt;
+    if (rhsEvaluated.has_value()) {
+        switch (compileTimeExpression.operation) {
+            case syrec::Number::Addition:
+                evaluationResult.emplace(*lhsEvaluated + *rhsEvaluated);
+            case syrec::Number::Subtraction:
+                evaluationResult.emplace(*lhsEvaluated - *rhsEvaluated);
+            case syrec::Number::Multiplication:
+                evaluationResult.emplace(*lhsEvaluated * *rhsEvaluated);
+            default:
+                *wasDivisionByZero = *rhsEvaluated == 0;
+                if (!*wasDivisionByZero)
+                    evaluationResult.emplace(*lhsEvaluated / *rhsEvaluated);
+        }
+    }
+    return evaluationResult;
 }
 
 [[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::applyBinaryOperation(const syrec_operation::operation operation, const unsigned int leftOperand, const unsigned int rightOperand) {

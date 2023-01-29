@@ -88,6 +88,7 @@ namespace syrecAstDumpUtils {
         [[nodiscard]] static std::string stringifyNumber(const syrec::Number::ptr& number);
 
         [[nodiscard]] static std::string stringifyDimensionExpression(const syrec::expression::ptr& expr);
+        [[nodiscard]] static std::string stringifyDimensions(const std::vector<unsigned int>& dimensions);
         [[nodiscard]] static std::string stringifyDimension(const unsigned int& dimension);
 
         [[nodiscard]] static std::string repeatNTimes(const std::string& str, const size_t numRepetitions);
