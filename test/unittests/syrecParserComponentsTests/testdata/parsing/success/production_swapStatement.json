@@ -27,6 +27,15 @@
   "bitRangeOfNestedDimensionOfLhs": {
     "circuit": "module main(out a[2][4][8](10), out b(3)) a[1][3][7].2:4 <=> b"
   },
+  "oneBitAsCompileTimeExpressionOfLhs": {
+    "circuit": "module main(out a(10), out b(1)) for $i = 0 to 9 step 1 do a.($i + (2 + $i)) <=> b rof"
+  },
+  "bitRangeOfLhsAsCompileTimeExpressionOfLhsDoesNotResultInError": {
+    "circuit": "module main(out a(10), out b(10)) for $i = 0 to 9 step 1 do a.($i + (2 + $i)):$i <=> b rof"
+  },
+  "oneDimensionOfLhsAsCompileTimeExpression": {
+    "circuit": "module main(out a[2](10), out b(10)) for $i = 0 to 9 step 1 do a[($i + (2 + $i))] <=> b rof"
+  },
 
   "oneBitOfRhs": {
     "circuit": "module main(out a(10), out b(1)) b <=> a.0"
@@ -52,6 +61,16 @@
   "bitRangeOfNestedDimensionOfRhs": {
     "circuit": "module main(out a[2][4][8](10), out b(3)) b <=> a[1][3][7].2:4"
   },
+  "oneBitAsCompileTimeExpressionOfRhs": {
+    "circuit": "module main(out a(1), out b(10)) for $i = 0 to 9 step 1 do a <=> b.($i + (2 + $i)) rof"
+  },
+  "bitRangeOfRhsAsCompileTimeExpressionOfLhsDoesNotResultInError": {
+    "circuit": "module main(out a(10), out b(10)) for $i = 0 to 9 step 1 do a <=> b.($i + (2 + $i)):$i rof"
+  },
+  "oneDimensionOfRhsAsCompileTimeExpression": {
+    "circuit": "module main(out a[2](10), out b(10)) for $i = 0 to 9 step 1 do a <=> b[($i + (2 + $i))] rof"
+  },
+
 
   "lhsAndRhsWithSameDimensions": {
     "circuit": "module main(out a[2][3][5](10), out b[2][3][5](10)) a <=> b"

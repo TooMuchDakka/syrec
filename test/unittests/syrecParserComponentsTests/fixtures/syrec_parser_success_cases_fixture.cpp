@@ -200,6 +200,12 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_swapStatement", "oneBitOfNestedDimensionOfLhs"),
                         std::make_pair("production_swapStatement", "bitRangeOfNestedDimensionOfLhs"),
 
+                        // TODO: Tests where the bitwidth of an operand of the shift operation can not be determine but would be larger than the other operands bitwidth should be ok ?
+                        // TODO: Should these compile time expressions tests for bit / range access be repeated for a single dimension / nested dimension
+                        std::make_pair("production_swapStatement", "oneBitAsCompileTimeExpressionOfLhs"),
+                        std::make_pair("production_swapStatement", "bitRangeOfLhsAsCompileTimeExpressionOfLhsDoesNotResultInError"),
+                        std::make_pair("production_swapStatement", "oneDimensionOfLhsAsCompileTimeExpression"),
+
                         std::make_pair("production_swapStatement", "oneBitOfRhs"),
                         std::make_pair("production_swapStatement", "bitRangeOfRhs"),
                         std::make_pair("production_swapStatement", "oneDimensionOfRhs"),
@@ -209,6 +215,12 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_swapStatement", "oneBitOfNestedDimensionOfRhs"),
                         std::make_pair("production_swapStatement", "bitRangeOfNestedDimensionOfRhs"),
                         std::make_pair("production_swapStatement", "lhsAndRhsWithSameDimensions"),
+
+                        // TODO: Tests where the bitwidth of an operand of the shift operation can not be determine but would be larger than the other operands bitwidth should be ok ?
+                        // TODO: Should these compile time expressions tests for bit / range access be repeated for a single dimension / nested dimension
+                        std::make_pair("production_swapStatement", "oneBitAsCompileTimeExpressionOfRhs"),
+                        std::make_pair("production_swapStatement", "bitRangeOfRhsAsCompileTimeExpressionOfLhsDoesNotResultInError"),
+                        std::make_pair("production_swapStatement", "oneDimensionOfRhsAsCompileTimeExpression"),
 
                         /* SkipStatement production */
                         std::make_pair("production_skipStatement", "simpleTest"),
@@ -231,6 +243,8 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_forStatement", "multipleStatementsInBody"),
                         std::make_pair("production_forStatement", "reusingLoopVariableNameInAnotherLoopAfterPreviousOneWasLeft"),
                         std::make_pair("production_forStatement", "usageOfLoopVariableInAnyExpressionExceptInitialValueOk"),
+                        std::make_pair("production_forStatement", "selfReferenceOfLoopVariableOkInEndValueDefinition"),
+                        std::make_pair("production_forStatement", "selfReferenceOfLoopVariableOkInStepsizeDefinition"),
 
                         /* Expression production */
                         std::make_pair("production_expression", "isConstant"),
@@ -314,7 +328,9 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_signal", "accessingNestedDimensionOfParameter"),
                         std::make_pair("production_signal", "accessingNestedDimensionOfParameterAsNotSimplifiedExpression"),
                         std::make_pair("production_signal", "accessingBitOfNestedDimensionOfParameter"),
+                        std::make_pair("production_signal", "accessingBitOfNestedDimensionOfParameterWithNotSimplifiedExpressions"),
                         std::make_pair("production_signal", "accessingBitRangeOfNestedDimensionOfParameter"),
+                        std::make_pair("production_signal", "accessingBitRangeOfNestedDimensionOfParameterWithNotSimplifiedExpressions"),
 
                         std::make_pair("production_signal", "completeSignalOfLocal"),
                         std::make_pair("production_signal", "accessingBitOfLocal"),
@@ -328,7 +344,9 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_signal", "accessingNestedDimensionOfLocal"),
                         std::make_pair("production_signal", "accessingNestedDimensionOfLocalAsNotSimplifiedExpression"),
                         std::make_pair("production_signal", "accessingBitOfNestedDimensionOfLocal"),
+                        std::make_pair("production_signal", "accessingBitOfNestedDimensionOfLocalWithNotSimplifiedExpressions"),
                         std::make_pair("production_signal", "accessingBitRangeOfNestedDimensionOfLocal"),
+                        std::make_pair("production_signal", "accessingBitRangeOfNestedDimensionOfLocalWithNotSimplifiedExpressions"),
 
                         /* number */
                         std::make_pair("number", "asConstant"),

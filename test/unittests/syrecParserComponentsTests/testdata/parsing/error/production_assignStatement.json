@@ -120,6 +120,26 @@
       }
     ]
   },
+  "invalidAssignmentOperandStructureMissmatchLhsHasDimensionAccessAsCompileTimeExpression": {
+    "circuit": "module main(out b[2](16), in c[3](16)) for $i = 0 to 2 step 1 do b[(1 + ($i + 0))] += c rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 65,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 1 | 3>"
+      }
+    ]
+  },
+  "invalidAssignmentOperandStructureMissmatchLhsHasNestedDimensionAccessAsCompileTimeExpression": {
+    "circuit": "module main(out b[2][4](16), in c[3][6](16)) for $i = 0 to 2 step 1 do b[0][(1 + ($i + 0))] += c rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 71,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 1 | 6>"
+      }
+    ]
+  },
   "invalidAssignmentToInParameterBit": {
     "circuit": "module main(in a(16)) a.0 += 2",
     "errors": [

@@ -222,6 +222,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_forStatement", "invalidRofEndDelimiter"),
                              std::make_pair("production_forStatement", "missingRofEndDelimiter"),
                              std::make_pair("production_forStatement", "duplicateLoopVariableNameInNestedLoop"),
+                             std::make_pair("production_forStatement", "invalidSelfReferenceToLoopVariableInStartValueDefinition"),
 
                              /* IfStatement production */
                              std::make_pair("production_ifStatement", "invalidIfIdent"),
@@ -277,7 +278,6 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_assignStatement", "invalidAssignmentOperandStructureMissmatchLhsIsBitAccess"),
                              std::make_pair("production_assignStatement", "invalidAssignmentOperandStructureMissmatchLhsIsBitRangeAccessOnDimension"),
                              std::make_pair("production_assignStatement", "invalidAssignmentOperandStructureMissmatchLhsIsBitRangeAccess"),
-                             
 
                              /* SwapStatement production */
                              std::make_pair("production_swapStatement", "invalidSwapStatementOperator"),
@@ -304,6 +304,8 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalWithRhsSignalWithValueForOneNestedDimensionTooSmall"),
                              std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalWithRhsSignalWithValueForOneNestedDimensionTooLarge"),
 
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalBitDefinedAsCompileTimeExpressionWithRhsSignal"),
+                             std::make_pair("production_swapStatement", "invalidSwapOfLhsSignalWithRhsSignalBitDefinedAsCompileTimeExpression"),
 
                              /* SkipStatement production */
                              std::make_pair("production_skipStatement", "missingSkipIdent"),

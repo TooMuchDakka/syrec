@@ -227,5 +227,26 @@
         "message": "invalid swap signal width missmatch, first operand had a signal width of 16 while the other had a signal width of 32"
       }
     ]
+  },
+  "invalidSwapOfLhsSignalBitDefinedAsCompileTimeExpressionWithRhsSignal": {
+    "circuit": "module main(out a(16), out b(2)) for $i = 0 to 5 step 1 do a.($i + 2) <=> b rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 59,
+        "message": "invalid swap signal width missmatch, first operand had a signal width of 1 while the other had a signal width of 2"
+      }
+    ]
+  },
+  "invalidSwapOfLhsSignalWithRhsSignalBitDefinedAsCompileTimeExpression": {
+    "circuit": "module main(out a(16), out b(2)) for $i = 0 to 5 step 1 do a <=> b.($i + 2) rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 59,
+        "message": "invalid swap signal width missmatch, first operand had a signal width of 16 while the other had a signal width of 1"
+      }
+    ]
   }
+
 }

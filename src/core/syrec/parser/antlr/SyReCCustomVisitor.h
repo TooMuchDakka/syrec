@@ -97,7 +97,7 @@ private:
     [[nodiscard]] bool SyReCCustomVisitor::canEvaluateNumber(const syrec::Number::ptr& number) const;
     [[nodiscard]] bool SyReCCustomVisitor::canEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression) const;
 
-    [[nodiscard]] unsigned int SyReCCustomVisitor::determineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess) const;
+    [[nodiscard]] bool SyReCCustomVisitor::tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, unsigned int* bitwidthAfterVariableAccess) const;
 
     [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand);
     [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable);

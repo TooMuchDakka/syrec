@@ -188,5 +188,15 @@
         "message": "variable '$a' was already declared"
       }
     ]
+  },
+  "invalidSelfReferenceToLoopVariableInStartValueDefinition": {
+    "circuit": "module main() for $a = ($a + 2) to 10 step 1 do skip rof",
+    "errors": [
+      {
+        "line": 1,
+        "column": 25,
+        "message": "cannot reference loop variable '$a' inside of the expression defining the initial value of the latter"
+      }
+    ]
   }
 }
