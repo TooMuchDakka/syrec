@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "core/syrec/module.hpp"
-#include "core/syrec/parser/binary_expression_signal_prohibition.hpp"
+#include "core/syrec/parser/signal_access_restriction.hpp"
 #include "core/syrec/parser/module_call_stack.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/operation.hpp"
@@ -19,22 +19,21 @@
 namespace parser {
 class SyReCCustomVisitor: public SyReCBaseVisitor {
 private:
-    std::unique_ptr<BinaryExpressionSignalProhibition>           binaryExpressionSignalProhibition;
-    SymbolTable::ptr                                             currentSymbolTableScope;
-    std::unique_ptr<ModuleCallStack>                             moduleCallStack;
-    size_t                                                       moduleCallNestingLevel;
+    static constexpr std::size_t fallbackErrorLinePosition   = 0;
+    static constexpr std::size_t fallbackErrorColumnPosition = 0;
+    size_t moduleCallNestingLevel;
 
-    syrec::Number::loop_variable_mapping                         loopVariableMappingLookup;
-    std::stack<syrec::Statement::vec>               statementListContainerStack;
-    const std::shared_ptr<ParserConfig>     config;
-
-    std::optional<unsigned int> optionalExpectedExpressionSignalWidth;
+    std::optional<unsigned int>               optionalExpectedExpressionSignalWidth;
     std::optional<syrec::VariableAccess::ptr> prohibitedSignalAccessAsBinaryExpressionOperand;
 
-    std::set<std::string> evaluableLoopVariables;
+    std::unordered_map<std::string, SignalAccessRestriction> signalAccessRestrictions;
+    syrec::Number::loop_variable_mapping                         loopVariableMappingLookup;
+    std::set<std::string>                                        evaluableLoopVariables;
+    std::stack<syrec::Statement::vec>                            statementListContainerStack;
 
-    static constexpr std::size_t fallbackErrorLinePosition = 0;
-    static constexpr std::size_t fallbackErrorColumnPosition = 0;
+    SymbolTable::ptr                                             currentSymbolTableScope;
+    std::unique_ptr<ModuleCallStack>                             moduleCallStack;
+    const std::shared_ptr<ParserConfig>     config;
 
     struct TokenPosition {
         std::size_t line;
@@ -125,16 +124,49 @@ private:
     bool doArgumentsBetweenCallAndUncallMatch(const TokenPosition& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments);
     bool checkIfNumberOfValuesPerDimensionMatchOrLogError(const TokenPosition& positionOfOptionalError, const std::vector<unsigned int>& lhsOperandNumValuesPerDimension, const std::vector<unsigned int>& rhsOperandNumValuesPerDimension);
 
+    void               restrictAccessToAssignedToPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalPart, const TokenPosition& optionalEvaluationErrorPosition);
+    void               liftRestrictionToAssignedToPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalPart, const TokenPosition& optionalEvaluationErrorPosition);
+    [[nodiscard]] bool isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const TokenPosition& optionalEvaluationErrorPosition);
+    std::optional<SignalAccessRestriction::SignalAccess> tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const TokenPosition& optionalEvaluationErrorPosition);
+    [[nodiscard]] std::optional<SignalAccessRestriction>               tryGetSignalAccessRestriction(const std::string& signalIdent) const;
+
+    /*
+     * static constexpr std::size_t fallbackErrorLinePosition   = 0;
+    static constexpr std::size_t fallbackErrorColumnPosition = 0;
+    size_t moduleCallNestingLevel;
+
+    std::optional<unsigned int>               optionalExpectedExpressionSignalWidth;
+    std::optional<syrec::VariableAccess::ptr> prohibitedSignalAccessAsBinaryExpressionOperand;
+
+    std::unordered_map<std::string, SignalAccessRestriction> signalAccessRestrictions;
+    syrec::Number::loop_variable_mapping                         loopVariableMappingLookup;
+    std::set<std::string>                                        evaluableLoopVariables;
+    std::stack<syrec::Statement::vec>                            statementListContainerStack;
+
+    SymbolTable::ptr                                             currentSymbolTableScope;
+    std::unique_ptr<ModuleCallStack>                             moduleCallStack;
+    const std::shared_ptr<ParserConfig>     config;
+     */
+
 public:
     syrec::Module::vec modules;
     std::vector<std::string> errors;
     std::vector<std::string> warnings;
 
     explicit SyReCCustomVisitor(const std::shared_ptr<ParserConfig>& parserConfig):
-        moduleCallNestingLevel(0), config(parserConfig) {
-        binaryExpressionSignalProhibition = std::make_unique<BinaryExpressionSignalProhibition>();
-        moduleCallStack = std::make_unique<ModuleCallStack>();
-    }
+        modules({}),
+        errors({}),
+        warnings({}),
+        moduleCallNestingLevel(0),
+        optionalExpectedExpressionSignalWidth(std::nullopt),
+        prohibitedSignalAccessAsBinaryExpressionOperand(std::nullopt),
+        signalAccessRestrictions({}),
+        loopVariableMappingLookup({}),
+        evaluableLoopVariables({}),
+        currentSymbolTableScope(std::make_shared<SymbolTable>()),
+        moduleCallStack(std::make_unique<ModuleCallStack>()),    
+        config(parserConfig)
+    {}
 
     /*
      * TODO: Visitor can be split into parts with error containers being shared
