@@ -12,6 +12,10 @@ void SignalAccessRestriction::blockAccessOnSignalCompletely() {
     this->dimensionRestrictions.clear();
 }
 
+bool SignalAccessRestriction::isAccessRestrictedOnWholeSignal() const {
+    return isBlockedCompletely;
+}
+
 bool SignalAccessRestriction::isAccessRestrictedToBit(const std::size_t bitPosition) const {
     return isAccessRestrictedToBitRange(SignalAccess(bitPosition, bitPosition));
 }
@@ -26,7 +30,7 @@ bool SignalAccessRestriction::isAccessRestrictedToBit(const std::size_t dimensio
 
 bool SignalAccessRestriction::isAccessRestrictedToBitRange(const SignalAccess& bitRange) const {
     return isBitRangeWithinRange(bitRange)
-        && (isBlockedCompletely || (globalSignalRestriction.has_value() && globalSignalRestriction->isAccessRestricted(bitRange)));
+        && (isAccessRestrictedOnWholeSignal() || (globalSignalRestriction.has_value() && globalSignalRestriction->isAccessRestricted(bitRange)));
 }
 
 bool SignalAccessRestriction::isAccessRestrictedToBitRange(const std::size_t dimension, const SignalAccess& bitRange) const {
@@ -51,14 +55,14 @@ bool SignalAccessRestriction::isAccessRestrictedToBitRange(const std::size_t dim
 
 bool SignalAccessRestriction::isAccessRestrictedToValueOfDimension(const std::size_t dimension, const std::size_t valueForDimension) const {
     return isDimensionWithinRange(dimension)
-        && (isBlockedCompletely 
+        && (isAccessRestrictedOnWholeSignal() 
             || (dimensionRestrictions.count(dimension) != 0
                 && (dimensionRestrictions.at(dimension).areAllValuesForDimensionBlocked
                 || dimensionRestrictions.at(dimension).restrictionsPerValueOfDimension.count(valueForDimension) != 0)));
 }
 
 bool SignalAccessRestriction::isAccessRestrictedToDimension(const std::size_t dimension) const {
-    return isDimensionWithinRange(dimension) && (isBlockedCompletely || dimensionRestrictions.count(dimension) != 0);
+    return isDimensionWithinRange(dimension) && (isAccessRestrictedOnWholeSignal() || dimensionRestrictions.count(dimension) != 0);
 }
 
 void SignalAccessRestriction::liftAccessRestrictionsForBit(const std::size_t bitPosition) {
@@ -74,7 +78,7 @@ void SignalAccessRestriction::liftAccessRestrictionsForBit(const std::size_t dim
 }
 
 void SignalAccessRestriction::liftAccessRestrictionForBitRange(const SignalAccess& bitRange) {
-    if (!isBitRangeWithinRange(bitRange) || isBlockedCompletely || !globalSignalRestriction.has_value()) {
+    if (!isBitRangeWithinRange(bitRange) || isAccessRestrictedOnWholeSignal() || !globalSignalRestriction.has_value()) {
         return;
     }
 
@@ -104,7 +108,7 @@ void SignalAccessRestriction::liftAccessRestrictionForBitRange(const std::size_t
 
 void SignalAccessRestriction::liftAccessRestrictionForDimension(const std::size_t dimension) {
     if (!isDimensionWithinRange(dimension)
-        || isBlockedCompletely
+        || isAccessRestrictedOnWholeSignal()
         || dimensionRestrictions.count(dimension) == 0) {
         return;
     }

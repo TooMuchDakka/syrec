@@ -28,6 +28,9 @@ public:
     void clearAllRestrictions();
     void blockAccessOnSignalCompletely();
 
+    // TODO: Structure of signal
+
+    [[nodiscard]] bool isAccessRestrictedOnWholeSignal() const;
     [[nodiscard]] bool isAccessRestrictedToBit(std::size_t bitPosition) const;
     [[nodiscard]] bool isAccessRestrictedToBit(std::size_t dimension, std::size_t bitPosition) const;
     [[nodiscard]] bool isAccessRestrictedToBit(std::size_t dimension, std::size_t valueForDimension, std::size_t bitPosition) const;
