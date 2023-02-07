@@ -37,7 +37,7 @@ public:
 
     [[nodiscard]] bool isAccessRestrictedToBitRange(const SignalAccess& bitRange) const;
     [[nodiscard]] bool isAccessRestrictedToBitRange(std::size_t dimension, const SignalAccess& bitRange) const;
-    [[nodiscard]] bool isAccessRestrictedToBitRange(std::size_t, std::size_t valueForDimension, const SignalAccess& bitRange) const;
+    [[nodiscard]] bool isAccessRestrictedToBitRange(std::size_t dimension, std::size_t valueForDimension, const SignalAccess& bitRange) const;
 
     [[nodiscard]] bool isAccessRestrictedToValueOfDimension(std::size_t dimension, std::size_t valueForDimension) const;
     [[nodiscard]] bool isAccessRestrictedToDimension(std::size_t dimension) const;
@@ -55,11 +55,11 @@ public:
 
     bool restrictAccessToBit(std::size_t bitPosition);
     bool restrictAccessToBit(std::size_t dimension, std::size_t bitPosition);
-    bool restrictAccessToBit(std::size_t, std::size_t valueForDimension, std::size_t bitPosition);
+    bool restrictAccessToBit(std::size_t dimension, std::size_t valueForDimension, std::size_t bitPosition);
 
     bool restrictAccessToBitRange(const SignalAccess& bitRange);
     bool restrictAccessToBitRange(std::size_t dimension, const SignalAccess& bitRange);
-    bool restrictAccessToBitRange(std::size_t, std::size_t valueForDimension, const SignalAccess& bitRange);
+    bool restrictAccessToBitRange(std::size_t dimension, std::size_t valueForDimension, const SignalAccess& bitRange);
 
     bool restrictAccessToValueOfDimension(std::size_t dimension, std::size_t valueForDimension);
     bool restrictAccessToDimension(std::size_t dimension);
@@ -186,7 +186,7 @@ private:
                     startPosition(startPosition), length(length), endPosition(startPosition + length - 1) {}
                 
                 [[nodiscard]] bool doesAccessIntersectRegion(const SignalAccess& signalAccess) const {
-                    return !((signalAccess.start < startPosition && signalAccess.stop < endPosition) || signalAccess.start > endPosition);
+                    return !((signalAccess.start < startPosition && signalAccess.stop < startPosition) || signalAccess.start > endPosition);
                 }
 
                 void updateLength() {
@@ -229,6 +229,20 @@ private:
     [[nodiscard]] bool isValueForDimensionWithinRange(std::size_t dimension, std::size_t valueForDimension) const;
     [[nodiscard]] bool isBitWithinRange(std::size_t bitPosition) const;
     [[nodiscard]] bool isBitRangeWithinRange(const SignalAccess& bitRange) const;
+
+    [[nodiscard]] bool isAccessRestrictedToBitRangeGlobally(const SignalAccess& bitRange) const;
+    [[nodiscard]] bool isAccessRestrictedToBitRange(const std::size_t& dimension, const SignalAccess& bitRange, const bool checkAllValuesForDimension) const;
+    [[nodiscard]] static std::vector<std::size_t> createIndexSequenceExcludingEnd(const std::size_t start, const std::size_t stop) {
+        if (start >= stop)
+            return {};
+
+        std::vector<std::size_t> container(((stop - 1) - start) + 1);
+        std::size_t              value = start;
+        for (auto& it: container) {
+            it = value++;
+        }
+        return container;
+    }
 };
 }
 
