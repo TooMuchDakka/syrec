@@ -111,13 +111,15 @@ setup(
     packages=find_namespace_packages(include=["mqt.*"]),
     extras_require={
         "test": ["pytest>=7"],
-        "coverage": ["coverage[toml]~=6.4.2", "pytest-cov~=3.0.0"],
+        "coverage": ["pytest-cov[toml]"],
         "docs": [
             "sphinx>=5.1.1",
             "sphinx-rtd-theme",
             "sphinxcontrib-bibtex~=2.5",
             "sphinx-copybutton",
-            "sphinx-hoverxref~=1.1.3",
+            "sphinx-hoverxref",
+            "sphinxext.opengraph",
+            "sphinx_rtd_dark_mode",
             "pybtex>=0.24",
             "importlib_metadata>=3.6; python_version < '3.10'",
         ],
@@ -146,7 +148,7 @@ setup(
         "Documentation": "https://syrec.readthedocs.io",
     },
     install_requires=[
-        "PyQt6>=6.2.3,<6.4.0",
+        "PyQt6>=6.2.3,<6.5.0",
     ],
     entry_points={
         "console_scripts": ["syrec-editor=mqt.syrec.syrec_editor:main"],

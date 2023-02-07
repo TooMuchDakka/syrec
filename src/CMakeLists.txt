@@ -1,77 +1,81 @@
-add_library(${PROJECT_NAME}
-            ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/syrec_synthesis.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/syrec_synthesis_additional_lines.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/syrec_synthesis_no_additional_lines.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/simulation/simple_simulation.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/dd_synthesis.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/encoding.cpp
+add_library( 
+      ${PROJECT_NAME}
+      ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/syrec_synthesis.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/syrec_cost_aware_synthesis.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/syrec_line_aware_synthesis.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/simulation/simple_simulation.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/simulation/circuit_to_truthtable.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/dd_synthesis.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/encoding.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/optimization/esop_minimization.cpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/optimization/esop_minimization.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/simulation/simple_simulation.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/simulation/circuit_to_truthtable.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/syrec_synthesis.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/syrec_cost_aware_synthesis.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/syrec_line_aware_synthesis.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/dd_synthesis.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/encoding.hpp
 
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/simulation/simple_simulation.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/syrec_synthesis.hpp          
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/syrec_synthesis_additional_lines.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/syrec_synthesis_no_additional_lines.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/dd_synthesis.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/encoding.hpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/program.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/variable.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/truthTable/truth_table.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/io/pla_parser.cpp
+      
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/custom_semantic_errors.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_comparer.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_evaluation_result.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/module_call_guess.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/module_call_stack.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/operation.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/parser_utilities.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/range_check.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/signal_access_restriction.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/signal_evaluation_result.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/symbol_table.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/value_broadcaster.cpp
 
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/program.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/variable.cpp
-			${CMAKE_CURRENT_SOURCE_DIR}/core/truthTable/truth_table.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/io/pla_parser.cpp
-            
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/custom_semantic_errors.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_comparer.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_evaluation_result.cpp
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/module_call_guess.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/module_call_stack.cpp
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/operation.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/parser_utilities.cpp
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/range_check.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/signal_access_restriction.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/signal_evaluation_result.cpp
-			${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/symbol_table.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/value_broadcaster.cpp
-			
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCErrorListener.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCErrorListener.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.h
 
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCErrorListener.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCErrorListener.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.cpp
 
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/custom_semantic_errors.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_comparer.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_evaluation_result.hpp
-			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/module_call_guess.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/module_call_stack.hpp
-			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/operation.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_utilities.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_config.hpp
-			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/range_check.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_access_restriction.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_evaluation_result.hpp
-			${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/value_broadcaster.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/module.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/number.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/program.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/statement.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/variable.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/utils/timer.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/truthTable/truth_table.hpp
-            ${${PROJECT_NAME}_SOURCE_DIR}/include/core/io/pla_parser.hpp)
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/custom_semantic_errors.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_comparer.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_evaluation_result.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/module_call_guess.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/module_call_stack.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/operation.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_utilities.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_config.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/range_check.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_access_restriction.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_evaluation_result.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/value_broadcaster.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/module.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/number.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/program.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/statement.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/variable.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/utils/timer.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/truthTable/truth_table.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/io/pla_parser.hpp)
 
 # set include directories
 target_include_directories(${PROJECT_NAME}
@@ -83,7 +87,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON 
 
 # add MQT::qfr library
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/qfr" "extern/qfr")
-target_link_libraries(${PROJECT_NAME} PUBLIC MQT::qfr)
+target_link_libraries(${PROJECT_NAME} PUBLIC MQT::qfr_dd)
 
 # add fmt library
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/fmt" "extern/fmt")

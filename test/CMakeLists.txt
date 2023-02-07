@@ -47,10 +47,10 @@ endmacro()
 package_add_test(
   ${PROJECT_NAME}_test
   unittests/test_parser.cpp
-  unittests/test_synthesis.cpp
-  unittests/test_simulation.cpp
-  unittests/test_add_lines_synthesis.cpp
-  unittests/test_add_lines_simulation.cpp
+  unittests/test_line_aware_synthesis.cpp
+  unittests/test_line_aware_simulation.cpp
+  unittests/test_cost_aware_synthesis.cpp
+  unittests/test_cost_aware_simulation.cpp
   unittests/test_tt_to_dd.cpp
   unittests/test_extend_tt.cpp
   unittests/test_huffman.cpp
@@ -61,7 +61,8 @@ package_add_test(
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_range_check_fixture.cpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_fixture.cpp unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_fixture.hpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_method_call_guess_fixture.cpp
-)
+  unittests/test_dd_synthesis.cpp
+  unittests/test_dd_synthesis_dc.cpp)
 
 add_custom_command(
   TARGET ${PROJECT_NAME}_test

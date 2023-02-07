@@ -23,6 +23,7 @@ namespace syrec {
         public:
             using Value  = std::optional<bool>;
             using Vector = std::vector<Cube>;
+            using Set    = std::set<Cube>;
 
         private:
             std::vector<Value> cube{};
@@ -52,6 +53,21 @@ namespace syrec {
                         return true;
                     default:
                         throw std::invalid_argument("Unknown Character");
+                }
+            }
+
+            static auto findMissingCube(TruthTable::Cube::Set const& p1SigVec) -> Cube {
+                if (p1SigVec.empty()) {
+                    return {};
+                }
+
+                const auto    bitwidth = p1SigVec.begin()->size();
+                std::uint64_t idx      = 0U;
+                while (true) {
+                    if (auto cube = Cube::fromInteger(idx, bitwidth); std::find(p1SigVec.begin(), p1SigVec.end(), cube) == p1SigVec.end()) {
+                        return cube;
+                    }
+                    ++idx;
                 }
             }
 
@@ -89,6 +105,47 @@ namespace syrec {
                 return result;
             }
 
+            // return bool vec representation of the cube (order is b0,b1,b2......bn)
+            [[nodiscard]] auto toBoolVec() const -> std::vector<bool> {
+                assert(std::all_of(cube.cbegin(), cube.cend(), [](auto const& v) { return v.has_value(); }));
+                const auto        nBits = size();
+                std::vector<bool> result(nBits);
+                for (std::size_t i = 0U; i < nBits; ++i) {
+                    result[nBits - 1 - i] = *cube[i];
+                }
+                return result;
+            }
+
+            // return string representation of the cube
+            [[nodiscard]] auto toString() const -> std::string {
+                std::stringstream ss{};
+                for (const auto& i: cube) {
+                    if (!i.has_value()) {
+                        ss << '-';
+                    } else {
+                        ss << (*i ? '1' : '0');
+                    }
+                }
+                return ss.str();
+            }
+
+            // checks if 2 Cubes are equal irrespective of don't care
+            [[nodiscard]] static auto checkCubeEquality(const Cube& c1, const Cube& c2, const bool equalityUpToDontCare = true) -> bool {
+                if (c1.size() != c2.size()) {
+                    return false;
+                }
+                const auto nBits = c1.size();
+                for (auto i = 0U; i < nBits; ++i) {
+                    if (equalityUpToDontCare && (!c1[i].has_value() || !c2[i].has_value())) {
+                        continue;
+                    }
+                    if (*c1[i] != *c2[i]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
             [[nodiscard]] auto completeCubes() const -> Vector;
 
             auto insertZero() -> void {
@@ -120,8 +177,16 @@ namespace syrec {
                 return (cube < cv.cube);
             }
 
+            auto operator>(const Cube& cv) const -> bool {
+                return (cube > cv.cube);
+            }
+
             auto operator==(const Cube& cv) const -> bool {
                 return (cube == cv.cube);
+            }
+
+            auto operator!=(const Cube& cv) const -> bool {
+                return (cube != cv.cube);
             }
 
             auto reserve(const std::size_t n) -> void {
@@ -172,14 +237,54 @@ namespace syrec {
             }
         };
 
-        using CubeMap = std::map<Cube, Cube>;
+        using CubeMap      = std::map<Cube, Cube>;
+        using CubeMultiMap = std::multimap<Cube, Cube>;
 
     private:
-        CubeMap cubeMap{};
+        CubeMap           cubeMap{};
+        std::vector<bool> constants;
+        std::vector<bool> garbage;
 
     public:
-        TruthTable()               = default;
-        TruthTable(TruthTable& tt) = default;
+        auto setConstants(std::vector<bool> const& c) -> void {
+            constants = c;
+        }
+
+        auto setGarbage(std::vector<bool> const& g) -> void {
+            garbage = g;
+        }
+
+        [[maybe_unused]] auto setConstant(const std::size_t n) -> void {
+            constants[n] = true;
+        }
+
+        auto setGarbage(const std::size_t n) -> void {
+            garbage[n] = true;
+        }
+
+        [[nodiscard]] auto getConstants() const -> const std::vector<bool>& {
+            return constants;
+        }
+
+        [[nodiscard]] auto getGarbage() const -> const std::vector<bool>& {
+            return garbage;
+        }
+
+        [[nodiscard]] auto getConstants() -> std::vector<bool>& {
+            return constants;
+        }
+
+        [[nodiscard]] auto getGarbage() -> std::vector<bool>& {
+            return garbage;
+        }
+
+        [[nodiscard]] auto isConstant(const std::size_t n) const -> bool {
+            return constants[n];
+        }
+
+        [[nodiscard]] auto isGarbage(const std::size_t n) const -> bool {
+            return garbage[n];
+        }
 
         auto operator==(const TruthTable& tt) const -> bool {
             return (cubeMap == tt.cubeMap);
@@ -228,11 +333,19 @@ namespace syrec {
             return cubeMap.begin()->first.size();
         }
 
+        [[nodiscard]] auto nPrimaryInputs() const -> std::size_t {
+            return std::count(constants.begin(), constants.end(), false);
+        }
+
         [[nodiscard]] auto nOutputs() const -> std::size_t {
             if (cubeMap.empty()) {
                 return 0U;
             }
             return cubeMap.begin()->second.size();
+        }
+
+        [[nodiscard]] auto nPrimaryOutputs() const -> std::size_t {
+            return std::count(garbage.begin(), garbage.end(), false);
         }
 
         auto extract(Cube const& key) -> CubeMap::node_type {
@@ -251,6 +364,21 @@ namespace syrec {
             return cubeMap.find(Cube::fromString(str));
         }
 
+        auto find(const Cube& c) -> decltype(cubeMap.cbegin()) {
+            return cubeMap.find(c);
+        }
+
+        template<class It>
+        auto erase(It elem) -> It {
+            return cubeMap.erase(elem);
+        }
+
+        // filters the inputs based on the number of primary inputs.
+        [[nodiscard]] auto filteredInput(const Cube& input) const -> Cube;
+
+        // filters the outputs based on the number of primary outputs.
+        [[nodiscard]] auto filteredOutput(const Cube& output) const -> Cube;
+
         auto try_emplace(const Cube& input, const Cube& output) -> void { // NOLINT(readability-identifier-naming) keeping same Interface as std::vector
             assert(cubeMap.empty() || (input.size() == nInputs() && output.size() == nOutputs()));
             cubeMap.try_emplace(input, output);
@@ -263,6 +391,10 @@ namespace syrec {
         auto insert(CubeMap::node_type nh) -> void {
             cubeMap.insert(std::move(nh));
         }
+
+        static auto equal(TruthTable const& tt1, TruthTable const& tt2, bool equalityUpToDontCare = true) -> bool;
+
+        [[nodiscard]] auto minimumAdditionalLinesRequired() const -> std::size_t;
 
         auto clear() -> void {
             cubeMap.clear();

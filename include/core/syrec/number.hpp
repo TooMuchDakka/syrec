@@ -7,7 +7,9 @@
 #include <variant>
 
 template<class... Ts>
-struct Overloaded: Ts... { using Ts::operator()...; };
+struct Overloaded: Ts... {
+    using Ts::operator()...;
+};
 template<class... Ts>
 Overloaded(Ts...) -> Overloaded<Ts...>;
 

@@ -16,13 +16,14 @@ namespace syrec {
             data(std::move(data)), freq(freq) {}
 
         auto operator>(const MinHeapNode& other) const -> bool {
-            return freq > other.freq;
+            return (freq > other.freq || (freq == other.freq && (data > other.data)));
         }
 
-        auto traverse(TruthTable::Cube&& encodedCube, TruthTable::CubeMap& encoding) const -> void {
+        template<class T>
+        auto traverse(TruthTable::Cube&& encodedCube, T& encoding) const -> void {
             // leaf node -> add encoding
             if (!data.empty()) {
-                encoding.try_emplace(data, std::move(encodedCube));
+                encoding.emplace(data, std::move(encodedCube));
                 return;
             }
 
@@ -36,10 +37,19 @@ namespace syrec {
         }
     };
 
-    auto extend(TruthTable& tt) -> void;
+    template<class T>
+    auto computeOutputFreq(TruthTable const& tt, T& outputFreq) -> void;
 
-    auto encodeHuffman(TruthTable& tt) -> void;
+    template<class T>
+    auto topNodeOfHuffmanTree(T const& outputFreq) -> std::shared_ptr<MinHeapNode>;
 
-    auto augmentWithConstants(TruthTable& tt) -> void;
+    template<class T>
+    auto alterTTAndCodewords(TruthTable& tt, T& encoding, std::size_t const& requiredGarbage) -> void;
+
+    auto encodeWithAdditionalLine(TruthTable& tt) -> TruthTable::CubeMap;
+
+    auto encodeWithoutAdditionalLine(TruthTable& tt) -> TruthTable::CubeMultiMap;
+
+    auto augmentWithConstants(TruthTable& tt, std::size_t const& nBits, bool appendZero = false) -> void;
 
 } //namespace syrec
