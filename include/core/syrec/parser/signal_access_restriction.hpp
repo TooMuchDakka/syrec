@@ -25,6 +25,27 @@ public:
     explicit SignalAccessRestriction(const syrec::Variable::ptr& signal):
         isBlockedCompletely(false), signal(signal) {}
 
+    SignalAccessRestriction(const SignalAccessRestriction& existingRestriction) = default;
+    SignalAccessRestriction(SignalAccessRestriction&& existingRestriction) noexcept:
+        SignalAccessRestriction(existingRestriction.signal) {
+        swap(*this, existingRestriction);
+    }
+    ~SignalAccessRestriction()                                                  = default;
+
+    friend void swap(SignalAccessRestriction& first, SignalAccessRestriction& other) noexcept
+    {
+        using std::swap;
+        swap(first.isBlockedCompletely, other.isBlockedCompletely);
+        swap(first.signal, other.signal);
+        swap(first.dimensionRestrictions, other.dimensionRestrictions);
+        swap(first.globalSignalRestriction, other.globalSignalRestriction);
+    }
+
+    SignalAccessRestriction& operator=(SignalAccessRestriction existingRestriction) {
+        swap(*this, existingRestriction);
+        return *this;
+    }
+
     void clearAllRestrictions();
     void blockAccessOnSignalCompletely();
 
@@ -70,7 +91,7 @@ private:
             isBlockedCompletely(false), signalLength(signalLength), restrictedRegions({}) {}
 
         void restrictAccessTo(const SignalAccess& signalPart) {
-            if (isBlockedCompletely || signalPart.start > signalPart.stop || !isAccessWithinRange(signalPart)) {
+            if (isCompletelyBlocked() || signalPart.start > signalPart.stop || !isAccessWithinRange(signalPart)) {
                 return;
             }
 
@@ -143,7 +164,7 @@ private:
         }
 
         [[nodiscard]] bool isAccessRestricted(const SignalAccess& signalPart) const {
-            return isBlockedCompletely || 
+            return isCompletelyBlocked() || 
                 (!isAccessOutsideOfBorderRestrictions(signalPart)
                 && std::any_of(
                     restrictedRegions.cbegin(),
@@ -158,12 +179,16 @@ private:
                 return true;
             }
             const auto& lowerBorderRestrictionRegion = restrictedRegions.at(0);
-            if (!lowerBorderRestrictionRegion.doesAccessIntersectRegion(signalPart)) {
+            if (signalPart.start < lowerBorderRestrictionRegion.startPosition && signalPart.stop < lowerBorderRestrictionRegion.startPosition) {
                 return true;
             }
             
             const auto& upperBorderRestrictionRegion = restrictedRegions.size() > 1 ? restrictedRegions.at(restrictedRegions.size() - 1) : lowerBorderRestrictionRegion;
-            return !upperBorderRestrictionRegion.doesAccessIntersectRegion(signalPart);
+            return signalPart.start > upperBorderRestrictionRegion.endPosition;
+        }
+
+        [[nodiscard]] bool isCompletelyBlocked() const {
+            return this->isBlockedCompletely;
         }
 
         void blockCompletely() {
@@ -217,7 +242,7 @@ private:
 
 
     bool                                                  isBlockedCompletely;
-    const syrec::Variable::ptr                            signal;
+    syrec::Variable::ptr                            signal;
     std::unordered_map<std::size_t, DimensionRestriction> dimensionRestrictions;
     std::optional<SignalRestriction>                      globalSignalRestriction;
 
@@ -243,6 +268,9 @@ private:
         }
         return container;
     }
+
+    [[nodiscard]] bool isAccessOnDimensionBlocked(const std::size_t& dimension, const bool& considerBitRestrictions=false) const;
+    [[nodiscard]] bool isAccessOnValueOfDimensionBlocked(const std::size_t& dimension, const std::size_t& valueForDimension, const bool& considerBitRestrictions = false) const;
 };
 }
 

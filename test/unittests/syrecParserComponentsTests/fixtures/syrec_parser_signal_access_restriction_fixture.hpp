@@ -22,8 +22,8 @@ public:
     using RestrictionPtr        = std::shared_ptr<SignalAccessRestriction>;
     using RestrictionDefinition = std::function<void(RestrictionPtr&)>;
 
-    static constexpr bool isBitWithinRange(const std::size_t bitToCheck, const std::size_t bitRangeStart, const std::size_t bitRangeEnd) {
-        return bitToCheck >= bitRangeStart && bitToCheck <= bitRangeEnd;
+    static constexpr bool isBitWithinRange(const std::size_t bitToCheck, const SignalAccessRestriction::SignalAccess& bitRange) {
+        return bitToCheck >= bitRange.start && bitToCheck <= bitRange.stop;
     }
 
     static constexpr bool doesAccessIntersectRegion(const SignalAccessRestriction::SignalAccess& referenceRegion, const SignalAccessRestriction::SignalAccess& signalAccess) {
@@ -333,6 +333,44 @@ TEST_P(SignalAccessRestrictionBaseTestForBitRangesForDimensions, ChecksForBitRan
 
     const auto& validator = std::get<2>(testParamInfo);
     checkRestrictionsStatusForAllBitRangesPerDimension(validator);
+}
+class SignalAccessRestrictionBaseTestToExtendRestriction:
+    public ::parser::SignalAccessRestrictionBaseTest,
+    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, SignalAccessRestrictionBaseTest::RestrictionDefinition, std::function<bool(const std::size_t&, const std::size_t&, const std::size_t&)>>> {
+public:
+    const static inline SignalAccessRestriction::SignalAccess bitRangeBeforeRestrictedBit = SignalAccessRestriction::SignalAccess(0, restrictedBit > 1 ? restrictedBit - 1 : 0);
+    const static inline SignalAccessRestriction::SignalAccess restrictedBitRange          = SignalAccessRestriction::SignalAccess(restrictedBit, restrictedBit + 2);
+    const static inline SignalAccessRestriction::SignalAccess bitRangeAfterGap            = SignalAccessRestriction::SignalAccess(restrictedBit + 3, bitWidthOfReferenceSignal - 1);
+
+    constexpr static std::size_t otherBlockedDimension = 0;
+    constexpr static std::size_t blockedValueForOtherDimension = 1;
+};
+
+TEST_P(SignalAccessRestrictionBaseTestToExtendRestriction, CheckThatRestrictionChanged) {
+    const auto testParamInfo = GetParam();
+    const auto& initialRestrictionDefinition = std::get<1>(testParamInfo);
+    initialRestrictionDefinition(restriction);
+    
+    const auto& additionalRestrictions = std::get<2>(testParamInfo);
+    additionalRestrictions(restriction);
+
+    const auto& restrictionValidator = std::get<3>(testParamInfo);
+    checkRestrictionsStatusForAllBitsOfAllDimensions(restrictionValidator);
+}
+
+class SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged:
+    public ::parser::SignalAccessRestrictionBaseTestToExtendRestriction {};
+
+TEST_P(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged, CheckThatRestrictionIsLeftUnchanged) {
+    const auto  testParamInfo                = GetParam();
+    const auto& initialRestrictionDefinition = std::get<1>(testParamInfo);
+    initialRestrictionDefinition(restriction);
+
+    const auto& additionalRestrictions = std::get<2>(testParamInfo);
+    additionalRestrictions(restriction);
+
+    const auto& restrictionValidator = std::get<3>(testParamInfo);
+    checkRestrictionsStatusForAllBitsOfAllDimensions(restrictionValidator);
 }
 }
 #endif
