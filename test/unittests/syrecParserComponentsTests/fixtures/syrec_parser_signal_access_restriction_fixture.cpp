@@ -298,7 +298,12 @@ INSTANTIATE_TEST_SUITE_P(
  * 5.   a[0].0 += ...; a[0].1 += ...; a[1].1 += ...; a[1].2 += ...;
  * 6.   a[0].2:5 += ...; a[0].0:1 += ...; a[0].6:10 += ...; a[1].2:5 += ...; a[1].0:1 += ...; a[1].6:10 += ...;
  * 7.   a[$i].0 += ...; a[$i].2 += ...; a[$i].1 += ...;
- * 8.   a[$i].2:5 += ...; a[$i].0:1 += ...; a[$i].6:10 += ...;   
+ * 8.   a[$i].2:5 += ...; a[$i].0:1 += ...; a[$i].6:10 += ...;
+ *
+ * Test scenarios that extend the existing restriction across multiple levels
+ * 9.   a[0].0:2 += ...; a.0:5 += ...;
+ * 10.  a[0].0 += a.0:5 += ...;
+ * 11.  a[0].
  */
 INSTANTIATE_TEST_SUITE_P(
     SignalAccessRestrictionTests,
@@ -312,213 +317,245 @@ INSTANTIATE_TEST_SUITE_P(
                 [](std::shared_ptr<SignalAccessRestriction>& restriction) {
                     restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
                 },
-                [](const std::size_t& bitPosition, const std::size_t&, const std::size_t&) {
-                    return SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
-                        bitPosition,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange
-                    );
-                }),
-            std::make_tuple(
-                "extendGlobalSignalRangeRestriction",
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
+                [](const SignalAccessRestriction::SignalAccess& bitRange) {
+                    return SignalAccessRestrictionBaseTestToExtendRestriction::doesAccessIntersectRegion(SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange, bitRange)
+                        || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(SignalAccessRestrictionBaseTest::restrictedBit, bitRange);
                 },
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
-                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap);
+                [](const std::size_t&) {
+                    return true;
                 },
-                [](const std::size_t& bitPosition, const std::size_t&, const std::size_t&) {
-                    return SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
-                        bitPosition,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange)
-                    || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
-                        bitPosition, 
-                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit)
-                    || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
-                        bitPosition,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap);
-                }),
-            std::make_tuple(
-                "extendDimensionRestriction",
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                        restriction->restrictAccessToValueOfDimension(
-                            SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                            SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension);
+                [](const std::size_t&, const std::size_t&) {
+                    return true;
                 },
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToValueOfDimension(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension);
-                },
-                [](const std::size_t&, const std::size_t& dimension, const std::size_t& valueForDimension) {
-                    return (dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension)
-                    || (dimension == SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension);
-                }),
-            std::make_tuple(
-                "extendBitRestrictionForDimension",
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToBit(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit.start);
-                },
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToBitRange(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
-                    restriction->restrictAccessToBitRange(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
-                },
-                [](const std::size_t& bitPosition, const std::size_t& dimension, const std::size_t& valueForDimension) {
-                    return ((dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension) 
-                        || (dimension == SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension))
-                    && SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
-                }),
-            std::make_tuple(
-                    "extendBitRestrictionWithSmallOverlapWithOtherDimension",
-                    [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                        restriction->restrictAccessToBit(
-                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
-                                SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit.start);
-                    },
-                    [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                        restriction->restrictAccessToBitRange(
-                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
-                                SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
-                        restriction->restrictAccessToBit(
-                                SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
-                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
-                                SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit.stop);
-                        restriction->restrictAccessToBitRange(
-                                SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
-                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
-                                SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
-                    },
-                    [](const std::size_t& bitPosition, const std::size_t& dimension, const std::size_t& valueForDimension) {
-                        return
-                            ((dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension) 
-                                && SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit))
-                            || ((dimension == SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension)) 
-                                && (bitPosition == SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit.stop || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange));
-                    }),
-            std::make_tuple(
-                "extendBitRangeRestrictionForDimension",
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToBitRange(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
-                },
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToBitRange(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
-                    restriction->restrictAccessToBitRange(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap);
-
-                    restriction->restrictAccessToBitRange(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
-                    restriction->restrictAccessToBitRange(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap);
-                    restriction->restrictAccessToBitRange(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
-                },
-                [](const std::size_t& bitPosition, const std::size_t& dimension, const std::size_t& valueForDimension) {
-                    return ((dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension) || (dimension == SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension))
-                    && (SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit)
-                    || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange) 
-                    || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap));
-                }),
-                // TODO: This should change nothing for the restriction
-            std::make_tuple(
-                "extendRestrictionToCompletelyRestrictedDimension",
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToDimension(SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension);
-                },
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToValueOfDimension(SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension, 0);
-                    restriction->restrictAccessToValueOfDimension(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension, 
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension);
-                },
-                [](const std::size_t&, const std::size_t& dimension, const std::size_t&) {
-                    return dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension;
-            }),
-            std::make_tuple(
-                "extendBitRestrictionToCompletelyRestrictedDimension",
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToBit(
-                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange.start);
-                },
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToBitRange(
-                            SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
-                            SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
-                },
-                [](const std::size_t& bitPosition, const std::size_t& dimension, const std::size_t&) {
-                    return SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange)
-                    && dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension;
-                })
+                [](const SignalAccessRestriction::SignalAccess& bitRange, const std::size_t&, const std::size_t&) {
+                    return SignalAccessRestrictionBaseTestToExtendRestriction::doesAccessIntersectRegion(SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange, bitRange)
+                        || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(SignalAccessRestrictionBaseTest::restrictedBit, bitRange);
+                }) 
     ),
     [](const testing::TestParamInfo<SignalAccessRestrictionBaseTestToExtendRestriction::ParamType>& info) {
         return std::get<0>(info.param);
     });
-
-/*
- * Test scenarios (extend restriction with restriction that will not extend the existing one)
- * 1.   a += ...; a.0 += ...; a.2:5 += ...; a[0] += ...; a[0].2 += ...; a[0].2:10 += ...; a[$i] += ...; a[$i].0 += ...; a[$i].0:8 += ...
- * 2.   a.0 += ...; a[0].0 += ...; a[$i].0 += ...
- * 3.   a.2:5 += ...; a.3 += ...; a.5 += ...; a:2:4 += ...; a[0].2 += ...; a[0].2:5 += ...; a[$i].2 += ...; a[$i].2:5 += ...
- * 4.   a[0] += ...; a[0].2 += ...; a[0].2:5 += ...; a[0] += ...
- * 5.   a[$i] += ...; a.0 += ...; a.2:5 += ...; a[0] += ...; a[0].2 += ...; a[0].2:10 += ...; a[$i] += ...; a[$i].0 += ...; a[$i].0:8 += ...
- * 6.   a[0].0 += ...; a[0].0 += ...
- * 7.   a[0].2:5 += ...; a[0].2 += ...; a[0].2:4 += ...;
- * 8.   a[$i].0 += ...; a[0].0 += ...; a[$i].0 += ...;
- * 9.   a[$i].2:5 += ...; a[0].2 += ...; a[0].4 += ...; a[$i].2 += ...; a[$i].4 += ...;      
- */
- INSTANTIATE_TEST_SUITE_P(
-    SignalAccessRestrictionTests,
-    SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged,
-    ::testing::Values(
-            std::make_tuple(
-                "extendGlobalSignalRestriction",
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->blockAccessOnSignalCompletely();
-                },
-                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
-                    restriction->restrictAccessToBit(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::restrictedBit);
-                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::bitRangeBeforeRestrictedBit);
-                    restriction->restrictAccessToValueOfDimension(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedValueForDimension);
-                    restriction->restrictAccessToBit(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedValueForDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::restrictedBit);
-                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedValueForDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::bitRangeBeforeRestrictedBit);
-                    restriction->restrictAccessToDimension(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension);
-                    restriction->restrictAccessToBit(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::restrictedBit);
-                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::bitRangeBeforeRestrictedBit);
-                },
-                [](const std::size_t& bitPosition, const std::size_t&, const std::size_t&) {
-                    return SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
-                        bitPosition,
-                        SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::restrictedBitRange);
-                })
-        ),
-        [](const testing::TestParamInfo<SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::ParamType>& info) {
-            return std::get<0>(info.param);
-        });
+//
+//
+//INSTANTIATE_TEST_SUITE_P(
+//    SignalAccessRestrictionTests,
+//    SignalAccessRestrictionBaseTestToExtendRestriction,
+//    ::testing::Values(
+//            std::make_tuple(
+//                "extendGlobalSignalRestriction",
+//                [](std::shared_ptr<SignalAccessRestriction>& restriction) {
+//                    restriction->restrictAccessToBit(SignalAccessRestrictionBaseTest::restrictedBit);
+//                },
+//                [](std::shared_ptr<SignalAccessRestriction>& restriction) {
+//                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
+//                },
+//                [](const std::size_t& bitPosition, const std::size_t&, const std::size_t&) {
+//                    return SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
+//                        bitPosition,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange
+//                    );
+//                }),
+//            std::make_tuple(
+//                "extendGlobalSignalRangeRestriction",
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
+//                },
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
+//                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap);
+//                },
+//                [](const std::size_t& bitPosition, const std::size_t&, const std::size_t&) {
+//                    return SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
+//                        bitPosition,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange)
+//                    || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
+//                        bitPosition, 
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit)
+//                    || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
+//                        bitPosition,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap);
+//                }),
+//            std::make_tuple(
+//                "extendDimensionRestriction",
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                        restriction->restrictAccessToValueOfDimension(
+//                            SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                            SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension);
+//                },
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToValueOfDimension(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension);
+//                },
+//                [](const std::size_t&, const std::size_t& dimension, const std::size_t& valueForDimension) {
+//                    return (dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension)
+//                    || (dimension == SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension);
+//                }),
+//            std::make_tuple(
+//                "extendBitRestrictionForDimension",
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToBit(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit.start);
+//                },
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToBitRange(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
+//                    restriction->restrictAccessToBitRange(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
+//                },
+//                [](const std::size_t& bitPosition, const std::size_t& dimension, const std::size_t& valueForDimension) {
+//                    return ((dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension) 
+//                        || (dimension == SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension))
+//                    && SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
+//                }),
+//            std::make_tuple(
+//                    "extendBitRestrictionWithSmallOverlapWithOtherDimension",
+//                    [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                        restriction->restrictAccessToBit(
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit.start);
+//                    },
+//                    [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                        restriction->restrictAccessToBitRange(
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
+//                        restriction->restrictAccessToBit(
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit.stop);
+//                        restriction->restrictAccessToBitRange(
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
+//                                SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
+//                    },
+//                    [](const std::size_t& bitPosition, const std::size_t& dimension, const std::size_t& valueForDimension) {
+//                        return
+//                            ((dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension) 
+//                                && SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit))
+//                            || ((dimension == SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension)) 
+//                                && (bitPosition == SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit.stop || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange));
+//                    }),
+//            std::make_tuple(
+//                "extendBitRangeRestrictionForDimension",
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToBitRange(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
+//                },
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToBitRange(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
+//                    restriction->restrictAccessToBitRange(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap);
+//
+//                    restriction->restrictAccessToBitRange(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
+//                    restriction->restrictAccessToBitRange(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap);
+//                    restriction->restrictAccessToBitRange(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit);
+//                },
+//                [](const std::size_t& bitPosition, const std::size_t& dimension, const std::size_t& valueForDimension) {
+//                    return ((dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension) || (dimension == SignalAccessRestrictionBaseTestToExtendRestriction::otherBlockedDimension && valueForDimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForOtherDimension))
+//                    && (SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeBeforeRestrictedBit)
+//                    || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange) 
+//                    || SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::bitRangeAfterGap));
+//                }),
+//                // TODO: This should change nothing for the restriction
+//            std::make_tuple(
+//                "extendRestrictionToCompletelyRestrictedDimension",
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToDimension(SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension);
+//                },
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToValueOfDimension(SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension, 0);
+//                    restriction->restrictAccessToValueOfDimension(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension, 
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedValueForDimension);
+//                },
+//                [](const std::size_t&, const std::size_t& dimension, const std::size_t&) {
+//                    return dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension;
+//            }),
+//            std::make_tuple(
+//                "extendBitRestrictionToCompletelyRestrictedDimension",
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToBit(
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                        SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange.start);
+//                },
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToBitRange(
+//                            SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension,
+//                            SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange);
+//                },
+//                [](const std::size_t& bitPosition, const std::size_t& dimension, const std::size_t&) {
+//                    return SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(bitPosition, SignalAccessRestrictionBaseTestToExtendRestriction::restrictedBitRange)
+//                    && dimension == SignalAccessRestrictionBaseTestToExtendRestriction::blockedDimension;
+//                })
+//    ),
+//    [](const testing::TestParamInfo<SignalAccessRestrictionBaseTestToExtendRestriction::ParamType>& info) {
+//        return std::get<0>(info.param);
+//    });
+//
+///*
+// * Test scenarios (extend restriction with restriction that will not extend the existing one)
+// * 1.   a += ...; a.0 += ...; a.2:5 += ...; a[0] += ...; a[0].2 += ...; a[0].2:10 += ...; a[$i] += ...; a[$i].0 += ...; a[$i].0:8 += ...
+// * 2.   a.0 += ...; a[0].0 += ...; a[$i].0 += ...
+// * 3.   a.2:5 += ...; a.3 += ...; a.5 += ...; a:2:4 += ...; a[0].2 += ...; a[0].2:5 += ...; a[$i].2 += ...; a[$i].2:5 += ...
+// * 4.   a[0] += ...; a[0].2 += ...; a[0].2:5 += ...; a[0] += ...
+// * 5.   a[$i] += ...; a.0 += ...; a.2:5 += ...; a[0] += ...; a[0].2 += ...; a[0].2:10 += ...; a[$i] += ...; a[$i].0 += ...; a[$i].0:8 += ...
+// * 6.   a[0].0 += ...; a[0].0 += ...
+// * 7.   a[0].2:5 += ...; a[0].2 += ...; a[0].2:4 += ...;
+// * 8.   a[$i].0 += ...; a[0].0 += ...; a[$i].0 += ...;
+// * 9.   a[$i].2:5 += ...; a[0].2 += ...; a[0].4 += ...; a[$i].2 += ...; a[$i].4 += ...;      
+// */
+// INSTANTIATE_TEST_SUITE_P(
+//    SignalAccessRestrictionTests,
+//    SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged,
+//    ::testing::Values(
+//            std::make_tuple(
+//                "extendGlobalSignalRestriction",
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->blockAccessOnSignalCompletely();
+//                },
+//                [](SignalAccessRestrictionBaseTest::RestrictionPtr& restriction) {
+//                    restriction->restrictAccessToBit(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::restrictedBit);
+//                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::bitRangeBeforeRestrictedBit);
+//                    restriction->restrictAccessToValueOfDimension(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedValueForDimension);
+//                    restriction->restrictAccessToBit(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedValueForDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::restrictedBit);
+//                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedValueForDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::bitRangeBeforeRestrictedBit);
+//                    restriction->restrictAccessToDimension(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension);
+//                    restriction->restrictAccessToBit(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::restrictedBit);
+//                    restriction->restrictAccessToBitRange(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::blockedDimension, SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::bitRangeBeforeRestrictedBit);
+//                },
+//                [](const std::size_t& bitPosition, const std::size_t&, const std::size_t&) {
+//                    return SignalAccessRestrictionBaseTestToExtendRestriction::isBitWithinRange(
+//                        bitPosition,
+//                        SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::restrictedBitRange);
+//                })
+//        ),
+//        [](const testing::TestParamInfo<SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged::ParamType>& info) {
+//            return std::get<0>(info.param);
+//        });
 /*
  * Test scenarios (lift restrictions):
  * 1.   

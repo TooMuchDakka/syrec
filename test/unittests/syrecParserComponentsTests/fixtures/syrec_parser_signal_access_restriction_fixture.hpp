@@ -4,6 +4,7 @@
 
 #include "core/syrec/variable.hpp"
 #include "core/syrec/parser/signal_access_restriction.hpp"
+#include "core/syrec/parser/signal_access_restriction.hpp"
 
 #include "gtest/gtest.h"
 #include <googletest/googletest/include/gtest/gtest.h>
@@ -21,6 +22,13 @@ public:
 
     using RestrictionPtr        = std::shared_ptr<SignalAccessRestriction>;
     using RestrictionDefinition = std::function<void(RestrictionPtr&)>;
+
+    using ExpectedBitRestrictionStatusLookup = std::function<bool(const std::size_t& bit)>;
+    using ExpectedBitOfDimensionRestrictionStatusLookup = std::function<bool(const std::size_t& bit, const std::size_t& dimension, const std::size_t& valueForDimension)>;
+    using ExpectedDimensionRestrictionStatusLookup = std::function<bool(const std::size_t& dimension)>;
+    using ExpectedValueForDimensionRestrictionStatusLookup = std::function<bool(const std::size_t& dimension, const std::size_t& valueForDimension)>;
+    using ExpectedGlobalBitRangesOfSignalRestrictionStatusLookup = std::function<bool(const SignalAccessRestriction::SignalAccess& bitRange)>;
+    using ExpectedBitRangeOfSignalRestrictionStatusLookup = std::function<bool(const SignalAccessRestriction::SignalAccess& bitRange, const std::size_t& dimension, const std::size_t& valueForDimension)>;
 
     static constexpr bool isBitWithinRange(const std::size_t bitToCheck, const SignalAccessRestriction::SignalAccess& bitRange) {
         return bitToCheck >= bitRange.start && bitToCheck <= bitRange.stop;
@@ -198,15 +206,13 @@ protected:
         std::for_each(indexSequence.cbegin(), indexSequence.cend(), f);
     }
 
-    template<class F>
-    void checkRestrictionsStatusForAllBitsGlobally(F&& restrictionStatusDeductor) {
+    void checkRestrictionsStatusForAllBitsGlobally(const ExpectedBitRestrictionStatusLookup& restrictionStatusDeductor) {
         assertForEachInSequence(0, bitWidthOfReferenceSignal, [&](const std::size_t& bit) {
             assertThatRestrictionStatusMatchesForBit(bit, restrictionStatusDeductor(bit));
         });
     }
-
-    template<class F>
-    void checkRestrictionsStatusForAllBitsOfAllDimensions(F&& restrictionStatusDeductor) {
+    
+    void checkRestrictionsStatusForAllBitsOfAllDimensions(const ExpectedBitOfDimensionRestrictionStatusLookup& restrictionStatusDeductor) {
         assertForEachInSequence(0, dimensionsOfReferenceSignal.size(), [&](const std::size_t& dimension) {
             assertForEachInSequence(0, dimensionsOfReferenceSignal.at(dimension), [&](const std::size_t& valueOfDimension) {
                 assertForEachInSequence(0, bitWidthOfReferenceSignal, [&](const std::size_t& bit) {
@@ -215,9 +221,8 @@ protected:
             });
         });
     }
-
-    template<class F>
-    void checkRestrictionsStatusForAllBitRangesGlobally(F&& restrictionStatusDeductor) {
+    
+    void checkRestrictionsStatusForAllBitRangesGlobally(const ExpectedGlobalBitRangesOfSignalRestrictionStatusLookup& restrictionStatusDeductor) {
         assertForEachInSequence(0, bitWidthOfReferenceSignal, [&](const std::size_t& bitRangeStart) {
             assertForEachInSequence(bitRangeStart, bitWidthOfReferenceSignal, [&](const std::size_t& bitRangeEnd) {
                 const auto bitRange = SignalAccessRestriction::SignalAccess(bitRangeStart, bitRangeEnd);
@@ -225,9 +230,8 @@ protected:
             });
         });
     }
-
-    template<class F>
-    void checkRestrictionsStatusForAllBitRangesPerDimension(F&& restrictionStatusDeductor) {
+    
+    void checkRestrictionsStatusForAllBitRangesPerDimension(const ExpectedBitRangeOfSignalRestrictionStatusLookup& restrictionStatusDeductor) {
         assertForEachInSequence(0, dimensionsOfReferenceSignal.size(), [&](const std::size_t& dimension) {
             assertForEachInSequence(0, dimensionsOfReferenceSignal.at(dimension), [&](const std::size_t& valueOfDimension) {
                 assertForEachInSequence(0, bitWidthOfReferenceSignal, [&](const std::size_t& bitRangeStart) {
@@ -239,16 +243,14 @@ protected:
             });
         });
     }
-
-    template<class F>
-    void checkRestrictionsStatusForDimensions(F&& restrictionStatusDeductor) {
+    
+    void checkRestrictionsStatusForDimensions(const ExpectedDimensionRestrictionStatusLookup& restrictionStatusDeductor) {
         assertForEachInSequence(0, dimensionsOfReferenceSignal.size(), [&](const std::size_t& dimension) {
             assertThatRestrictionStatusMatchesForDimension(dimension, restrictionStatusDeductor(dimension));
         });
     }
-
-    template<class F>
-    void checkRestrictionsStatusForAllValuesPerDimensions(F&& restrictionStatusDeductor) {
+    
+    void checkRestrictionsStatusForAllValuesPerDimensions(const ExpectedValueForDimensionRestrictionStatusLookup& restrictionStatusDeductor) {
         assertForEachInSequence(0, dimensionsOfReferenceSignal.size(), [&](const std::size_t& dimension) {
             assertForEachInSequence(0, dimensionsOfReferenceSignal.at(dimension), [&](const std::size_t& valueOfDimension) {
                 assertThatRestrictionStatusMatchesForValueOfDimension(dimension, valueOfDimension, restrictionStatusDeductor(dimension, valueOfDimension));
@@ -259,7 +261,7 @@ protected:
 
 class SignalAccessRestrictionBaseTestForBitsOfSignal:
     public ::parser::SignalAccessRestrictionBaseTest,
-    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, std::function<bool(const std::size_t&)>>> {};
+    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, SignalAccessRestrictionBaseTest::ExpectedBitRestrictionStatusLookup>> {};
 
 TEST_P(SignalAccessRestrictionBaseTestForBitsOfSignal, CheckForBitsOfSignal) {
     const auto  testParamInfo        = GetParam();
@@ -272,7 +274,7 @@ TEST_P(SignalAccessRestrictionBaseTestForBitsOfSignal, CheckForBitsOfSignal) {
 
 class SignalAccessRestrictionBaseTestForBitRanges:
     public ::parser::SignalAccessRestrictionBaseTest,
-    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, std::function<bool(const SignalAccessRestriction::SignalAccess&)>>> {};
+    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, SignalAccessRestrictionBaseTest::ExpectedGlobalBitRangesOfSignalRestrictionStatusLookup>> {};
 
 TEST_P(SignalAccessRestrictionBaseTestForBitRanges, ChecksForBitRangesOfSignal) {
     const auto  testParamInfo        = GetParam();
@@ -285,7 +287,7 @@ TEST_P(SignalAccessRestrictionBaseTestForBitRanges, ChecksForBitRangesOfSignal) 
 
 class SignalAccessRestrictionBaseTestForDimensions:
     public ::parser::SignalAccessRestrictionBaseTest,
-    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, std::function<bool(const std::size_t&)>>> {};
+    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, SignalAccessRestrictionBaseTest::ExpectedDimensionRestrictionStatusLookup>> {};
 
 TEST_P(SignalAccessRestrictionBaseTestForDimensions, ChecksForDimensionsOfSignal) {
     const auto  testParamInfo        = GetParam();
@@ -298,7 +300,7 @@ TEST_P(SignalAccessRestrictionBaseTestForDimensions, ChecksForDimensionsOfSignal
 
 class SignalAccessRestrictionBaseTestForValuesOfDimensions:
     public ::parser::SignalAccessRestrictionBaseTest,
-    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, std::function<bool(const std::size_t&, const std::size_t&)>>> {};
+    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, SignalAccessRestrictionBaseTest::ExpectedValueForDimensionRestrictionStatusLookup>> {};
 
 TEST_P(SignalAccessRestrictionBaseTestForValuesOfDimensions, ChecksForValuesOfDimensionsOfSignal) {
     const auto  testParamInfo        = GetParam();
@@ -311,7 +313,7 @@ TEST_P(SignalAccessRestrictionBaseTestForValuesOfDimensions, ChecksForValuesOfDi
 
 class SignalAccessRestrictionBaseTestForBitsOfDimension:
     public ::parser::SignalAccessRestrictionBaseTest,
-    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, std::function<bool(const std::size_t&, const std::size_t&, const std::size_t&)>>> {};
+    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, SignalAccessRestrictionBaseTest::ExpectedBitOfDimensionRestrictionStatusLookup>> {};
 
 TEST_P(SignalAccessRestrictionBaseTestForBitsOfDimension, CheckForBitsOfDimensions) {
     const auto  testParamInfo        = GetParam();
@@ -324,7 +326,7 @@ TEST_P(SignalAccessRestrictionBaseTestForBitsOfDimension, CheckForBitsOfDimensio
 
 class SignalAccessRestrictionBaseTestForBitRangesForDimensions:
     public ::parser::SignalAccessRestrictionBaseTest,
-    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, std::function<bool(const SignalAccessRestriction::SignalAccess&, const std::size_t&, const std::size_t&)>>> {};
+    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, SignalAccessRestrictionBaseTest::ExpectedBitRangeOfSignalRestrictionStatusLookup>> {};
 
 TEST_P(SignalAccessRestrictionBaseTestForBitRangesForDimensions, ChecksForBitRangesOfDimensions) {
     const auto  testParamInfo        = GetParam();
@@ -336,7 +338,15 @@ TEST_P(SignalAccessRestrictionBaseTestForBitRangesForDimensions, ChecksForBitRan
 }
 class SignalAccessRestrictionBaseTestToExtendRestriction:
     public ::parser::SignalAccessRestrictionBaseTest,
-    public ::testing::WithParamInterface<std::tuple<std::string, SignalAccessRestrictionBaseTest::RestrictionDefinition, SignalAccessRestrictionBaseTest::RestrictionDefinition, std::function<bool(const std::size_t&, const std::size_t&, const std::size_t&)>>> {
+    public ::testing::WithParamInterface<
+        std::tuple<std::string,
+            SignalAccessRestrictionBaseTest::RestrictionDefinition,
+            SignalAccessRestrictionBaseTest::RestrictionDefinition,
+            SignalAccessRestrictionBaseTest::ExpectedGlobalBitRangesOfSignalRestrictionStatusLookup,
+            SignalAccessRestrictionBaseTest::ExpectedDimensionRestrictionStatusLookup,
+            SignalAccessRestrictionBaseTest::ExpectedValueForDimensionRestrictionStatusLookup,
+            SignalAccessRestrictionBaseTest::ExpectedBitRangeOfSignalRestrictionStatusLookup
+    >> {
 public:
     const static inline SignalAccessRestriction::SignalAccess bitRangeBeforeRestrictedBit = SignalAccessRestriction::SignalAccess(0, restrictedBit > 1 ? restrictedBit - 1 : 0);
     const static inline SignalAccessRestriction::SignalAccess restrictedBitRange          = SignalAccessRestriction::SignalAccess(restrictedBit, restrictedBit + 2);
@@ -347,30 +357,41 @@ public:
 };
 
 TEST_P(SignalAccessRestrictionBaseTestToExtendRestriction, CheckThatRestrictionChanged) {
-    const auto testParamInfo = GetParam();
+    const auto& testParamInfo = GetParam();
     const auto& initialRestrictionDefinition = std::get<1>(testParamInfo);
     initialRestrictionDefinition(restriction);
     
     const auto& additionalRestrictions = std::get<2>(testParamInfo);
     additionalRestrictions(restriction);
 
-    const auto& restrictionValidator = std::get<3>(testParamInfo);
-    checkRestrictionsStatusForAllBitsOfAllDimensions(restrictionValidator);
+    const ExpectedGlobalBitRangesOfSignalRestrictionStatusLookup& expectedSignalBitRangeRestrictionStatusLookup              = std::get<3>(testParamInfo);
+    const ExpectedDimensionRestrictionStatusLookup&               expectedDimensionRestrictionStatusLookup                   = std::get<4>(testParamInfo);
+    const ExpectedValueForDimensionRestrictionStatusLookup&       expectedValueForDimensionRestrictionStatusLookup           = std::get<5>(testParamInfo);
+    const ExpectedBitRangeOfSignalRestrictionStatusLookup&        expectedBitRangeOfValueForDimensionRestrictionStatusLookup = std::get<6>(testParamInfo);
+
+    checkRestrictionsStatusForAllBitRangesGlobally(expectedSignalBitRangeRestrictionStatusLookup);
+    checkRestrictionsStatusForDimensions(expectedDimensionRestrictionStatusLookup);
+    checkRestrictionsStatusForAllValuesPerDimensions(expectedValueForDimensionRestrictionStatusLookup);
+    checkRestrictionsStatusForAllBitRangesPerDimension(expectedBitRangeOfValueForDimensionRestrictionStatusLookup);
+
+
+    //const auto& restrictionValidator = std::get<3>(testParamInfo);
+    //checkRestrictionsStatusForAllBitsOfAllDimensions(restrictionValidator);
 }
-
-class SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged:
-    public ::parser::SignalAccessRestrictionBaseTestToExtendRestriction {};
-
-TEST_P(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged, CheckThatRestrictionIsLeftUnchanged) {
-    const auto  testParamInfo                = GetParam();
-    const auto& initialRestrictionDefinition = std::get<1>(testParamInfo);
-    initialRestrictionDefinition(restriction);
-
-    const auto& additionalRestrictions = std::get<2>(testParamInfo);
-    additionalRestrictions(restriction);
-
-    const auto& restrictionValidator = std::get<3>(testParamInfo);
-    checkRestrictionsStatusForAllBitsOfAllDimensions(restrictionValidator);
-}
+//
+//class SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged:
+//    public ::parser::SignalAccessRestrictionBaseTestToExtendRestriction {};
+//
+//TEST_P(SignalAccessRestrictionBaseTestToExtendRestrictionThatWillLeaveItUnchanged, CheckThatRestrictionIsLeftUnchanged) {
+//    const auto&  testParamInfo                = GetParam();
+//    const auto& initialRestrictionDefinition = std::get<1>(testParamInfo);
+//    initialRestrictionDefinition(restriction);
+//
+//    const auto& additionalRestrictions = std::get<2>(testParamInfo);
+//    additionalRestrictions(restriction);
+//
+//    const auto& restrictionValidator = std::get<3>(testParamInfo);
+//    checkRestrictionsStatusForAllBitsOfAllDimensions(restrictionValidator);
+//}
 }
 #endif
