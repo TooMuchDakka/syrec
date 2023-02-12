@@ -29,15 +29,15 @@ using namespace parser;
 * 7.   a[$i].0 + a[x][$j].0
 * 8.   a[0].0 + a[x][0].0
 * 9.   a[0].0:2 + a[$i].0:2
-* 5.   a[0].0:2 + a[0].2:5
-* 6.   a[0].0:2 + a[1].2:5
-* 9.   a[0].0:2 + a[$i].2:5
-* 9.   a[$i].0:2 + a.0:2
-* 10.  a[0].0:2 + a.0:2
-* 11.  a[0].0 + a
-* 12.  a[0].0:2 + a
-* 13.  a[0] + a
-* 14.  a[$i] + a 
+* 10.  a[0].0:2 + a[0].2:5
+* 11.  a[0].0:2 + a[1].2:5
+* 12.  a[0].0:2 + a[$i].2:5
+* 13.  a[$i].0:2 + a.0:2
+* 14.  a[0].0:2 + a.0:2
+* 15.  a[0].0 + a
+* 16.  a[0].0:2 + a
+* 17.  a[0] + a
+* 18.  a[$i] + a 
 */
 INSTANTIATE_TEST_SUITE_P(
     SignalAccessRestrictionTests,
@@ -359,8 +359,9 @@ INSTANTIATE_TEST_SUITE_P(
                 return dimension == SignalAccessRestrictionTest::blockedDimension
                     || dimension == SignalAccessRestrictionTest::otherBlockedDimension;
             },
-            [](const SignalAccessRestriction::SignalAccess& bitRange, const std::size_t&, const std::size_t&) {
-                return SignalAccessRestrictionTest::isBitWithinRange(SignalAccessRestrictionTest::restrictedBit, bitRange);
+            [](const SignalAccessRestriction::SignalAccess& bitRange, const std::size_t& dimension, const std::size_t&) {
+                return (dimension == SignalAccessRestrictionTest::blockedDimension || dimension == SignalAccessRestrictionTest::otherBlockedDimension)
+                    && SignalAccessRestrictionTest::isBitWithinRange(SignalAccessRestrictionTest::restrictedBit, bitRange);
             }),
         std::make_tuple(
             "extendBitRangeRestrictionForValueOfDimensionToValueOfAnotherDimension",
@@ -471,9 +472,10 @@ INSTANTIATE_TEST_SUITE_P(
             [](const std::size_t& dimension, const std::size_t&) {
                 return dimension == SignalAccessRestrictionTest::blockedDimension;
             },
-            [](const SignalAccessRestriction::SignalAccess& bitRange, const std::size_t& dimension, const std::size_t&) {
-                return dimension == SignalAccessRestrictionTest::blockedDimension
-                    && (SignalAccessRestrictionTest::doesAccessIntersectRegion(SignalAccessRestrictionTest::bitRangeBeforeRestrictedBit, bitRange) || SignalAccessRestrictionTest::doesAccessIntersectRegion(SignalAccessRestrictionTest::restrictedBitRange, bitRange));
+            [](const SignalAccessRestriction::SignalAccess& bitRange, const std::size_t& dimension, const std::size_t& valueForDimension) {
+                return dimension == SignalAccessRestrictionTest::blockedDimension 
+                    && (SignalAccessRestrictionTest::doesAccessIntersectRegion(SignalAccessRestrictionTest::restrictedBitRange, bitRange) 
+                        || (valueForDimension == SignalAccessRestrictionTest::blockedValueForDimension && SignalAccessRestrictionTest::doesAccessIntersectRegion(SignalAccessRestrictionTest::bitRangeBeforeRestrictedBit, bitRange)));
             }),
         std::make_tuple(
             "extendBitRangeRestrictionForOneDimensionToBitRangeOfWholeSignal",

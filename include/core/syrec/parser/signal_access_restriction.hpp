@@ -9,6 +9,9 @@
 /*
  * TODO: Is set notCompletelyBlockedValuesOfDimension inside of DimensionRestriction correctly updated when lifting or restricting access
  * TODO: Is set notCompletelyBlockedValueForDimension consider when checking the status
+ *
+ * TODO: When restricting the access on a bit range / whole signal for the entire dimension, we can remove all sub-restrictions in all values for the dimension that are smaller than restricted one
+ * TODO: The same must be done when blocking either all values for a dimension or the dimension itself
  */
 
 namespace parser {
@@ -175,7 +178,7 @@ private:
         }
 
         [[nodiscard]] bool isAccessOutsideOfBorderRestrictions(const SignalAccess& signalPart) const {
-            if (restrictedRegions.empty()) {
+            if (!hasAnyRestrictions()) {
                 return true;
             }
             const auto& lowerBorderRestrictionRegion = restrictedRegions.at(0);
@@ -189,6 +192,10 @@ private:
 
         [[nodiscard]] bool isCompletelyBlocked() const {
             return this->isBlockedCompletely;
+        }
+
+        [[nodiscard]] bool hasAnyRestrictions() const {
+            return !restrictedRegions.empty();
         }
 
         void blockCompletely() {
@@ -238,6 +245,43 @@ private:
 
         explicit DimensionRestriction(std::size_t numValuesForDimension):
             areAllValuesForDimensionBlocked(false), numValuesForDimension(numValuesForDimension) {}
+
+        void removeSmallerRestrictionsPerValueOfDimension(const SignalAccess& bitRange) {
+            if (areAllValuesForDimensionBlocked || (dimensionSignalRestriction.has_value() && dimensionSignalRestriction->isAccessRestricted(bitRange))) {
+                return;
+            }
+
+            for (auto restrictionPerValueOfDimension = restrictionsPerValueOfDimension.begin(); restrictionPerValueOfDimension != restrictionsPerValueOfDimension.end();) {
+                auto restriction = restrictionPerValueOfDimension->second;
+                if (!restriction.isAccessRestricted(bitRange)) {
+                    ++restrictionPerValueOfDimension;
+                    continue;
+                }
+                restriction.removeRestrictionFor(bitRange);
+                if (restriction.hasAnyRestrictions()) {
+                    ++restrictionPerValueOfDimension;
+                    continue;
+                }
+
+                restrictionsPerValueOfDimension.erase(restrictionPerValueOfDimension++);
+            }
+        }
+
+        void blockCompletely() {
+            areAllValuesForDimensionBlocked = true;
+            dimensionSignalRestriction.reset();
+            restrictionsPerValueOfDimension.clear();
+            notCompletelyBlockedValuesOfDimension.clear();
+        }
+
+        void blockValueOfDimensionCompletely(const std::size_t valueForDimension) {
+            const auto& optionalElementToRemove = restrictionsPerValueOfDimension.find(valueForDimension);
+            if (optionalElementToRemove == restrictionsPerValueOfDimension.end()) {
+                return;
+            }
+
+            restrictionsPerValueOfDimension.erase(optionalElementToRemove);
+        }
     };
 
 
@@ -246,8 +290,12 @@ private:
     std::unordered_map<std::size_t, DimensionRestriction> dimensionRestrictions;
     std::optional<SignalRestriction>                      globalSignalRestriction;
 
-    [[nodiscard]] DimensionRestriction createDimensionRestriction(std::size_t dimension) const {
-        return DimensionRestriction(signal->dimensions.at(dimension));
+    [[nodiscard]] void checkAndCreateDimensionRestriction(const std::size_t dimension) {
+        if (dimensionRestrictions.count(dimension) != 0 || isBlockedCompletely) {
+            return;
+        }
+
+        dimensionRestrictions.insert({dimension, DimensionRestriction(signal->dimensions.at(dimension))});
     }
     
     [[nodiscard]] bool isDimensionWithinRange(std::size_t dimension) const;
@@ -271,6 +319,9 @@ private:
 
     [[nodiscard]] bool isAccessOnDimensionBlocked(const std::size_t& dimension, const bool& considerBitRestrictions=false) const;
     [[nodiscard]] bool isAccessOnValueOfDimensionBlocked(const std::size_t& dimension, const std::size_t& valueForDimension, const bool& considerBitRestrictions = false) const;
+
+    [[nodiscard]] void updateExistingBitRangeRestrictions(const SignalAccess& newlyRestrictedBitRange);
+    [[nodiscard]] void updateExistingBitRangeRestrictions(const SignalAccess& newlyRestrictedBitRange, const std::size_t dimension);
 };
 }
 
