@@ -159,7 +159,7 @@ std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
     }
 
     for (const auto& dimensionToken: context->dimensionTokens) {
-        std::optional<unsigned int> dimensionTokenValueAsNumber = ParserUtilities::convertToNumber(dimensionToken);
+        std::optional<unsigned int> dimensionTokenValueAsNumber = dimensionToken != nullptr ? ParserUtilities::convertToNumber(dimensionToken->getText()) : std::nullopt;
         if (dimensionTokenValueAsNumber.has_value()) {
             dimensions.emplace_back((*dimensionTokenValueAsNumber));
         } else {
@@ -172,7 +172,7 @@ std::any SyReCCustomVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
     }
 
     if (context->signalWidthToken != nullptr) {
-        const std::optional<unsigned int> customSignalWidth = ParserUtilities::convertToNumber(context->signalWidthToken);
+        const std::optional<unsigned int> customSignalWidth = ParserUtilities::convertToNumber(context->signalWidthToken->getText());
         if (customSignalWidth.has_value()) {
             signalWidth = (*customSignalWidth);
         } else {

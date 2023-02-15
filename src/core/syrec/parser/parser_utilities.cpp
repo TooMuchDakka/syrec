@@ -2,10 +2,42 @@
 
 #include "core/syrec/expression.hpp"
 #include "core/syrec/statement.hpp"
+#include "core/syrec/parser/infix_iterator.hpp"
 
+#include <sstream>
 #include <fmt/format.h>
 
 using namespace parser;
+
+std::string ParserUtilities::combineErrors(const std::vector<std::string>& errors, char const* errorDelimiter) {
+    std::ostringstream errorsConcatinatedBuffer;
+    std::copy(errors.cbegin(), errors.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, errorDelimiter));
+    return errorsConcatinatedBuffer.str();
+}
+
+std::vector<std::string> ParserUtilities::splitCombinedErrors(const std::string& combinedErrors, char const* errorDelimiter) {
+    if (combinedErrors.empty()) {
+        return {};
+    }
+
+    std::vector<std::string> actualErrors{};
+    size_t                   previousErrorEndPosition = 0;
+    size_t                   currErrorEndPosition     = combinedErrors.find_first_of(errorDelimiter, previousErrorEndPosition);
+    bool                     foundErrorSeparator;
+    do {
+        foundErrorSeparator = std::string::npos != currErrorEndPosition;
+        if (foundErrorSeparator) {
+            actualErrors.emplace_back(combinedErrors.substr(previousErrorEndPosition, (currErrorEndPosition - previousErrorEndPosition)));
+            previousErrorEndPosition = currErrorEndPosition + 1;
+            currErrorEndPosition     = combinedErrors.find_first_of(errorDelimiter, previousErrorEndPosition);
+        } else {
+            currErrorEndPosition = combinedErrors.size();
+            actualErrors.emplace_back(combinedErrors.substr(previousErrorEndPosition, (currErrorEndPosition - previousErrorEndPosition)));
+        }
+    } while (foundErrorSeparator);
+    return actualErrors;
+}
+
 
 std::string ParserUtilities::createError(size_t line, size_t column, const std::string& errorMessage) {
     return fmt::format(messageFormat, line, column, errorMessage);
@@ -13,14 +45,6 @@ std::string ParserUtilities::createError(size_t line, size_t column, const std::
 
 std::string ParserUtilities::createWarning(size_t line, size_t column, const std::string& warningMessage) {
     return fmt::format(messageFormat, line, column, warningMessage);
-}
-
-std::optional<unsigned int> ParserUtilities::convertToNumber(const antlr4::Token* token) {
-    if (token == nullptr) {
-        return std::nullopt;
-    }
-
-    return convertToNumber(token->getText());
 }
 
 std::optional<unsigned int> ParserUtilities::convertToNumber(const std::string& tokenText) {

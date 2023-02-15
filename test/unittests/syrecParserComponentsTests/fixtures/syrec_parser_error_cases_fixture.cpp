@@ -1,5 +1,6 @@
 #include "core/syrec/program.hpp"
 #include "core/syrec/parser/infix_iterator.hpp"
+#include "core/syrec/parser/parser_utilities.hpp"
 
 #include <fmt/core.h>
 #include "gtest/gtest.h"
@@ -81,32 +82,6 @@ protected:
             ASSERT_NO_THROW(expectedErrors.emplace_back(fmt::format(expectedErrorMessageFormat, expectedError.line, expectedError.column, expectedError.message)));
         }
     }
-
-    static std::vector<std::string> transformActualErrors(const std::string& rawActualErrors) {
-        if (rawActualErrors.empty()) {
-            return {};
-        }
-
-        std::vector<std::string> actualErrors{};
-        size_t                   previousErrorEndPosition = 0;
-        size_t currErrorEndPosition  = rawActualErrors.find_first_of('\n', previousErrorEndPosition);
-        bool                     foundErrorSeparator;
-        do 
-        {
-            foundErrorSeparator = std::string::npos != currErrorEndPosition;
-            if (foundErrorSeparator) {
-                actualErrors.emplace_back(rawActualErrors.substr(previousErrorEndPosition, (currErrorEndPosition - previousErrorEndPosition)));
-                previousErrorEndPosition = currErrorEndPosition + 1;
-                currErrorEndPosition     = rawActualErrors.find_first_of('\n', previousErrorEndPosition);
-            }
-            else {
-                currErrorEndPosition = rawActualErrors.size();
-                actualErrors.emplace_back(rawActualErrors.substr(previousErrorEndPosition, (currErrorEndPosition - previousErrorEndPosition)));
-            }
-        } while (foundErrorSeparator);
-        return actualErrors;
-    }
-    
 
     static void compareExpectedAndActualErrors(const std::vector<std::string>& expectedErrors, const std::vector<std::string>& actualErrorsInUnifiedFormat) {
         if (expectedErrors.size() != actualErrorsInUnifiedFormat.size()) {
@@ -385,5 +360,5 @@ TEST_P(SyrecParserErrorCasesFixture, GenericSyrecParserErrorTest) {
     ASSERT_NO_THROW(actualErrorsConcatinated = parserPublicInterface.readFromString(this->circuitDefinition, syrec::ReadProgramSettings{})) << "Error while parsing circuit";
     ASSERT_TRUE(this->parserPublicInterface.modules().empty()) << "Expected no valid modules but actually found " << this->parserPublicInterface.modules().size() << " valid modules";
     ASSERT_FALSE(actualErrorsConcatinated.empty()) << "Expected at least one error";
-    ASSERT_NO_THROW(compareExpectedAndActualErrors(this->expectedErrors, transformActualErrors(actualErrorsConcatinated))) << "Missmatch between expected and actual errors";
+    ASSERT_NO_THROW(compareExpectedAndActualErrors(this->expectedErrors, parser::ParserUtilities::splitCombinedErrors(actualErrorsConcatinated))) << "Missmatch between expected and actual errors";
 }

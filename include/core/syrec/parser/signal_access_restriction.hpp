@@ -290,7 +290,7 @@ private:
     std::unordered_map<std::size_t, DimensionRestriction> dimensionRestrictions;
     std::optional<SignalRestriction>                      globalSignalRestriction;
 
-    [[nodiscard]] void checkAndCreateDimensionRestriction(const std::size_t dimension) {
+    void checkAndCreateDimensionRestriction(const std::size_t dimension) {
         if (dimensionRestrictions.count(dimension) != 0 || isBlockedCompletely) {
             return;
         }
@@ -320,8 +320,8 @@ private:
     [[nodiscard]] bool isAccessOnDimensionBlocked(const std::size_t& dimension, const bool& considerBitRestrictions=false) const;
     [[nodiscard]] bool isAccessOnValueOfDimensionBlocked(const std::size_t& dimension, const std::size_t& valueForDimension, const bool& considerBitRestrictions = false) const;
 
-    [[nodiscard]] void updateExistingBitRangeRestrictions(const SignalAccess& newlyRestrictedBitRange);
-    [[nodiscard]] void updateExistingBitRangeRestrictions(const SignalAccess& newlyRestrictedBitRange, const std::size_t dimension);
+    void updateExistingBitRangeRestrictions(const SignalAccess& newlyRestrictedBitRange);
+    void updateExistingBitRangeRestrictions(const SignalAccess& newlyRestrictedBitRange, const std::size_t dimension);
 };
 }
 

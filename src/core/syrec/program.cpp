@@ -2,6 +2,7 @@
 
 #include "CommonTokenStream.h"
 #include "core/syrec/parser/infix_iterator.hpp"
+#include "core/syrec/parser/parser_utilities.hpp"
 #include "parser/antlr/SyReCCustomVisitor.h"
 #include "parser/antlr/SyReCLexer.h"
 #include "parser/antlr/SyReCParser.h"
@@ -70,7 +71,5 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     }
 
     // TODO: Syntax errors will be inserted before semantic errors (i.e. the errors are not sorted according to their position)
-    std::ostringstream errorsConcatinatedBuffer;
-    std::copy(customVisitor->errors.cbegin(), customVisitor->errors.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, "\n"));
-    return errorsConcatinatedBuffer.str();
+    return ::parser::ParserUtilities::combineErrors(customVisitor->errors);
 }
