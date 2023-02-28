@@ -343,7 +343,12 @@ bool SignalAccessRestriction::isAccessOnValueOfDimensionBlocked(const std::size_
 
 void SignalAccessRestriction::updateExistingBitRangeRestrictions(const SignalAccessRestriction::SignalAccess& bitRange) {
     for (auto dimensionRestrictionEntry = dimensionRestrictions.begin(); dimensionRestrictionEntry != dimensionRestrictions.end();) {
-        updateExistingBitRangeRestrictions(bitRange, dimensionRestrictionEntry->first);
+        const auto dimension = dimensionRestrictionEntry->first;
+        updateExistingBitRangeRestrictions(bitRange, dimension);
+        if (dimensionRestrictionEntry->second.restrictionsPerValueOfDimension.empty()) {
+            dimensionRestrictions.erase(dimension);
+        }
+        
         ++dimensionRestrictionEntry;
     }
 }
@@ -368,13 +373,12 @@ void SignalAccessRestriction::updateExistingBitRangeRestrictions(const SignalAcc
 
         valueOfDimensionRestriction.removeRestrictionFor(bitRange);
         if (!valueOfDimensionRestriction.hasAnyRestrictions()) {
-            dimensionRestriction.restrictionsPerValueOfDimension.erase(valueOfDimensionRestrictionEntry->first);
+            const auto valueOfDimensionToBeRemoved = valueOfDimensionRestrictionEntry->first;
+            ++valueOfDimensionRestrictionEntry;
+
+            dimensionRestriction.restrictionsPerValueOfDimension.erase(valueOfDimensionToBeRemoved);
+        } else {
+            ++valueOfDimensionRestrictionEntry;            
         }
-
-        ++valueOfDimensionRestrictionEntry;
-    }
-
-    if (dimensionRestriction.restrictionsPerValueOfDimension.empty()) {
-        dimensionRestrictions.erase(dimension);
     }
 }

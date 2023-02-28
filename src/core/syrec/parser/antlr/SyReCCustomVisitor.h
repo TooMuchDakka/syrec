@@ -115,6 +115,8 @@ private:
     [[nodiscard]] bool SyReCCustomVisitor::canEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression) const;
 
     [[nodiscard]] std::optional<unsigned int> SyReCCustomVisitor::tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, const TokenPosition& evaluationErrorPositionHelper);
+    [[nodiscard]] std::optional<unsigned int>                tryDetermineExpressionBitwidth(const syrec::expression::ptr& expression, const TokenPosition& evaluationErrorPosition);
+
 
     [[nodiscard]] std::optional<unsigned int> applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand, const TokenPosition& potentialErrorPosition);
     [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable);
@@ -128,7 +130,8 @@ private:
     void               liftRestrictionToAssignedToPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalPart, const TokenPosition& optionalEvaluationErrorPosition);
     [[nodiscard]] bool isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const TokenPosition& optionalEvaluationErrorPosition);
     std::optional<SignalAccessRestriction::SignalAccess> tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const TokenPosition& optionalEvaluationErrorPosition);
-    [[nodiscard]] std::optional<SignalAccessRestriction>               tryGetSignalAccessRestriction(const std::string& signalIdent) const;
+    [[nodiscard]] std::optional<SignalAccessRestriction> tryGetSignalAccessRestriction(const std::string& signalIdent) const;
+    void                                                 updateSignalRestriction(const std::string& signalIdent, const SignalAccessRestriction& updatedRestriction);
 
     /*
      * static constexpr std::size_t fallbackErrorLinePosition   = 0;

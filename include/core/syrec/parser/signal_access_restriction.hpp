@@ -14,6 +14,15 @@
  * TODO: The same must be done when blocking either all values for a dimension or the dimension itself
  */
 
+// TODO: Check correctness of iterator based loops (do they also work correctly while the current element is removed)
+/* Example:
+ *  for (auto it = vector.begin(); it != vector.end();){
+ *      if (...) {
+ *          vector.erase(it);
+ *      }
+ *      ++it;
+ *  }
+ */
 namespace parser {
 class SignalAccessRestriction {
 public:
@@ -159,7 +168,62 @@ private:
 
         // TODO: Implement me with updated implementation (see previous one for reference)
         void removeRestrictionFor(const SignalAccess& signalPart) {
-            return;
+            if (isCompletelyBlocked() || signalPart.start > signalPart.stop || !isAccessWithinRange(signalPart) || !isAccessRestricted(signalPart)) {
+                return;
+            }
+
+            std::pair<std::optional<std::size_t>, std::optional<std::size_t>> firstAndLastIntersectedRegionIndizes;
+            for (std::size_t i = 0; i < restrictedRegions.size(); ++i) {
+                if (!restrictedRegions.at(i).doesAccessIntersectRegion(signalPart)) {
+                    if (firstAndLastIntersectedRegionIndizes.first.has_value()) {
+                        break;
+                    }
+                }
+                else {
+                    if (!firstAndLastIntersectedRegionIndizes.first.has_value()) {
+                        firstAndLastIntersectedRegionIndizes.first.emplace(i);
+                    }
+                    else {
+                        firstAndLastIntersectedRegionIndizes.second.emplace(i);
+                    }
+                }
+            }
+
+            if (!firstAndLastIntersectedRegionIndizes.first.has_value()) {
+                return;   
+            }
+
+            const std::size_t startRegionIdx          = firstAndLastIntersectedRegionIndizes.first.value();
+            const std::size_t endRegionIdx       = firstAndLastIntersectedRegionIndizes.second.has_value()
+                ? firstAndLastIntersectedRegionIndizes.second.value()
+                : startRegionIdx;
+            const std::size_t numRegionsToUpdate      = (endRegionIdx - startRegionIdx) + 1;
+
+            if (numRegionsToUpdate > 2) {
+                const std::size_t numIntermediateRegionsToDelete = numRegionsToUpdate - 2;
+                for (std::size_t i = 1; i <= numIntermediateRegionsToDelete; ++i) {
+                    restrictedRegions.erase(restrictedRegions.begin() + i);
+                }
+            }
+
+            std::vector<std::size_t> borderRegionsToUpdate {startRegionIdx, endRegionIdx};
+            if (startRegionIdx == endRegionIdx) {
+                borderRegionsToUpdate.pop_back();
+            }
+            
+            for (const auto regionIdx : borderRegionsToUpdate) {
+                const auto remainingRestrictionForFirstIntersectedRegion = determineRemainingRestrictedRegions(regionIdx, signalPart);
+                restrictedRegions.erase(restrictedRegions.begin() + regionIdx);
+
+                if (remainingRestrictionForFirstIntersectedRegion.has_value()) {
+                    if (remainingRestrictionForFirstIntersectedRegion->first.has_value()) {
+                        restrictedRegions.emplace(restrictedRegions.begin() + regionIdx, remainingRestrictionForFirstIntersectedRegion->first.value());
+                    }
+                    if (remainingRestrictionForFirstIntersectedRegion->second.has_value()) {
+                        restrictedRegions.emplace(restrictedRegions.begin() + regionIdx + (remainingRestrictionForFirstIntersectedRegion->first.has_value() ? 1 : 0), remainingRestrictionForFirstIntersectedRegion->second.value());
+                    }
+                }
+            }
         }
 
         [[nodiscard]] bool isAccessRestricted(std::size_t bitPosition) const {
@@ -233,6 +297,36 @@ private:
             
             [[nodiscard]] bool isAccessWithinRange(const SignalAccess& signalAccess) const {
                 return signalAccess.start <= signalLength && signalAccess.stop <= signalLength;
+            }
+            [[nodiscard]] std::optional<std::pair<std::optional<RestrictionRegion>, std::optional<RestrictionRegion>>> determineRemainingRestrictedRegions(const std::size_t restrictedRegionIdx, const SignalAccess& restrictedAreaToRemove) const {
+                auto& regionToUpdate = restrictedRegions.at(restrictedRegionIdx);
+                if (restrictedAreaToRemove.start <= regionToUpdate.startPosition && restrictedAreaToRemove.stop >= regionToUpdate.endPosition) {
+                    return std::nullopt;
+                }
+
+                /*
+                 *  Restricted region:      X-X-X-X-X-X
+                 *  Removed restriction:      X-X-X
+                 *
+                 */
+                const std::size_t trimStartPosition               = std::max(regionToUpdate.startPosition, restrictedAreaToRemove.start);
+                const std::size_t numBitsNeededToBeTrimmedAtStart = (std::min(regionToUpdate.endPosition, restrictedAreaToRemove.stop) - trimStartPosition) + 1;
+
+                std::optional<RestrictionRegion> remainingRestrictionBeforeRemovedOne;
+                std::optional<RestrictionRegion> remainingRestrictionAfterRemovedOne;
+                // We have bits remaining from our initial restriction at indizes smaller than the trim start position
+                if (trimStartPosition > regionToUpdate.startPosition) {
+                    const std::size_t startPosition = regionToUpdate.startPosition;
+                    const std::size_t endPosition   = trimStartPosition - 1;
+                    remainingRestrictionBeforeRemovedOne.emplace(RestrictionRegion(startPosition, (endPosition - startPosition) + 1));
+                } else if (regionToUpdate.endPosition - (trimStartPosition + numBitsNeededToBeTrimmedAtStart) > 0) {
+                    // We have bits remaining from our initial restriction at indizes outside of the removed range
+                    const std::size_t startPosition = trimStartPosition + numBitsNeededToBeTrimmedAtStart + 1;
+                    const std::size_t endPosition   = regionToUpdate.endPosition;
+                    remainingRestrictionAfterRemovedOne.emplace(RestrictionRegion(startPosition, (endPosition - startPosition) + 1));
+                }
+
+                return std::make_optional(std::make_pair(remainingRestrictionBeforeRemovedOne, remainingRestrictionAfterRemovedOne));
             }
     };
 

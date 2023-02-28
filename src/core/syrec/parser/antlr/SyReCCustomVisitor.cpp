@@ -29,6 +29,10 @@ using namespace parser;
 // TODO: Currently loop variables are not supported as arguments
 // TODO: Currently the parser is not able to correctly parse assign statements such as <a> + = (...) since the operand will be split into two tokens and the assign statement production is not "found" during the parse tree creation
 // TODO: Refactor passing of position where error should be created in createError() and semantic checks (i.e. pass exact position as line, col and potentially an ident instead of just passing in the token)
+// TODO: Calculation of the bitwidth of an expression (for lhs of a binaryExpression or assignemntStatement) and handling of errors for optional expected signal width (i.e. for the rhs of an assingment statement)
+
+// TODO: Are signal acess restrictions cleared after assign statement is done ? (i.e. access restrictions required for reversibility and not for optimizations)
+// TODO: Determine correct behaviour for setting/clearing restrictions if one of the operands is not a compile time constant (i.e. a.0:$i [should this lock the whole signal ?] or just up to the value of i (we would have to check every possible value for i in the rhs)
 std::any SyReCCustomVisitor::visitProgram(SyReCParser::ProgramContext* context) {
     SymbolTable::openScope(currentSymbolTableScope);
     for (const auto& module : context->module()) {
@@ -279,7 +283,7 @@ std::any SyReCCustomVisitor::visitSignal(SyReCParser::SignalContext* context) {
         if (isAccessToAccessedSignalPartRestricted(*accessedSignal, restrictionErrorPosition)) {
             // TODO: GEN_ERROR
             // TODO: Create correct error message
-            createError(restrictionErrorPosition, fmt::format("TODO: Restricted signal access"));
+            createError(restrictionErrorPosition, fmt::format(AccessingRestrictedPartOfSignal, signalIdent));
         }
         else {
             return std::make_optional(std::make_shared<SignalEvaluationResult>(*accessedSignal));   
@@ -479,10 +483,19 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
         createError(mapAntlrTokenPosition(context->binaryOperation), InvalidBinaryOperation);
     }
 
-    bool modifiedExpectedExpressionSignalWidth = !optionalExpectedExpressionSignalWidth.has_value();
-    if (lhsOperand.has_value()) {
-        optionalExpectedExpressionSignalWidth.emplace((*(*lhsOperand)->getAsExpression())->bitwidth());
+    // TODO:
+    bool modifiedExpectedExpressionSignalWidth = false;
+    /*if (!optionalExpectedExpressionSignalWidth.has_value() && lhsOperand.has_value()) {
+        optionalExpectedExpressionSignalWidth = tryDetermineExpressionBitwidth(*(*lhsOperand)->getAsExpression(), determineContextStartTokenPositionOrUseDefaultOne(context));
         modifiedExpectedExpressionSignalWidth = true;
+    }*/
+
+    if (lhsOperand.has_value()) {
+        const auto bitWidthOfLhsOperand = tryDetermineExpressionBitwidth(*(*lhsOperand)->getAsExpression(), determineContextStartTokenPositionOrUseDefaultOne(context));
+        if (bitWidthOfLhsOperand.has_value()) {
+            optionalExpectedExpressionSignalWidth.emplace(*bitWidthOfLhsOperand);
+            modifiedExpectedExpressionSignalWidth = true;
+        }
     }
 
     const auto rhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->rhsOperand);
@@ -521,7 +534,8 @@ std::any SyReCCustomVisitor::visitBinaryExpression(SyReCParser::BinaryExpression
             )) {
                 const auto lhsOperandAsExpression   = (*lhsOperand)->getAsExpression();
                 const auto rhsOperandAsExpression   = (*rhsOperand)->getAsExpression();
-                const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
+                // TODO: Call to bitwidth does not work with loop variables here
+                //const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
 
                 // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
                 result.emplace(ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression), (*lhsOperand)->numValuesPerDimension));                        
@@ -983,6 +997,7 @@ std::any SyReCCustomVisitor::visitAssignStatement(SyReCParser::AssignStatementCo
 }
 
 // TODO:
+// TODO: Broadcasting checks for swap statement
 std::any SyReCCustomVisitor::visitSwapStatement(SyReCParser::SwapStatementContext* context) {
     const auto swapLhsOperand = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->lhsOperand);
     const bool lhsOperandOk            = swapLhsOperand.has_value() && (*swapLhsOperand)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->lhsOperand->IDENT()->getSymbol(), *(*swapLhsOperand)->getAsVariableAccess());
@@ -1343,7 +1358,7 @@ std::optional<syrec_operation::operation> SyReCCustomVisitor::getDefinedOperatio
         const unsigned int bitRangeStart = *tryEvaluateNumber(rangeStart, evaluationErrorPositionHelper);
         const unsigned int bitRangeEnd = *tryEvaluateNumber(rangeEnd, evaluationErrorPositionHelper);
 
-        bitWidthAfterVariableAccess.emplace(bitRangeEnd - bitRangeStart + 1);
+        bitWidthAfterVariableAccess.emplace((bitRangeEnd - bitRangeStart) + 1);
     }
     else {
         bitWidthAfterVariableAccess.reset();
@@ -1521,6 +1536,9 @@ bool SyReCCustomVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(const 
     return true;
 }
 
+// TODO: Refactor restriction/check for restriction/lift of restriction into helper utility class
+
+// TODO: Handling of partial bit ranges (i.e. .2:$i) when evaluating bit range !!!
 void SyReCCustomVisitor::restrictAccessToAssignedToPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalPart, const TokenPosition& optionalEvaluationErrorPosition) {
     // a[$i][2][3].0
     // a[2][3][($i + 2)].$i:0
@@ -1528,69 +1546,85 @@ void SyReCCustomVisitor::restrictAccessToAssignedToPartOfSignal(const syrec::Var
     // a[$i]
     // a[$i].0:($i + ($i / 10)) = 0
     // a
-    auto signalAccessRestriction = tryGetSignalAccessRestriction(assignedToSignalPart->getVar()->name);
+
+    const std::string& assignedToSignalIdent   = assignedToSignalPart->getVar()->name;
+    auto signalAccessRestriction = tryGetSignalAccessRestriction(assignedToSignalIdent);
     if (!signalAccessRestriction.has_value()) {
-        signalAccessRestrictions.insert({assignedToSignalPart->getVar()->name, SignalAccessRestriction(assignedToSignalPart->getVar())});
-        signalAccessRestriction.emplace(*tryGetSignalAccessRestriction(assignedToSignalPart->getVar()->name));
+        signalAccessRestrictions.insert({assignedToSignalIdent, SignalAccessRestriction(assignedToSignalPart->getVar())});
+        signalAccessRestriction.emplace(*tryGetSignalAccessRestriction(assignedToSignalIdent));
     }
     
-    const bool                                           wasBitOrRangeAccessDefined = assignedToSignalPart->range.has_value();
     const std::optional<SignalAccessRestriction::SignalAccess> evaluatedBitOrRangeAccess = 
-        wasBitOrRangeAccessDefined
+        assignedToSignalPart->range.has_value()
         ? tryEvaluateBitOrRangeAccess(*assignedToSignalPart->range, optionalEvaluationErrorPosition)
         : std::nullopt;
 
-    if (wasBitOrRangeAccessDefined && evaluatedBitOrRangeAccess.has_value() && signalAccessRestriction->isAccessRestrictedToBitRange(*evaluatedBitOrRangeAccess)) {
+    if (evaluatedBitOrRangeAccess.has_value() && signalAccessRestriction->isAccessRestrictedToBitRange(*evaluatedBitOrRangeAccess)) {
         return;
     }
 
     if (assignedToSignalPart->indexes.empty()) {
-        if (!wasBitOrRangeAccessDefined || !evaluatedBitOrRangeAccess.has_value()) {
+        if (!evaluatedBitOrRangeAccess.has_value()) {
             signalAccessRestriction->blockAccessOnSignalCompletely();
         }
         else {
             signalAccessRestriction->restrictAccessToBitRange(*evaluatedBitOrRangeAccess);
         }
+        updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
         return;
     }
 
-    std::optional<unsigned int> accessedValueForDimension;
     for (std::size_t dimensionIdx = 0; dimensionIdx < assignedToSignalPart->indexes.size(); ++dimensionIdx) {
-        accessedValueForDimension.reset();
-
-        const auto& accessedDimensionExpr = assignedToSignalPart->indexes.at(dimensionIdx);
-        if (auto const* numeric = dynamic_cast<syrec::NumericExpression*>(accessedDimensionExpr.get())) {
-            accessedValueForDimension = canEvaluateNumber(numeric->value) ? tryEvaluateNumber(numeric->value, optionalEvaluationErrorPosition) : std::nullopt;
-        }
-
-        if ((accessedValueForDimension.has_value() && signalAccessRestriction->isAccessRestrictedToValueOfDimension(dimensionIdx, *accessedValueForDimension))
-            || signalAccessRestriction->isAccessRestrictedToDimension(dimensionIdx)){
+        if (signalAccessRestriction->isAccessRestrictedToDimension(dimensionIdx)) {
             return;
         }
 
-        // We are currently processing the last defined dimension:
-        if (dimensionIdx + 1 == assignedToSignalPart->indexes.size()) {
-            /*
-             * Additionally we can either:
-             * I. Not determine which value for said dimension was accessed or
-             * II.No bit or range access was defined or the exact position of the latter cannot be determined 
-             *
-             * Both cases allow use to lock the complete dimension
-             */
-            if (!accessedValueForDimension.has_value() && (!wasBitOrRangeAccessDefined || !evaluatedBitOrRangeAccess.has_value())) {
-                signalAccessRestriction->restrictAccessToDimension(dimensionIdx);
-            } else if (accessedValueForDimension.has_value()) {
-                // We cannot determine which bit/s were accessed for the given value of the dimension
-                if (!wasBitOrRangeAccessDefined || !evaluatedBitOrRangeAccess.has_value()) {
-                    signalAccessRestriction->restrictAccessToValueOfDimension(dimensionIdx, *accessedValueForDimension);   
-                }
-                // We can determine which value of the dimension as well as which bit/s were accessed and restrict the access accordingly
-                else {
-                    signalAccessRestriction->restrictAccessToBitRange(dimensionIdx, *accessedValueForDimension, *evaluatedBitOrRangeAccess);
-                }
+        std::optional<unsigned int> accessedValueForDimension = std::nullopt;
+        if (auto const* numeric = dynamic_cast<syrec::NumericExpression*>(assignedToSignalPart->indexes.at(dimensionIdx).get())) {
+            if (canEvaluateNumber(numeric->value)) {
+                accessedValueForDimension = tryEvaluateNumber(numeric->value, optionalEvaluationErrorPosition);
+            }
+        }
+
+        if (accessedValueForDimension.has_value() && signalAccessRestriction->isAccessRestrictedToValueOfDimension(dimensionIdx, accessedValueForDimension.value())) {
+            return;
+        }
+    }
+
+    const std::size_t           lastDimensionIdx          = assignedToSignalPart->indexes.size() - 1;
+    std::optional<unsigned int> accessedValueForDimension = std::nullopt;
+    if (auto const* numeric = dynamic_cast<syrec::NumericExpression*>(assignedToSignalPart->indexes.at(lastDimensionIdx).get())) {
+        if (canEvaluateNumber(numeric->value)) {
+            accessedValueForDimension = tryEvaluateNumber(numeric->value, optionalEvaluationErrorPosition);
+        }
+    }
+    
+    if (accessedValueForDimension.has_value()) {
+        if (evaluatedBitOrRangeAccess.has_value()) {
+            signalAccessRestriction->restrictAccessToBitRange(lastDimensionIdx, *accessedValueForDimension, *evaluatedBitOrRangeAccess);
+        } else {
+            signalAccessRestriction->restrictAccessToValueOfDimension(lastDimensionIdx, *accessedValueForDimension);
+        }
+    }
+    else {
+        if (evaluatedBitOrRangeAccess.has_value()) {
+            signalAccessRestriction->restrictAccessToBitRange(lastDimensionIdx, *evaluatedBitOrRangeAccess);
+        }
+        else {
+            if (lastDimensionIdx == 0) {
+                /*
+                  * Accessing either a bit range for which we cannot determine which bits were accessed or accessing any value of the first dimension,
+                  * allows one to restrict the access to the whole signal for both 1-D as well as N-D signals since the restriction status of subsequent dimensions
+                  * depends on the prior ones
+                 */ 
+                signalAccessRestriction->blockAccessOnSignalCompletely();
+            } else {
+                // Accessing either a bit range for which we cannot determine which bits were accessed or accessing any value of a dimension, allows one to restrict the access to the whole dimension
+                signalAccessRestriction->restrictAccessToDimension(lastDimensionIdx);   
             }
         }
     }
+    updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
 }
 
 void SyReCCustomVisitor::liftRestrictionToAssignedToPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalPart, const TokenPosition& optionalEvaluationErrorPosition) {
@@ -1599,6 +1633,7 @@ void SyReCCustomVisitor::liftRestrictionToAssignedToPartOfSignal(const syrec::Va
         return;
     }
 
+    const std::string                                          assignedToSignalIdent      = assignedToSignalPart->getVar()->name;
     const bool                                                 wasBitOrRangeAccessDefined = assignedToSignalPart->range.has_value();
     const std::optional<SignalAccessRestriction::SignalAccess> evaluatedBitOrRangeAccess =
             wasBitOrRangeAccessDefined ? tryEvaluateBitOrRangeAccess(*assignedToSignalPart->range, optionalEvaluationErrorPosition) : std::nullopt;
@@ -1606,9 +1641,10 @@ void SyReCCustomVisitor::liftRestrictionToAssignedToPartOfSignal(const syrec::Va
     if (assignedToSignalPart->indexes.empty()) {
         if (evaluatedBitOrRangeAccess.has_value()) {
             signalAccessRestriction->liftAccessRestrictionForBitRange(*evaluatedBitOrRangeAccess);
+            updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
         }
         else {
-            signalAccessRestrictions.erase(assignedToSignalPart->getVar()->name);
+            signalAccessRestrictions.erase(assignedToSignalIdent);
         }
         return;
     }
@@ -1627,6 +1663,7 @@ void SyReCCustomVisitor::liftRestrictionToAssignedToPartOfSignal(const syrec::Va
         else {
             signalAccessRestriction->liftAccessRestrictionForValueOfDimension(lastAccessedDimensionIdx, *accessedValueForDimension);      
         }
+        updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
     }
     else {
         if (evaluatedBitOrRangeAccess.has_value()) {
@@ -1634,26 +1671,34 @@ void SyReCCustomVisitor::liftRestrictionToAssignedToPartOfSignal(const syrec::Va
         }
         else {
             if (assignedToSignalPart->indexes.size() == 1) {
-                signalAccessRestrictions.erase(assignedToSignalPart->getVar()->name);
+                signalAccessRestrictions.erase(assignedToSignalIdent);
+                return;
             }
-            else {
-                signalAccessRestriction->liftAccessRestrictionForDimension(lastAccessedDimensionIdx);   
-            }
+            signalAccessRestriction->liftAccessRestrictionForDimension(lastAccessedDimensionIdx);   
         }
+        updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
     }
 }
 
+// TODO: Handling of partial bit ranges (i.e. .2:$i) when evaluating bit range !!!
 bool SyReCCustomVisitor::isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const TokenPosition& optionalEvaluationErrorPosition) {
     const auto signalAccessRestriction = tryGetSignalAccessRestriction(accessedSignalPart->getVar()->name);
     if (!signalAccessRestriction.has_value()) {
         return false;
     }
+    
+    if ((accessedSignalPart->indexes.empty() && !accessedSignalPart->range.has_value()) || signalAccessRestriction->isAccessRestrictedOnWholeSignal()) {
+        return true;
+    }
 
     const bool                                                 wasBitOrRangeAccessDefined = accessedSignalPart->range.has_value();
+
+    // TODO: Do we need to be able to distinguish between an evaluation error due to a division by zero or simply because the compile
+    // time expression cannot be evaluated ? If the latter is the case, is a check for a block of the complete signal enough ?
     const std::optional<SignalAccessRestriction::SignalAccess> evaluatedBitOrRangeAccess =
             wasBitOrRangeAccessDefined ? tryEvaluateBitOrRangeAccess(*accessedSignalPart->range, optionalEvaluationErrorPosition) : std::nullopt;
 
-    if (wasBitOrRangeAccessDefined && evaluatedBitOrRangeAccess.has_value() && signalAccessRestriction->isAccessRestrictedToBitRange(*evaluatedBitOrRangeAccess)) {
+    if (evaluatedBitOrRangeAccess.has_value() && signalAccessRestriction->isAccessRestrictedToBitRange(*evaluatedBitOrRangeAccess)) {
         return true;
     }
 
@@ -1696,5 +1741,69 @@ std::optional<SignalAccessRestriction::SignalAccess> SyReCCustomVisitor::tryEval
 }
 
 [[nodiscard]] std::optional<SignalAccessRestriction> SyReCCustomVisitor::tryGetSignalAccessRestriction(const std::string& signalIdent) const {
-    return signalAccessRestrictions.count(signalIdent) != 0 ? std::make_optional<SignalAccessRestriction>(signalAccessRestrictions.at(signalIdent)) : std::nullopt;
+    auto signalRestrictionEntry = signalAccessRestrictions.find(signalIdent);
+    return signalRestrictionEntry != signalAccessRestrictions.end() ? std::make_optional(signalRestrictionEntry->second) : std::nullopt;
+}
+
+void SyReCCustomVisitor::updateSignalRestriction(const std::string& signalIdent, const SignalAccessRestriction& updatedRestriction) {
+    if (signalAccessRestrictions.count(signalIdent) == 0) {
+        return;
+    }
+
+    signalAccessRestrictions.insert_or_assign(signalIdent, updatedRestriction);
+}
+
+std::optional<unsigned int> SyReCCustomVisitor::tryDetermineExpressionBitwidth(const syrec::expression::ptr& expression, const TokenPosition& optionalEvaluationErrorPosition) {
+    if (auto const* numericExpression = dynamic_cast<syrec::NumericExpression*>(expression.get())) {
+        if (canEvaluateNumber(numericExpression->value)) {
+            return tryEvaluateNumber(numericExpression->value, optionalEvaluationErrorPosition);
+        }
+        return std::nullopt;
+    }
+
+    if (auto const* binaryExpression = dynamic_cast<syrec::BinaryExpression*>(expression.get())) {
+        switch (binaryExpression->op) {
+            case syrec::BinaryExpression::LogicalAnd:
+            case syrec::BinaryExpression::LogicalOr:
+            case syrec::BinaryExpression::LessThan:
+            case syrec::BinaryExpression::GreaterThan:
+            case syrec::BinaryExpression::Equals:
+            case syrec::BinaryExpression::NotEquals:
+            case syrec::BinaryExpression::LessEquals:
+            case syrec::BinaryExpression::GreaterEquals:
+                return 1;
+            default:
+                const auto& lhsBitWidthEvaluated = tryDetermineExpressionBitwidth(binaryExpression->lhs, optionalEvaluationErrorPosition);
+                const auto& rhsBitWidthEvaluated = lhsBitWidthEvaluated.has_value() ? lhsBitWidthEvaluated : tryDetermineExpressionBitwidth(binaryExpression->rhs, optionalEvaluationErrorPosition);
+
+                if (lhsBitWidthEvaluated.has_value() && rhsBitWidthEvaluated.has_value()) {
+                    return std::max(*lhsBitWidthEvaluated, *rhsBitWidthEvaluated);
+                }
+
+                return lhsBitWidthEvaluated.has_value() ? *lhsBitWidthEvaluated : *rhsBitWidthEvaluated;
+        }
+    }
+
+    if (auto const* shiftExpression = dynamic_cast<syrec::ShiftExpression*>(expression.get())) {
+        return tryDetermineExpressionBitwidth(shiftExpression->lhs, optionalEvaluationErrorPosition);    
+    }
+
+    if (auto const* variableExpression = dynamic_cast<syrec::VariableExpression*>(expression.get())) {
+        if (!variableExpression->var->range.has_value()) {
+            return variableExpression->bitwidth();
+        }
+
+        const auto& bitRangeStart = variableExpression->var->range->first;
+        const auto& bitRangeEnd = variableExpression->var->range->second;
+
+        if (bitRangeStart->isLoopVariable() && bitRangeEnd->isLoopVariable() && bitRangeStart->variableName() == bitRangeEnd->variableName()) {
+            return 1;
+        }
+
+        if (bitRangeStart->isConstant() && bitRangeEnd->isConstant()) {
+            return (bitRangeEnd->evaluate(loopVariableMappingLookup) - bitRangeStart->evaluate(loopVariableMappingLookup)) + 1;
+        }
+
+        return variableExpression->var->bitwidth();
+    }
 }
