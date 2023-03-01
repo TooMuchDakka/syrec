@@ -411,8 +411,8 @@ private:
         return container;
     }
 
-    [[nodiscard]] bool isAccessOnDimensionBlocked(const std::size_t& dimension, const bool& considerBitRestrictions=false) const;
-    [[nodiscard]] bool isAccessOnValueOfDimensionBlocked(const std::size_t& dimension, const std::size_t& valueForDimension, const bool& considerBitRestrictions = false) const;
+    [[nodiscard]] bool isAccessOnDimensionBlocked(const std::size_t& dimension, const bool& considerGlobalBitRestrictions=true, const bool& considerBitRestrictionsFromAnyValueOfDimensions=false) const;
+    [[nodiscard]] bool isAccessOnValueOfDimensionBlocked(const std::size_t& dimension, const std::size_t& valueForDimension, const bool& considerGlobalBitRestrictions=true, const bool& considerAnyBitRestrictionsForValueOfDimension = false) const;
 
     void updateExistingBitRangeRestrictions(const SignalAccess& newlyRestrictedBitRange);
     void updateExistingBitRangeRestrictions(const SignalAccess& newlyRestrictedBitRange, const std::size_t dimension);
