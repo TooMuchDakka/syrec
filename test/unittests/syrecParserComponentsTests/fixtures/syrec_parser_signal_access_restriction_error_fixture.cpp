@@ -3,7 +3,7 @@
 
 #include "syrec_parser_signal_access_restriction_error_fixture.hpp"
 
-using namespace parser;
+using namespace SignalAccessRestrictionParserTests;
 
 TEST_P(SyrecParserSignalAccessRestrictionErrorFixture, CheckThatRestrictionChanged){
     const auto testData = createTestData(assignmentLhsOperand, excludedTestCases);
@@ -37,107 +37,107 @@ INSTANTIATE_TEST_SUITE_P(
         testing::Values(
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentOfWholeSignal",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal(),
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName),
                         ExcludedCases::OverlappingBitRanges),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitOfSignal",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessBit(std::make_optional(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange.first)),
                         ExcludedCases::OverlappingBitRanges),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToAnyBitOfSignal",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessBit(std::nullopt),
                         ExcludedCases::OverlappingBitRanges),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeOfSignal",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessBitRange(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange),
                         ExcludedCases::NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeWithEndBeingOnlyRuntimeConstantOfSignal",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessBitRange(std::make_pair(std::make_optional(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange.first), std::nullopt)),
                         ExcludedCases::NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeWithStartBeingOnlyRuntimeConstantOfSignal",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessBitRange(std::make_pair(std::nullopt, std::make_optional(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange.second))),
                         ExcludedCases::NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeWithBordersBeingRuntimeConstantsOfSignal",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessBitRange(std::make_pair(std::nullopt, std::nullopt)),
                         ExcludedCases::NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToConcreteBitOfCompletelyBlockedDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(std::nullopt)
                             .accessBit(std::make_optional(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange.first)),
                         ExcludedCases::OverlappingBitRanges),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToAnyBitOfCompletelyBlockedDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(std::nullopt)
                             .accessBit(std::nullopt),
                         ExcludedCases::OverlappingBitRanges),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToConcreteBitOfValueForDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(SyrecParserSignalAccessRestrictionErrorFixture::defaultValueForAccessedDimension)
                             .accessBit(std::make_optional(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange.first)),
                         ExcludedCases::OverlappingBitRanges),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToAnyBitOfValueForDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(SyrecParserSignalAccessRestrictionErrorFixture::defaultValueForAccessedDimension)
                             .accessBit(std::nullopt),
                         ExcludedCases::OverlappingBitRanges),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeOfCompletelyBlockedDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(std::nullopt)
                             .accessBitRange(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange),
                         NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeWithEndBeingOnlyRuntimeConstantOfCompletelyBlockedDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(std::nullopt)
                             .accessBitRange(std::make_pair(std::make_optional(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange.first), std::nullopt)),
                         ExcludedCases::NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeWithStartBeingOnlyRuntimeConstantOfCompletelyBlockedDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(std::nullopt)
                             .accessBitRange(std::make_pair(std::nullopt, std::make_optional(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange.second))),
                         ExcludedCases::NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeWithBordersBeingRuntimeConstantsOfCompletelyBlockedDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(std::nullopt)
                             .accessBitRange(std::make_pair(std::nullopt, std::nullopt)),
                         ExcludedCases::NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeOfValueForDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(SyrecParserSignalAccessRestrictionErrorFixture::defaultValueForAccessedDimension)
                             .accessBitRange(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange),
                         NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeWithEndBeingOnlyRuntimeConstantOfValueForDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(SyrecParserSignalAccessRestrictionErrorFixture::defaultValueForAccessedDimension)
                             .accessBitRange(std::make_pair(std::make_optional(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange.first), std::nullopt)),
                         ExcludedCases::NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeWithStartBeingOnlyRuntimeConstantOfValueForDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(SyrecParserSignalAccessRestrictionErrorFixture::defaultValueForAccessedDimension)
                             .accessBitRange(std::make_pair(std::nullopt, std::make_optional(SyrecParserSignalAccessRestrictionErrorFixture::defaultBitRange.second))),
                         ExcludedCases::NoneExcluded),
                 std::make_tuple(
                         "testAccessingRestrictedPartOfAssignmentToBitRangeWithBordersBeingRuntimeConstantsOfValueForDimension",
-                        SyrecParserSignalAccessRestrictionErrorFixture::createAccessOnWholeSignal()
+                        SignalOperandBuilderHelpers::createAccessOnWholeSignal(SyrecParserSignalAccessRestrictionErrorFixture::assignedToSignalName)
                             .accessDimension(SyrecParserSignalAccessRestrictionErrorFixture::defaultValueForAccessedDimension)
                             .accessBitRange(std::make_pair(std::nullopt, std::nullopt)),
                         ExcludedCases::NoneExcluded)
