@@ -1,12 +1,7 @@
 #include "core/syrec/program.hpp"
 
-#include "CommonTokenStream.h"
-#include "core/syrec/parser/infix_iterator.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
-#include "parser/antlr/SyReCCustomVisitor.h"
-#include "parser/antlr/SyReCLexer.h"
-#include "parser/antlr/SyReCParser.h"
-#include "parser/antlr/SyReCErrorListener.h"
+#include "core/syrec/parser/antlr/parserComponents/syrec_parser_interface.hpp"
 
 using namespace syrec;
 
@@ -50,26 +45,14 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     if (nullptr == buffer) {
         return "Cannot parse invalid buffer";
     }
-
-    const char*               tmp = (char *)(buffer);
-    antlr4::ANTLRInputStream  input(tmp, bufferSizeInBytes);
-    ::parser::SyReCLexer      lexer(&input);
-    antlr4::CommonTokenStream tokens(&lexer);
-    ::parser::SyReCParser     antlrParser(&tokens);
-
-    const auto  parserConfig             = std::make_shared<::parser::ParserConfig>();
-    const auto& customVisitor            = std::make_unique<::parser::SyReCCustomVisitor>(parserConfig);
-
-    const auto antlrParserErrorListener = std::make_shared<::parser::SyReCErrorListener>(::parser::SyReCErrorListener(customVisitor->errors));
-    lexer.addErrorListener(antlrParserErrorListener.get());
-    antlrParser.addErrorListener(antlrParserErrorListener.get());
-
-    //const auto x = lexer.getAllTokens();
-    if (std::any_cast<bool>(customVisitor->visit(antlrParser.program()))) {
-        this->modulesVec = customVisitor->modules;
+    
+    const char*                  bufferCasted = (char *)(buffer);
+    const auto parsingResult = ::parser::SyrecParserInterface::parseProgram(bufferCasted, bufferSizeInBytes, ::parser::ParserConfig());
+    if (parsingResult.wasParsingSuccessful) {
+        this->modulesVec = parsingResult.foundModules;
         return "";
     }
 
     // TODO: Syntax errors will be inserted before semantic errors (i.e. the errors are not sorted according to their position)
-    return ::parser::ParserUtilities::combineErrors(customVisitor->errors);
+    return ::parser::ParserUtilities::combineErrors(parsingResult.errors);
 }

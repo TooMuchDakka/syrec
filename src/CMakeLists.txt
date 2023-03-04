@@ -37,18 +37,21 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/value_broadcaster.cpp
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.h
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.h
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.h
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCErrorListener.h
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.h
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCCustomVisitor.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCLexer.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCParser.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCErrorListener.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCVisitor.cpp
+
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_expression_visitor.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_module_visitor.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.cpp
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
@@ -65,6 +68,12 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_evaluation_result.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/value_broadcaster.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor_shared_data.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_expression_visitor.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_module_visitor.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_parser_interface.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/module.hpp
@@ -80,6 +89,9 @@ add_library(
 # set include directories
 target_include_directories(${PROJECT_NAME}
                            PUBLIC $<BUILD_INTERFACE:${${PROJECT_NAME}_SOURCE_DIR}/include>)
+
+target_include_directories(${PROJECT_NAME}
+                           PRIVATE $<BUILD_INTERFACE:${${PROJECT_NAME}_SOURCE_DIR}/src/core/syrec/parser/antlr>)
 
 # set required C++ standard and disable compiler specific extensions
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
