@@ -76,7 +76,7 @@ TEST_P(SyrecSynthesisTest, GenericSynthesisTest) {
     std::string         errorString;
 
     errorString = prog.read(fileName, settings);
-    EXPECT_TRUE(errorString.empty());
+    ASSERT_TRUE(errorString.empty());
 
     EXPECT_TRUE(LineAwareSynthesis::synthesize(circ, prog));
 

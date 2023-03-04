@@ -78,23 +78,16 @@ std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
 }
 
 std::any SyReCModuleVisitor::visitParameterList(SyReCParser::ParameterListContext* context) {
-    bool                                allParametersValid = true;
     syrec::Variable::vec                parametersContainer;
-    std::optional<syrec::Variable::vec> parameters;
 
     for (const auto& parameter: context->parameter()) {
         const auto parsedParameterDefinition = tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(parameter);
-        allParametersValid &= parsedParameterDefinition.has_value();
-        if (allParametersValid) {
+        if (parsedParameterDefinition.has_value()) {
             parametersContainer.emplace_back(*parsedParameterDefinition);
         }
     }
-
-    if (allParametersValid) {
-        parameters.emplace(parametersContainer);
-    }
-
-    return parameters;
+    const bool areAllParametersValid = parametersContainer.size() == context->parameter().size();
+    return areAllParametersValid ? std::make_optional(parametersContainer) : std::nullopt;
 }
 
 std::any SyReCModuleVisitor::visitParameter(SyReCParser::ParameterContext* context) {
