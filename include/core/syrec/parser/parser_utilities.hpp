@@ -23,6 +23,7 @@ public:
 
     // TODO: This should only be a temporary workaround, ideally these internal flags are replaced by this new enum
     [[nodiscard]] static std::optional<unsigned int> mapOperationToInternalFlag(const syrec_operation::operation& operation);
+    [[nodiscard]] static std::optional<syrec_operation::operation> mapInternalBinaryOperationFlagToEnum(const unsigned int& internalOperationFlag);
 };
 }
 

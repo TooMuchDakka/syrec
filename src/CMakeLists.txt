@@ -53,6 +53,9 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_module_visitor.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.cpp
 
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/no_additional_line_assignment.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/reassociate_expression.cpp
+
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/custom_semantic_errors.hpp
@@ -74,6 +77,8 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_module_visitor.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_parser_interface.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/no_additional_line_assignment.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/reassociate_expression.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/module.hpp
