@@ -55,6 +55,9 @@ package_add_test(
   unittests/test_extend_tt.cpp
   unittests/test_huffman.cpp
   unittests/test_pla_parser.cpp
+
+  unittests/syrecOptimizerComponentsTests/test_reassociate_expression_optimization.cpp
+
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_error_cases_fixture.cpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_method_call_guess_fixture.cpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_range_check_fixture.cpp
@@ -92,6 +95,15 @@ add_custom_command(
           $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/unittests/syrecParserComponentsTests/testdata
   COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/unittests/syrecParserComponentsTests/testdata
           ${CMAKE_BINARY_DIR}/unittests/syrecParserComponentsTests/testdata
+
+  COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/unittests/syrecOptimizerComponentsTests
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/unittests/syrecOptimizerComponentsTests
+
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/testdata
+          $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/unittests/syrecOptimizerComponentsTests/testdata
+  COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE_DIR:${PROJECT_NAME}_test>/unittests/syrecOptimizerComponentsTests/testdata
+          ${CMAKE_BINARY_DIR}/unittests/syrecOptimizerComponentsTests/testdata
+
 
   COMMENT "Copying circuits and creating symlinks for ${PROJECT_NAME}_test"
   VERBATIM)
