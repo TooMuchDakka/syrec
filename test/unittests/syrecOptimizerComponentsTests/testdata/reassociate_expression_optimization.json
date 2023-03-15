@@ -1,0 +1,81 @@
+{
+  "simplificationOfExpressionWithOnlyConstantOperands": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += (2 + 10)",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += 12"
+  },
+  "simplificationOfExpressionWithNestedExpressionContainingOnlyConstantOperands": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((2 + 10) + (10 + 5))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += 27"
+  },
+  "simplificationOfExpressionWithMultiplicationByRightOperandBeingZeroResultsInZero": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((a + b) * 0)",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += 0"
+  },
+  "simplificationOfExpressionWithMultiplicationByLeftOperandBeingZeroResultsInZero": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += (0 * (a + b))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += 0"
+  },
+  "lhsExpressionContainingConstantReorderedWithConstantOfRhsExprWithBothExpressionOpsBeingAddition": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((2 + b) + 4); c += ((b + 2) + 4)",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (6 + b); c += (6 + b)"
+  },
+  "rhsExpressionContainingConstantReorderedWithConstantOfLhsExprWithBothExpressionOpsBeingAddition": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += (4 + (2 + b)); c += (4 + (b + 2))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (6 + b); c += (6 + b)"
+  },
+  "lhsExpressionContainingConstantReorderedWithConstantOfRhsExprWithBothExpressionOpsBeingMultiplication": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((2 * b) * 4); c += ((b * 2) * 4)",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (8 * b); c += (8 * b)"
+  },
+  "rhsExpressionContainingConstantReorderedWithConstantOfLhsExprWithBothExpressionOpsBeingMultiplication": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += (4 * (2 * b)); c += (4 * (b * 2))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (8 * b); c += (8 * b)"
+  },
+  "lhsExpressionContaingConstantReorderedWithRhsExprContainingConstantAndOperationThatIsDistributive": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += (4 * (2 + b)); c += (4 * (b + 2))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (8 + (4 * b)); c += (8 + (4 * b))"
+  },
+  "rhsExpressionContaingConstantReorderedWithLhsExprContainingConstantAndOperationThatIsDistributive": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((2 + b) * 4); c += ((b + 2) * 4)",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (8 + (4 * b)); c += (8 + (4 * b))"
+  },
+  "divisionByZeroExpressionNotSimplified": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((2 + b) / 0)"
+  },
+  "expressionWithRhsOperandBeingConstantReordersToLeftSide": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((a + b) + 2)",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += ((2 + a) + b)"
+  },
+  "expressionWithRhsOperandBeingConstantAndOperationBeingSubtractionTransformedToAddition": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((a + b) - 2)",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += ((-2 + a) + b)"
+  },
+  "distributiveLawIsNotAppliedToSubexpressionWithOperationDisablingDistributivity": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += (a * (a / b)); c += ((a / b) * a)",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (a * (a / b)); c += ((a / b) * a)"
+  },
+  "parentExpressionWithAdditionAndBothOperandBeingExpressionsWithAdditionAndOneConstantOperandSimplified": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((2 + a) + (b + 2)); c += ((2 + a) + (2 + b)); c += ((a + 2) + (b + 2)); c += ((a + 2) + (2 + b))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (4 + (a + b)); c += (4 + (a + b)); c += (4 + (a + b)); c += (4 + (a + b))"
+  },
+  "parentExpressionWithLhsBeingVariableAccessAndRhsOperandBeingExpressionWithAllOperandsBeingCommutativeReordered": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += (a + (a + b)); c += (a * (a * b))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += ((a + a) + b); c += ((a * a) * b)"
+  },
+  "parentExpressionContainingNotSimplifiableOperationWillTryToOptimizeOperands": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((2 + (a + 2)) / (2 + (2 + 4)))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += ((4 + a) / 8)"
+  },
+  "initiallyNotOptimizableParentExprSimplifiedAfterOperandsWereSimplified": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += ((2 - (4 - 2)) / (a + (b + 4))); c += ((a * (b * (2 - 2))) / (a + (b * b)))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += 0; c += 0"
+  },
+  "simpleExpression": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += (((2 + a) + b) + 10)",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += ((12 + a) + b)"
+  },
+  "testMultipleReorderingsOfCommutativeOperationsWithOneOperandBeingAConstantAndTheOtherBeingAnExpressionWithOneOperandConstant": {
+    "circuit": "module main(in a(16), in b(16), out c(16)) c += (2 + (a + (2 + (a + (2 + (2 * (2 + a))))))); c += (2 * (a * (2 * (a * (2 * (a * (2 * a)))))))",
+    "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (((10 + a) + a) + (2 * a)); c += ((((16 * a) * a) * a) * a)"
+  }
+}

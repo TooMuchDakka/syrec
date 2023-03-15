@@ -1,4 +1,5 @@
 #include "syrec_ast_dump_utils.hpp"
+#include "test_case_creation_utils.hpp"
 
 #include "gtest/gtest.h"
 #include "core/syrec/program.hpp"
@@ -10,27 +11,29 @@
 using namespace syrec;
 
 class ReassociateExpressionTest : public testing::TestWithParam<std::string> {
+public:
+    inline static const std::string pathToTestCaseFile = "./unittests/syrecOptimizerComponentsTests/testdata/reassociate_expression_optimization.json";
 private:
-    const std::string relativePathToTestCaseFile    = "./unittests/syrecOptimizerComponentsTests/testdata/reassociate_expression_optimization.json";
     const std::string cJsonKeyCircuit               = "circuit";
     const std::string cJsonKeyExpectedCircuitOutput = "expectedCircuit";
 
 protected:
     syrecAstDumpUtils::SyrecASTDumper astDumper;
+    syrec::ReadProgramSettings config;
     syrec::program parserPublicInterface;
 
     std::string circuitToOptimize;
     std::string expectedOptimizedCircuit;
 
     explicit ReassociateExpressionTest():
-        astDumper(syrecAstDumpUtils::SyrecASTDumper(true)) {}
+        astDumper(syrecAstDumpUtils::SyrecASTDumper(true)), config(16, true) {}
 
     void SetUp() override {
         const std::string                         testCaseJsonKey = GetParam();
         
-        std::ifstream     configFileStream(relativePathToTestCaseFile, std::ios_base::in);
+        std::ifstream configFileStream(ReassociateExpressionTest::pathToTestCaseFile, std::ios_base::in);
         ASSERT_TRUE(configFileStream.good()) << "Could not open test data json file @ "
-                                             << relativePathToTestCaseFile;
+                                             << ReassociateExpressionTest::pathToTestCaseFile;
 
         const nlohmann::json parsedJson = nlohmann::json::parse(configFileStream);
         ASSERT_TRUE(parsedJson.contains(testCaseJsonKey)) << "Required entry for given test case with key '" << testCaseJsonKey << "' was not found";
@@ -40,19 +43,19 @@ protected:
 
         ASSERT_TRUE(testcaseJsonData.contains(cJsonKeyCircuit)) << "Required entry with key '" << cJsonKeyCircuit << "' was not found";
         ASSERT_TRUE(testcaseJsonData.at(cJsonKeyCircuit).is_string()) << "Expected entry with key '" << cJsonKeyCircuit << "' to by a string";
+        circuitToOptimize = testcaseJsonData.at(cJsonKeyCircuit).get<std::string>();
 
         if (testcaseJsonData.contains(cJsonKeyExpectedCircuitOutput)) {
             ASSERT_TRUE(testcaseJsonData.at(cJsonKeyExpectedCircuitOutput).is_string()) << "Expected entry with key '" << cJsonKeyExpectedCircuitOutput << "' to by an array";
-            expectedOptimizedCircuit = testcaseJsonData.at(cJsonKeyCircuit).get<std::string>();
+            expectedOptimizedCircuit = testcaseJsonData.at(cJsonKeyExpectedCircuitOutput).get<std::string>();
+        } else {
+            expectedOptimizedCircuit = circuitToOptimize;
         }
-
-        circuitToOptimize = testcaseJsonData.at(cJsonKeyCircuit).get<std::string>();
-    }
+    }    
 };
 
 INSTANTIATE_TEST_SUITE_P(SyReCOptimizations, ReassociateExpressionTest,
-                         testing::Values(
-                                 "alu_2"),
+                         testing::ValuesIn(syrecTestUtils::loadTestCasesNamesFromFile(ReassociateExpressionTest::pathToTestCaseFile, {})),
                          [](const testing::TestParamInfo<ReassociateExpressionTest::ParamType>& info) {
                              auto s = info.param;
                              std::replace( s.begin(), s.end(), '-', '_');
@@ -60,7 +63,7 @@ INSTANTIATE_TEST_SUITE_P(SyReCOptimizations, ReassociateExpressionTest,
 
 TEST_P(ReassociateExpressionTest, GenericReassociateExpressionOptimization) {
     std::string errorsFromParsedCircuit;
-    ASSERT_NO_THROW(errorsFromParsedCircuit = parserPublicInterface.readFromString(circuitToOptimize));
+    ASSERT_NO_THROW(errorsFromParsedCircuit = parserPublicInterface.readFromString(circuitToOptimize, config));
     ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors";
 
     std::string stringifiedProgram;
