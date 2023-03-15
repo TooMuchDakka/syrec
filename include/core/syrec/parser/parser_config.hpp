@@ -6,18 +6,21 @@ namespace parser {
         unsigned int cDefaultSignalWidth;
         bool         supportBroadcastingExpressionOperands;
         bool         supportBroadcastingAssignmentOperands;
+        bool reassociateExpressionsEnabled;
 
         explicit ParserConfig(
             const unsigned int defaultSignalWidth = 32U, 
             const bool supportBroadcastingExpressionOperands = false,
-            const bool supportBroadcastingAssignmentOperands = false):
-            cDefaultSignalWidth(defaultSignalWidth), supportBroadcastingExpressionOperands(supportBroadcastingExpressionOperands), supportBroadcastingAssignmentOperands(supportBroadcastingAssignmentOperands) {};
+            const bool supportBroadcastingAssignmentOperands = false,
+            const bool reassociateExpressionEnabled = false):
+            cDefaultSignalWidth(defaultSignalWidth), supportBroadcastingExpressionOperands(supportBroadcastingExpressionOperands), supportBroadcastingAssignmentOperands(supportBroadcastingAssignmentOperands), reassociateExpressionsEnabled(reassociateExpressionEnabled) {};
 
         
         ParserConfig& operator=(const ParserConfig& copy) {
             cDefaultSignalWidth = copy.cDefaultSignalWidth;
             supportBroadcastingExpressionOperands = copy.supportBroadcastingExpressionOperands;
             supportBroadcastingAssignmentOperands = copy.supportBroadcastingAssignmentOperands;
+            reassociateExpressionsEnabled         = copy.reassociateExpressionsEnabled;
             return *this;
         }
     };

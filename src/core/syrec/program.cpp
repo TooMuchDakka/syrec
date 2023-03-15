@@ -12,12 +12,12 @@ std::string program::read(const std::string& filename, const ReadProgramSettings
         return "Cannot open given circuit file @ " + filename;
     }
 
-    return parseBufferContent(fileContentBuffer, fileContentLength);
+    return parseBufferContent(fileContentBuffer, fileContentLength, settings);
 }
 
 // TODO: Replace ReadProgramSettings with ParserConfig
 std::string program::readFromString(const std::string& circuitStringified, const ReadProgramSettings settings) {
-    return parseBufferContent(reinterpret_cast<const unsigned char*>(circuitStringified.c_str()), circuitStringified.size());
+    return parseBufferContent(reinterpret_cast<const unsigned char*>(circuitStringified.c_str()), circuitStringified.size(), settings);
 }
 
 bool program::readFile(const std::string& filename, const ReadProgramSettings settings, std::string* error) {
@@ -41,13 +41,13 @@ unsigned char* program::readAndBufferFileContent(const std::string& filename, st
 }
 
 // TODO: Added erros from parser to return value
-std::string program::parseBufferContent(const unsigned char* buffer, const int bufferSizeInBytes) {
+std::string program::parseBufferContent(const unsigned char* buffer, const int bufferSizeInBytes, const ReadProgramSettings& config) {
     if (nullptr == buffer) {
         return "Cannot parse invalid buffer";
     }
     
     const char*                  bufferCasted = (char *)(buffer);
-    const auto parsingResult = ::parser::SyrecParserInterface::parseProgram(bufferCasted, bufferSizeInBytes, ::parser::ParserConfig());
+    const auto parsingResult = ::parser::SyrecParserInterface::parseProgram(bufferCasted, bufferSizeInBytes, ::parser::ParserConfig(config.defaultBitwidth, false, false, config.reassociateExpressionEnabled));
     if (parsingResult.wasParsingSuccessful) {
         this->modulesVec = parsingResult.foundModules;
         return "";

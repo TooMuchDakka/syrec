@@ -15,9 +15,10 @@
 namespace syrec {
 
     struct ReadProgramSettings {
-        explicit ReadProgramSettings(unsigned bitwidth = 32U):
-            defaultBitwidth(bitwidth){};
+        explicit ReadProgramSettings(unsigned bitwidth = 32U, bool reassociateExpressionEnabled = false):
+            defaultBitwidth(bitwidth), reassociateExpressionEnabled(reassociateExpressionEnabled){};
         unsigned defaultBitwidth;
+        bool reassociateExpressionEnabled;
     };
 
     class program {
@@ -65,7 +66,7 @@ namespace syrec {
         * @return true if parsing was successful, otherwise false
         */
         bool readFile(const std::string& filename, ReadProgramSettings settings, std::string* error = nullptr);
-        std::string parseBufferContent(const unsigned char* buffer, int bufferSizeInBytes);
+        std::string    parseBufferContent(const unsigned char* buffer, int bufferSizeInBytes, const ReadProgramSettings& config);
         unsigned char* readAndBufferFileContent(const std::string& filename, std::size_t* fileContentLength);
     };
 

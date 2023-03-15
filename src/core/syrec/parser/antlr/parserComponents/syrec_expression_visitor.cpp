@@ -7,6 +7,8 @@
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/value_broadcaster.hpp"
 
+#include "core/syrec/parser/optimizations/reassociate_expression.hpp"
+
 using namespace parser;
 
 /*
@@ -131,8 +133,13 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                 // TODO: Call to bitwidth does not work with loop variables here
                 //const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
 
+                syrec::BinaryExpression::ptr createdBinaryExpr = std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression);
+                if (sharedData->parserConfig->reassociateExpressionsEnabled) {
+                    createdBinaryExpr = optimization::simplifyBinaryExpression(createdBinaryExpr);
+                }
+
                 // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
-                result.emplace(ExpressionEvaluationResult::createFromExpression(std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression), (*lhsOperand)->numValuesPerDimension));
+                result.emplace(ExpressionEvaluationResult::createFromExpression(createdBinaryExpr, (*lhsOperand)->numValuesPerDimension));
             }
         }
     }

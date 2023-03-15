@@ -142,7 +142,7 @@ std::optional<unsigned int> ParserUtilities::mapOperationToInternalFlag(const sy
     return internalOperationFlag;
 }
 
-static std::optional<syrec_operation::operation> mapInternalBinaryOperationFlagToEnum(const unsigned int& internalOperationFlag) {
+std::optional<syrec_operation::operation> ParserUtilities::mapInternalBinaryOperationFlagToEnum(const unsigned int& internalOperationFlag) {
     std::optional<syrec_operation::operation> mappedToEnumValue;
 
     switch (internalOperationFlag) {

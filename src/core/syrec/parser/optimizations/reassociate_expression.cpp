@@ -1,9 +1,31 @@
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
 
+#include <tuple>
+
 using namespace optimization;
 
-bool isArithmeticOperation(syrec_operation::operation operation) {
+inline std::optional<std::shared_ptr<syrec::BinaryExpression>> tryConvertExpressionToBinaryOne(const syrec::expression::ptr& expr) {
+    if (const auto& exprAsBinaryExpression = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpression != nullptr) {
+        return std::make_optional(exprAsBinaryExpression);
+    }
+    return std::nullopt;
+}
+
+inline syrec::expression::ptr createBinaryExpression(const syrec::expression::ptr& lhsOperand, const unsigned int binaryOperation, const syrec::expression::ptr& rhsOperand) {
+    return std::make_shared<syrec::BinaryExpression>(lhsOperand, binaryOperation, rhsOperand);
+}
+
+inline syrec::expression::ptr simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
+    const auto simplificationResultOfLhsOperand = simplifyBinaryExpression(binaryExpr->lhs);
+    const auto simplificationResultOfRhsOperand = simplifyBinaryExpression(binaryExpr->rhs);
+    if (simplificationResultOfLhsOperand == binaryExpr->lhs && simplificationResultOfRhsOperand == binaryExpr->rhs) {
+        return binaryExpr;
+    }
+    return simplifyBinaryExpression(createBinaryExpression(simplificationResultOfLhsOperand, binaryExpr->op, simplificationResultOfRhsOperand));
+}
+
+inline bool isArithmeticOperation(syrec_operation::operation operation) {
     switch (operation) {
         case syrec_operation::operation::addition:
         case syrec_operation::operation::subtraction:
@@ -40,50 +62,127 @@ std::optional<unsigned int> tryGetConstantValueOfExpression(const syrec::express
     return valueOfExpression;
 }
 
-syrec::expression::ptr simplifyBinaryExpression(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
+inline bool isExpressionConstantOrSignalAccess(const syrec::expression::ptr& expression) {
+    return std::dynamic_pointer_cast<syrec::NumericExpression>(expression) != nullptr || std::dynamic_pointer_cast<syrec::VariableExpression>(expression) != nullptr;
+}
+
+std::optional<std::tuple<unsigned int, syrec::expression::ptr>> trySplitExpressionIntoConstantAndNonExprOperand(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
+    if (!isExpressionConstantOrSignalAccess(binaryExpr->lhs) && !isExpressionConstantOrSignalAccess(binaryExpr->rhs)) {
+        return std::nullopt;
+    }
+
+    std::optional<unsigned int> constOperandOfLhsExpr    = tryGetConstantValueOfExpression(binaryExpr->lhs);
+    syrec::expression::ptr      nonConstOperandOfLhsExpr = binaryExpr->rhs;
+    if (!constOperandOfLhsExpr.has_value()) {
+        constOperandOfLhsExpr    = tryGetConstantValueOfExpression(binaryExpr->rhs);
+        nonConstOperandOfLhsExpr = binaryExpr->lhs;
+    }
+
+    if (constOperandOfLhsExpr.has_value()) {
+        return std::make_optional(std::make_tuple(*constOperandOfLhsExpr, nonConstOperandOfLhsExpr));   
+    }
+    return std::nullopt;
+}
+
+/*
+ * TODO: More tests with subexpressions being not optimizable or simply testing the other reordering rules currently not covered
+ */
+syrec::expression::ptr optimization::simplifyBinaryExpression(const syrec::expression::ptr& expr) {
+    const auto binaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
+    if (binaryExpr == nullptr) {
+        return expr;
+    }
+
     const auto lOperandConstValue = tryGetConstantValueOfExpression(binaryExpr->lhs);
     const auto rOperandConstValue = tryGetConstantValueOfExpression(binaryExpr->rhs);
 
-    const auto                 mappedFlagToEnum    = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(binaryExpr->op);
+    const auto mappedFlagToEnum = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(binaryExpr->op);
     if (!mappedFlagToEnum.has_value()) {
         return binaryExpr;
     }
 
-    const syrec_operation::operation binaryExprOperation = mappedFlagToEnum.value();
+    const auto binaryOperationOfExpr = mappedFlagToEnum.value();
     if (lOperandConstValue.has_value() && rOperandConstValue.has_value()) {
-        const auto simplificationResult = trySimplifyConstantExpression(lOperandConstValue.value(), binaryExprOperation, rOperandConstValue.value());
-        if (simplificationResult.has_value()) {
-            // TODO: Bitwidth
-            return createExpressionForNumber(simplificationResult.value());
+        if (const auto resultOfExprWithConstOperands = apply(binaryOperationOfExpr, *lOperandConstValue, *rOperandConstValue);
+            resultOfExprWithConstOperands.has_value()) {
+            return createExpressionForNumber(*resultOfExprWithConstOperands);
         }
+        return expr;
     }
 
-    if (binaryExprOperation == syrec_operation::operation::subtraction) {
+    if (binaryOperationOfExpr == syrec_operation::operation::subtraction) {
         if (rOperandConstValue.has_value()) {
-            return simplifyBinaryExpression(std::make_shared<syrec::BinaryExpression>(createExpressionForNumber(-rOperandConstValue.value()), syrec::BinaryExpression::Add, binaryExpr->lhs));    
+            return simplifyBinaryExpression(createBinaryExpression(createExpressionForNumber(-*rOperandConstValue), syrec::BinaryExpression::Add, binaryExpr->lhs));
         }
-        if (lOperandConstValue.has_value()) {
+        // TODO:
+        /*if (lOperandConstValue.has_value()) {
             return simplifyBinaryExpression(std::make_shared<syrec::BinaryExpression>(createExpressionForNumber(-lOperandConstValue.value()), syrec::BinaryExpression::Add, binaryExpr->rhs));
+        }*/
+        return simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(binaryExpr);
+    }
+
+    if (binaryOperationOfExpr == syrec_operation::operation::division && lOperandConstValue.has_value() && *lOperandConstValue == 0) {
+        return createExpressionForNumber(0);
+    }
+
+    if ((binaryOperationOfExpr != syrec_operation::operation::multiplication && binaryOperationOfExpr != syrec_operation::operation::addition) 
+        || (!isExpressionConstantOrSignalAccess(binaryExpr->lhs) && !isExpressionConstantOrSignalAccess(binaryExpr->rhs))) {
+        if (binaryOperationOfExpr == syrec_operation::operation::addition) {
+            const auto lhsExprAsBinaryExpr = tryConvertExpressionToBinaryOne(binaryExpr->lhs);
+            const auto rhsExprAsBinaryExpr = tryConvertExpressionToBinaryOne(binaryExpr->rhs);
+
+            if (lhsExprAsBinaryExpr.has_value() && rhsExprAsBinaryExpr.has_value()) {
+                if ((*lhsExprAsBinaryExpr)->op == syrec::BinaryExpression::Add && (*rhsExprAsBinaryExpr)->op == syrec::BinaryExpression::Add) {
+                    const auto lhsExprDividedIntoConstantAndNonExprOperand = trySplitExpressionIntoConstantAndNonExprOperand(*lhsExprAsBinaryExpr);
+                    const auto rhsExprDividedIntoConstantAndNonExprOperand = trySplitExpressionIntoConstantAndNonExprOperand(*rhsExprAsBinaryExpr);
+
+                    /*
+                     * We can simplify the expression (c1 + x) + (c2 + y) into (c1 + c2) + (x + y)
+                     */
+                    if (lhsExprDividedIntoConstantAndNonExprOperand.has_value() && rhsExprDividedIntoConstantAndNonExprOperand.has_value()) {
+                        return createBinaryExpression(
+                                createExpressionForNumber(
+                                        *apply(
+                                                syrec_operation::operation::addition,
+                                                std::get<unsigned int>(*lhsExprDividedIntoConstantAndNonExprOperand),
+                                                std::get<unsigned int>(*rhsExprDividedIntoConstantAndNonExprOperand))),
+                                syrec::BinaryExpression::Add,
+                                createBinaryExpression(
+                                        std::get<syrec::expression::ptr>(*lhsExprDividedIntoConstantAndNonExprOperand),
+                                        syrec::BinaryExpression::Add,
+                                        std::get<syrec::expression::ptr>(*rhsExprDividedIntoConstantAndNonExprOperand)));
+                    }
+                }
+            }
         }
-
-        return simplifyBinaryExpression(std::make_shared<syrec::BinaryExpression>(simplifyBinaryExpression(binaryExpr->lhs), syrec::BinaryExpression::Subtract, simplifyBinaryExpression(binaryExpr->rhs)));
-    }
-    
-    if ((binaryExprOperation != syrec_operation::operation::multiplication && binaryExprOperation != syrec_operation::operation::addition) 
-        || (!lOperandConstValue.has_value() && !rOperandConstValue.has_value())) {
-        return simplifyBinaryExpression(std::make_shared<syrec::BinaryExpression>(simplifyBinaryExpression(binaryExpr->lhs), binaryExpr->op, simplifyBinaryExpression(binaryExpr->rhs)));
+        return simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(binaryExpr);
     }
 
-    unsigned int parentExprConstOperand;
-    syrec::expression::ptr exprToCheckForDistributivity;
-
+    std::optional<unsigned int> constOperandOfParentExpr;
     if (lOperandConstValue.has_value()) {
-        parentExprConstOperand = rOperandConstValue.value();
-        exprToCheckForDistributivity = binaryExpr->rhs;
+        constOperandOfParentExpr = lOperandConstValue;
+    } else if (rOperandConstValue.has_value()) {
+        constOperandOfParentExpr = rOperandConstValue;
     }
-    else {
-        parentExprConstOperand = lOperandConstValue.value();
-        exprToCheckForDistributivity = binaryExpr->lhs;
+
+    // x * 0 = 0 or 0 * x = 0
+    if (constOperandOfParentExpr.has_value() && *constOperandOfParentExpr == 0 && binaryOperationOfExpr == syrec_operation::operation::multiplication) {
+        return createExpressionForNumber(0);
+    }
+
+    std::optional<syrec::expression::ptr> nonNestedExpressionOperandOfParentExpr;
+    syrec::expression::ptr                exprToCheckForDistributivity;
+    if (isExpressionConstantOrSignalAccess(binaryExpr->lhs)) {
+        nonNestedExpressionOperandOfParentExpr = binaryExpr->lhs;
+        exprToCheckForDistributivity           = binaryExpr->rhs;
+    } else {
+        nonNestedExpressionOperandOfParentExpr = binaryExpr->rhs;
+        exprToCheckForDistributivity           = binaryExpr->lhs;
+    }
+
+    // Both operands of expression are expressions themselves so we recursively apply the simplification operation on both operands
+    if (!nonNestedExpressionOperandOfParentExpr.has_value()) {
+        return createBinaryExpression(simplifyBinaryExpression(binaryExpr->lhs), binaryExpr->op, simplifyBinaryExpression(binaryExpr->rhs));
     }
 
     std::optional<std::shared_ptr<syrec::BinaryExpression>> childBinaryExpression;
@@ -91,53 +190,145 @@ syrec::expression::ptr simplifyBinaryExpression(const std::shared_ptr<syrec::Bin
         childBinaryExpression.emplace(childOperandAsBinaryExpression);
     }
 
-    const auto                 childBinaryExprOperationMapped = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum((*childBinaryExpression)->op);
-    if (!childBinaryExprOperationMapped.has_value()) {
-        return simplifyBinaryExpression(std::make_shared<syrec::BinaryExpression>(simplifyBinaryExpression(binaryExpr->lhs), binaryExpr->op, simplifyBinaryExpression(binaryExpr->rhs)));
+    const std::optional<syrec_operation::operation> childBinaryExprOperation = childBinaryExpression.has_value()
+        ? std::make_optional(*parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum((*childBinaryExpression)->op))
+        : std::nullopt;
+
+    if (!childBinaryExpression.has_value() || !childBinaryExprOperation.has_value() || !isArithmeticOperation(*childBinaryExprOperation)) {
+        /*
+         * In case our expression is of the form t op c where op is a commutative operation we rewrite our expression as
+         * c op t and retry our simplification
+         */ 
+        if (rOperandConstValue.has_value()) {
+            return simplifyBinaryExpression(createBinaryExpression(binaryExpr->rhs, binaryExpr->op, binaryExpr->lhs));
+        }
+        
+        return simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(binaryExpr);
     }
 
-    const syrec_operation::operation childBinaryExprOperation = childBinaryExprOperationMapped.value();
-    if (!childBinaryExpression.has_value() || !isArithmeticOperation(childBinaryExprOperation)) {
-        return simplifyBinaryExpression(std::make_shared<syrec::BinaryExpression>(simplifyBinaryExpression(binaryExpr->lhs), binaryExpr->op, simplifyBinaryExpression(binaryExpr->rhs)));
+    const auto splitOfChildBinaryExpr        = trySplitExpressionIntoConstantAndNonExprOperand(*childBinaryExpression);
+    const auto constOperandOfChildBinaryExpr = splitOfChildBinaryExpr.has_value() ? std::make_optional(std::get<unsigned int>(*splitOfChildBinaryExpr)) : std::nullopt;
+    
+    if (binaryOperationOfExpr == syrec_operation::operation::multiplication && isOperationCombinedWithMultiplicationDistributive(*childBinaryExprOperation)) {
+        if (constOperandOfParentExpr.has_value() && constOperandOfChildBinaryExpr.has_value()) {
+            /*
+            * Cases:
+            * I.   (c1 * (c1 * y))
+            * II.  (c1 * (x * c2))
+            * III. ((c2 * y) * c1)
+            * IV.  ((x * c2) * c1)
+            * all simplify to: ((c1 * c2) * x)
+            *
+            */
+            const auto productOfParentAndChildConstOperand = apply(
+                    syrec_operation::operation::multiplication,
+                    *constOperandOfParentExpr,
+                    *constOperandOfChildBinaryExpr);
+
+            if (*childBinaryExprOperation == syrec_operation::operation::multiplication) {
+                return createBinaryExpression(
+                        createExpressionForNumber(*productOfParentAndChildConstOperand),
+                        (*childBinaryExpression)->op,
+                        std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr));
+            }
+
+            /*
+            * Cases:
+            * I.   (c1 * (c1 op y))
+            * II.  (c1 * (x op c2))
+            * III. ((c2 op y) * c1)
+            * IV.  ((x op c2) * c1)
+            * all simplify to: ((c1 op c2) * (c1 op x))
+            *
+            */
+            return createBinaryExpression(
+                    createExpressionForNumber(*productOfParentAndChildConstOperand),
+                    (*childBinaryExpression)->op,
+                    simplifyBinaryExpression(
+                            createBinaryExpression(
+                                    *nonNestedExpressionOperandOfParentExpr,
+                                    syrec::BinaryExpression::Multiply,
+                                    std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr))));
+        }
+
+        if (*childBinaryExprOperation == syrec_operation::operation::multiplication) {
+            /*
+            * If no other simplification rule can be applied we rewrite our expression (t * (t1 * t2)) as ((t * t1) * t2)
+            */
+            if (*childBinaryExpression == binaryExpr->rhs) {
+                return createBinaryExpression(
+                        simplifyBinaryExpression(
+                                createBinaryExpression(
+                                        binaryExpr->lhs,
+                                        syrec::BinaryExpression::Multiply,
+                                        (*childBinaryExpression)->lhs)),
+                        syrec::BinaryExpression::Multiply,
+                        (*childBinaryExpression)->rhs);
+            }
+        }
+
+        /*
+        * Otherwise apply distributivity rule:
+        * I.  (x op y) * a
+        * II. a * (x op y)
+        * all 'simplify' to: ((x * a) op (y * a))
+        */
+        if (constOperandOfParentExpr.has_value()) {
+            return createBinaryExpression(
+                    simplifyBinaryExpression(
+                            createBinaryExpression(
+                                    *nonNestedExpressionOperandOfParentExpr,
+                                    syrec::BinaryExpression::Multiply,
+                                    (*childBinaryExpression)->lhs)),
+                    (*childBinaryExpression)->op,
+                    simplifyBinaryExpression(
+                            createBinaryExpression(
+                                    *nonNestedExpressionOperandOfParentExpr,
+                                    syrec::BinaryExpression::Multiply,
+                                    (*childBinaryExpression)->rhs)));
+        }
     }
 
-    const auto childBinaryExprLOperandConstValue = tryGetConstantValueOfExpression(childBinaryExpression.value()->lhs);
-    const auto childBinaryExprROperandConstValue = childBinaryExprLOperandConstValue.has_value() ? std::nullopt : tryGetConstantValueOfExpression(childBinaryExpression.value()->rhs);
-    const bool hasChildBinaryExprAnyConstantOperand = childBinaryExprLOperandConstValue.has_value() || childBinaryExprROperandConstValue.has_value();
-
-    // IS a * (b / c) commutative ?
-    if (binaryExprOperation == syrec_operation::operation::multiplication && isOperationCombinedWithMultiplicationDistributive(*childBinaryExprOperationMapped)) {
-        if (hasChildBinaryExprAnyConstantOperand) {
-            const auto productOfParentAndChildConstOperand = trySimplifyConstantExpression(parentExprConstOperand, syrec_operation::operation::multiplication, childBinaryExprLOperandConstValue.has_value() ? childBinaryExprLOperandConstValue.value() : childBinaryExprROperandConstValue.value());
+    if (binaryOperationOfExpr == syrec_operation::operation::addition && childBinaryExprOperation == syrec_operation::operation::addition) {
+        if (constOperandOfChildBinaryExpr.has_value() && constOperandOfParentExpr.has_value()) {
+            /*
+            * The cases:
+            * I.   c1 + (c2 + y)
+            * II.  c1 + (x + c2)
+            * III. (x + c2) + c1
+            * IV.  (c2 + x) + c1
+            * all simplify to:
+            * ((c1 + c2) + x)
+            */
+            const auto sumOfParentAndChildConstOperand = apply(
+                    syrec_operation::operation::addition,
+                    *constOperandOfParentExpr,
+                    *constOperandOfChildBinaryExpr);
 
             return simplifyBinaryExpression(
-                std::make_shared<syrec::BinaryExpression>(
-                    createExpressionForNumber(productOfParentAndChildConstOperand.value()), 
-                    (*childBinaryExpression)->op,
-                    childBinaryExprLOperandConstValue.has_value() ? (*childBinaryExpression)->rhs : (*childBinaryExpression)->lhs)
-            );
-        } 
-        return simplifyBinaryExpression(
-            std::make_shared<syrec::BinaryExpression>(
-                std::make_shared<syrec::BinaryExpression>(createExpressionForNumber(parentExprConstOperand), syrec::BinaryExpression::Multiply, (*childBinaryExpression)->lhs),
-                (*childBinaryExpression)->op,
-                std::make_shared<syrec::BinaryExpression>(createExpressionForNumber(parentExprConstOperand), syrec::BinaryExpression::Multiply, (*childBinaryExpression)->rhs))
-        );   
+                    createBinaryExpression(
+                            createExpressionForNumber(*sumOfParentAndChildConstOperand),
+                            syrec::BinaryExpression::Add,
+                            std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr)));
+        }
+
+        /*
+         * If no other simplification rule can be applied we rewrite our expression (t + (t1 + t2)) as ((t + t1) + t2)
+         */
+        if (*childBinaryExpression == binaryExpr->rhs) {
+            return createBinaryExpression(
+                    simplifyBinaryExpression(createBinaryExpression(binaryExpr->lhs, syrec::BinaryExpression::Add, (*childBinaryExpression)->lhs)),
+                    syrec::BinaryExpression::Add,
+                    (*childBinaryExpression)->rhs);    
+        }
     }
 
-    if (binaryExprOperation == syrec_operation::operation::addition && childBinaryExprOperation == syrec_operation::operation::addition && hasChildBinaryExprAnyConstantOperand) {
-        const auto sumOfParentAndChildConstOperand = trySimplifyConstantExpression(parentExprConstOperand, syrec_operation::operation::addition, childBinaryExprLOperandConstValue.has_value() ? childBinaryExprLOperandConstValue.value() : childBinaryExprROperandConstValue.value());
-        return simplifyBinaryExpression(
-            std::make_shared<syrec::BinaryExpression>(
-                createExpressionForNumber(sumOfParentAndChildConstOperand.value()),
-                syrec::BinaryExpression::Add,
-                std::make_shared<syrec::BinaryExpression>(
-                    createExpressionForNumber(parentExprConstOperand),
-                    syrec::BinaryExpression::Add,
-                    childBinaryExprLOperandConstValue.has_value() ? (*childBinaryExpression)->rhs : (*childBinaryExpression)->lhs
-                    )
-            )
-        );
+    /*
+     * In case our expression is of the form t op c where op is a commutative operation we rewrite our expression as
+     * c op t and retry our simplification
+     */
+    if (rOperandConstValue.has_value()) {
+        return simplifyBinaryExpression(createBinaryExpression(binaryExpr->rhs, binaryExpr->op, binaryExpr->lhs));
     }
 
     return binaryExpr;
