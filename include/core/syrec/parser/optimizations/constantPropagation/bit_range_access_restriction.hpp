@@ -19,7 +19,7 @@ namespace optimizations {
         void liftAllRestrictions();
         void restrictAccessTo(const BitRangeAccess& specificBitRange);
 
-        explicit BitRangeAccessRestriction() {}
+        explicit BitRangeAccessRestriction() = default;
         explicit BitRangeAccessRestriction(const BitRangeAccess& initialBitRangeRestriction) {}
     };
 }; // namespace optimizations

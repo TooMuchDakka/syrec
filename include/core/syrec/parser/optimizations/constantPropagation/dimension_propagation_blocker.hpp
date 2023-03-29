@@ -23,23 +23,22 @@ namespace optimizations {
                 isDimensionCompletelyBlocked(false), signalInformation(sharedSignalInformation), sharedDimensionBitRangeAccessRestriction(sharedDimensionBitRangeAccessRestriction) {}
         };
 
-        explicit DimensionPropagationBlocker(const unsigned int dimension, const SharedBlockerInformation& sharedBlockerInformation):
-            sharedBlockerInformation(sharedBlockerInformation), perValueOfDimensionBitRangeAccessRestrictionLookup({}) {
-            const auto numValuesForDimension                   = sharedBlockerInformation.signalInformation.valuesPerDimension.at(dimension);
-            for (unsigned int valueOfDimension = 0; valueOfDimension < numValuesForDimension; ++valueOfDimension) {
-                perValueOfDimensionBitRangeAccessRestrictionLookup.insert(std::pair(valueOfDimension, std::nullopt));
-            }
-        }
+        explicit DimensionPropagationBlocker(const unsigned int dimension, SharedBlockerInformation& sharedBlockerInformation):
+            sharedBlockerInformation(sharedBlockerInformation), perValueOfDimensionBitRangeAccessRestrictionLookup({}), numValuesForDimension(sharedBlockerInformation.signalInformation.valuesPerDimension.at(dimension)) {}
 
         [[nodiscard]] bool isSubstitutionBlockedFor(const std::optional<unsigned int>& valueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) const;
 
         void blockSubstitutionForBitRange(const std::optional<unsigned int>& valueOfDimensionToBlock, const BitRangeAccessRestriction::BitRangeAccess& bitRangeToBlock);
         void blockSubstitutionForDimension(const std::optional<unsigned int>& valueOfDimensionToBlock);
-        void liftRestrictionFor(const std::optional<unsigned int>& blockedValueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& blockedBitRange);
+
+        void liftRestrictionForWholeDimension();
+        void liftRestrictionForBitRange(const std::optional<unsigned int>& blockedValueOfDimension, const BitRangeAccessRestriction::BitRangeAccess& blockedBitRange);
+        void liftRestrictionForValueOfDimension(unsigned int blockedValueOfDimension);
 
     private:
-        const SharedBlockerInformation& sharedBlockerInformation;
-        std::map<unsigned int, std::optional<BitRangeAccessRestriction::ptr>> perValueOfDimensionBitRangeAccessRestrictionLookup;
+        SharedBlockerInformation& sharedBlockerInformation;
+        std::map<unsigned int, BitRangeAccessRestriction::ptr> perValueOfDimensionBitRangeAccessRestrictionLookup;
+        const unsigned int numValuesForDimension;
     };
 };
 

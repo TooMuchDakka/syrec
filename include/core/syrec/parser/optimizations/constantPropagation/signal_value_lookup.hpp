@@ -44,8 +44,23 @@ namespace optimizations {
          * II. For the second dimension we need 2 dimension restrictions since the subsequent dimensions of the signal are independent from each other when accessing any value for the first dimension
          *      (i.e. when accessing a[0] the resulting signal would be of dimension [4][3] and independent from the [4][3] dimensional signal of a[1]) [each created dimension restriction consists of a lookup map of 4 entries)
          * III. The third dimension requires 4 dimension restrictions
+         *
+         * 0: 1 restriction -> Lookup entries: 2
+         * 1: 2 restrictions -> Lookup entries: 4
+         * 2: 4 restrictions -> Lookup entries: 3
          */
         std::vector<std::vector<DimensionPropagationBlocker::ptr>> dimensionAccessRestrictions;
+
+        /*
+         * a[2][4][3]
+         *
+         * A dimension is called a layer and can either be an intermediate one that simple links to the next one or a lookup one containing the optionally substitutable values for the signal
+         * The structure of this lookup for the signal above will look like the following:
+         *
+         * Layer 0: INTERMEDIATE, # lookup entries: 2 -> Link to layer 1
+         * Layer 1: INTERMEDIATE, # lookup entries: 4 -> Link to layer 2
+         * Layer 2: LOOKUP, # lookup entries 3 -> Optional value for access on last dimension (i.e. by accessing a[1][2][0])
+         */
         std::optional<PotentialValueStorage>                               valueLookup;
 
         std::optional<PotentialValueStorage> initValueLookupWithDefaultValues(unsigned int defaultValue);

@@ -7,7 +7,7 @@ std::vector<DimensionPropagationBlocker::ptr> SignalValueLookup::initEmptyAccess
     std::vector<DimensionPropagationBlocker::ptr> accessRestrictionsForDimension(numValuesForDimension);
 
     auto sharedDimensionBitRangeRestriction = std::optional<BitRangeAccessRestriction::ptr>(std::nullopt);
-    const auto sharedBlockingInformation          = DimensionPropagationBlocker::SharedBlockerInformation(signalInformation, sharedDimensionBitRangeRestriction);
+    auto sharedBlockingInformation          = DimensionPropagationBlocker::SharedBlockerInformation(signalInformation, sharedDimensionBitRangeRestriction);
 
     for (unsigned int valueOfDimension = 0; valueOfDimension < numValuesForDimension; ++valueOfDimension) {
         accessRestrictionsForDimension[valueOfDimension] = std::make_shared<DimensionPropagationBlocker>(DimensionPropagationBlocker(dimension, sharedBlockingInformation));
