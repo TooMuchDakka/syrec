@@ -3,13 +3,13 @@
 using namespace optimizations;
 
 void DimensionPropagationBlocker::blockSubstitutionForDimension(const std::optional<unsigned>& valueOfDimensionToBlock) {
-    if (sharedBlockerInformation.isDimensionCompletelyBlocked || (sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.has_value() && (*sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction)->isAccessCompletelyRestricted())) {
+    if (isDimensionCompletelyBlocked || (dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessCompletelyRestricted())) {
         return;
     }
 
     if (!valueOfDimensionToBlock.has_value()) {
-        sharedBlockerInformation.isDimensionCompletelyBlocked = true;
-        sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.reset();
+        isDimensionCompletelyBlocked = true;
+        dimensionBitRangeAccessRestriction.reset();
         perValueOfDimensionBitRangeAccessRestrictionLookup.clear();
     } else {
         perValueOfDimensionBitRangeAccessRestrictionLookup.insert_or_assign(*valueOfDimensionToBlock, std::make_shared<BitRangeAccessRestriction>(BitRangeAccessRestriction()));
@@ -17,21 +17,21 @@ void DimensionPropagationBlocker::blockSubstitutionForDimension(const std::optio
 }
 
 void DimensionPropagationBlocker::blockSubstitutionForBitRange(const std::optional<unsigned>& valueOfDimensionToBlock, const BitRangeAccessRestriction::BitRangeAccess& bitRangeToBlock) {
-    if (sharedBlockerInformation.isDimensionCompletelyBlocked || (sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.has_value() && (*sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction)->isAccessRestrictedTo(bitRangeToBlock))) {
+    if (isDimensionCompletelyBlocked || (dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessRestrictedTo(bitRangeToBlock))) {
         return;
     }
 
     const auto blockedBitRangeSize              = bitRangeToBlock.second - bitRangeToBlock.first;
-    const bool isWholeSignalwidthBlocked = blockedBitRangeSize == sharedBlockerInformation.signalInformation.bitWidth;
+    const bool isWholeSignalwidthBlocked = blockedBitRangeSize == signalInformation.bitWidth;
 
     if (!valueOfDimensionToBlock.has_value()) {
         if (isWholeSignalwidthBlocked) {
             blockSubstitutionForDimension(valueOfDimensionToBlock);
         } else {
-            if (!sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.has_value()) {
-                sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction = std::make_shared<BitRangeAccessRestriction>(BitRangeAccessRestriction(bitRangeToBlock));
+            if (!dimensionBitRangeAccessRestriction.has_value()) {
+                dimensionBitRangeAccessRestriction = std::make_shared<BitRangeAccessRestriction>(BitRangeAccessRestriction(bitRangeToBlock));
             } else {
-                (*sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction)->restrictAccessTo(bitRangeToBlock);
+                (*dimensionBitRangeAccessRestriction)->restrictAccessTo(bitRangeToBlock);
             }
         }
 
@@ -61,14 +61,14 @@ void DimensionPropagationBlocker::blockSubstitutionForBitRange(const std::option
 }
 
 void DimensionPropagationBlocker::liftRestrictionForWholeDimension() {
-    sharedBlockerInformation.isDimensionCompletelyBlocked = false;
-    sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.reset();
+    isDimensionCompletelyBlocked = false;
+    dimensionBitRangeAccessRestriction.reset();
     perValueOfDimensionBitRangeAccessRestrictionLookup.clear();
 }
 
 void DimensionPropagationBlocker::liftRestrictionForBitRange(const std::optional<unsigned>& blockedValueOfDimension, const BitRangeAccessRestriction::BitRangeAccess& blockedBitRange) {
     const auto blockedBitRangeSize       = blockedBitRange.second - blockedBitRange.first;
-    const bool isWholeSignalwidthBlocked = blockedBitRangeSize == sharedBlockerInformation.signalInformation.bitWidth;
+    const bool isWholeSignalwidthBlocked = blockedBitRangeSize == signalInformation.bitWidth;
 
     if (isWholeSignalwidthBlocked) {
         if (blockedValueOfDimension.has_value()) {
@@ -79,12 +79,12 @@ void DimensionPropagationBlocker::liftRestrictionForBitRange(const std::optional
         return;
     }
 
-    if (!sharedBlockerInformation.isDimensionCompletelyBlocked) {
+    if (!isDimensionCompletelyBlocked) {
         /*
          * Check if we are changing an existing dimension wide restriction
          */
-        if (sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.has_value() && (*sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction)->isAccessRestrictedTo(blockedBitRange)) {
-            auto& dimensionBitRangeRestriction = sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction;
+        if (dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessRestrictedTo(blockedBitRange)) {
+            auto& dimensionBitRangeRestriction = dimensionBitRangeAccessRestriction;
             (*dimensionBitRangeRestriction)->liftRestrictionFor(blockedBitRange);
             if (!(*dimensionBitRangeRestriction)->hasAnyRestrictions()) {
                 dimensionBitRangeRestriction->reset();
@@ -134,9 +134,9 @@ void DimensionPropagationBlocker::liftRestrictionForBitRange(const std::optional
          * Since the unblocked bit range leaves some of the signal still blocked, we need to either create the remaining restriction on a dimension or per value of dimension wide level
          */
         if (!blockedValueOfDimension.has_value()) {
-            if (!sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.has_value()) {
-                sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction = std::make_shared<BitRangeAccessRestriction>();
-                (*sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction)->liftRestrictionFor(blockedBitRange);
+            if (!dimensionBitRangeAccessRestriction.has_value()) {
+                dimensionBitRangeAccessRestriction = std::make_shared<BitRangeAccessRestriction>();
+                (*dimensionBitRangeAccessRestriction)->liftRestrictionFor(blockedBitRange);
             }
         } else {
             BitRangeAccessRestriction remainingRestriction = BitRangeAccessRestriction();
@@ -152,8 +152,8 @@ void DimensionPropagationBlocker::liftRestrictionForBitRange(const std::optional
 }
 
 void DimensionPropagationBlocker::liftRestrictionForValueOfDimension(const unsigned blockedValueOfDimension) {
-    if (sharedBlockerInformation.isDimensionCompletelyBlocked) {
-        sharedBlockerInformation.isDimensionCompletelyBlocked = false;
+    if (isDimensionCompletelyBlocked) {
+        isDimensionCompletelyBlocked = false;
         for (unsigned int valueOfDimensionToBlockCompletely = 0; valueOfDimensionToBlockCompletely < numValuesForDimension; ++valueOfDimensionToBlockCompletely) {
             if (valueOfDimensionToBlockCompletely != blockedValueOfDimension) {
                 perValueOfDimensionBitRangeAccessRestrictionLookup.insert_or_assign(valueOfDimensionToBlockCompletely, std::make_shared<BitRangeAccessRestriction>());
@@ -167,23 +167,23 @@ void DimensionPropagationBlocker::liftRestrictionForValueOfDimension(const unsig
 }
 
 bool DimensionPropagationBlocker::isSubstitutionBlockedFor(const std::optional<unsigned>& valueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
-    if (sharedBlockerInformation.isDimensionCompletelyBlocked) {
+    if (isDimensionCompletelyBlocked) {
         return true;
     }
 
     if (!bitRange.has_value()) {
         if (valueOfDimension.has_value()) {
-            return sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.has_value() || !perValueOfDimensionBitRangeAccessRestrictionLookup.empty();
+            return dimensionBitRangeAccessRestriction.has_value() || !perValueOfDimensionBitRangeAccessRestrictionLookup.empty();
         }
-        return sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.has_value() && (*sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction)->hasAnyRestrictions();    
+        return dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->hasAnyRestrictions();    
     }
 
     if (valueOfDimension.has_value()) {
-        return (sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.has_value() && (*sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction)->isAccessRestrictedTo(*bitRange))
+        return (dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessRestrictedTo(*bitRange))
             || (perValueOfDimensionBitRangeAccessRestrictionLookup.count(*valueOfDimension) != 0 && perValueOfDimensionBitRangeAccessRestrictionLookup.at(*valueOfDimension)->isAccessRestrictedTo(*bitRange));
     }
 
-    const bool hasDimensionWideRestrictionForBitRange = sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction.has_value() && (*sharedBlockerInformation.sharedDimensionBitRangeAccessRestriction)->isAccessRestrictedTo(*bitRange);
+    const bool hasDimensionWideRestrictionForBitRange = dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessRestrictedTo(*bitRange);
     bool isBlockedInValueOfDimension            = hasDimensionWideRestrictionForBitRange;
     for (unsigned int currValueOfDimension = 0; currValueOfDimension < numValuesForDimension && !isBlockedInValueOfDimension; ++currValueOfDimension) {
         if (perValueOfDimensionBitRangeAccessRestrictionLookup.count(currValueOfDimension) != 0) {

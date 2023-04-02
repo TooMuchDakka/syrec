@@ -2,11 +2,11 @@
 
 using namespace optimizations;
 
-inline PotentialValueStorage PotentialValueStorage::initAsIntermediateLayer(const unsigned numEntries) {
+PotentialValueStorage PotentialValueStorage::initAsIntermediateLayer(const unsigned numEntries) {
     return PotentialValueStorage(Intermediate, createLayerData(numEntries));
 }
 
-inline PotentialValueStorage PotentialValueStorage::initAsValueLookupLayer(const unsigned numEntries, const unsigned defaultValue) {
+PotentialValueStorage PotentialValueStorage::initAsValueLookupLayer(const unsigned numEntries, const unsigned defaultValue) {
     return PotentialValueStorage(Value, createLayerData(numEntries, defaultValue));
 }
 
@@ -74,7 +74,7 @@ std::optional<unsigned> PotentialValueStorage::tryFetchStoredValue(unsigned laye
 /*
  * TODO: We are assuming that the maximum signal length is equal to 32 bits ?
  */
-inline unsigned PotentialValueStorage::extractPartsOfValue(const unsigned int value, const BitRangeAccessRestriction::BitRangeAccess& partToFetch) {
+unsigned PotentialValueStorage::extractPartsOfValue(const unsigned int value, const BitRangeAccessRestriction::BitRangeAccess& partToFetch) {
     /*
      * Assuming we are working with a 8-bit wide signal:                        00011111 (0x1F)
      * Initially our layer mask is:                                             11111111
@@ -142,5 +142,16 @@ void PotentialValueStorage::tryUpdatePartOfStoredValue(const unsigned int layerD
     const auto currentlyStoredValueWithAccessBitrangeZeroed = (*storedValueForEntry & layerMask) | (*storedValueForEntry & layerMaskForBitsBeforeAccessedBitRange);
     const auto newValueShifted                              = newValue << partsToUpdate.first;
     storedValueForEntry.emplace(currentlyStoredValueWithAccessBitrangeZeroed | newValueShifted);
+}
+
+void PotentialValueStorage::invalidateLayer() {
+    for (auto& layerEntry : layerData) {
+        if (std::holds_alternative<PotentialValueStorage>(layerEntry)) {
+            std::get<PotentialValueStorage>(layerEntry).invalidateLayer();
+        } else if (std::holds_alternative<std::optional<unsigned int>>(layerEntry)) {
+            auto& layerEntryValue = std::get<std::optional<unsigned int>>(layerEntry);
+            layerEntryValue.reset();
+        }
+    }
 }
 

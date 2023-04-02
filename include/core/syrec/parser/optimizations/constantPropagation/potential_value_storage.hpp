@@ -30,6 +30,8 @@ namespace optimizations {
         void                                      tryInvalidateStoredValue(const std::optional<unsigned int>& layerDataEntryIdx);
         [[nodiscard]] std::optional<unsigned int> tryFetchStoredValue(unsigned int layerDataEntryIdx, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRangeToFetch) const;
 
+        void invalidateLayer();
+
     private:
         [[nodiscard]] static std::vector<std::variant<PotentialValueStorage, std::optional<unsigned int>>> createLayerData(std::size_t numEntries, unsigned int defaultValue);
         [[nodiscard]] static std::vector<std::variant<PotentialValueStorage, std::optional<unsigned int>>> createLayerData(std::size_t numEntries);
