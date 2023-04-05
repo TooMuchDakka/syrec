@@ -1,5 +1,7 @@
 #include "core/syrec/parser/optimizations/constantPropagation/dimension_propagation_blocker.hpp"
 
+#include <algorithm>
+
 using namespace optimizations;
 
 void DimensionPropagationBlocker::blockSubstitutionForDimension(const std::optional<unsigned>& valueOfDimensionToBlock) {
@@ -166,29 +168,83 @@ void DimensionPropagationBlocker::liftRestrictionForValueOfDimension(const unsig
     }
 }
 
-bool DimensionPropagationBlocker::isSubstitutionBlockedFor(const std::optional<unsigned>& valueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
+bool DimensionPropagationBlocker::isSubstitutionBlockedFor(const std::optional<unsigned>& valueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange, bool ignoreNotFullwidthBitRangeRestrictions, bool ignoreSmallerThanAccessedBitrange) const {
     if (isDimensionCompletelyBlocked) {
         return true;
     }
 
     if (!bitRange.has_value()) {
         if (valueOfDimension.has_value()) {
+            if (ignoreNotFullwidthBitRangeRestrictions) {
+                return (dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessCompletelyRestricted())
+                    || std::any_of(
+                        perValueOfDimensionBitRangeAccessRestrictionLookup.cbegin(),
+                        perValueOfDimensionBitRangeAccessRestrictionLookup.cend(),
+                        [](const auto& mapEntry) {
+                            const BitRangeAccessRestriction::ptr perValueOfDimensionRestriction = mapEntry.second;
+                            return perValueOfDimensionRestriction->isAccessCompletelyRestricted();
+                    });
+            }
             return dimensionBitRangeAccessRestriction.has_value() || !perValueOfDimensionBitRangeAccessRestrictionLookup.empty();
         }
-        return dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->hasAnyRestrictions();    
+
+        const bool isBlockedForWholeDimension = dimensionBitRangeAccessRestriction.has_value()
+            && (ignoreNotFullwidthBitRangeRestrictions 
+                ? (*dimensionBitRangeAccessRestriction)->isAccessCompletelyRestricted()
+                : (*dimensionBitRangeAccessRestriction)->hasAnyRestrictions());
+
+        const bool isBlockedInAnyValueOfDimension = isBlockedForWholeDimension
+            || std::any_of(
+              perValueOfDimensionBitRangeAccessRestrictionLookup.cbegin(),
+              perValueOfDimensionBitRangeAccessRestrictionLookup.cend(),
+              [ignoreNotFullwidthBitRangeRestrictions](const auto& mapEntry) {
+                  const BitRangeAccessRestriction::ptr perValueOfDimensionRestriction = mapEntry.second;
+                  return ignoreNotFullwidthBitRangeRestrictions ? perValueOfDimensionRestriction->isAccessCompletelyRestricted() : perValueOfDimensionRestriction->hasAnyRestrictions();
+              });
+        return isBlockedInAnyValueOfDimension;
+    }
+
+    const auto accessedBitRange                    = *bitRange;
+    bool isAccessRestrictedForWhileDimension;
+    if (ignoreNotFullwidthBitRangeRestrictions) {
+        isAccessRestrictedForWhileDimension = dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessCompletelyRestricted();
+    }
+    else if (ignoreSmallerThanAccessedBitrange) {
+        isAccessRestrictedForWhileDimension = dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessRestrictedToWholeRange(accessedBitRange);
+    } else {
+        isAccessRestrictedForWhileDimension = dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessRestrictedTo(accessedBitRange);
     }
 
     if (valueOfDimension.has_value()) {
-        return (dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessRestrictedTo(*bitRange))
-            || (perValueOfDimensionBitRangeAccessRestrictionLookup.count(*valueOfDimension) != 0 && perValueOfDimensionBitRangeAccessRestrictionLookup.at(*valueOfDimension)->isAccessRestrictedTo(*bitRange));
+        if (isAccessRestrictedForWhileDimension || perValueOfDimensionBitRangeAccessRestrictionLookup.count(*valueOfDimension) == 0) {
+            return isAccessRestrictedForWhileDimension;   
+        }
+        const auto& restrictionForValueOfDimension = perValueOfDimensionBitRangeAccessRestrictionLookup.at(*valueOfDimension);
+        if (ignoreNotFullwidthBitRangeRestrictions) {
+            return restrictionForValueOfDimension->isAccessCompletelyRestricted();
+        }
+        if (ignoreSmallerThanAccessedBitrange) {
+            return restrictionForValueOfDimension->isAccessRestrictedToWholeRange(accessedBitRange);
+        }
+        return restrictionForValueOfDimension->isAccessRestrictedTo(accessedBitRange);
     }
 
-    const bool hasDimensionWideRestrictionForBitRange = dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessRestrictedTo(*bitRange);
-    bool isBlockedInValueOfDimension            = hasDimensionWideRestrictionForBitRange;
-    for (unsigned int currValueOfDimension = 0; currValueOfDimension < numValuesForDimension && !isBlockedInValueOfDimension; ++currValueOfDimension) {
-        if (perValueOfDimensionBitRangeAccessRestrictionLookup.count(currValueOfDimension) != 0) {
-            isBlockedInValueOfDimension |= perValueOfDimensionBitRangeAccessRestrictionLookup.at(currValueOfDimension)->isAccessRestrictedTo(*bitRange);    
-        }
+    if (isAccessRestrictedForWhileDimension) {
+        return true;
     }
-    return isBlockedInValueOfDimension;
+
+    return std::any_of(
+    perValueOfDimensionBitRangeAccessRestrictionLookup.cbegin(),
+    perValueOfDimensionBitRangeAccessRestrictionLookup.cend(),
+    [ignoreNotFullwidthBitRangeRestrictions, ignoreSmallerThanAccessedBitrange, accessedBitRange](const auto& mapEntry) {
+        const BitRangeAccessRestriction::ptr perValueOfDimensionRestriction = mapEntry.second;
+                if (ignoreNotFullwidthBitRangeRestrictions) {
+                    return perValueOfDimensionRestriction->isAccessCompletelyRestricted();
+                }
+                if (ignoreSmallerThanAccessedBitrange) {
+                    return perValueOfDimensionRestriction->isAccessRestrictedToWholeRange(accessedBitRange);
+                }
+                return perValueOfDimensionRestriction->isAccessRestrictedTo(accessedBitRange);
+                
+    });
 }

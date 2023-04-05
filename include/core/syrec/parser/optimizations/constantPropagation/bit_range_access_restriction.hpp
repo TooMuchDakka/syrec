@@ -13,6 +13,7 @@ namespace optimizations {
 
         [[nodiscard]] bool isAccessCompletelyRestricted() const;
         [[nodiscard]] bool isAccessRestrictedTo(const BitRangeAccess& specificBitRange) const;
+        [[nodiscard]] bool isAccessRestrictedToWholeRange(const BitRangeAccess& specificBitRange) const;
         [[nodiscard]] bool hasAnyRestrictions() const;
 
         void liftRestrictionFor(const BitRangeAccess& specificBitRange);

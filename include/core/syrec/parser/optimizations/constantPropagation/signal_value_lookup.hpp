@@ -21,6 +21,9 @@ namespace optimizations {
         void invalidateStoredValueForBitrange(const std::vector<std::optional<unsigned int>>& accessedDimensions, const BitRangeAccessRestriction::BitRangeAccess& bitRange) const;
         void invalidateAllStoredValuesForSignal() const;
 
+        void liftRestrictionsFromWholeSignal() const;
+        void liftRestrictionsOfDimensions(const std::vector<unsigned int>& accessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange);
+
         /*void liftRestrictionsFromValueOfDimension(const std::vector<std::optional<unsigned int>>& accessedDimensions);
         void liftRestrictionFromBitRange(const std::vector<std::optional<unsigned int>>& accessedDimensions, const BitRangeAccessRestriction::BitRangeAccess& bitRange);
         void liftRestrictionsForWholeSignal();*/
@@ -66,21 +69,54 @@ namespace optimizations {
                 }
             }
 
+            // TODO: This would not work if the would try to restriction the bit range 1:5 for an existing bit range restriction from 2:3 since the predicate that checks if an restriction already exists would evaluate to true
+            template <typename Fn, typename Pn>
+            void applyOnLastAccessedDimensionIfPredicateDoesHold(const unsigned int currDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, Fn&& applyLambda, Pn&& predicate) {
+                if (currDimension + 1 == accessedDimensions.size()) {
+                    if (predicate(layerData, accessedDimensions.at(currDimension), std::nullopt)) {
+                        applyLambda(layerData, nextLayerLinks, accessedDimensions.at(currDimension), std::nullopt);    
+                    }
+                } else {
+                    const auto& accessedValueOfCurrentDimension = accessedDimensions.at(currDimension);
+                    if (!predicate(layerData, accessedValueOfCurrentDimension, std::nullopt)) {
+                        return;
+                    }
+
+                    if (accessedValueOfCurrentDimension.has_value()) {
+                        nextLayerLinks.at(*accessedValueOfCurrentDimension)->applyOnLastAccessedDimension(currDimension + 1, accessedDimensions, applyLambda);   
+                    } else {
+                        for (auto& nextLayerLink: nextLayerLinks) {
+                            nextLayerLink->applyOnLastAccessedDimension(currDimension + 1, accessedDimensions, applyLambda);
+                        }
+                    }
+                }
+            }
+
             template <typename Fn>
             void applyOnLastLayer(const unsigned int lastLayerIndex, Fn&& applyLambda) {
                 applyOnLayerIfLastOrCheckNextLayer(0, lastLayerIndex, applyLambda);
             }
 
-            template <typename Fn>
-            [[nodiscard]] bool doesPredicateHoldThenCheckRecursivelyOtherwiseStop(Fn&& applyLambda) {
-                bool doesPredicateHoldCurrently = applyLambda(layerData);
+            template <typename Pn>
+            [[nodiscard]] bool doesPredicateHoldInDimensionThenCheckRecursivelyOtherwiseStop(const unsigned int currDimension, const std::vector<std::optional<unsigned int>> accessedDimensions, Pn&& predicate) {
+                if (currDimension >= accessedDimensions.size()) {
+                    return true;    
+                }
+
+                bool doesPredicateHoldCurrently = predicate(currDimension, accessedDimensions.at(currDimension), layerData);
                 if (!doesPredicateHoldCurrently) {
                     return false;
                 }
 
-                for (std::size_t i = 0; i < nextLayerLinks.size() && doesPredicateHoldCurrently; ++i) {
-                    doesPredicateHoldCurrently &= nextLayerLinks.at(i)->doesPredicateHoldThenCheckRecursivelyOtherwiseStop(applyLambda);
+                const auto& accessedValueOfCurrentDimension = accessedDimensions.at(currDimension);
+                if (accessedValueOfCurrentDimension.has_value()) {
+                    doesPredicateHoldCurrently &= nextLayerLinks.at(*accessedValueOfCurrentDimension)->doesPredicateHoldInDimensionThenCheckRecursivelyOtherwiseStop(currDimension + 1, accessedDimensions, predicate);
+                } else {
+                    for (auto& nextLayerLink: nextLayerLinks) {
+                        doesPredicateHoldCurrently &= nextLayerLink->doesPredicateHoldInDimensionThenCheckRecursivelyOtherwiseStop(currDimension + 1, accessedDimensions, predicate);
+                    }
                 }
+
                 return doesPredicateHoldCurrently;
             }
 
@@ -172,12 +208,10 @@ namespace optimizations {
             return std::make_optional(std::make_unique<LayerData<std::map<unsigned int, std::optional<unsigned int>>>>(perValueOfDimensionValueLookup, nextLayerLinks));
         }
 
-        [[nodiscard]] bool isValueStorableInBitrange(const BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace, unsigned int value);
-
-    private:
         [[nodiscard]] std::optional<std::vector<unsigned int>> transformAccessOnDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions) const;
         [[nodiscard]] bool                                     isValueLookupBlockedFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) const;
 
+        [[nodiscard]] static bool         isValueStorableInBitrange(const BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace, unsigned int value);
         [[nodiscard]] static unsigned int extractPartsOfValue(unsigned int value, const BitRangeAccessRestriction::BitRangeAccess& partToFetch);
         [[nodiscard]] static unsigned int transformExistingValueByMergingWithNewOne(unsigned int currentValue, unsigned int newValue, const BitRangeAccessRestriction::BitRangeAccess& partsToUpdate);
     };

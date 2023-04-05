@@ -29,39 +29,58 @@ void SignalValueLookup::invalidateStoredValueFor(const std::vector<std::optional
         return;
     }
 
+    // Skip extra work if accessed parts of signal are already blocked
+    if (dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyOtherwiseStop(
+                0,
+                accessedDimensions,
+                [](const unsigned int _, const std::optional<unsigned int>& accessedValueOfDimension, const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
+                    return !dimensionPropagationBlocker->isSubstitutionBlockedFor(accessedValueOfDimension, std::nullopt, true, true);
+                })) {
+        return;
+    }
+
     dimensionAccessRestrictions->applyOnLastAccessedDimension(
-            0,
-            accessedDimensions,
-            [](const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker, const std::vector<LayerData<DimensionPropagationBlocker::ptr>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
-                dimensionPropagationBlocker->blockSubstitutionForDimension(valueOfLastAccessedDimension);
-                for (const auto& nextLayerLink: nextLayerLinks) {
-                    nextLayerLink->applyRecursively([](const DimensionPropagationBlocker::ptr& nextLayerDimensionPropagationBlocker) {
-                        nextLayerDimensionPropagationBlocker->liftRestrictionForWholeDimension();
-                    });
-                }
-            });
+        0,
+        accessedDimensions,
+        [](const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker, const std::vector<LayerData<DimensionPropagationBlocker::ptr>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
+            dimensionPropagationBlocker->blockSubstitutionForDimension(valueOfLastAccessedDimension);
+            for (const auto& nextLayerLink: nextLayerLinks) {
+                nextLayerLink->applyRecursively([](const DimensionPropagationBlocker::ptr& nextLayerDimensionPropagationBlocker) {
+                    nextLayerDimensionPropagationBlocker->liftRestrictionForWholeDimension();
+                });
+            }
+        });
 
     valueLookup->applyOnLastAccessedDimension(
-            0,
-            accessedDimensions,
-            [](std::map<unsigned int, std::optional<unsigned int>> layerValueLookup, const std::vector<LayerData<std::map<unsigned int, std::optional<unsigned int>>>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
-                if (valueOfLastAccessedDimension.has_value()) {
-                    if (layerValueLookup.count(*valueOfLastAccessedDimension) > 0) {
-                        layerValueLookup.erase(*valueOfLastAccessedDimension);
-                    }
+        0,
+        accessedDimensions,
+        [](std::map<unsigned int, std::optional<unsigned int>>& layerValueLookup, const std::vector<LayerData<std::map<unsigned int, std::optional<unsigned int>>>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
+            if (valueOfLastAccessedDimension.has_value()) {
+                if (layerValueLookup.count(*valueOfLastAccessedDimension) > 0) {
+                    layerValueLookup.erase(*valueOfLastAccessedDimension);
                 }
-                else {
-                    layerValueLookup.clear();
-                }
-            });
+            } else {
+                layerValueLookup.clear();
+            }
+        });
 }
 
 void SignalValueLookup::invalidateStoredValueForBitrange(const std::vector<std::optional<unsigned>>& accessedDimensions, const BitRangeAccessRestriction::BitRangeAccess& bitRange) const {
     if (accessedDimensions.empty()) {
-        if (bitRange.second - bitRange.first == signalInformation.bitWidth) {
+        if ((bitRange.second - bitRange.first) + 1 == signalInformation.bitWidth) {
             invalidateAllStoredValuesForSignal();
             return;
         }
+    }
+
+     // Skip extra work if accessed parts of signal are already blocked
+    if (dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyOtherwiseStop(
+                0,
+                accessedDimensions,
+                [bitRange](const unsigned int _, const std::optional<unsigned int>& accessedValueOfDimension, const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
+                    return !dimensionPropagationBlocker->isSubstitutionBlockedFor(accessedValueOfDimension, bitRange, false, true);
+                })) {
+        return;
     }
 
      dimensionAccessRestrictions->applyOnLastAccessedDimension(
@@ -79,6 +98,28 @@ void SignalValueLookup::invalidateStoredValueForBitrange(const std::vector<std::
                 }
             });
 }
+
+void SignalValueLookup::liftRestrictionsOfDimensions(const std::vector<unsigned int>& accessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) {
+    const auto isWholeDimensionBlocked = dimensionAccessRestrictions->layerData->isSubstitutionBlockedFor(std::nullopt, std::nullopt);
+
+    // We have to distinguish the following cases
+    // I.   In case the whole dimension was blocked, we need to block the other values for the dimension other than the accessed one
+    // II.  In case there existing a dimension wide bit range restriction, we need to lift the restriction for the given bitrange from the dimension ana recreated it for the other values of the dimension as in I.
+    // III. Otherwise simple lift the restrictions
+	
+	/* When we lift the restriction for a bit range we might need to lift a restriction in a parent dimension (i.e. bit range a[$i].1:3 is locked in parent while a[0][2].4:5 is locked in child)
+	 * if we would lift the restriction for a[0][2].1:5 we need to lift the one in the parent (where the dimension propagation should already handle the recreation for the remaining valus of the first dimension)
+	 * and subsequently in the child. They same must be done when lifting a[$i][2].1:5 (but again for the parent dimension, the dimension propagation blocker should already do the majority of the lifting)
+	*
+	*/
+}
+
+inline void SignalValueLookup::liftRestrictionsFromWholeSignal() const {
+    dimensionAccessRestrictions->applyRecursively([](const DimensionPropagationBlocker::ptr& dimensionPropgationBlocker) {
+        dimensionPropgationBlocker->liftRestrictionForWholeDimension();
+    });
+}
+
 
 std::optional<unsigned> SignalValueLookup::tryFetchValueFor(const std::vector<std::optional<unsigned>>& accessedDimensions, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
     const auto& transformedAccessedDimensions = transformAccessOnDimensions(accessedDimensions);
@@ -98,7 +139,7 @@ std::optional<unsigned> SignalValueLookup::tryFetchValueFor(const std::vector<st
         valueLookupLayer          = valueLookupLayer->nextLayerLinks.at(accessedValueOfDimension);
     }
 
-    unsigned int accessedValueOfDimension = accessedDimensions.size() == 1 ? (*transformedAccessedDimensions).front() : (*transformedAccessedDimensions).at(accessedDimensions.size() - 2);
+    const unsigned int accessedValueOfDimension = accessedDimensions.size() == 1 ? (*transformedAccessedDimensions).front() : (*transformedAccessedDimensions).at(accessedDimensions.size() - 2);
     canFetchValue &= lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), bitRange);
     if (!canFetchValue) {
         return std::nullopt;
@@ -111,8 +152,10 @@ std::optional<unsigned> SignalValueLookup::tryFetchValueFor(const std::vector<st
     return storedValue;
 }
 
+// TODO: Should we check that the new value is actually storable in the given bit range (and what should happen to the stored value if this is not the case, should we truncate the new value, clear the existing one, etc.)
 void SignalValueLookup::updateStoredValueFor(const std::vector<std::optional<unsigned>>& accessedDimensions, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange, const unsigned int newValue) const {
     const auto& transformedAccessedDimensions = !isValueLookupBlockedFor(accessedDimensions, bitRange) ? transformAccessOnDimensions(accessedDimensions) : std::vector<unsigned int>(0);
+    // TODO: What should happen in case that one tries to update more than one value of a dimension ?
     if (!transformedAccessedDimensions.has_value()) {
         return;
     }
@@ -138,7 +181,14 @@ void SignalValueLookup::updateStoredValueFor(const std::vector<std::optional<uns
     }
 }
 
-std::optional<std::vector<unsigned>> SignalValueLookup::transformAccessOnDimensions(const std::vector<std::optional<unsigned>>& accessedDimensions) const {
+bool SignalValueLookup::isValueStorableInBitrange(const BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace, const unsigned int value) {
+    const auto resultContainerSize = (availableStorageSpace.second - availableStorageSpace.first) + 1;
+    const auto maxStorableValue    = UINT_MAX >> (32 - resultContainerSize);
+    return value <= maxStorableValue;
+}
+
+
+std::optional<std::vector<unsigned int>> SignalValueLookup::transformAccessOnDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions) const {
     if (accessedDimensions.size() < signalInformation.valuesPerDimension.size()) {
         return std::nullopt;
     }
@@ -165,7 +215,7 @@ std::optional<std::vector<unsigned>> SignalValueLookup::transformAccessOnDimensi
     std::transform(
             accessedDimensions.cbegin(),
             accessedDimensions.cend(),
-            transformedAccessOnDimensions,
+            transformedAccessOnDimensions.begin(),
             [](const std::optional<unsigned int> accessedValueOfDimension) {
                 return accessedValueOfDimension.has_value() ? *accessedValueOfDimension : 0;
             });
@@ -173,7 +223,7 @@ std::optional<std::vector<unsigned>> SignalValueLookup::transformAccessOnDimensi
 }
 
 inline bool SignalValueLookup::isValueLookupBlockedFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
-    return dimensionAccessRestrictions->doesPredicateHoldThenCheckRecursivelyOtherwiseStop([bitRange](const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker, const std::optional<unsigned int>& accessedValueOfDimension) {
+    return dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyOtherwiseStop(0, accessedDimensions, [bitRange](const unsigned int _, const std::optional<unsigned int> accessedValueOfDimension, const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
         return dimensionPropagationBlocker->isSubstitutionBlockedFor(accessedValueOfDimension, bitRange);
     });
 }
@@ -235,181 +285,3 @@ unsigned int SignalValueLookup::transformExistingValueByMergingWithNewOne(const 
     const auto newValueShifted                              = newValue << partsToUpdate.first;
     return currentValueWithAccessBitrangeZeroed | newValueShifted;
 }
-
-
-
-//
-//void SignalValueLookup::invalidateAllStoredValuesForSignal() {
-//    if (dimensionAccessRestrictions.empty()) {
-//        return;
-//    }
-//
-//    dimensionAccessRestrictions.at(0).at(0)->blockSubstitutionForDimension(std::nullopt);
-//    for (std::size_t dimension = 1; dimension < dimensionAccessRestrictions.size(); ++dimension) {
-//        for (const auto& restriction : dimensionAccessRestrictions.at(dimension)) {
-//            restriction->liftRestrictionForWholeDimension();
-//        }
-//    }
-//
-//    if (valueLookup.has_value()) {
-//        (*valueLookup).invalidateLayer();
-//    }
-//}
-//
-//void SignalValueLookup::invalidateStoredValueFor(const std::vector<std::optional<unsigned>>& accessedDimensions) const {
-//    if (dimensionAccessRestrictions.empty()) {
-//        return;
-//    }
-//
-//    /*
-//     * In case that we want to invalidate stored values based one some incomplete signal access (i.e. accessing a[2][1] of the signal a[2][4][3][5])
-//     * we have to distinguish between two cases,
-//     */
-//    if (accessedDimensions.size() < dimensionAccessRestrictions.size()) {
-//        const auto firstWholeDimensionAccess = std::find(
-//                accessedDimensions.cbegin(),
-//                accessedDimensions.cend(),
-//                [](const std::optional<unsigned int>& accessedDimension) {
-//                    return accessedDimension.has_value();
-//                });
-//
-//        /*
-//         * If the defined signal access accesses a whole dimension, we will invalidate all entries for this dimension and all subsequent ones
-//         */
-//        if (firstWholeDimensionAccess != accessedDimensions.end()) {
-//            if (firstWholeDimensionAccess == accessedDimensions.begin()) {
-//                dimensionAccessRestrictions
-//                    .front()
-//                    .front()->blockSubstitutionForDimension(std::nullopt);
-//                return;
-//            }
-//
-//            const auto firstWholeDimensionAccessIndex = std::distance(accessedDimensions.begin(), firstWholeDimensionAccess);
-//            for (std::size_t dimension = 1; dimension <= firstWholeDimensionAccessIndex; ++dimension) {
-//                const auto& prevAccessedDimensionValue = *accessedDimensions.at(dimension - 1);
-//                dimensionAccessRestrictions
-//                    .at(dimension)
-//                    .at(prevAccessedDimensionValue)->blockSubstitutionForDimension(accessedDimensions.at(dimension));
-//            }
-//
-//            for (std::size_t remainingDimension = firstWholeDimensionAccessIndex + 1; remainingDimension < dimensionAccessRestrictions.size(); ++remainingDimension) {
-//                for (const auto& dimensionRestriction: dimensionAccessRestrictions.at(remainingDimension)) {
-//                    dimensionRestriction->liftRestrictionForWholeDimension();
-//                }
-//            }
-//        } else {
-//            /*
-//             * In case that no whole dimension access is defined, we can restrict access specified values of the defined dimensions
-//             * and remove all restrictions from the subsequent dimensions
-//             */
-//
-//            const auto lastAccessedDimensionIdx = accessedDimensions.size() - 1;
-//            for (std::size_t dimension = 0; dimension < dimensionAccessRestrictions.size(); ++dimension) {
-//                if (dimension < lastAccessedDimensionIdx) {
-//                    const auto effectedDimensionRestrictionIdx = *accessedDimensions.at(dimension - 1);
-//                    dimensionAccessRestrictions
-//                            .at(dimension)
-//                            .at(effectedDimensionRestrictionIdx)
-//                            ->blockSubstitutionForDimension(accessedDimensions.at(dimension));   
-//                }
-//                else {
-//                    for (const auto& dimensionRestriction: dimensionAccessRestrictions.at(dimension)) {
-//                        dimensionRestriction->liftRestrictionForWholeDimension();
-//                    }
-//                }
-//            }
-//        }
-//    }
-//    else {
-//        /*
-//         *
-//         */
-//        const auto  indexOfLastAccessedDimension           = accessedDimensions.size() - 1;
-//        const auto& valueOfLastAccessedDimension  = accessedDimensions.at(indexOfLastAccessedDimension);
-//        auto&       effectedDimensionRestrictions          = dimensionAccessRestrictions.at(indexOfLastAccessedDimension);
-//        const std::optional<unsigned int> selectorForEffectedDimensionRestrictionsOfLastAccessedDimension = indexOfLastAccessedDimension > 1 ? accessedDimensions.at(indexOfLastAccessedDimension - 1) : std::nullopt;
-//
-//        if (selectorForEffectedDimensionRestrictionsOfLastAccessedDimension.has_value()) {
-//            effectedDimensionRestrictions.at(*selectorForEffectedDimensionRestrictionsOfLastAccessedDimension)->blockSubstitutionForDimension(valueOfLastAccessedDimension);    
-//        }
-//        else {
-//            for (auto& effectedDimensionRestriction: effectedDimensionRestrictions) {
-//                effectedDimensionRestriction->blockSubstitutionForDimension(valueOfLastAccessedDimension);
-//            }    
-//        }
-//
-//        const auto& firstAccessedDimension = accessedDimensions.front();
-//        dimensionAccessRestrictions
-//                .front()
-//                .front()
-//                ->blockSubstitutionForDimension(firstAccessedDimension);
-//
-//        /*
-//         * For every dimension after the first one we can identify which dimension restriction shall be updated by the value of the previously accessed dimension
-//         * If the previous one access the whole dimension, we need to update the all restrictions for the current dimension, otherwise just the accessed one
-//         *
-//         * Example:
-//         * Assume the declared signal: a[2][4][3][2], the dimension restrictions have the following structure: (DIM #, # DIM_RESTRICTIONS_n - # LOOKUP_VALUES): 0: 1 - 2, 1: 2 - 4, 2: 4 - 3, 3: 3 - 2
-//         * We are now invalidating the stored values for the signal access: a[$i][3][$j][2].
-//         *
-//         * I.   We invalidate all entries of dimension 0
-//         * II.  Since the first dimension access the whole dimension, we need to update all restrictions of the second dimension (and here the 3rd value of the dimension).
-//         * III. We will update the 3rd dimension restriction by invalidating all values for all values of the dimension
-//         * IV.  Since the 3rd accessed dimension was accessed as a whole, we need to update all dimension restrictions of the last dimension by invalidating the values for the 2nd value of the dimension
-//         */
-//        for (std::size_t dimension = 1; dimension < dimensionAccessRestrictions.size(); ++dimension) {
-//            const auto  valueForPrevDimension         = accessedDimensions.at(dimension - 1);
-//            const auto& accessedValueForDimension     = accessedDimensions.at(dimension);
-//            auto& effectedDimensionRestrictions = dimensionAccessRestrictions.at(dimension);
-//
-//            if (valueForPrevDimension.has_value()) {
-//                effectedDimensionRestrictions.at(*valueForPrevDimension)->blockSubstitutionForDimension(accessedValueForDimension);
-//            }
-//            else {
-//                for (const auto& effectedDimensionRestriction: effectedDimensionRestrictions) {
-//                    effectedDimensionRestriction->blockSubstitutionForDimension(accessedValueForDimension);
-//                }                
-//            }
-//        }
-//    }
-//}
-//
-//void SignalValueLookup::invalidateStoredValueForBitrange(const std::vector<std::optional<unsigned>>& accessedDimensions, const BitRangeAccessRestriction::BitRangeAccess& bitRange) const {
-//    /*if (dimensionAccessRestrictions.empty()) {
-//        return;
-//    }
-//
-//    const auto& bitRangeLength = bitRange.second - bitRange.first;
-//    if (bitRangeLength == signalInformation.bitWidth) {
-//        invalidateStoredValueFor(accessedDimensions);
-//        return;
-//    }
-//
-//    if (accessedDimensions.size() < dimensionAccessRestrictions.size()) {
-//        for (std::size_t dimension = 0; dimension < accessedDimensions.size(); ++dimension) {
-//            const auto accessedValueOfDimension = accessedDimensions.at(dimension);
-//            const auto accessedValueOfPrevDimension = dimension > 1 ? accessedDimensions.at(dimension) : std::nullopt;
-//
-//
-//        }
-//
-//
-//        const auto& firstAccessedWholeDimension = std::find(
-//                accessedDimensions.cbegin(),
-//                accessedDimensions.cend(),
-//                [](const std::optional<unsigned int>& accessedValueOfDimension) { return accessedValueOfDimension.has_value(); }
-//        );
-//
-//        if (firstAccessedWholeDimension == accessedDimensions.begin()) {
-//            for (auto& valueOfDimensionRestriction: dimensionAccessRestrictions.front()) {
-//                valueOfDimensionRestriction->blockSubstitutionForBitRange(std::nullopt, bitRange);
-//            }
-//        }
-//
-//        const auto& firstAccessedWholeDimensionIdx = std::distance(accessedDimensions.cbegin(), firstAccessedWholeDimension);
-//        for ()
-//    }
-//    else {
-//        
-//    }*/
-//}
