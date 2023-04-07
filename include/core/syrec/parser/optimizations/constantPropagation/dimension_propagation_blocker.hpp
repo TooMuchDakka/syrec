@@ -18,7 +18,6 @@ namespace optimizations {
             isDimensionCompletelyBlocked(false), signalInformation(signalInformation), dimensionBitRangeAccessRestriction(std::nullopt), perValueOfDimensionBitRangeAccessRestrictionLookup({}), numValuesForDimension(signalInformation.valuesPerDimension.at(dimension)) {}
 
         [[nodiscard]] bool isSubstitutionBlockedFor(const std::optional<unsigned int>& valueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange, bool ignoreNotFullwidthBitRangeRestrictions = false, bool ignoreSmallerThanAccessedBitranges = false) const;
-        
 
         void blockSubstitutionForBitRange(const std::optional<unsigned int>& valueOfDimensionToBlock, const BitRangeAccessRestriction::BitRangeAccess& bitRangeToBlock);
         void blockSubstitutionForDimension(const std::optional<unsigned int>& valueOfDimensionToBlock);
@@ -26,6 +25,8 @@ namespace optimizations {
         void liftRestrictionForWholeDimension();
         void liftRestrictionForBitRange(const std::optional<unsigned int>& blockedValueOfDimension, const BitRangeAccessRestriction::BitRangeAccess& blockedBitRange);
         void liftRestrictionForValueOfDimension(unsigned int blockedValueOfDimension);
+
+        [[nodiscard]] bool tryTrimAlreadyBlockedPartsFromRestriction(const std::optional<unsigned int>& accessedValueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange, BitRangeAccessRestriction& bitRangeAccess) const;
 
     private:
         bool                                                   isDimensionCompletelyBlocked;

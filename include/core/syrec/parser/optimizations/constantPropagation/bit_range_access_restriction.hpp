@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace optimizations {
     class BitRangeAccessRestriction {
@@ -15,6 +16,7 @@ namespace optimizations {
         [[nodiscard]] bool isAccessRestrictedTo(const BitRangeAccess& specificBitRange) const;
         [[nodiscard]] bool isAccessRestrictedToWholeRange(const BitRangeAccess& specificBitRange) const;
         [[nodiscard]] bool hasAnyRestrictions() const;
+        [[nodiscard]] std::vector<BitRangeAccess> getRestrictions() const;
 
         void liftRestrictionFor(const BitRangeAccess& specificBitRange);
         void liftAllRestrictions();

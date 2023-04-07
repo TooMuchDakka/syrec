@@ -6,6 +6,7 @@
 #include "core/syrec/parser/optimizations/constantPropagation/dimension_propagation_blocker.hpp"
 #include "core/syrec/parser/optimizations/constantPropagation/shared_dimension_blocking_information.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -22,7 +23,7 @@ namespace optimizations {
         void invalidateAllStoredValuesForSignal() const;
 
         void liftRestrictionsFromWholeSignal() const;
-        void liftRestrictionsOfDimensions(const std::vector<unsigned int>& accessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange);
+        void liftRestrictionsOfDimensions(const std::vector<std::optional<unsigned int>>& accessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange);
 
         /*void liftRestrictionsFromValueOfDimension(const std::vector<std::optional<unsigned int>>& accessedDimensions);
         void liftRestrictionFromBitRange(const std::vector<std::optional<unsigned int>>& accessedDimensions, const BitRangeAccessRestriction::BitRangeAccess& bitRange);
@@ -69,6 +70,11 @@ namespace optimizations {
                 }
             }
 
+            template <typename Fn>
+            void applyRecursivelyStartingFrom(const unsigned int startDimension, const std::optional<unsigned int> valueOfDimension, const std::vector<std::optional<unsigned int>>& accessedDimension, Fn&& applyLambda) {
+                applyRecursivelyOnLayerStartingFrom(startDimension, valueOfDimension, 0, accessedDimension, applyLambda);
+            }
+
             // TODO: This would not work if the would try to restriction the bit range 1:5 for an existing bit range restriction from 2:3 since the predicate that checks if an restriction already exists would evaluate to true
             template <typename Fn, typename Pn>
             void applyOnLastAccessedDimensionIfPredicateDoesHold(const unsigned int currDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, Fn&& applyLambda, Pn&& predicate) {
@@ -98,26 +104,30 @@ namespace optimizations {
             }
 
             template <typename Pn>
-            [[nodiscard]] bool doesPredicateHoldInDimensionThenCheckRecursivelyOtherwiseStop(const unsigned int currDimension, const std::vector<std::optional<unsigned int>> accessedDimensions, Pn&& predicate) {
+            [[nodiscard]] bool doesPredicateHoldInAllDimensionsThenCheckRecursivelyElseStop(const std::vector<std::optional<unsigned int>>& accessedDimensions, Pn&& predicate) {
+                return doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(0, accessedDimensions, predicate);
+            }
+
+            template<typename Pn>
+            [[nodiscard]] bool doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(const unsigned int currDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, Pn&& predicate) {
                 if (currDimension >= accessedDimensions.size()) {
-                    return true;    
+                    return true;
                 }
 
-                bool doesPredicateHoldCurrently = predicate(currDimension, accessedDimensions.at(currDimension), layerData);
-                if (!doesPredicateHoldCurrently) {
+                const auto accessedValueOfDimension = accessedDimensions.at(currDimension);
+                if (!predicate(currDimension, accessedValueOfDimension, layerData)) {
                     return false;
                 }
 
-                const auto& accessedValueOfCurrentDimension = accessedDimensions.at(currDimension);
-                if (accessedValueOfCurrentDimension.has_value()) {
-                    doesPredicateHoldCurrently &= nextLayerLinks.at(*accessedValueOfCurrentDimension)->doesPredicateHoldInDimensionThenCheckRecursivelyOtherwiseStop(currDimension + 1, accessedDimensions, predicate);
-                } else {
-                    for (auto& nextLayerLink: nextLayerLinks) {
-                        doesPredicateHoldCurrently &= nextLayerLink->doesPredicateHoldInDimensionThenCheckRecursivelyOtherwiseStop(currDimension + 1, accessedDimensions, predicate);
-                    }
+                if (accessedValueOfDimension.has_value()) {
+                    return nextLayerLinks.at(*accessedValueOfDimension)->doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(currDimension + 1, accessedDimensions, predicate);
                 }
-
-                return doesPredicateHoldCurrently;
+                return std::all_of(
+                        nextLayerLinks.cbegin(),
+                        nextLayerLinks.cend(),
+                        [currDimension, accessedDimensions, predicate](const LayerData::ptr& nextLayerLink) {
+                            return nextLayerLink->doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(currDimension + 1, accessedDimensions, predicate);
+                        });
             }
 
         private:
@@ -128,6 +138,33 @@ namespace optimizations {
                 } else {
                     for (auto& nextLayerLink: nextLayerLinks) {
                         nextLayerLink->applyOnLayerIfLastOrCheckNextLayer(currDimension + 1, lastDimension, applyLambda);
+                    }
+                }
+            }
+
+            template <typename Fn>
+            void applyRecursivelyOnLayerStartingFrom(const unsigned int startDimension, const std::optional<unsigned int>& valueOfStartDimension, const unsigned int currDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, Fn&& applyLambda) {
+                if (startDimension > accessedDimensions.size()) {
+                    return;
+                }
+
+                if (currDimension != startDimension) {
+                    const auto& accessedValueOfCurrentDimension = accessedDimensions.at(currDimension);
+                    if (accessedValueOfCurrentDimension.has_value()) {
+                        if (currDimension < startDimension) {
+                            nextLayerLinks.at(*accessedValueOfCurrentDimension)->applyRecursivelyOnLayerStartingFrom(startDimension, valueOfStartDimension, currDimension + 1, accessedDimensions, applyLambda);
+                        }
+                        else {
+                            applyLambda(layerData, accessedDimensions.at(currDimension));
+                        }
+                    } else {
+                        for (auto& nextLayerLink: nextLayerLinks) {
+                            if (currDimension < startDimension) {
+                                nextLayerLink->applyRecursivelyOnLayerStartingFrom(startDimension, valueOfStartDimension, currDimension + 1, accessedDimensions, applyLambda);
+                            } else {
+                                applyLambda(layerData, accessedDimensions.at(currDimension));
+                            }
+                        }
                     }
                 }
             }
