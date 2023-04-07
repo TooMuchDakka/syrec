@@ -24,6 +24,22 @@ namespace optimizations {
 
         explicit BitRangeAccessRestriction() = default;
         explicit BitRangeAccessRestriction(const BitRangeAccess& initialBitRangeRestriction) {}
+
+    private:
+        struct RestrictionRegion {
+            unsigned int start;
+            unsigned int end;
+
+            explicit RestrictionRegion(const unsigned int start, const unsigned int end) :
+                start(start), end(end) {}
+
+            [[nodiscard]] bool doesIntersectWith(const BitRangeAccess& bitRangeAccess) const;
+            [[nodiscard]] bool isEmptyAfterTrim(const BitRangeAccess& bitRangeAccess);
+            [[nodiscard]] std::size_t getNumberOfOverlappingBitsWith(const BitRangeAccess& bitRangeAccess) const;
+            void                      resize(const unsigned int newStartIndex, const unsigned int newEndIndex);
+        };
+
+        std::vector<RestrictionRegion> restrictionRegions;
     };
 }; // namespace optimizations
 
