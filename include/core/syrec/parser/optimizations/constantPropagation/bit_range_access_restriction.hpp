@@ -7,6 +7,7 @@
 #include <vector>
 
 namespace optimizations {
+    // TODO: Since we are note throwing any exceptions, should we simply trim the given bit range from a parameter to a valid range ?
     class BitRangeAccessRestriction {
     public:
         typedef std::pair<unsigned int, unsigned int> BitRangeAccess;
@@ -22,8 +23,14 @@ namespace optimizations {
         void liftAllRestrictions();
         void restrictAccessTo(const BitRangeAccess& specificBitRange);
 
-        explicit BitRangeAccessRestriction() = default;
-        explicit BitRangeAccessRestriction(const BitRangeAccess& initialBitRangeRestriction) {}
+        explicit BitRangeAccessRestriction(const unsigned int validBitRange) :
+         BitRangeAccessRestriction(validBitRange, BitRangeAccess(0, validBitRange == 0 ? 0 : validBitRange - 1)) {}
+
+        explicit BitRangeAccessRestriction(const unsigned int validBitRange, const BitRangeAccess& initialBitRangeRestriction)
+            : validBitRange(validBitRange), restrictionRegions({})
+        {
+            restrictAccessTo(initialBitRangeRestriction);
+        }
 
     private:
         struct RestrictionRegion {
@@ -34,11 +41,11 @@ namespace optimizations {
                 start(start), end(end) {}
 
             [[nodiscard]] bool doesIntersectWith(const BitRangeAccess& bitRangeAccess) const;
-            [[nodiscard]] bool isEmptyAfterTrim(const BitRangeAccess& bitRangeAccess);
             [[nodiscard]] std::size_t getNumberOfOverlappingBitsWith(const BitRangeAccess& bitRangeAccess) const;
             void                      resize(const unsigned int newStartIndex, const unsigned int newEndIndex);
         };
 
+        const unsigned int             validBitRange;
         std::vector<RestrictionRegion> restrictionRegions;
     };
 }; // namespace optimizations

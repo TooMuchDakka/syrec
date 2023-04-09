@@ -70,7 +70,7 @@ void SignalValueLookup::invalidateStoredValueForBitrange(const std::vector<std::
         }
     }
 
-    auto transformedBitRangeAccess = BitRangeAccessRestriction(bitRange);
+    auto transformedBitRangeAccess = BitRangeAccessRestriction(signalInformation.bitWidth, bitRange);
     dimensionAccessRestrictions->applyOnLastAccessedDimensionIfPredicateDoesHold(
             0,
             accessedDimensions,
