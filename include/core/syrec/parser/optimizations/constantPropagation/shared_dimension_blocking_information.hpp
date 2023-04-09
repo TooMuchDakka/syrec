@@ -17,9 +17,9 @@ namespace optimizations {
     };
 
     struct SharedBlockerInformation {
-        bool                                                 isDimensionCompletelyBlocked;
-        const SignalDimensionInformation& signalInformation;
-        std::optional<BitRangeAccessRestriction::ptr>&       sharedDimensionBitRangeAccessRestriction;
+        bool                                           isDimensionCompletelyBlocked;
+        const SignalDimensionInformation&              signalInformation;
+        std::optional<BitRangeAccessRestriction::ptr>& sharedDimensionBitRangeAccessRestriction;
 
         explicit SharedBlockerInformation(const SignalDimensionInformation& sharedSignalInformation, std::optional<BitRangeAccessRestriction::ptr>& sharedDimensionBitRangeAccessRestriction):
             isDimensionCompletelyBlocked(false), signalInformation(sharedSignalInformation), sharedDimensionBitRangeAccessRestriction(sharedDimensionBitRangeAccessRestriction) {}

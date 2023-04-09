@@ -1,26 +1,79 @@
-#include "core/syrec/parser/optimizations/constantPropagation/signal_value_lookup.hpp"
+#include "core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.hpp"
 
-#include <algorithm>
+using namespace valueLookup;
 
-using namespace optimizations;
+template<typename Vt>
+BaseValueLookup<Vt>::~BaseValueLookup() {
+    return;   
+}
 
-void SignalValueLookup::invalidateAllStoredValuesForSignal() const {
+template<typename Vt>
+std::optional<LayerData<optimizations::DimensionPropagationBlocker::ptr>::ptr> BaseValueLookup<Vt>::initializeDimensionAccessRestrictionLayer(const unsigned dimension) {
+    if (dimension >= signalInformation.valuesPerDimension.size()) {
+        return std::nullopt;
+    }
+    
+    std::vector<LayerData<optimizations::DimensionPropagationBlocker::ptr>::ptr> nextLayerLinks;
+    if (dimension < signalInformation.valuesPerDimension.size() - 1) {
+        const unsigned int numValuesOfDimension = signalInformation.valuesPerDimension.at(dimension);
+        nextLayerLinks.resize(numValuesOfDimension);
+
+        for (auto valueOfDimension = 0; valueOfDimension < numValuesOfDimension; ++valueOfDimension) {
+            nextLayerLinks[valueOfDimension] = *initializeDimensionAccessRestrictionLayer(dimension + 1);
+        }
+    }
+
+    return std::make_optional(std::make_unique<LayerData<optimizations::DimensionPropagationBlocker::ptr>>(
+        std::make_shared<optimizations::DimensionPropagationBlocker>(dimension, signalInformation), nextLayerLinks    
+    ));
+}
+
+template<typename Vt>
+std::optional<std::shared_ptr<LayerData<std::map<unsigned, std::optional<Vt>>>>> BaseValueLookup<Vt>::initializeValueLookupLayer(const unsigned dimension, const std::optional<Vt>& defaultValue) {
+    if (dimension >= signalInformation.valuesPerDimension.size()) {
+        return std::nullopt;
+    }
+
+    std::vector<std::shared_ptr<LayerData<std::map<unsigned, std::optional<Vt>>>>> nextLayerLinks;
+    std::map<unsigned, std::optional<Vt>>                         lookupLayerData;
+
+    const unsigned int numValuesOfDimension = signalInformation.valuesPerDimension.at(dimension);
+    if (dimension < signalInformation.valuesPerDimension.size() - 1) {
+        nextLayerLinks.resize(numValuesOfDimension);
+
+        for (auto valueOfDimension = 0; valueOfDimension < numValuesOfDimension; ++valueOfDimension) {
+            nextLayerLinks[valueOfDimension] = *initializeValueLookupLayer(dimension + 1, defaultValue);
+        }
+    } else {
+        for (auto valueOfDimension = 0; valueOfDimension < numValuesOfDimension; ++valueOfDimension) {
+            lookupLayerData.insert(std::pair(valueOfDimension, defaultValue));
+        }
+    }
+
+    return std::make_optional(std::make_unique<LayerData<std::map<unsigned, std::optional<Vt>>>>(
+        LayerData<std::map<unsigned, std::optional<Vt>>>(lookupLayerData, nextLayerLinks)
+        ));
+}
+
+template<typename Vt>
+void BaseValueLookup<Vt>::invalidateAllStoredValuesForSignal() const {
     valueLookup->applyRecursively([](std::map<unsigned int, std::optional<unsigned int>> layerValueLookup) {
         layerValueLookup.clear();
     });
 
     dimensionAccessRestrictions->layerData->blockSubstitutionForDimension(std::nullopt);
     dimensionAccessRestrictions->applyRecursively(
-    [](const DimensionPropagationBlocker::ptr& dim) {
-        dim->liftRestrictionForWholeDimension();
-    });
+            [](const optimizations::DimensionPropagationBlocker::ptr& dim) {
+                dim->liftRestrictionForWholeDimension();
+            });
 
     valueLookup->applyOnLastLayer(signalInformation.valuesPerDimension.size() - 1, [](std::map<unsigned int, std::optional<unsigned int>>& perValueOfDimensionValueLookup) {
         perValueOfDimensionValueLookup.clear();
     });
 }
 
-void SignalValueLookup::invalidateStoredValueFor(const std::vector<std::optional<unsigned>>& accessedDimensions) const {
+template<typename Vt>
+void BaseValueLookup<Vt>::invalidateStoredValueFor(const std::vector<std::optional<unsigned>>& accessedDimensions) const {
     if (accessedDimensions.empty()) {
         invalidateAllStoredValuesForSignal();
         return;
@@ -30,39 +83,40 @@ void SignalValueLookup::invalidateStoredValueFor(const std::vector<std::optional
     if (dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(
                 0,
                 accessedDimensions,
-                [](const unsigned int, const std::optional<unsigned int>& accessedValueOfDimension, const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
+                [](const unsigned int, const std::optional<unsigned int>& accessedValueOfDimension, const optimizations::DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
                     return !dimensionPropagationBlocker->isSubstitutionBlockedFor(accessedValueOfDimension, std::nullopt, true, true);
                 })) {
         return;
     }
 
     dimensionAccessRestrictions->applyOnLastAccessedDimension(
-        0,
-        accessedDimensions,
-        [](const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker, const std::vector<LayerData<DimensionPropagationBlocker::ptr>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
-            dimensionPropagationBlocker->blockSubstitutionForDimension(valueOfLastAccessedDimension);
-            for (const auto& nextLayerLink: nextLayerLinks) {
-                nextLayerLink->applyRecursively([](const DimensionPropagationBlocker::ptr& nextLayerDimensionPropagationBlocker) {
-                    nextLayerDimensionPropagationBlocker->liftRestrictionForWholeDimension();
-                });
-            }
-        });
+            0,
+            accessedDimensions,
+            [](const optimizations::DimensionPropagationBlocker::ptr& dimensionPropagationBlocker, const std::vector<LayerData<optimizations::DimensionPropagationBlocker::ptr>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
+                dimensionPropagationBlocker->blockSubstitutionForDimension(valueOfLastAccessedDimension);
+                for (const auto& nextLayerLink: nextLayerLinks) {
+                    nextLayerLink->applyRecursively([](const optimizations::DimensionPropagationBlocker::ptr& nextLayerDimensionPropagationBlocker) {
+                        nextLayerDimensionPropagationBlocker->liftRestrictionForWholeDimension();
+                    });
+                }
+            });
 
     valueLookup->applyOnLastAccessedDimension(
-        0,
-        accessedDimensions,
-        [](std::map<unsigned int, std::optional<unsigned int>>& layerValueLookup, const std::vector<LayerData<std::map<unsigned int, std::optional<unsigned int>>>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
-            if (valueOfLastAccessedDimension.has_value()) {
-                if (layerValueLookup.count(*valueOfLastAccessedDimension) > 0) {
-                    layerValueLookup.erase(*valueOfLastAccessedDimension);
+            0,
+            accessedDimensions,
+            [](std::map<unsigned int, std::optional<unsigned int>>& layerValueLookup, const std::vector<LayerData<std::map<unsigned int, std::optional<unsigned int>>>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
+                if (valueOfLastAccessedDimension.has_value()) {
+                    if (layerValueLookup.count(*valueOfLastAccessedDimension) > 0) {
+                        layerValueLookup.erase(*valueOfLastAccessedDimension);
+                    }
+                } else {
+                    layerValueLookup.clear();
                 }
-            } else {
-                layerValueLookup.clear();
-            }
-        });
+            });
 }
 
-void SignalValueLookup::invalidateStoredValueForBitrange(const std::vector<std::optional<unsigned>>& accessedDimensions, const BitRangeAccessRestriction::BitRangeAccess& bitRange) const {
+template<typename Vt>
+void BaseValueLookup<Vt>::invalidateStoredValueForBitrange(const std::vector<std::optional<unsigned>>& accessedDimensions, const optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) const {
     if (accessedDimensions.empty()) {
         if ((bitRange.second - bitRange.first) + 1 == signalInformation.bitWidth) {
             invalidateAllStoredValuesForSignal();
@@ -70,24 +124,24 @@ void SignalValueLookup::invalidateStoredValueForBitrange(const std::vector<std::
         }
     }
 
-    auto transformedBitRangeAccess = BitRangeAccessRestriction(signalInformation.bitWidth, bitRange);
+    auto transformedBitRangeAccess = optimizations::BitRangeAccessRestriction(signalInformation.bitWidth, bitRange);
     dimensionAccessRestrictions->applyOnLastAccessedDimensionIfPredicateDoesHold(
             0,
             accessedDimensions,
-            [&transformedBitRangeAccess](const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker, const std::vector<LayerData<DimensionPropagationBlocker::ptr>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>&) {
-                for (const auto& restriction : transformedBitRangeAccess.getRestrictions()) {
+            [&transformedBitRangeAccess](const optimizations::DimensionPropagationBlocker::ptr& dimensionPropagationBlocker, const std::vector<LayerData<optimizations::DimensionPropagationBlocker::ptr>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>&) {
+                for (const auto& restriction: transformedBitRangeAccess.getRestrictions()) {
                     dimensionPropagationBlocker->blockSubstitutionForBitRange(valueOfLastAccessedDimension, restriction);
 
                     // Since we are already blocking the bit range in the parent dimension and due to our assumption that restrictions in subsequent dimensions are always more specific,
                     // we can lift the bit range restriction from the latter.
                     for (const auto& nextLayerLink: nextLayerLinks) {
-                        nextLayerLink->applyRecursively([&restriction, valueOfLastAccessedDimension](const DimensionPropagationBlocker::ptr& nextLayerDimensionPropagationBlocker) {
+                        nextLayerLink->applyRecursively([&restriction, valueOfLastAccessedDimension](const optimizations::DimensionPropagationBlocker::ptr& nextLayerDimensionPropagationBlocker) {
                             nextLayerDimensionPropagationBlocker->liftRestrictionForBitRange(valueOfLastAccessedDimension, restriction);
                         });
                     }
                 }
             },
-            [&transformedBitRangeAccess](const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker, const std::optional<unsigned int>& valueOfAccessedDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
+            [&transformedBitRangeAccess](const optimizations::DimensionPropagationBlocker::ptr& dimensionPropagationBlocker, const std::optional<unsigned int>& valueOfAccessedDimension, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
                 // Due to our assumption that restrictions in subsequent dimensions are always more specific, we try to trim from to be restricted bit range all already existing restrictions and only apply the remaining part of the former if anything is still left
                 if (dimensionPropagationBlocker->tryTrimAlreadyBlockedPartsFromRestriction(valueOfAccessedDimension, accessedBitRange, transformedBitRangeAccess)) {
                     return transformedBitRangeAccess.hasAnyRestrictions();
@@ -96,34 +150,33 @@ void SignalValueLookup::invalidateStoredValueForBitrange(const std::vector<std::
             });
 }
 
-void SignalValueLookup::liftRestrictionsOfDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) {
-    const BitRangeAccessRestriction::BitRangeAccess& transformedBitRangeAccess = bitRange.has_value() ? *bitRange : BitRangeAccessRestriction::BitRangeAccess(0, signalInformation.bitWidth - 1);
+template<typename Vt>
+void BaseValueLookup<Vt>::liftRestrictionsOfDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) {
+    const optimizations::BitRangeAccessRestriction::BitRangeAccess& transformedBitRangeAccess = bitRange.has_value() ? *bitRange : optimizations::BitRangeAccessRestriction::BitRangeAccess(0, signalInformation.bitWidth - 1);
     dimensionAccessRestrictions->applyRecursivelyStartingFrom(
             0,
             accessedDimensions.front(),
             accessedDimensions,
-            [transformedBitRangeAccess](const DimensionPropagationBlocker::ptr& blockerForDimension, const std::optional<unsigned int>& accessedValueOfDimension) {
+            [transformedBitRangeAccess](const optimizations::DimensionPropagationBlocker::ptr& blockerForDimension, const std::optional<unsigned int>& accessedValueOfDimension) {
                 blockerForDimension->liftRestrictionForBitRange(accessedValueOfDimension, transformedBitRangeAccess);
-            }
-    );
+            });
     // We have to distinguish the following cases
     // I.   In case the whole dimension was blocked, we need to block the other values for the dimension other than the accessed one
     // II.  In case there existing a dimension wide bit range restriction, we need to lift the restriction for the given bitrange from the dimension ana recreated it for the other values of the dimension as in I.
     // III. Otherwise simple lift the restrictions
-	
-	/* When we lift the restriction for a bit range we might need to lift a restriction in a parent dimension (i.e. bit range a[$i].1:3 is locked in parent while a[0][2].4:5 is locked in child)
+
+    /* When we lift the restriction for a bit range we might need to lift a restriction in a parent dimension (i.e. bit range a[$i].1:3 is locked in parent while a[0][2].4:5 is locked in child)
 	 * if we would lift the restriction for a[0][2].1:5 we need to lift the one in the parent (where the dimension propagation should already handle the recreation for the remaining valus of the first dimension)
 	 * and subsequently in the child. They same must be done when lifting a[$i][2].1:5 (but again for the parent dimension, the dimension propagation blocker should already do the majority of the lifting)
 	*
 	*/
 
-
     /*
-     *  BitRangeAccessRestriction::BitRange transformedBitRange = bitRange.has_value()
+     *  optimizations::BitRangeAccessRestriction::BitRange transformedBitRange = bitRange.has_value()
      *      ? *bitRange
-     *      : BitRangeAccessRestriction::BitRangeAccess();
+     *      : optimizations::BitRangeAccessRestriction::BitRangeAccess();
      *
-     *  BitRangeAccessRestriction::BitRange remainingRestrictionToApply = transformedBitRange;
+     *  optimizations::BitRangeAccessRestriction::BitRange remainingRestrictionToApply = transformedBitRange;
      *
      *  const bool isWholeBitrangeAccessed = transformedBitRange.second - transformedBitRange.first == signalInformation->signalDimension.bitwidth;
      *
@@ -178,7 +231,6 @@ void SignalValueLookup::liftRestrictionsOfDimensions(const std::vector<std::opti
      *
      */
 
-
     /*
      * PSEUDO CODE IMPLEMENTATION
      *
@@ -196,15 +248,15 @@ void SignalValueLookup::liftRestrictionsOfDimensions(const std::vector<std::opti
      *      [](const unsigned int dimension, const std::vector<std::optional<unsigned int>> accessedValuePerDimension, const DimensionPropagationBlocker::ptr &dimensionPropagationBlocker){
      *          const auto& accessedValueOfDimension = accessedValuePerDimension.at(dimension);
      *
-     *          const BitRangeAccessRestriction::BitRangeAccess bitRangeToUnblock = bitRange.has_value()
+     *          const optimizations::BitRangeAccessRestriction::BitRangeAccess bitRangeToUnblock = bitRange.has_value()
      *                  ? *bitRange
-     *                  : BitRangeAccessRestriction::BitRangeAccess();
+     *                  : optimizations::BitRangeAccessRestriction::BitRangeAccess();
      *          // Is dimension completely blocked
      *          if (dimensionPropagationBlocker->isSubstitutionBlockedFor(std::nullopt, std::nullopt, ignoreNotFullwidthBitrangeRestrictions: true, ignoreSmallerThanAccessedBitranges: true)) {
      *              dimensionPropagationBlocker->liftRestrictionForBitRange(accessedValueOfDimension, bitRangeToUnblock);
      *          }
      *          // Exists dimension wide signal range restriction
-     *          else if (const auto& dimensionWideBitrangeRestriction = dimensionPropagationBlocker->tryGetDimensionWideBitRangeAccessRestriction(); dimensionWideBitrangeRestriction.has_value()) {
+     *          else if (const auto& dimensionWideBitrangeRestriction = dimensionPropagationBlocker->tryGetDimensionWideoptimizations::BitRangeAccessRestriction(); dimensionWideBitrangeRestriction.has_value()) {
      *              const bool shouldDimensionWideRestrictionBeUpdated = bitRange.has_value()
      *                  ? dimensionWideBitrangeRestriction->isAccessRestrictedTo(*bitRange)
      *                  : dimensionWideBitrangeRestriction->hasAnyRestrictions();
@@ -280,7 +332,7 @@ void SignalValueLookup::liftRestrictionsOfDimensions(const std::vector<std::opti
      *          else {
      *              if (accessedValueOfDimension.has_value()) {
      *                  // No dimension wide signal range restriction was defined but there exists one for the accessed value of the dimension
-     *                  if (const auto& bitrangeRestrictionForAccessedValueOfDimension = dimensionPropagationBlocker->tryGetValueOfDimenionBitRangeAccessRestriction(*accessedValueOfDimension); bitrangeRestrictionForAccessedValueOfDimension.has_value()) {
+     *                  if (const auto& bitrangeRestrictionForAccessedValueOfDimension = dimensionPropagationBlocker->tryGetValueOfDimenionoptimizations::BitRangeAccessRestriction(*accessedValueOfDimension); bitrangeRestrictionForAccessedValueOfDimension.has_value()) {
      *
      *                  }
      *              }
@@ -288,7 +340,7 @@ void SignalValueLookup::liftRestrictionsOfDimensions(const std::vector<std::opti
      *                  // No dimension wide signal range restriction was defined but due to the access on the whole dimension we need to check for restrictions on any value of the dimension
      *                  const auto numDefinedValuesOfDimension = signalInformation->signalDimension.at(dimension);
      *                  for (std::size_t i = 0; i < numDefinedValuesOfDimension; ++i) {
-     *                      if (const auto& bitrangeRestrictionForAccessedValueOfDimension = dimensionPropagationBlocker->tryGetValueOfDimenionBitRangeAccessRestriction(*accessedValueOfDimension); bitrangeRestrictionForAccessedValueOfDimension.has_value()) {
+     *                      if (const auto& bitrangeRestrictionForAccessedValueOfDimension = dimensionPropagationBlocker->tryGetValueOfDimenionoptimizations::BitRangeAccessRestriction(*accessedValueOfDimension); bitrangeRestrictionForAccessedValueOfDimension.has_value()) {
      *
      *                      }
      *                  }
@@ -390,28 +442,29 @@ void SignalValueLookup::liftRestrictionsOfDimensions(const std::vector<std::opti
      */
 }
 
-inline void SignalValueLookup::liftRestrictionsFromWholeSignal() const {
-    dimensionAccessRestrictions->applyRecursively([](const DimensionPropagationBlocker::ptr& dimensionPropgationBlocker) {
+template<typename Vt>
+void BaseValueLookup<Vt>::liftRestrictionsFromWholeSignal() const {
+    dimensionAccessRestrictions->applyRecursively([](const optimizations::DimensionPropagationBlocker::ptr& dimensionPropgationBlocker) {
         dimensionPropgationBlocker->liftRestrictionForWholeDimension();
     });
 }
 
-std::optional<unsigned> SignalValueLookup::tryFetchValueFor(const std::vector<std::optional<unsigned>>& accessedDimensions, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
+template<typename Vt>
+std::optional<Vt> BaseValueLookup<Vt>::tryFetchValueFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
     const auto& transformedAccessedDimensions = transformAccessOnDimensions(accessedDimensions);
     if (!transformedAccessedDimensions.has_value()) {
-         return std::nullopt;
+        return std::nullopt;
     }
 
     bool                                                                canFetchValue             = true;
-    LayerData<DimensionPropagationBlocker::ptr>::ptr                    lastAccessedDimensionData = dimensionAccessRestrictions;
-    LayerData<std::map<unsigned int, std::optional<unsigned int>>>::ptr valueLookupLayer          = valueLookup;
-    
+    LayerData<optimizations::DimensionPropagationBlocker::ptr>::ptr     lastAccessedDimensionData = dimensionAccessRestrictions;
+    std::shared_ptr<LayerData<std::map<unsigned int, std::optional<Vt>>>> valueLookupLayer          = valueLookup;
 
     for (std::size_t dimension = 1; dimension < accessedDimensions.size() && canFetchValue; ++dimension) {
-        const auto accessedValueOfDimension  = (*transformedAccessedDimensions).at(dimension - 1);
-        canFetchValue             = lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), bitRange);
-        lastAccessedDimensionData = lastAccessedDimensionData->nextLayerLinks.at(accessedValueOfDimension);
-        valueLookupLayer          = valueLookupLayer->nextLayerLinks.at(accessedValueOfDimension);
+        const auto accessedValueOfDimension = (*transformedAccessedDimensions).at(dimension - 1);
+        canFetchValue                       = lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), bitRange);
+        lastAccessedDimensionData           = lastAccessedDimensionData->nextLayerLinks.at(accessedValueOfDimension);
+        valueLookupLayer                    = valueLookupLayer->nextLayerLinks.at(accessedValueOfDimension);
     }
 
     const unsigned int accessedValueOfDimension = accessedDimensions.size() == 1 ? (*transformedAccessedDimensions).front() : (*transformedAccessedDimensions).at(accessedDimensions.size() - 2);
@@ -420,15 +473,16 @@ std::optional<unsigned> SignalValueLookup::tryFetchValueFor(const std::vector<st
         return std::nullopt;
     }
 
-    const std::optional<unsigned int> storedValue = valueLookupLayer->layerData.count(accessedValueOfDimension) == 0 ? std::nullopt : valueLookupLayer->layerData[accessedValueOfDimension];
+    const std::optional<Vt> storedValue = valueLookupLayer->layerData.count(accessedValueOfDimension) == 0 ? std::nullopt : valueLookupLayer->layerData[accessedValueOfDimension];
     if (storedValue.has_value() && bitRange.has_value()) {
-        return std::make_optional(extractPartsOfValue(*storedValue, *bitRange));
+        return std::make_optional(std::any_cast<Vt>(extractPartsOfValue(*storedValue, *bitRange)));
     }
     return storedValue;
 }
 
+template<typename Vt>
 // TODO: Should we check that the new value is actually storable in the given bit range (and what should happen to the stored value if this is not the case, should we truncate the new value, clear the existing one, etc.)
-void SignalValueLookup::updateStoredValueFor(const std::vector<std::optional<unsigned>>& accessedDimensions, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange, const unsigned int newValue) const {
+void BaseValueLookup<Vt>::updateStoredValueFor(const std::vector<std::optional<unsigned>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange, const Vt& newValue) const {
     const auto& transformedAccessedDimensions = !isValueLookupBlockedFor(accessedDimensions, bitRange) ? transformAccessOnDimensions(accessedDimensions) : std::vector<unsigned int>(0);
     // TODO: What should happen in case that one tries to update more than one value of a dimension ?
     if (!transformedAccessedDimensions.has_value()) {
@@ -436,7 +490,7 @@ void SignalValueLookup::updateStoredValueFor(const std::vector<std::optional<uns
     }
 
     // Since we are trying to update an entry in a lookup the defined access on the dimension must be fully specified (i.e. for every dimension of the signal) and must not access all values of a dimension for any dimension
-    LayerData<std::map<unsigned int, std::optional<unsigned int>>>::ptr valueLookupLayer = valueLookup;
+    std::shared_ptr<LayerData<std::map<unsigned int, std::optional<Vt>>>> valueLookupLayer = valueLookup;
 
     for (std::size_t dimension = 1; dimension < signalInformation.valuesPerDimension.size() - 1; ++dimension) {
         valueLookupLayer = valueLookupLayer->nextLayerLinks[(*transformedAccessedDimensions).at(dimension - 1)];
@@ -447,23 +501,17 @@ void SignalValueLookup::updateStoredValueFor(const std::vector<std::optional<uns
         valueLookupLayer->layerData.insert(std::pair(accessedValueOfLastDimension, newValue));
     } else {
         auto& currentValue = valueLookupLayer->layerData[accessedValueOfLastDimension];
-        // The bit range to be update for the signal must be used to update the corresponding bit range in the stored value 
+        // The bit range to be update for the signal must be used to update the corresponding bit range in the stored value
         if (currentValue.has_value() && bitRange.has_value()) {
-            currentValue.emplace(transformExistingValueByMergingWithNewOne(*currentValue, newValue, *bitRange));
+            currentValue.emplace(std::any_cast<Vt>(transformExistingValueByMergingWithNewOne(*currentValue, newValue, *bitRange)));
         } else {
             currentValue.emplace(newValue);
         }
     }
 }
 
-bool SignalValueLookup::isValueStorableInBitrange(const BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace, const unsigned int value) {
-    const auto resultContainerSize = (availableStorageSpace.second - availableStorageSpace.first) + 1;
-    const auto maxStorableValue    = UINT_MAX >> (32 - resultContainerSize);
-    return value <= maxStorableValue;
-}
-
-
-std::optional<std::vector<unsigned int>> SignalValueLookup::transformAccessOnDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions) const {
+template<typename Vt>
+std::optional<std::vector<unsigned int>> BaseValueLookup<Vt>::transformAccessOnDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions) const {
     if (accessedDimensions.size() < signalInformation.valuesPerDimension.size()) {
         return std::nullopt;
     }
@@ -497,66 +545,9 @@ std::optional<std::vector<unsigned int>> SignalValueLookup::transformAccessOnDim
     return transformedAccessOnDimensions;
 }
 
-inline bool SignalValueLookup::isValueLookupBlockedFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
-    return dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(0, accessedDimensions, [bitRange](const unsigned int _, const std::optional<unsigned int> accessedValueOfDimension, const DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
+template<typename Vt>
+bool BaseValueLookup<Vt>::isValueLookupBlockedFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
+    return dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(0, accessedDimensions, [bitRange](const unsigned int _, const std::optional<unsigned int> accessedValueOfDimension, const optimizations::DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
         return dimensionPropagationBlocker->isSubstitutionBlockedFor(accessedValueOfDimension, bitRange);
     });
-}
-
-/*
- * TODO: We are assuming that the maximum signal length is equal to 32 bits ?
- */
-unsigned int SignalValueLookup::extractPartsOfValue(const unsigned int value, const BitRangeAccessRestriction::BitRangeAccess& partToFetch) {
-    /*
- * Assuming we are working with a 8-bit wide signal:                        00011111 (0x1F)
- * Initially our layer mask is:                                             11111111
- * We are trying to access the bit range 2.4:                       
- * I.   Shift out bits before accessed bit range (L_SHIFT by (2 - 0)):      00111111
- * II.  Shift back layer mask to (R_SHIFT by (2 - 0)):                      11111100
- * III. Shift out bits after accessed bit range (R_SHIFT by (8 - 1) - 4):   11100000
- * IV. Shift back to create final layer mask (L_SHIFT by (8 - 1) - 4):      00011100
- */
-    unsigned int layerMask = UINT_MAX;
-    if (partToFetch.first > 0) {
-        layerMask >>= partToFetch.first;
-        layerMask <<= partToFetch.first;
-    }
-
-    if (partToFetch.second > 0) {
-        const std::size_t shiftAmount = (32 - 1) - partToFetch.second;
-        layerMask <<= shiftAmount;
-        layerMask >>= shiftAmount;
-    }
-
-    return value & layerMask;
-}
-
-unsigned int SignalValueLookup::transformExistingValueByMergingWithNewOne(const unsigned int currentValue, const unsigned int newValue, const BitRangeAccessRestriction::BitRangeAccess& partsToUpdate) {
-    /*
-     * Assume for we are working with an 8-bit signal that currently has a value of 00011111 (0x1F) and we are updating the bit range .2:5 with the value 5 (101)
-     * We at first zero out the accessed bit range in the stored value with the help of a layer mask
-     * I. Initialize the layer mask to 11111111 (0xFF)
-     * II. To extract the value after the accessed bit range, we perform a right shift by (8 - 5)                                               11000000    B1
-     * III. A second bit mask is created to extract the bits before the start of the accessed bit range (by a left shift by (X - 1 - 2):        00000011    B2
-     * IV. With the help of these two bitmask we can zero out the accessed bit range from the currently stored value:                           (00011111 & B1) | (00011111 & B2) = 00000011
-     * V. We need to shift the new value to the now zeroed out bit range of the currently stored value (by a left shift by 2):                  00000101 << 2 = 00010100
-     * VI. We can now calculate the new value by a simply OR operation of the result of IV. and V:                                              00000011 | 00010100 = 00010111
-     */
-
-    unsigned int layerMask                              = UINT_MAX;
-    unsigned int layerMaskForBitsBeforeAccessedBitRange = UINT_MAX;
-    if (partsToUpdate.second > 0) {
-        layerMask >>= partsToUpdate.second;
-        layerMask <<= partsToUpdate.second;
-    }
-
-    if (partsToUpdate.first > 0) {
-        const auto shiftAmount = (32 - 1) - partsToUpdate.first;
-        layerMaskForBitsBeforeAccessedBitRange <<= shiftAmount;
-        layerMaskForBitsBeforeAccessedBitRange >>= shiftAmount;
-    }
-
-    const auto currentValueWithAccessBitrangeZeroed = (currentValue & layerMask) | (currentValue & layerMaskForBitsBeforeAccessedBitRange);
-    const auto newValueShifted                              = newValue << partsToUpdate.first;
-    return currentValueWithAccessBitrangeZeroed | newValueShifted;
 }

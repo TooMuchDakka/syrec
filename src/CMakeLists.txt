@@ -58,8 +58,9 @@ add_library(
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/bit_range_access_restriction.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/dimension_propagation_blocker.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/potential_value_storage.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/signal_value_lookup.cpp
+
+      #${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.cpp
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
@@ -86,9 +87,13 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/reassociate_expression.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/bit_range_access_restriction.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/dimension_propagation_blocker.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/potential_value_storage.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/shared_dimension_blocking_information.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/signal_value_lookup.hpp
+
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.tpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/layer_data.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp
+
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/module.hpp

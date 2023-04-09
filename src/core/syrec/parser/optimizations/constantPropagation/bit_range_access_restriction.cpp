@@ -127,7 +127,30 @@ void BitRangeAccessRestriction::restrictAccessTo(const BitRangeAccess& specificB
     );
 
     if (firstOverlappingRestrictionRegion == restrictionRegions.end()) {
-        restrictionRegions.emplace_back(RestrictionRegion(specificBitRange.first, specificBitRange.second));
+        if (restrictionRegions.empty()) {
+            restrictionRegions.emplace_back(RestrictionRegion(specificBitRange.first, specificBitRange.second));            
+        }
+
+        /*
+         * Check if the restriction region prior and after the specific bit range to be restricted are sharing a border (i.e. for the prior one does the last restricted bit + 1 matches the start of the restricted bit range)
+         * If that is the case, merge these regions
+         */
+        const auto& restrictionRegionPriorToSpecificOneSharingBorder = std::find_if(
+                restrictionRegions.begin(),
+                restrictionRegions.end(),
+                [&specificBitRange](const RestrictionRegion& restrictedRegion) {
+                    return restrictedRegion.end + 1 == specificBitRange.first;
+                });
+
+        if (restrictionRegionPriorToSpecificOneSharingBorder != restrictionRegions.end()) {
+            if (const auto nextRestrictionRegion = std::next(restrictionRegionPriorToSpecificOneSharingBorder);
+                nextRestrictionRegion != restrictionRegions.end() && nextRestrictionRegion->start == specificBitRange.second + 1) {
+                restrictionRegionPriorToSpecificOneSharingBorder->resize(restrictionRegionPriorToSpecificOneSharingBorder->start, nextRestrictionRegion->end);
+                restrictionRegions.erase(nextRestrictionRegion);
+            } else {
+                restrictionRegionPriorToSpecificOneSharingBorder->resize(restrictionRegionPriorToSpecificOneSharingBorder->start, specificBitRange.second);
+            }
+        }
         return;
     }
 
