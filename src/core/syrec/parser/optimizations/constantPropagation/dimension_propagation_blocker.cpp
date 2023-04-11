@@ -23,7 +23,7 @@ void DimensionPropagationBlocker::blockSubstitutionForBitRange(const std::option
         return;
     }
 
-    const auto blockedBitRangeSize              = bitRangeToBlock.second - bitRangeToBlock.first;
+    const auto blockedBitRangeSize              = (bitRangeToBlock.second - bitRangeToBlock.first) + 1;
     const bool isWholeSignalwidthBlocked = blockedBitRangeSize == signalInformation.bitWidth;
 
     if (!valueOfDimensionToBlock.has_value()) {
@@ -69,7 +69,7 @@ void DimensionPropagationBlocker::liftRestrictionForWholeDimension() {
 }
 
 void DimensionPropagationBlocker::liftRestrictionForBitRange(const std::optional<unsigned>& blockedValueOfDimension, const BitRangeAccessRestriction::BitRangeAccess& blockedBitRange) {
-    const auto blockedBitRangeSize       = blockedBitRange.second - blockedBitRange.first;
+    const auto blockedBitRangeSize       = (blockedBitRange.second - blockedBitRange.first) + 1;
     const bool isWholeSignalwidthBlocked = blockedBitRangeSize == signalInformation.bitWidth;
 
     if (isWholeSignalwidthBlocked) {

@@ -18,7 +18,7 @@ std::optional<LayerData<optimizations::DimensionPropagationBlocker::ptr>::ptr> B
         const unsigned int numValuesOfDimension = signalInformation.valuesPerDimension.at(dimension);
         nextLayerLinks.resize(numValuesOfDimension);
 
-        for (auto valueOfDimension = 0; valueOfDimension < numValuesOfDimension; ++valueOfDimension) {
+        for (unsigned int valueOfDimension = 0; valueOfDimension < numValuesOfDimension; ++valueOfDimension) {
             nextLayerLinks[valueOfDimension] = *initializeDimensionAccessRestrictionLayer(dimension + 1);
         }
     }
@@ -41,11 +41,11 @@ std::optional<std::shared_ptr<LayerData<std::map<unsigned, std::optional<Vt>>>>>
     if (dimension < signalInformation.valuesPerDimension.size() - 1) {
         nextLayerLinks.resize(numValuesOfDimension);
 
-        for (auto valueOfDimension = 0; valueOfDimension < numValuesOfDimension; ++valueOfDimension) {
+        for (unsigned int valueOfDimension = 0; valueOfDimension < numValuesOfDimension; ++valueOfDimension) {
             nextLayerLinks[valueOfDimension] = *initializeValueLookupLayer(dimension + 1, defaultValue);
         }
     } else {
-        for (auto valueOfDimension = 0; valueOfDimension < numValuesOfDimension; ++valueOfDimension) {
+        for (unsigned int valueOfDimension = 0; valueOfDimension < numValuesOfDimension; ++valueOfDimension) {
             lookupLayerData.insert(std::pair(valueOfDimension, defaultValue));
         }
     }
@@ -80,7 +80,7 @@ void BaseValueLookup<Vt>::invalidateStoredValueFor(const std::vector<std::option
     }
 
     // Skip extra work if accessed parts of signal are already blocked
-    if (dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(
+    if (!dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(
                 0,
                 accessedDimensions,
                 [](const unsigned int, const std::optional<unsigned int>& accessedValueOfDimension, const optimizations::DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
@@ -122,6 +122,23 @@ void BaseValueLookup<Vt>::invalidateStoredValueForBitrange(const std::vector<std
             invalidateAllStoredValuesForSignal();
             return;
         }
+
+        auto transformedBitRangeAccess = optimizations::BitRangeAccessRestriction(signalInformation.bitWidth, bitRange);
+        const bool _ = dimensionAccessRestrictions->layerData->tryTrimAlreadyBlockedPartsFromRestriction(std::nullopt, std::make_optional(bitRange), transformedBitRangeAccess);
+        if (transformedBitRangeAccess.hasAnyRestrictions()) {
+            for (const auto& remainingRestriction: transformedBitRangeAccess.getRestrictions()) {
+                dimensionAccessRestrictions->layerData->blockSubstitutionForBitRange(std::nullopt, remainingRestriction);    
+            }
+
+            for (const auto& nextLayerLink: dimensionAccessRestrictions->nextLayerLinks) {
+                nextLayerLink->applyRecursively([&transformedBitRangeAccess](const optimizations::DimensionPropagationBlocker::ptr& nextLayerDimensionPropagationBlocker) {
+                    for (const auto& remainingRestriction : transformedBitRangeAccess.getRestrictions()) {
+                        nextLayerDimensionPropagationBlocker->liftRestrictionForBitRange(std::nullopt, remainingRestriction);    
+                    }
+                });
+            }
+        }
+        return;
     }
 
     auto transformedBitRangeAccess = optimizations::BitRangeAccessRestriction(signalInformation.bitWidth, bitRange);
@@ -451,6 +468,10 @@ void BaseValueLookup<Vt>::liftRestrictionsFromWholeSignal() const {
 
 template<typename Vt>
 std::optional<Vt> BaseValueLookup<Vt>::tryFetchValueFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
+    if (isValueLookupBlockedFor(accessedDimensions, bitRange)) {
+        return std::nullopt;
+    }
+
     const auto& transformedAccessedDimensions = transformAccessOnDimensions(accessedDimensions);
     if (!transformedAccessedDimensions.has_value()) {
         return std::nullopt;
@@ -462,13 +483,13 @@ std::optional<Vt> BaseValueLookup<Vt>::tryFetchValueFor(const std::vector<std::o
 
     for (std::size_t dimension = 1; dimension < accessedDimensions.size() && canFetchValue; ++dimension) {
         const auto accessedValueOfDimension = (*transformedAccessedDimensions).at(dimension - 1);
-        canFetchValue                       = lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), bitRange);
+        canFetchValue                       = !lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), bitRange);
         lastAccessedDimensionData           = lastAccessedDimensionData->nextLayerLinks.at(accessedValueOfDimension);
         valueLookupLayer                    = valueLookupLayer->nextLayerLinks.at(accessedValueOfDimension);
     }
 
     const unsigned int accessedValueOfDimension = accessedDimensions.size() == 1 ? (*transformedAccessedDimensions).front() : (*transformedAccessedDimensions).at(accessedDimensions.size() - 2);
-    canFetchValue &= lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), bitRange);
+    canFetchValue &= !lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), bitRange);
     if (!canFetchValue) {
         return std::nullopt;
     }
@@ -520,7 +541,7 @@ std::optional<std::vector<unsigned int>> BaseValueLookup<Vt>::transformAccessOnD
             accessedDimensions.cbegin(),
             accessedDimensions.cend(),
             [](const std::optional<unsigned int>& accessedValueOfDimension) {
-                return accessedValueOfDimension.has_value();
+                return !accessedValueOfDimension.has_value();
             });
 
     const bool isAccessOnAllValuesForAnyDimensionOk = std::all_of(
@@ -547,7 +568,10 @@ std::optional<std::vector<unsigned int>> BaseValueLookup<Vt>::transformAccessOnD
 
 template<typename Vt>
 bool BaseValueLookup<Vt>::isValueLookupBlockedFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
-    return dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(0, accessedDimensions, [bitRange](const unsigned int _, const std::optional<unsigned int> accessedValueOfDimension, const optimizations::DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
-        return dimensionPropagationBlocker->isSubstitutionBlockedFor(accessedValueOfDimension, bitRange);
+    /*
+     * We need to check all accessed dimensions since subsequent dimensions could define more specific restrictions
+     */
+    return !dimensionAccessRestrictions->doesPredicateHoldInDimensionThenCheckRecursivelyElseStop(0, accessedDimensions, [bitRange](const unsigned int, const std::optional<unsigned int> accessedValueOfDimension, const optimizations::DimensionPropagationBlocker::ptr& dimensionPropagationBlocker) {
+        return !dimensionPropagationBlocker->isSubstitutionBlockedFor(accessedValueOfDimension, bitRange);
     });
 }

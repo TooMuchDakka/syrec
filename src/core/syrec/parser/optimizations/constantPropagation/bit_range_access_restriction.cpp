@@ -181,7 +181,7 @@ void BitRangeAccessRestriction::RestrictionRegion::resize(const unsigned newStar
 }
 
 bool BitRangeAccessRestriction::RestrictionRegion::doesIntersectWith(const BitRangeAccess& bitRangeAccess) const {
-    return start >= bitRangeAccess.first && end <= bitRangeAccess.second;
+    return !(bitRangeAccess.second < start || bitRangeAccess.first > end);
 }
 
 std::size_t BitRangeAccessRestriction::RestrictionRegion::getNumberOfOverlappingBitsWith(const BitRangeAccess& bitRangeAccess) const {

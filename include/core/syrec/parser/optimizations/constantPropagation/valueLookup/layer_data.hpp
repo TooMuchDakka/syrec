@@ -51,9 +51,15 @@ struct LayerData {
             }
         } else {
             const auto& accessedValueOfCurrentDimension = accessedDimensions.at(currDimension);
-            if (!predicate(layerData, accessedValueOfCurrentDimension, std::nullopt)) {
+            const bool  predicateEvaluationResult       = predicate(layerData, accessedValueOfCurrentDimension, std::nullopt);
+
+            if (!predicateEvaluationResult || currDimension == (accessedDimensions.size() - 1)) {
                 return;
             }
+            
+            /*if (!predicate(layerData, accessedValueOfCurrentDimension, std::nullopt)) {
+                return;
+            }*/
 
             if (accessedValueOfCurrentDimension.has_value()) {
                 nextLayerLinks.at(*accessedValueOfCurrentDimension)->applyOnLastAccessedDimension(currDimension + 1, accessedDimensions, applyLambda);
@@ -82,7 +88,11 @@ struct LayerData {
         }
 
         const auto accessedValueOfDimension = accessedDimensions.at(currDimension);
-        if (!predicate(currDimension, accessedValueOfDimension, layerData)) {
+        const bool predicateEvaluationResult = predicate(currDimension, accessedValueOfDimension, layerData);
+        if (currDimension == (accessedDimensions.size() - 1)) {
+            return predicateEvaluationResult;
+        }
+        if (!predicateEvaluationResult) {
             return false;
         }
 

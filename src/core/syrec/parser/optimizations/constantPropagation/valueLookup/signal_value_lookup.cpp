@@ -20,6 +20,10 @@ std::any SignalValueLookup::extractPartsOfValue(const std::any& value, const opt
  * TODO: We are assuming that the maximum signal length is equal to 32 bits ?
  */
 unsigned int SignalValueLookup::extractPartsOfSignalValue(const unsigned int value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partToFetch) {
+    if (partToFetch.first == partToFetch.second) {
+        return value & (1 << partToFetch.first);
+    }
+
     /*
  * Assuming we are working with a 8-bit wide signal:                        00011111 (0x1F)
  * Initially our layer mask is:                                             11111111
@@ -41,6 +45,9 @@ unsigned int SignalValueLookup::extractPartsOfSignalValue(const unsigned int val
         layerMask >>= shiftAmount;
     }
 
+    if (partToFetch.first > 0) {
+        return (value & layerMask) >> partToFetch.first;
+    }
     return value & layerMask;
 }
 

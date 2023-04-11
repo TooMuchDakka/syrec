@@ -12,6 +12,10 @@
 #include <vector>
 
 namespace valueLookup {
+    /*
+     * Useful links:
+     * https://isocpp.org/wiki/faq/templates#nondependent-name-lookup-members
+     */
     template<typename Vt>
     class BaseValueLookup {
     public:
@@ -42,6 +46,11 @@ namespace valueLookup {
 
         [[nodiscard]] std::optional<std::vector<unsigned int>> transformAccessOnDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions) const;
         [[nodiscard]] bool isValueLookupBlockedFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const;
+
+        /*
+         * To have both static and dynamic polymorphism we need to use type erase to keep the dynamic part here
+         * https://www.artima.com/articles/on-the-tension-between-object-oriented-and-generic-programming-in-c
+         */
 
         [[nodiscard]] virtual bool canStoreValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const = 0;
         [[nodiscard]] virtual std::any extractPartsOfValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const = 0;
