@@ -59,6 +59,7 @@ package_add_test(
   unittests/test_pla_parser.cpp
 
   unittests/syrecOptimizerComponentsTests/test_reassociate_expression_optimization.cpp unittests/syrecComponentsTestsUtils/test_case_creation_utils.hpp
+  unittests/syrecOptimizerComponentsTests/test_signal_value_lookup.cpp unittests/syrecOptimizerComponentsTests/test_signal_value_lookup.hpp
 
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_error_cases_fixture.cpp
   unittests/syrecParserComponentsTests/fixtures/syrec_parser_method_call_guess_fixture.cpp
