@@ -21,7 +21,7 @@ std::any SignalValueLookup::extractPartsOfValue(const std::any& value, const opt
  */
 unsigned int SignalValueLookup::extractPartsOfSignalValue(const unsigned int value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partToFetch) {
     if (partToFetch.first == partToFetch.second) {
-        return value & (1 << partToFetch.first);
+        return (value & (1 << partToFetch.first)) >> partToFetch.first;
     }
 
     /*

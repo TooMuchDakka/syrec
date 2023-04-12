@@ -25,13 +25,16 @@ namespace valueLookup {
         constexpr static ::optimizations::BitRangeAccessRestriction::BitRangeAccess defaultValueRequiredStorageBitRange  = ::optimizations::BitRangeAccessRestriction::BitRangeAccess(0, 7);
         constexpr static unsigned int                 defaultValue            = 230; // 1110 0110
 
-        constexpr static unsigned int lockedValueOfFirstDimension = 1;
-        constexpr static unsigned int lockedValueOfSecondDimension = 3;
+        constexpr static unsigned int                                               lockedValueOfFirstDimension                              = 1;
+        constexpr static unsigned int                                               lockedValueOfSecondDimension                             = 3;
+        constexpr static unsigned int                                               lockedValueOfThirdDimension                              = 1;
         constexpr static unsigned int                                               firstBlockedBitOfDefaultBitRange = 2;
         constexpr static unsigned int                                               lastBlockedBitOfDefaultBitRange  = defaultSignalBitwidth - firstBlockedBitOfDefaultBitRange;
         constexpr static ::optimizations::BitRangeAccessRestriction::BitRangeAccess defaultBlockedBitRange           = ::optimizations::BitRangeAccessRestriction::BitRangeAccess(firstBlockedBitOfDefaultBitRange, lastBlockedBitOfDefaultBitRange);
+        constexpr static ::optimizations::BitRangeAccessRestriction::BitRangeAccess defaultNonOverlappingBitRange    = ::optimizations::BitRangeAccessRestriction::BitRangeAccess(0, firstBlockedBitOfDefaultBitRange - 1);
+        constexpr static ::optimizations::BitRangeAccessRestriction::BitRangeAccess defaultOverlappingBitRange       = ::optimizations::BitRangeAccessRestriction::BitRangeAccess(firstBlockedBitOfDefaultBitRange, firstBlockedBitOfDefaultBitRange + 2);
+        constexpr static ::optimizations::BitRangeAccessRestriction::BitRangeAccess defaultRemainingBlockedBitRangeAfterOverlappingWasLifted = ::optimizations::BitRangeAccessRestriction::BitRangeAccess(firstBlockedBitOfDefaultBitRange + 3, lastBlockedBitOfDefaultBitRange);
 
-        
         [[nodiscard]] static bool isFullySpecifiedDimensionAccess(const std::vector<std::optional<unsigned int>>& accessedDimensions) {
             return std::all_of(
                     accessedDimensions.cbegin(),
@@ -48,7 +51,7 @@ namespace valueLookup {
 
         [[nodiscard]] static unsigned int determineExpectedValueForBitRange(const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) {
             if (bitRange.first == bitRange.second) {
-                return defaultValue & (1 << bitRange.first);
+                return (defaultValue & (1 << bitRange.first)) >> bitRange.first;
             }
 
             unsigned int maskingBitMask = UINT_MAX;
