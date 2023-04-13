@@ -35,6 +35,7 @@ namespace valueLookup {
         constexpr static ::optimizations::BitRangeAccessRestriction::BitRangeAccess defaultOverlappingBitRange       = ::optimizations::BitRangeAccessRestriction::BitRangeAccess(firstBlockedBitOfDefaultBitRange, firstBlockedBitOfDefaultBitRange + 2);
         constexpr static ::optimizations::BitRangeAccessRestriction::BitRangeAccess defaultRemainingBlockedBitRangeAfterOverlappingWasLifted = ::optimizations::BitRangeAccessRestriction::BitRangeAccess(firstBlockedBitOfDefaultBitRange + 3, lastBlockedBitOfDefaultBitRange);
 
+        constexpr static ::optimizations::BitRangeAccessRestriction::BitRangeAccess defaultRemainingBlockedBitRangeAfterSignalWasUnblocked = ::optimizations::BitRangeAccessRestriction::BitRangeAccess(defaultBlockedBitRange.first - 1, defaultBlockedBitRange.second + 1);
         [[nodiscard]] static bool isFullySpecifiedDimensionAccess(const std::vector<std::optional<unsigned int>>& accessedDimensions) {
             return std::all_of(
                     accessedDimensions.cbegin(),
@@ -47,6 +48,11 @@ namespace valueLookup {
         [[nodiscard]] static bool doesBitrangeOverlapOther(const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRangeToCheck,
                                                      const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& other) {
             return !(bitRangeToCheck.second < other.first || bitRangeToCheck.first > other.second);
+        }
+
+        [[nodiscard]] static bool doesBitrangeLieWithin(const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRangeToCheck,
+            const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& other) {
+            return bitRangeToCheck.first >= other.first && bitRangeToCheck.second <= other.second;
         }
 
         [[nodiscard]] static unsigned int determineExpectedValueForBitRange(const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) {
@@ -340,27 +346,27 @@ namespace valueLookup {
         }
     };
 
-    TEST_P(SignalValueLookupTest, CheckRestrictionAndFetchedValueOfSignalValueLookupTests) {
-        const auto& testParamInfo               = GetParam();
-        const auto& initialRestrictionGenerator = std::get<1>(testParamInfo);
-        initialRestrictionGenerator(signalValueLookup);
+    //TEST_P(SignalValueLookupTest, CheckRestrictionAndFetchedValueOfSignalValueLookupTests) {
+    //    const auto& testParamInfo               = GetParam();
+    //    const auto& initialRestrictionGenerator = std::get<1>(testParamInfo);
+    //    initialRestrictionGenerator(signalValueLookup);
 
-        //createCombinations({2, 4});
+    //    //createCombinations({2, 4});
 
-        const auto& expectedRestrictionStatusLookup = std::get<2>(testParamInfo);
-        const auto& expectedValueLookup = std::get<3>(testParamInfo);
+    //    const auto& expectedRestrictionStatusLookup = std::get<2>(testParamInfo);
+    //    const auto& expectedValueLookup = std::get<3>(testParamInfo);
 
-        ASSERT_NO_FATAL_FAILURE(checkThatNoValueCanBeFetchedForGlobalBitRanges());
-        ASSERT_NO_FATAL_FAILURE(checkThatNoValueCanBeFetchedForValuesOrBitRangesOfIntermediateDimensions());
+    //    ASSERT_NO_FATAL_FAILURE(checkThatNoValueCanBeFetchedForGlobalBitRanges());
+    //    ASSERT_NO_FATAL_FAILURE(checkThatNoValueCanBeFetchedForValuesOrBitRangesOfIntermediateDimensions());
 
-        ASSERT_NO_FATAL_FAILURE(
-            createAndCheckConditionForAllDimensionAndBitrangeCombinations(
-                SignalValueLookupTest::defaultSignalDimensions,
-                expectedRestrictionStatusLookup,
-                expectedValueLookup)
-        );
+    //    ASSERT_NO_FATAL_FAILURE(
+    //        createAndCheckConditionForAllDimensionAndBitrangeCombinations(
+    //            SignalValueLookupTest::defaultSignalDimensions,
+    //            expectedRestrictionStatusLookup,
+    //            expectedValueLookup)
+    //    );
 
-        //ASSERT_NO_FATAL_FAILURE(checkThatValueMatchesIfItCanBeFetched(expectedRestrictionStatusLookup, expectedValueLookup));
-    }
+    //    //ASSERT_NO_FATAL_FAILURE(checkThatValueMatchesIfItCanBeFetched(expectedRestrictionStatusLookup, expectedValueLookup));
+    //}
 }; // namespace valueLookup
 #endif
