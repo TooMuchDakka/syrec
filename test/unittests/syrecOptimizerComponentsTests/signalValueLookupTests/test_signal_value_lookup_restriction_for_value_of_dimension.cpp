@@ -5,6 +5,27 @@ using namespace valueLookup;
 using UserDefinedDimensionAccess = std::vector<std::optional<unsigned int>>;
 using OptionalBitRangeAccess     = std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>;
 
+/*
+ * a[x][y][z]
+*
+* 1. a[0][$i]
+* 2. a[0][0]
+* 3. a[0][$i].s:e
+* 4. a[0][1].s:e
+* 5. a[0][$i][0]
+* * 5. a[0][$i][$j]
+* 6. a[0][0][1]
+* * 5. a[0][0][$i]
+* 7. a[0][$i][0].s:e
++ 8. a[0][0][1].s:e
+* 9. a[0]
+* 10. a[$i]
+* 11. a[0].s:e <-
+* 12. a[$i].s:e
+* 13. a.s:e
+* 14. a
+ */
+
 // TODO: Test cases for lifting unrelated restrictions
 INSTANTIATE_TEST_SUITE_P(
     SignalValueLookupTests,
