@@ -15,11 +15,20 @@
 namespace syrec {
 
     struct ReadProgramSettings {
-        explicit ReadProgramSettings(unsigned bitwidth = 32U, bool reassociateExpressionEnabled = false, bool removalOfUnusedVariablesAndModulesEnabled = false):
-            defaultBitwidth(bitwidth), reassociateExpressionEnabled(reassociateExpressionEnabled), removalOfUnusedVariablesAndModulesEnabled(removalOfUnusedVariablesAndModulesEnabled){};
+        explicit ReadProgramSettings(
+            unsigned bitwidth = 32U,
+            bool reassociateExpressionEnabled = false,
+            bool removalOfUnusedVariablesAndModulesEnabled = false,
+            std::string expectedMainModuleName = "main"):
+            defaultBitwidth(bitwidth),
+            reassociateExpressionEnabled(reassociateExpressionEnabled),
+            removalOfUnusedVariablesAndModulesEnabled(removalOfUnusedVariablesAndModulesEnabled),
+            expectedMainModuleName(expectedMainModuleName)
+        {};
         unsigned defaultBitwidth;
         bool     reassociateExpressionEnabled;
         bool     removalOfUnusedVariablesAndModulesEnabled;
+        std::string expectedMainModuleName;
     };
 
     class program {

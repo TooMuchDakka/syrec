@@ -39,11 +39,12 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
             }
         }
     }
-
+    
+    const auto& nameOfTopLevelModule = determineExpectedNameOfTopLevelModule();
     // TODO: UNUSED_REFERENCE - Marked as used
     if (sharedData->parserConfig->isRemovalOfUnusedVariablesAndModulesEnabled) {
-        removeUnusedModules();
-        removeModulesWithoutParameters();
+        removeUnusedModules(nameOfTopLevelModule);
+        removeModulesWithoutParameters(nameOfTopLevelModule);
     }
 
     return 0;
@@ -88,6 +89,7 @@ std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
     sharedData->currentModuleCallNestingLevel--;
 
     if (isDeclaredModuleValid) {
+        lastDeclaredModuleIdent = moduleIdent;
         module->statements = *validUserDefinedModuleStatements;
         return std::make_optional(module);
     }
@@ -217,31 +219,44 @@ void SyReCModuleVisitor::removeUnusedVariablesAndParametersFromModule(const syre
 }
 
 // TODO: UNUSED_REFERENCE - Marked as used
-void SyReCModuleVisitor::removeUnusedModules() {
+void SyReCModuleVisitor::removeUnusedModules(const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) {
     const auto& wasUsedStatusPerFoundModule = sharedData->currentSymbolTableScope->determineIfModuleWasUsed(foundModules);
     std::size_t moduleIdx                   = 0;
 
-    for (auto foundModule = foundModules.begin(); foundModule != foundModules.end();) {
-        if (!wasUsedStatusPerFoundModule.at(moduleIdx)) {
-            foundModules.erase(foundModule);
-        } else {
+    for (auto foundModule = foundModules.begin(); foundModule != foundModules.end(); moduleIdx++) {
+        if (foundModule->get()->name == expectedIdentOfTopLevelModuleToNotRemove 
+            || wasUsedStatusPerFoundModule.at(moduleIdx)) {
             ++foundModule;
         }
-        moduleIdx++;
+        else {
+            foundModule = foundModules.erase(foundModule);   
+        }
     }
 }
 
 // TODO: UNUSED_REFERENCE - Marked as used
-void SyReCModuleVisitor::removeModulesWithoutParameters() {
+void SyReCModuleVisitor::removeModulesWithoutParameters(const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) {
     foundModules.erase(
     std::remove_if(
             foundModules.begin(),
             foundModules.end(),
-            [](const syrec::Module::ptr& module) {
-                return module->parameters.empty();
+            [&expectedIdentOfTopLevelModuleToNotRemove](const syrec::Module::ptr& module) {
+                return module->name != expectedIdentOfTopLevelModuleToNotRemove && module->parameters.empty();
             }),
     foundModules.end());
 }
+
+std::string SyReCModuleVisitor::determineExpectedNameOfTopLevelModule() const {
+    const auto& defaultExpectedTopLevelModuleName              = sharedData->parserConfig->expectedMainModuleName;
+    const auto doesModuleWithExpectedDefaultTopLevelNameExist = std::any_of(
+             foundModules.cbegin(),
+             foundModules.cend(),
+             [&defaultExpectedTopLevelModuleName](const syrec::Module::ptr& module) {
+                return module->name == defaultExpectedTopLevelModuleName;
+            });
+    return doesModuleWithExpectedDefaultTopLevelNameExist && !lastDeclaredModuleIdent.empty() ? defaultExpectedTopLevelModuleName : lastDeclaredModuleIdent;
+}
+
 
 std::optional<syrec::Variable::Types> SyReCModuleVisitor::getParameterType(const antlr4::Token* token) {
     if (token == nullptr) {

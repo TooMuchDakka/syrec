@@ -155,31 +155,31 @@ void SymbolTable::markModulesMatchingSignatureAsUsed(const syrec::Module::ptr& m
 std::vector<bool> SymbolTable::determineIfModuleWasUsed(const syrec::Module::vec& modules) const {
     std::vector<bool> usageStatusPerModule(modules.size());
     std::transform(
-    modules.cbegin(),
-    modules.cend(),
-    std::back_inserter(usageStatusPerModule),
-    [&](const syrec::Module::ptr& moduleToCheck) {
-        const auto foundModulesMatchingName = getEntryForModulesWithMatchingName(moduleToCheck->name);
-        if (foundModulesMatchingName ==nullptr) {
-            return false;
-        }
+            modules.cbegin(),
+            modules.cend(),
+            usageStatusPerModule.begin(),
+            [&](const syrec::Module::ptr& moduleToCheck) {
+                const auto foundModulesMatchingName = getEntryForModulesWithMatchingName(moduleToCheck->name);
+                if (foundModulesMatchingName == nullptr) {
+                    return false;
+                }
 
-        const auto& modulesMatchingName          = foundModulesMatchingName->matchingModules;
-        const auto& foundModuleMatchingSignature = std::find_if(
-                modulesMatchingName.cbegin(),
-                modulesMatchingName.cend(),
-                [&moduleToCheck](const syrec::Module::ptr& moduleInSymbolTable) {
-                    return doModuleSignaturesMatch(moduleInSymbolTable, moduleToCheck);
-                });
+                const auto& modulesMatchingName          = foundModulesMatchingName->matchingModules;
+                const auto& foundModuleMatchingSignature = std::find_if(
+                        modulesMatchingName.cbegin(),
+                        modulesMatchingName.cend(),
+                        [&moduleToCheck](const syrec::Module::ptr& moduleInSymbolTable) {
+                            return doModuleSignaturesMatch(moduleInSymbolTable, moduleToCheck);
+                        });
 
-        if (foundModuleMatchingSignature == modulesMatchingName.end()) {
-            return false;
-        }
+                if (foundModuleMatchingSignature == modulesMatchingName.end()) {
+                    return false;
+                }
 
-        const std::size_t offsetForModuleInSymbolTableEntry             = std::distance(modulesMatchingName.begin(), foundModuleMatchingSignature);
-        const auto& isUsedFlagPerModule                           = foundModulesMatchingName->isUnusedFlagPerModule;
-        return isUsedFlagPerModule.at(offsetForModuleInSymbolTableEntry);
-    });
+                const std::size_t offsetForModuleInSymbolTableEntry = std::distance(modulesMatchingName.begin(), foundModuleMatchingSignature);
+                const auto&       isUsedFlagPerModule               = foundModulesMatchingName->isUnusedFlagPerModule;
+                return !isUsedFlagPerModule.at(offsetForModuleInSymbolTableEntry);
+            });
     return usageStatusPerModule;
 }
 

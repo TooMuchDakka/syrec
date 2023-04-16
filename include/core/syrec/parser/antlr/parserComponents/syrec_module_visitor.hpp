@@ -13,7 +13,8 @@ namespace parser {
     public:
         explicit SyReCModuleVisitor(const std::shared_ptr<SharedVisitorData>& sharedVisitorData) : SyReCCustomBaseVisitor(sharedVisitorData),
             foundModules(syrec::Module::vec()),
-            statementVisitor(std::make_unique<SyReCStatementVisitor>(SyReCStatementVisitor(sharedVisitorData)))
+            statementVisitor(std::make_unique<SyReCStatementVisitor>(SyReCStatementVisitor(sharedVisitorData))),
+            lastDeclaredModuleIdent("")
         {}
 
         std::any visitProgram(SyReCParser::ProgramContext* context) override;
@@ -25,6 +26,7 @@ namespace parser {
     private:
         syrec::Module::vec                     foundModules;
         std::unique_ptr<SyReCStatementVisitor> statementVisitor;
+        std::string                            lastDeclaredModuleIdent;
 
         std::any visitModule(SyReCParser::ModuleContext* context) override;
         std::any visitParameterList(SyReCParser::ParameterListContext* context) override;
@@ -34,8 +36,10 @@ namespace parser {
         std::any visitStatementList(SyReCParser::StatementListContext* context) override;
 
         void removeUnusedVariablesAndParametersFromModule(const syrec::Module::ptr& module) const;
-        void removeUnusedModules();
-        void removeModulesWithoutParameters();
+        void removeUnusedModules(const std::string_view& expectedIdentOfTopLevelModuleToNotRemove);
+        void removeModulesWithoutParameters(const std::string_view& expectedIdentOfTopLevelModuleToNotRemove);
+
+        [[nodiscard]] std::string determineExpectedNameOfTopLevelModule() const;
 
         static std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
         static std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);

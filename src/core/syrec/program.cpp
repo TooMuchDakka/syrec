@@ -47,7 +47,15 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     }
     
     const char*                  bufferCasted = (char *)(buffer);
-    const auto parsingResult = ::parser::SyrecParserInterface::parseProgram(bufferCasted, bufferSizeInBytes, ::parser::ParserConfig(config.defaultBitwidth, false, false, config.reassociateExpressionEnabled));
+    const auto  parsingResult = ::parser::SyrecParserInterface::parseProgram(
+             bufferCasted,
+             bufferSizeInBytes,
+             ::parser::ParserConfig(config.defaultBitwidth,
+                                    false,
+                                    false,
+                                    config.reassociateExpressionEnabled,
+                                    config.removalOfUnusedVariablesAndModulesEnabled,
+                                    config.expectedMainModuleName));
     if (parsingResult.wasParsingSuccessful) {
         this->modulesVec = parsingResult.foundModules;
         return "";

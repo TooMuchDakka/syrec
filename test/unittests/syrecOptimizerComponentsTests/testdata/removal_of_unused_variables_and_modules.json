@@ -1,0 +1,38 @@
+{
+  "testRemovalOfUnusedInParameter": {
+    "circuit": "module main(in a(16), out b(16)) b += 0",
+    "expectedCircuit": "module main(out b(16)) b += 0"
+  },
+  "testRemovalOfUnusedOutParameter": {
+    "circuit": "module main(out a(16), out b(16)) b += 0",
+    "expectedCircuit": "module main(out b(16)) b += 0"
+  },
+  "testRemovalOfUnusedInoutParameter": {
+    "circuit": "module main(inout a(16), out b(16)) b += 0",
+    "expectedCircuit": "module main(out b(16)) b += 0"
+  },
+  "testRemovalOfUnusedWireLocal": {
+    "circuit": "module main(out b(16)) wire a(16) b += 0",
+    "expectedCircuit": "module main(out b(16)) b += 0"
+  },
+  "testRemovalOfUnusedStateLocal": {
+    "circuit": "module main(out b(16)) state a(16) b += 0",
+    "expectedCircuit": "module main(out b(16)) b += 0"
+  },
+  "testRemovalOfUnusedModule": {
+    "circuit": "module double(in a(16), out b(16)) b += (a << 1) module main(out b(16)) b += 1",
+    "expectedCircuit": "module main(out b(16)) b += 1"
+  },
+  "testRemovalOfUnusedModuleParametersAlsoDeletesModule": {
+    "circuit": "module double(in a(16), out b(16)) skip module main(out b(16)) b += 1",
+    "expectedCircuit": "module main(out b(16)) b += 1"
+  },
+  "testAttemptedRemovalOfTopLevelModuleWillNotBeDone": {
+    "circuit": "module double(in a(16)) skip",
+    "expectedCircuit": "module double() skip"
+  },
+  "testAttemptedRemovalOfTopLevelModuleWillNotBeDoneWhenDeclaringMultipleModules": {
+    "circuit": "module main(out b(16)) b += 1 module test(in a(16)) skip",
+    "expectedCircuit": "module main(out b(16)) b += 1"
+  }
+}
