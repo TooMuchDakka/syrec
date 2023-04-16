@@ -3,6 +3,7 @@
 #include "core/syrec/variable.hpp"
 #include "core/syrec/parser/custom_semantic_errors.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
+#include "core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp"
 
 #include <fmt/format.h>
 
@@ -21,6 +22,11 @@ syrec::Module::vec       SyReCModuleVisitor::getFoundModules() const {
 }
 
 std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) {
+    const auto                                dimensions = std::vector<unsigned int>({2, 4, 3});
+    const valueLookup::SignalValueLookup::ptr x = std::make_shared<valueLookup::SignalValueLookup>(valueLookup::SignalValueLookup(10, dimensions, 10)); 
+    x->invalidateStoredValueFor({1, std::nullopt});
+    const auto y = x->tryFetchValueFor({0, 3, 1}, std::nullopt);
+
     SymbolTable::openScope(sharedData->currentSymbolTableScope);
     for (const auto& module: context->module()) {
         const auto moduleParseResult = tryVisitAndConvertProductionReturnValue<syrec::Module::ptr>(module);
@@ -32,6 +38,12 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
                 foundModules.emplace_back(moduleParseResult.value());
             }
         }
+    }
+
+    // TODO: UNUSED_REFERENCE - Marked as used
+    if (sharedData->parserConfig->isRemovalOfUnusedVariablesAndModulesEnabled) {
+        removeUnusedModules();
+        removeModulesWithoutParameters();
     }
 
     return 0;
@@ -66,6 +78,11 @@ std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
 
     const auto validUserDefinedModuleStatements = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
     isDeclaredModuleValid &= validUserDefinedModuleStatements.has_value() && !validUserDefinedModuleStatements->empty();
+
+    // TODO: UNUSED_REFERENCE - Marked as used
+    if (isDeclaredModuleValid && sharedData->parserConfig->isRemovalOfUnusedVariablesAndModulesEnabled) {
+        removeUnusedVariablesAndParametersFromModule(module);
+    }
 
     SymbolTable::closeScope(sharedData->currentSymbolTableScope);
     sharedData->currentModuleCallNestingLevel--;
@@ -175,6 +192,57 @@ std::any SyReCModuleVisitor::visitStatementList(SyReCParser::StatementListContex
     return statementVisitor->visitStatementList(context);
 }
 
+void SyReCModuleVisitor::removeUnusedVariablesAndParametersFromModule(const syrec::Module::ptr& module) const {
+    // TODO: UNUSED_REFERENCE - Marked as used
+    const auto&                        unusedModuleLocalsOrVariables = sharedData->currentSymbolTableScope->getUnusedLiterals();
+
+    // Use the erase/remove idiom
+    module->parameters.erase(
+        std::remove_if(
+                module->parameters.begin(),
+                module->parameters.end(),
+                [&unusedModuleLocalsOrVariables](const syrec::Variable::ptr& moduleParameter) {
+                        return unusedModuleLocalsOrVariables.find(moduleParameter->name) != unusedModuleLocalsOrVariables.end();
+                }),
+        module->parameters.end());
+
+    module->variables.erase(
+    std::remove_if(
+            module->variables.begin(),
+            module->variables.end(),
+            [&unusedModuleLocalsOrVariables](const syrec::Variable::ptr& moduleParameter) {
+                return unusedModuleLocalsOrVariables.find(moduleParameter->name) != unusedModuleLocalsOrVariables.end();
+            }),
+    module->variables.end());
+}
+
+// TODO: UNUSED_REFERENCE - Marked as used
+void SyReCModuleVisitor::removeUnusedModules() {
+    const auto& wasUsedStatusPerFoundModule = sharedData->currentSymbolTableScope->determineIfModuleWasUsed(foundModules);
+    std::size_t moduleIdx                   = 0;
+
+    for (auto foundModule = foundModules.begin(); foundModule != foundModules.end();) {
+        if (!wasUsedStatusPerFoundModule.at(moduleIdx)) {
+            foundModules.erase(foundModule);
+        } else {
+            ++foundModule;
+        }
+        moduleIdx++;
+    }
+}
+
+// TODO: UNUSED_REFERENCE - Marked as used
+void SyReCModuleVisitor::removeModulesWithoutParameters() {
+    foundModules.erase(
+    std::remove_if(
+            foundModules.begin(),
+            foundModules.end(),
+            [](const syrec::Module::ptr& module) {
+                return module->parameters.empty();
+            }),
+    foundModules.end());
+}
+
 std::optional<syrec::Variable::Types> SyReCModuleVisitor::getParameterType(const antlr4::Token* token) {
     if (token == nullptr) {
         return std::nullopt;
@@ -215,4 +283,3 @@ std::optional<syrec::Variable::Types> SyReCModuleVisitor::getSignalType(const an
     }
     return signalType;
 }
-

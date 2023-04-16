@@ -193,14 +193,32 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
         // TODO: GEN_ERROR Ambigous call, more than one match for given arguments
         // TODO: Error position
         createError(mapAntlrTokenPosition(context->moduleIdent), fmt::format(AmbigousCall, *moduleIdent));
+
+        
+        // TODO: UNUSED_REFERENCE - Marked as used
+        /*
+         * Since we have an ambiguous call, we will mark all modules matching the current call signature as used
+         */
+        for (const auto& moduleMatchingCall: (*potentialModulesToCall)->getMatchesForGuess()) {
+            sharedData->currentSymbolTableScope->markModulesMatchingSignatureAsUsed(moduleMatchingCall);   
+        }
         return 0;
     }
+
+    
+    // TODO: UNUSED_REFERENCE - Marked as used
+    /*
+     * At this point we know that there must be a matching module for the current call/uncall statement, so we mark the former as used.
+     * We do this before checking whether the call is valid (at this point it would either indicate a missmatch between the formal and actual parameters)
+     * or a semantic error between a call / uncall
+     */
+    sharedData->currentSymbolTableScope->markModulesMatchingSignatureAsUsed((*potentialModulesToCall)->getMatchesForGuess().front());
 
     if (!isValidCallOperationDefined) {
         return 0;
     }
 
-    const auto moduleMatchingCalleeArguments = (*potentialModulesToCall)->getMatchesForGuess().at(0);
+    const auto moduleMatchingCalleeArguments = (*potentialModulesToCall)->getMatchesForGuess().front();
     if (*isCallOperation) {
         addStatementToOpenContainer(std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments));
     } else {
@@ -229,7 +247,8 @@ std::any SyReCStatementVisitor::visitForStatement(SyReCParser::ForStatementConte
             loopHeaderValid = false;
         } else {
             SymbolTable::openScope(sharedData->currentSymbolTableScope);
-            sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(*loopVariableIdent));
+            // TODO: Since we are currently assuming that the value of a signal can be stored in at most 32 bits, we assume the latter as the bit width of the loop variable value
+            sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(*loopVariableIdent), 32, std::nullopt);
             sharedData->lastDeclaredLoopVariable.emplace(*loopVariableIdent);
         }
     }

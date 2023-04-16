@@ -17,7 +17,7 @@ bool SymbolTable::contains(const syrec::Module::ptr& module) const {
     bool       foundModuleMatchingSignature    = false;
     const auto module_search_result = this->modules.find(module->name);
     if (module_search_result != this->modules.end()) {
-        const syrec::Module::vec modulesWithMatchingName = module_search_result->second;
+        const syrec::Module::vec modulesWithMatchingName = module_search_result->second->matchingModules;
 
         foundModuleMatchingSignature = std::find_if(
             cbegin(modulesWithMatchingName),
@@ -33,7 +33,7 @@ std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> SymbolTabl
     std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> found_entry;
 
     if (this->locals.find(literalIdent) != this->locals.end()) {
-        found_entry.emplace(this->locals.find(literalIdent)->second);
+        found_entry.emplace(this->locals.find(literalIdent)->second->variableInformation);
     }
     else if (nullptr != outer) {
         return outer->getVariable(literalIdent);
@@ -44,7 +44,7 @@ std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> SymbolTabl
 std::optional<syrec::Module::vec> SymbolTable::getMatchingModulesForName(const std::string_view& moduleName) const {
     std::optional<syrec::Module::vec> matchingModules;
     if (this->modules.find(moduleName) != this->modules.end()) {
-        matchingModules.emplace(this->modules.find(moduleName)->second);
+        matchingModules.emplace(this->modules.find(moduleName)->second->matchingModules);
     } else if (nullptr != outer) {
         matchingModules = outer->getMatchingModulesForName(moduleName);
     }
@@ -56,20 +56,16 @@ bool SymbolTable::addEntry(const syrec::Variable::ptr& variable) {
         return false;
     }
     
-    const std::variant<syrec::Variable::ptr, syrec::Number::ptr> symbolTableEntryValue (variable);
-    const std::pair symbolTableEntry(variable->name, symbolTableEntryValue);
-    locals.insert(symbolTableEntry);
+    locals.insert(std::make_pair(variable->name, std::make_shared<VariableSymbolTableEntry>(VariableSymbolTableEntry(variable))));
     return true;
 }
 
-bool SymbolTable::addEntry(const syrec::Number::ptr& number) {
+bool SymbolTable::addEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultLoopVariableValue) {
     if (nullptr == number || !number->isLoopVariable() || number->variableName().empty() || contains(number->variableName())) {
         return false;
     }
 
-    const std::variant<syrec::Variable::ptr, syrec::Number::ptr> symbolTableEntryValue(number);
-    const std::pair                                symbolTableEntry(number->variableName(), symbolTableEntryValue);
-    locals.insert(symbolTableEntry);
+    locals.insert(std::make_pair(number->variableName(), std::make_shared<VariableSymbolTableEntry>(VariableSymbolTableEntry(number, bitsRequiredToStoreMaximumValue, defaultLoopVariableValue))));
     return true;
 }
 
@@ -79,11 +75,12 @@ bool SymbolTable::addEntry(const syrec::Module::ptr& module) {
     }
 
     if (!contains(module)) {
-        modules.insert(std::pair<std::string, std::vector<std::shared_ptr<syrec::Module>>>(module->name, syrec::Module::vec()));
+        modules.insert(std::pair(module->name, std::make_shared<ModuleSymbolTableEntry>(ModuleSymbolTableEntry(module))));
+    } else {
+        ModuleSymbolTableEntry& modulesWithMatchingName = *getEntryForModulesWithMatchingName(module->name);
+        modulesWithMatchingName.matchingModules.emplace_back(module);
+        modulesWithMatchingName.isUnusedFlagPerModule.emplace_back(true);
     }
-    
-    std::vector<syrec::Module::ptr> &modulesWithMatchingName = modules.find(module->name)->second;
-    modulesWithMatchingName.emplace_back(module);
     return true;
 }
 
@@ -116,3 +113,101 @@ bool SymbolTable::isAssignableTo(const syrec::Variable::ptr& formalParameter, co
         && formalParameter->dimensions == actualParameter->dimensions
         && formalParameter->bitwidth == actualParameter->bitwidth;
 }
+
+void SymbolTable::markLiteralAsUsed(const std::string_view& literalIdent) const {
+    if (const auto& optionalSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); optionalSymbolTableEntryForLiteral != nullptr) {
+        optionalSymbolTableEntryForLiteral->isUnused = false;
+    }
+}
+
+void SymbolTable::markModulesMatchingSignatureAsUsed(const syrec::Module::ptr& module) const {
+    const auto matchingModulesForName = getEntryForModulesWithMatchingName(module->name);
+    if (matchingModulesForName == nullptr) {
+        return;
+    }
+
+    const auto              numMatchingModulesForName = matchingModulesForName->matchingModules.size();
+    const auto& currentlyStoredModules    = matchingModulesForName->matchingModules;
+    auto&                   unusedStatusPerModule     = matchingModulesForName->isUnusedFlagPerModule;
+
+    for (std::size_t moduleIdx = 0; moduleIdx < numMatchingModulesForName; ++moduleIdx) {
+        if (!unusedStatusPerModule.at(moduleIdx)) {
+            continue;
+        }
+
+        if (doModuleSignaturesMatch(module, currentlyStoredModules.at(moduleIdx))) {
+            unusedStatusPerModule.at(moduleIdx) = false;
+        }
+    }
+}
+
+[[nodiscard]] std::set<std::string> SymbolTable::getUnusedLiterals() const {
+    std::set<std::string> unusedLiterals;
+    for (const auto& localKVPair : locals) {
+        const auto& localSymbolTableEntry = localKVPair.second;
+        if (localSymbolTableEntry->isUnused) {
+            unusedLiterals.emplace(localKVPair.first);
+        }
+    }
+    return unusedLiterals;
+}
+
+std::vector<bool> SymbolTable::determineIfModuleWasUsed(const syrec::Module::vec& modules) const {
+    std::vector<bool> usageStatusPerModule(modules.size());
+    std::transform(
+    modules.cbegin(),
+    modules.cend(),
+    std::back_inserter(usageStatusPerModule),
+    [&](const syrec::Module::ptr& moduleToCheck) {
+        const auto foundModulesMatchingName = getEntryForModulesWithMatchingName(moduleToCheck->name);
+        if (foundModulesMatchingName ==nullptr) {
+            return false;
+        }
+
+        const auto& modulesMatchingName          = foundModulesMatchingName->matchingModules;
+        const auto& foundModuleMatchingSignature = std::find_if(
+                modulesMatchingName.cbegin(),
+                modulesMatchingName.cend(),
+                [&moduleToCheck](const syrec::Module::ptr& moduleInSymbolTable) {
+                    return doModuleSignaturesMatch(moduleInSymbolTable, moduleToCheck);
+                });
+
+        if (foundModuleMatchingSignature == modulesMatchingName.end()) {
+            return false;
+        }
+
+        const std::size_t offsetForModuleInSymbolTableEntry             = std::distance(modulesMatchingName.begin(), foundModuleMatchingSignature);
+        const auto& isUsedFlagPerModule                           = foundModulesMatchingName->isUnusedFlagPerModule;
+        return isUsedFlagPerModule.at(offsetForModuleInSymbolTableEntry);
+    });
+    return usageStatusPerModule;
+}
+
+SymbolTable::ModuleSymbolTableEntry* SymbolTable::getEntryForModulesWithMatchingName(const std::string_view& moduleIdent) const {
+    const auto& symbolTableEntryForModule = modules.find(moduleIdent);
+    
+    if (symbolTableEntryForModule != modules.end()) {
+        return &(*symbolTableEntryForModule->second);
+    }
+
+    if (nullptr != outer) {
+        return outer->getEntryForModulesWithMatchingName(moduleIdent);
+    }
+
+    return nullptr;
+}
+
+SymbolTable::VariableSymbolTableEntry* SymbolTable::getEntryForVariable(const std::string_view& literalIdent) const {
+    const auto& symbolTableEntryForIdent = locals.find(literalIdent);
+
+    if (symbolTableEntryForIdent != locals.end()) {
+        return &(*symbolTableEntryForIdent->second);
+    }
+
+    if (nullptr != outer) {
+        return outer->getEntryForVariable(literalIdent);
+    }
+
+    return nullptr;
+}
+

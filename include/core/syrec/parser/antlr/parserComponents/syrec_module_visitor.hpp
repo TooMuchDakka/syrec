@@ -33,6 +33,10 @@ namespace parser {
         std::any visitSignalDeclaration(SyReCParser::SignalDeclarationContext* context) override;
         std::any visitStatementList(SyReCParser::StatementListContext* context) override;
 
+        void removeUnusedVariablesAndParametersFromModule(const syrec::Module::ptr& module) const;
+        void removeUnusedModules();
+        void removeModulesWithoutParameters();
+
         static std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
         static std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);
     };

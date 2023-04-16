@@ -159,6 +159,9 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
             const syrec::VariableAccess::ptr container = std::make_shared<syrec::VariableAccess>();
             container->setVar(std::get<syrec::Variable::ptr>(*signalSymTabEntry));
             accessedSignal.emplace(container);
+
+            // TODO: UNUSED_REFERENCE - Marked as used
+            sharedData->currentSymbolTableScope->markLiteralAsUsed(signalIdent);
         }
     }
 
@@ -265,6 +268,9 @@ std::any SyReCCustomBaseVisitor::visitNumberFromSignalwidth(SyReCParser::NumberF
     const auto&                       symTableEntryForSignal = sharedData->currentSymbolTableScope->getVariable(signalIdent);
     if (symTableEntryForSignal.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symTableEntryForSignal)) {
         signalWidthOfSignal.emplace(std::make_shared<syrec::Number>(std::get<syrec::Variable::ptr>(*symTableEntryForSignal)->bitwidth));
+
+        // TODO: UNUSED_REFERENCE - Marked as used
+        sharedData->currentSymbolTableScope->markLiteralAsUsed(signalIdent);
     } else {
         // TODO: GEN_ERROR, this should not happen
         // TODO: Error position
@@ -346,6 +352,9 @@ std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::Number
                 TokenPosition(context->IDENT()->getSymbol()->getLine(), context->IDENT()->getSymbol()->getCharPositionInLine()))) {
         return std::nullopt;
     }
+
+    // TODO: UNUSED_REFERENCE - Marked as used
+    sharedData->currentSymbolTableScope->markLiteralAsUsed(signalIdent);
 
     if (sharedData->lastDeclaredLoopVariable.has_value() && *sharedData->lastDeclaredLoopVariable == signalIdent) {
         createError(mapAntlrTokenPosition(context->IDENT()->getSymbol()), fmt::format(CannotReferenceLoopVariableInInitalValueDefinition, signalIdent));

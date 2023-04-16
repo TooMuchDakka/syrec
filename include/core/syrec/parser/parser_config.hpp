@@ -6,14 +6,21 @@ namespace parser {
         unsigned int cDefaultSignalWidth;
         bool         supportBroadcastingExpressionOperands;
         bool         supportBroadcastingAssignmentOperands;
-        bool reassociateExpressionsEnabled;
+        bool         reassociateExpressionsEnabled;
+        bool         isRemovalOfUnusedVariablesAndModulesEnabled;
 
         explicit ParserConfig(
             const unsigned int defaultSignalWidth = 32U, 
             const bool supportBroadcastingExpressionOperands = false,
             const bool supportBroadcastingAssignmentOperands = false,
-            const bool reassociateExpressionEnabled = false):
-            cDefaultSignalWidth(defaultSignalWidth), supportBroadcastingExpressionOperands(supportBroadcastingExpressionOperands), supportBroadcastingAssignmentOperands(supportBroadcastingAssignmentOperands), reassociateExpressionsEnabled(reassociateExpressionEnabled) {};
+            const bool reassociateExpressionEnabled = false,
+            const bool isRemovalOfUnusedVariablesAndModulesEnabled = false):
+                cDefaultSignalWidth(defaultSignalWidth),
+                supportBroadcastingExpressionOperands(supportBroadcastingExpressionOperands),
+                supportBroadcastingAssignmentOperands(supportBroadcastingAssignmentOperands),
+                reassociateExpressionsEnabled(reassociateExpressionEnabled),
+                isRemovalOfUnusedVariablesAndModulesEnabled(isRemovalOfUnusedVariablesAndModulesEnabled)
+                {}
 
         
         ParserConfig& operator=(const ParserConfig& copy) {
@@ -21,6 +28,7 @@ namespace parser {
             supportBroadcastingExpressionOperands = copy.supportBroadcastingExpressionOperands;
             supportBroadcastingAssignmentOperands = copy.supportBroadcastingAssignmentOperands;
             reassociateExpressionsEnabled         = copy.reassociateExpressionsEnabled;
+            isRemovalOfUnusedVariablesAndModulesEnabled = copy.isRemovalOfUnusedVariablesAndModulesEnabled;
             return *this;
         }
     };
