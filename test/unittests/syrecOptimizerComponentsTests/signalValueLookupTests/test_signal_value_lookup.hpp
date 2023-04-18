@@ -55,9 +55,9 @@ namespace valueLookup {
             return bitRangeToCheck.first >= other.first && bitRangeToCheck.second <= other.second;
         }
 
-        [[nodiscard]] static unsigned int determineExpectedValueForBitRange(const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) {
+        [[nodiscard]] static unsigned int determineValueForBitRangeFromValue(const unsigned int value, const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) {
             if (bitRange.first == bitRange.second) {
-                return (defaultValue & (1 << bitRange.first)) >> bitRange.first;
+                return (value & (1 << bitRange.first)) >> bitRange.first;
             }
 
             unsigned int maskingBitMask = UINT_MAX;
@@ -70,7 +70,53 @@ namespace valueLookup {
                 maskingBitMask >>= defaultSignalBitwidth - (bitRange.second + 1);
             }
 
-            return (defaultValue & maskingBitMask) >> bitRange.first;
+            return (value & maskingBitMask) >> bitRange.first;
+        }
+
+        [[nodiscard]] static unsigned int determineExpectedValueForBitRange(const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) {
+            return determineValueForBitRangeFromValue(defaultValue, bitRange);
+        }
+
+        static void resetAllValuesTo(const SignalValueLookup::ptr& signalValueLookup, const unsigned int newDefaultValue) {
+            std::vector<std::optional<unsigned int>> dimensionAccessToReset(defaultSignalDimensions.size(), 0);
+            std::size_t                              dimensionIdx        = defaultSignalDimensions.size() - 1;
+            const std::size_t                        lastDefinedSignalDimensionIdx = defaultSignalDimensions.size() - 1;
+
+            bool continueResetting = true;
+            while (continueResetting) {
+                const unsigned int numValuesForPosition = defaultSignalDimensions.at(dimensionIdx);
+                for (unsigned int value = 0; value < numValuesForPosition; ++value) {
+                    dimensionAccessToReset[dimensionIdx] = value;
+                    signalValueLookup->updateStoredValueFor(dimensionAccessToReset, std::nullopt, newDefaultValue);
+                }
+
+                dimensionAccessToReset.at(dimensionIdx) = 0;
+                bool       backtracking                 = dimensionIdx > 0;
+                const bool hadToBacktrack               = backtracking;
+                bool       didBacktrackMoreThanOneLevel = false;
+                while (backtracking) {
+                    dimensionIdx--;
+                    const unsigned valuesForPrevPosition      = defaultSignalDimensions.at(dimensionIdx);
+                    const auto&    currentValueAtPrevPosition = *dimensionAccessToReset.at(dimensionIdx);
+                    if (currentValueAtPrevPosition + 1 == valuesForPrevPosition) {
+                        dimensionAccessToReset.at(dimensionIdx) = 0;
+                        backtracking                            = dimensionIdx > 0;
+                        didBacktrackMoreThanOneLevel            = true;
+                    } else {
+                        dimensionAccessToReset.at(dimensionIdx) = currentValueAtPrevPosition + 1;
+                        // If we did not backtrack we process the current dimension further by simply undo or decrement of the dimension idx
+                        if (!didBacktrackMoreThanOneLevel) {
+                            dimensionIdx++;   
+                        } else {
+                            // If we backtracked at least one level back, we start processing again at the last possible signal dimension
+                            dimensionIdx = lastDefinedSignalDimensionIdx;
+                        }
+                        backtracking = false;
+                    }
+                }
+
+                continueResetting = !(hadToBacktrack && dimensionIdx == 0 && dimensionAccessToReset.front() == 0);
+            }
         }
 
     protected:

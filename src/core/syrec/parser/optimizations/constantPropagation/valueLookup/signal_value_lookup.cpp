@@ -61,6 +61,17 @@ std::any SignalValueLookup::transformExistingValueByMergingWithNewOne(const std:
 
 
 unsigned int SignalValueLookup::transformExistingSignalValueByMergingWithNewOne(const unsigned int currentValue, const unsigned int newValue, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partsToUpdate) {
+    if (partsToUpdate.first == partsToUpdate.second) {
+        /*
+         * We at first create the layer mask to zero the accessed bit in the current value
+         * We then simply apply an OR operation of the value from the previous step with the
+         * new value shifted to the accessed bit position. We are assuming that new value is either 0 or 1
+         */
+        const unsigned int           layerMask                   = ~(1 << partsToUpdate.first);
+        const unsigned int extractValueOfBitOfNewValue = newValue & 1;
+        return (currentValue & layerMask) | (extractValueOfBitOfNewValue << partsToUpdate.first);
+    }
+
     /*
      * Assume for we are working with an 8-bit signal that currently has a value of 00011111 (0x1F) and we are updating the bit range .2:5 with the value 5 (101)
      * We at first zero out the accessed bit range in the stored value with the help of a layer mask

@@ -513,7 +513,7 @@ void BaseValueLookup<Vt>::updateStoredValueFor(const std::vector<std::optional<u
     // Since we are trying to update an entry in a lookup the defined access on the dimension must be fully specified (i.e. for every dimension of the signal) and must not access all values of a dimension for any dimension
     std::shared_ptr<LayerData<std::map<unsigned int, std::optional<Vt>>>> valueLookupLayer = valueLookup;
 
-    for (std::size_t dimension = 1; dimension < signalInformation.valuesPerDimension.size() - 1; ++dimension) {
+    for (std::size_t dimension = 1; dimension < signalInformation.valuesPerDimension.size(); ++dimension) {
         valueLookupLayer = valueLookupLayer->nextLayerLinks[(*transformedAccessedDimensions).at(dimension - 1)];
     }
 
