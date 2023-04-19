@@ -1,0 +1,6 @@
+{
+  "simplePropagationExample": {
+    "circuit": "module main(in a(16), out b(16), out c(16)) c += (2 + 10); c -= (b + 1); b.0:2 += c.0:2; c.0:2 += 3; b += 10",
+    "expectedCircuit": "module main(in a(16), out b(16), out c(16)) c += 12"
+  }
+}
