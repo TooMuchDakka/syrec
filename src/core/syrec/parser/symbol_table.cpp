@@ -79,7 +79,7 @@ bool SymbolTable::addEntry(const syrec::Module::ptr& module) {
     } else {
         ModuleSymbolTableEntry& modulesWithMatchingName = *getEntryForModulesWithMatchingName(module->name);
         modulesWithMatchingName.matchingModules.emplace_back(module);
-        modulesWithMatchingName.isUnusedFlagPerModule.emplace_back(true);
+        modulesWithMatchingName.referenceCountsPerModule.emplace_back(0);
     }
     return true;
 }
@@ -114,38 +114,76 @@ bool SymbolTable::isAssignableTo(const syrec::Variable::ptr& formalParameter, co
         && formalParameter->bitwidth == actualParameter->bitwidth;
 }
 
-void SymbolTable::markLiteralAsUsed(const std::string_view& literalIdent) const {
-    if (const auto& optionalSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); optionalSymbolTableEntryForLiteral != nullptr) {
-        optionalSymbolTableEntryForLiteral->isUnused = false;
+void SymbolTable::incrementLiteralReferenceCount(const std::string_view& literalIdent) const {
+    if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
+        if (foundSymbolTableEntryForLiteral->referenceCount == SIZE_MAX) {
+            return;
+        }
+        foundSymbolTableEntryForLiteral->referenceCount++;
     }
 }
 
-void SymbolTable::markModulesMatchingSignatureAsUsed(const syrec::Module::ptr& module) const {
-    const auto matchingModulesForName = getEntryForModulesWithMatchingName(module->name);
-    if (matchingModulesForName == nullptr) {
+void SymbolTable::decrementLiteralReferenceCount(const std::string_view& literalIdent) const {
+    if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
+        foundSymbolTableEntryForLiteral->referenceCount = std::min(static_cast<std::size_t>(0), foundSymbolTableEntryForLiteral->referenceCount - 1);
+    }
+}
+
+void SymbolTable::incrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const {
+    incrementOrDecrementReferenceCountOfModulesMatchingSignature(module, true);
+}
+
+void SymbolTable::decrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const {
+    incrementOrDecrementReferenceCountOfModulesMatchingSignature(module, false);
+}
+
+std::optional<unsigned int> SymbolTable::tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const {
+    const auto& symbolTableEntryForVariable = getEntryForVariable(assignedToSignalParts->var->name);
+    if (symbolTableEntryForVariable == nullptr || !symbolTableEntryForVariable->optionalValueLookup.has_value() || !doesVariableAccessAllowValueLookup(symbolTableEntryForVariable, assignedToSignalParts)) {
+        return std::nullopt;
+    }
+    
+    const auto  isAssignedToVariableLoopVariable = std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation);
+    const auto& transformedBitRange = tryTransformAccessedBitRange(assignedToSignalParts);
+    const auto& transformedDimensionAccess = tryTransformAccessedDimensions(assignedToSignalParts, isAssignedToVariableLoopVariable);
+
+    const auto& signalValueLookup = *symbolTableEntryForVariable->optionalValueLookup;
+    return signalValueLookup->tryFetchValueFor(transformedDimensionAccess, transformedBitRange);
+}
+
+void SymbolTable::invalidateStoredValuesFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const {
+    const auto& symbolTableEntryForVariable = getEntryForVariable(assignedToSignalParts->var->name);
+    if (symbolTableEntryForVariable == nullptr || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {
         return;
     }
 
-    const auto              numMatchingModulesForName = matchingModulesForName->matchingModules.size();
-    const auto& currentlyStoredModules    = matchingModulesForName->matchingModules;
-    auto&                   unusedStatusPerModule     = matchingModulesForName->isUnusedFlagPerModule;
-
-    for (std::size_t moduleIdx = 0; moduleIdx < numMatchingModulesForName; ++moduleIdx) {
-        if (!unusedStatusPerModule.at(moduleIdx)) {
-            continue;
+    const auto  isAssignedToVariableLoopVariable = std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation);
+    const auto& transformedBitRange              = tryTransformAccessedBitRange(assignedToSignalParts);
+    const auto& transformedDimensionAccess       = tryTransformAccessedDimensions(assignedToSignalParts, isAssignedToVariableLoopVariable);
+    
+    const auto& signalValueLookup = *symbolTableEntryForVariable->optionalValueLookup;
+    if (!transformedBitRange.has_value()) {
+        if (transformedDimensionAccess.empty()) {
+            signalValueLookup->invalidateAllStoredValuesForSignal();
+        } else {
+            signalValueLookup->invalidateStoredValueFor(transformedDimensionAccess);
         }
-
-        if (doModuleSignaturesMatch(module, currentlyStoredModules.at(moduleIdx))) {
-            unusedStatusPerModule.at(moduleIdx) = false;
+    }
+    else {
+        if (isAssignedToVariableLoopVariable) {
+            signalValueLookup->invalidateStoredValueFor(transformedDimensionAccess);
+        } else {
+            signalValueLookup->invalidateStoredValueForBitrange(transformedDimensionAccess, *transformedBitRange);   
         }
     }
 }
+
 
 [[nodiscard]] std::set<std::string> SymbolTable::getUnusedLiterals() const {
     std::set<std::string> unusedLiterals;
     for (const auto& localKVPair : locals) {
         const auto& localSymbolTableEntry = localKVPair.second;
-        if (localSymbolTableEntry->isUnused) {
+        if (localSymbolTableEntry->referenceCount == 0) {
             unusedLiterals.emplace(localKVPair.first);
         }
     }
@@ -177,8 +215,8 @@ std::vector<bool> SymbolTable::determineIfModuleWasUsed(const syrec::Module::vec
                 }
 
                 const std::size_t offsetForModuleInSymbolTableEntry = std::distance(modulesMatchingName.begin(), foundModuleMatchingSignature);
-                const auto&       isUsedFlagPerModule               = foundModulesMatchingName->isUnusedFlagPerModule;
-                return !isUsedFlagPerModule.at(offsetForModuleInSymbolTableEntry);
+                const auto&       referenceCountsPerModule               = foundModulesMatchingName->referenceCountsPerModule;
+                return referenceCountsPerModule.at(offsetForModuleInSymbolTableEntry) > 0;
             });
     return usageStatusPerModule;
 }
@@ -211,3 +249,108 @@ SymbolTable::VariableSymbolTableEntry* SymbolTable::getEntryForVariable(const st
     return nullptr;
 }
 
+void SymbolTable::incrementOrDecrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module, bool incrementReferenceCount) const {
+    const auto matchingModulesForName = getEntryForModulesWithMatchingName(module->name);
+    if (matchingModulesForName == nullptr) {
+        return;
+    }
+
+    const auto  numMatchingModulesForName = matchingModulesForName->matchingModules.size();
+    const auto& currentlyStoredModules    = matchingModulesForName->matchingModules;
+    auto&       referenceCountPerModule   = matchingModulesForName->referenceCountsPerModule;
+
+    for (std::size_t moduleIdx = 0; moduleIdx < numMatchingModulesForName; ++moduleIdx) {
+        if (referenceCountPerModule.at(moduleIdx) > 0) {
+            continue;
+        }
+
+        if (doModuleSignaturesMatch(module, currentlyStoredModules.at(moduleIdx))) {
+            auto& currentReferenceCountOfModule = referenceCountPerModule.at(moduleIdx);
+            if (incrementReferenceCount) {
+                if (currentReferenceCountOfModule != SIZE_MAX) {
+                    currentReferenceCountOfModule++;
+                }
+            } else {
+                currentReferenceCountOfModule = std::min(static_cast<std::size_t>(0), referenceCountPerModule.at(moduleIdx) - 1);   
+            }
+        }
+    }
+}
+
+bool SymbolTable::doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const {
+    const auto isAssignedToVariableLoopVariable = std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation);
+    if (isAssignedToVariableLoopVariable && (variableAccess->range.has_value() || !variableAccess->indexes.empty())) {
+        return false;
+    }
+
+    if (!variableAccess->indexes.empty()) {
+        if (std::any_of(
+                    variableAccess->indexes.cbegin(),
+                    variableAccess->indexes.cend(),
+                    [](const syrec::expression::ptr& accessedValueOfDimensionExpr) {
+                        if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr != nullptr) {
+                            return !numericExpr->value->isConstant();
+                        }
+                        return true;
+                    })) {
+            return false;
+        }
+    } else {
+        if (variableAccess->var->dimensions.size() > 1 || variableAccess->var->dimensions.front() > 1) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> SymbolTable::tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts) {
+    const auto&                                                               accessedBitRange = accessedSignalParts->range;
+    std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> transformedBitRangeAccess;
+    if (accessedBitRange.has_value()) {
+        unsigned int bitRangeStart = 0;
+        unsigned int bitRangeEnd   = accessedSignalParts->var->bitwidth - 1;
+        if (accessedBitRange->first->isConstant() && accessedBitRange->second->isConstant()) {
+            bitRangeStart = accessedBitRange->first->evaluate({});
+            bitRangeEnd   = accessedBitRange->second->evaluate({});
+        }
+        transformedBitRangeAccess.emplace(std::pair(bitRangeStart, bitRangeEnd));
+    }
+    return transformedBitRangeAccess;
+}
+
+std::vector<std::optional<unsigned>> SymbolTable::tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable) {
+    // TODO: Do we need to insert an entry into this vector when working with loop variables or 1D signals (for the latter it seems natural)
+    std::vector<std::optional<unsigned int>> transformedDimensionAccess;
+    if (!accessedSignalParts->indexes.empty() && !isAccessedSignalLoopVariable) {
+        std::transform(
+                accessedSignalParts->indexes.cbegin(),
+                accessedSignalParts->indexes.cend(),
+                std::back_inserter(transformedDimensionAccess),
+                [](const syrec::expression::ptr& accessedValueOfDimensionExpr) -> std::optional<unsigned int> {
+                    if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr != nullptr) {
+                        if (numericExpr->value->isConstant()) {
+                            return std::make_optional(numericExpr->value->evaluate({}));
+                        }
+                    }
+                    return std::nullopt;
+                });
+    }
+    return transformedDimensionAccess;
+}
+
+// TODO: CONSTANT_PROPAGATION: What should happen if the value cannot be stored inside the accessed signal part
+// TODO: CONSTANT_PROPAGATION: Should it be the responsibility of the caller to validate the assigned to signal part prior to this call ?
+void SymbolTable::updateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignalParts, unsigned int newValue) const {
+    const auto& symbolTableEntryForVariable = getEntryForVariable(assignedToSignalParts->var->name);
+    if (symbolTableEntryForVariable == nullptr || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {
+        return;
+    }
+
+    const auto isAssignedToVariableLoopVariable = std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation);
+    const auto& transformedDimensionAccess = tryTransformAccessedDimensions(assignedToSignalParts, isAssignedToVariableLoopVariable);
+    const auto& transformedBitRangeAccess        = tryTransformAccessedBitRange(assignedToSignalParts);
+    const auto& signalValueLookup                = *symbolTableEntryForVariable->optionalValueLookup;
+
+    signalValueLookup->updateStoredValueFor(transformedDimensionAccess, transformedBitRangeAccess, newValue);
+}

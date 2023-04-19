@@ -161,7 +161,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
             accessedSignal.emplace(container);
 
             // TODO: UNUSED_REFERENCE - Marked as used
-            sharedData->currentSymbolTableScope->markLiteralAsUsed(signalIdent);
+            sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);
         }
     }
 
@@ -237,7 +237,13 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
             // TODO: Create correct error message
             createError(restrictionErrorPosition, fmt::format(AccessingRestrictedPartOfSignal, signalIdent));
         } else {
-            return std::make_optional(std::make_shared<SignalEvaluationResult>(*accessedSignal));
+            if (sharedData->parserConfig->performConstantPropagation) {
+                const auto& fetchedValueForSignal = sharedData->currentSymbolTableScope->tryFetchValueForLiteral(*accessedSignal);
+                if (fetchedValueForSignal.has_value()) {
+                    return std::make_optional(std::make_shared<SignalEvaluationResult>(std::make_shared<syrec::Number>(*fetchedValueForSignal)));
+                }
+            }
+            return std::make_optional(std::make_shared<SignalEvaluationResult>(*accessedSignal));                
         }
     }
     return std::nullopt;
@@ -270,7 +276,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromSignalwidth(SyReCParser::NumberF
         signalWidthOfSignal.emplace(std::make_shared<syrec::Number>(std::get<syrec::Variable::ptr>(*symTableEntryForSignal)->bitwidth));
 
         // TODO: UNUSED_REFERENCE - Marked as used
-        sharedData->currentSymbolTableScope->markLiteralAsUsed(signalIdent);
+        sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);
     } else {
         // TODO: GEN_ERROR, this should not happen
         // TODO: Error position
@@ -340,6 +346,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromExpression(SyReCParser::NumberFr
     return std::nullopt;
 }
 
+// TODO: Fetching of value for loop variable from loop variable mapping or from signal value lookup in symbol table ?
 std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::NumberFromLoopVariableContext* context) {
     if (context->IDENT() == nullptr) {
         return std::nullopt;
@@ -354,7 +361,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::Number
     }
 
     // TODO: UNUSED_REFERENCE - Marked as used
-    sharedData->currentSymbolTableScope->markLiteralAsUsed(signalIdent);
+    sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);
 
     if (sharedData->lastDeclaredLoopVariable.has_value() && *sharedData->lastDeclaredLoopVariable == signalIdent) {
         createError(mapAntlrTokenPosition(context->IDENT()->getSymbol()), fmt::format(CannotReferenceLoopVariableInInitalValueDefinition, signalIdent));

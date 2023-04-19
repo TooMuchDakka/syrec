@@ -92,13 +92,34 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                 createError(determineContextStartTokenPositionOrUseDefaultOne(context->signal()), "Broadcasting of operands is currently not supported");
             }
         } else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(mapAntlrTokenPosition(context->signal()->start), lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
+            // TODO: CONSTANT_PROPAGATION: Invalidate stored values if rhs is not constant
+            const auto& assignedToSignalParts = *(*assignedToSignal)->getAsVariableAccess();
+
+            const auto& containerOfExpressionContainingNewValue = (*assignmentOpRhsOperand)->getAsExpression();
+            const auto& exprContainingNewValue = *containerOfExpressionContainingNewValue;
+            // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
+            tryUpdateOrInvalidateStoredValueFor(assignedToSignalParts, exprContainingNewValue);
+
             // TODO: Add mapping from custom operation enum to internal "numeric"
             addStatementToOpenContainer(
                     std::make_shared<syrec::AssignStatement>(
-                            *(*assignedToSignal)->getAsVariableAccess(),
+                            assignedToSignalParts,
                             *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
-                            (*assignmentOpRhsOperand)->getAsExpression().value()));
+                            exprContainingNewValue));
         }
+        // TODO: CONSTANT_PROPAGATION: Invalidate stored values if rhs is not constant
+        /*
+         * Theoretically we can ignore out of range accesses since the would not destroy the value for any valid value of a dimension.
+         * What should happen if either the bit range access or value of dimension access is out of range (the latter should be covered by the above statement) or is malformed (i.e. syntax errors). Our visitor would not return any value, so what should we update now
+         * Should we opt to just invalidate the whole signal (even if we could identify some of the accessed dimensions ?
+         *
+         * The error handling for such cases should be done in the visitor of the signal (add flag that we are parsing the assigned to signal part to shared data and add handling to signal visitor production).
+         * Name this flag invalidateSignalValueOnError since the same error handling needs to be done in case of inout/out parameters in call statements
+         */
+    } else if (assignedToSignal.has_value() && (*assignedToSignal)->isVariableAccess()) {
+        // If we can determine which parts of the signal on the lhs of the assignment statement were accessed, we simply invalidate them in case not all semantic checks for the latter where correct
+        const auto& assignedToSignalParts = *(*assignedToSignal)->getAsVariableAccess();
+        sharedData->currentSymbolTableScope->invalidateStoredValuesFor(assignedToSignalParts);
     }
 
     if (sharedData->optionalExpectedExpressionSignalWidth.has_value()) {
@@ -200,19 +221,18 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
          * Since we have an ambiguous call, we will mark all modules matching the current call signature as used
          */
         for (const auto& moduleMatchingCall: (*potentialModulesToCall)->getMatchesForGuess()) {
-            sharedData->currentSymbolTableScope->markModulesMatchingSignatureAsUsed(moduleMatchingCall);   
+            sharedData->currentSymbolTableScope->incrementReferenceCountOfModulesMatchingSignature(moduleMatchingCall);   
         }
         return 0;
     }
 
-    
     // TODO: UNUSED_REFERENCE - Marked as used
     /*
      * At this point we know that there must be a matching module for the current call/uncall statement, so we mark the former as used.
      * We do this before checking whether the call is valid (at this point it would either indicate a missmatch between the formal and actual parameters)
      * or a semantic error between a call / uncall
      */
-    sharedData->currentSymbolTableScope->markModulesMatchingSignatureAsUsed((*potentialModulesToCall)->getMatchesForGuess().front());
+    sharedData->currentSymbolTableScope->incrementReferenceCountOfModulesMatchingSignature((*potentialModulesToCall)->getMatchesForGuess().front());
 
     if (!isValidCallOperationDefined) {
         return 0;
@@ -220,6 +240,8 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
 
     const auto moduleMatchingCalleeArguments = (*potentialModulesToCall)->getMatchesForGuess().front();
     if (*isCallOperation) {
+        // TODO: CONSTANT_PROPAGATION
+        invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(moduleMatchingCalleeArguments, calleeArguments);
         addStatementToOpenContainer(std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments));
     } else {
         addStatementToOpenContainer(std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments));
@@ -667,3 +689,42 @@ void SyReCStatementVisitor::liftRestrictionToAssignedToPartOfSignal(const syrec:
         updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
     }
 }
+
+// TODO: CONSTANT_PROPAGATION: Handling of out of range indizes for dimension or bit range
+// TODO: CONSTANT_PROPAGATION: In case the rhs expr was a constant, should we trim its value in case it cannot be stored in the lhs ?
+void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const {
+    if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(exprContainingNewValue); numericExpr != nullptr) {
+        if (!numericExpr->value->isConstant()) {
+            sharedData->currentSymbolTableScope->invalidateStoredValuesFor(assignedToVariableParts);
+            return;    
+        }
+
+        /*
+         * If we cannot determine which bits of the signal should be updated we instead invalidate the currently stored value
+         */
+        if (assignedToVariableParts->range.has_value() && (!assignedToVariableParts->range->first->isConstant() || !assignedToVariableParts->range->second->isConstant())) {
+            sharedData->currentSymbolTableScope->invalidateStoredValuesFor(assignedToVariableParts);
+        }
+        else {
+            const unsigned int exprContainingNewValueEvaluated = numericExpr->value->evaluate({});
+            sharedData->currentSymbolTableScope->updateStoredValueFor(assignedToVariableParts, exprContainingNewValueEvaluated);            
+        }
+    }
+}
+
+// TODO: CONSTANT_PROPAGATION: We are assuming that no loop variables or constant can be passed as parameter and that all passed callee arguments were declared
+void SyReCStatementVisitor::invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(const syrec::Module::ptr& calledModule, const std::vector<std::string>& calleeArguments) const {
+    std::size_t parameterIdx = 0;
+    for (const auto& formalCalleeArgument: calledModule->parameters) {
+        if (formalCalleeArgument->type == syrec::Variable::Types::Inout || formalCalleeArgument->type == syrec::Variable::Types::Out) {
+            const auto& symbolTableEntryForParameter = *sharedData->currentSymbolTableScope->getVariable(calleeArguments.at(parameterIdx));
+
+            auto variableAccessOnCalleeArgument = std::make_shared<syrec::VariableAccess>();
+            variableAccessOnCalleeArgument->setVar(std::get<syrec::Variable::ptr>(symbolTableEntryForParameter));
+
+            sharedData->currentSymbolTableScope->invalidateStoredValuesFor(variableAccessOnCalleeArgument);
+        }
+        parameterIdx++;
+    }
+}
+

@@ -24,9 +24,9 @@ std::optional<syrec::expression::ptr> ExpressionEvaluationResult::getAsExpressio
         return std::make_optional(std::get<syrec::expression::ptr>(this->evaluationResult.value()));
     }
 
-    const auto constantValueAndBitwidthPair = std::get<ConstantValueAndBitwidthPair>(this->evaluationResult.value());
-    const auto containerForConstantValue    = std::make_shared<syrec::Number>(constantValueAndBitwidthPair.first);
-    const auto generatedExpression          = std::make_shared<syrec::NumericExpression>(containerForConstantValue, constantValueAndBitwidthPair.second);
+    const auto& constantValueAndBitwidthPair = std::get<ConstantValueAndBitwidthPair>(this->evaluationResult.value());
+    const auto& containerForConstantValue    = std::make_shared<syrec::Number>(constantValueAndBitwidthPair.first);
+    const auto& generatedExpression          = std::make_shared<syrec::NumericExpression>(containerForConstantValue, constantValueAndBitwidthPair.second);
     return std::make_optional(generatedExpression);
 }
 

@@ -29,10 +29,18 @@ namespace parser {
         bool                                                                         addEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
         bool                                                                         addEntry(const syrec::Module::ptr& module);                     
 
-        // BEGIN
+        // BEGIN 
         // TODO: UNUSED_REFERENCE - Marked as used
-        void markLiteralAsUsed(const std::string_view& literalIdent) const;
-        void markModulesMatchingSignatureAsUsed(const syrec::Module::ptr& module) const;
+        void incrementLiteralReferenceCount(const std::string_view& literalIdent) const;
+        void decrementLiteralReferenceCount(const std::string_view& literalIdent) const;
+
+        void incrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const;
+        void decrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const;
+
+        // TODO: CONSTANT_PROPAGATION
+        [[nodiscard]] std::optional<unsigned int> tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
+        void                                  invalidateStoredValuesFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
+        void                                      updateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignalParts, unsigned int newValue) const;
 
         [[nodiscard]] std::set<std::string> getUnusedLiterals() const;
         [[nodiscard]] std::vector<bool>     determineIfModuleWasUsed(const syrec::Module::vec& modules) const;
@@ -46,11 +54,10 @@ namespace parser {
         struct VariableSymbolTableEntry {
             std::variant<syrec::Variable::ptr, syrec::Number::ptr> variableInformation;
             std::optional<valueLookup::SignalValueLookup::ptr>     optionalValueLookup;
-            bool                                                   isUnused;
+            std::size_t                                            referenceCount;
 
-            VariableSymbolTableEntry(const syrec::Variable::ptr& variable) {
+            VariableSymbolTableEntry(const syrec::Variable::ptr& variable): referenceCount(0) {
                 variableInformation = std::variant<syrec::Variable::ptr, syrec::Number::ptr>(variable);
-                isUnused            = true;
                 
                 switch (variable->type) {
                     case syrec::Variable::Types::Out:
@@ -68,9 +75,8 @@ namespace parser {
                 }
 
             }
-            VariableSymbolTableEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultLoopVariableValue) {
+            VariableSymbolTableEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultLoopVariableValue): referenceCount(0) {
                 variableInformation = std::variant<syrec::Variable::ptr, syrec::Number::ptr>(number);
-                isUnused            = true;
 
                 valueLookup::SignalValueLookup::ptr valueLookup;
                 if (defaultLoopVariableValue.has_value()) {
@@ -86,10 +92,10 @@ namespace parser {
 
         struct ModuleSymbolTableEntry {
             syrec::Module::vec matchingModules;
-            std::vector<bool>  isUnusedFlagPerModule;
+            std::vector<std::size_t> referenceCountsPerModule;
 
             ModuleSymbolTableEntry(const syrec::Module::ptr& module):
-                matchingModules({module}), isUnusedFlagPerModule({true}){}
+                matchingModules({module}), referenceCountsPerModule({0}){}
         };
 
         std::map<std::string, std::shared_ptr<VariableSymbolTableEntry>, std::less<void>> locals;
@@ -97,9 +103,14 @@ namespace parser {
         SymbolTable::ptr outer;
 
         
-        [[nodiscard]] ModuleSymbolTableEntry* getEntryForModulesWithMatchingName(const std::string_view& moduleIdent) const;
+        [[nodiscard]] ModuleSymbolTableEntry*   getEntryForModulesWithMatchingName(const std::string_view& moduleIdent) const;
         [[nodiscard]] VariableSymbolTableEntry* getEntryForVariable(const std::string_view& literalIdent) const;
-        static bool doModuleSignaturesMatch(const syrec::Module::ptr& module, const syrec::Module::ptr& otherModule);
+        static bool                             doModuleSignaturesMatch(const syrec::Module::ptr& module, const syrec::Module::ptr& otherModule);
+        void                                    incrementOrDecrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module, bool incrementReferenceCount) const;
+
+        [[nodiscard]] bool doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const;
+        static std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts);
+        static std::vector<std::optional<unsigned int>>                                  tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable);
     };    
 }
 

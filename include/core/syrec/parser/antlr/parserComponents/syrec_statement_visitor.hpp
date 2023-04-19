@@ -64,6 +64,9 @@ namespace parser {
         std::any visitShiftExpression(SyReCParser::ShiftExpressionContext* context) override {
             return expressionVisitor->visitShiftExpression(context);
         }
+
+        void tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const;
+        void invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(const syrec::Module::ptr& calledModule, const std::vector<std::string>& calleeArguments) const;
     };
 } // namespace parser
 #endif
