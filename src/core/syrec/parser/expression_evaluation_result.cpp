@@ -32,5 +32,9 @@ std::optional<syrec::expression::ptr> ExpressionEvaluationResult::getAsExpressio
 
 // TODO:
 unsigned ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(unsigned int constantValue) {
+    if (constantValue == 0) {
+        return 1;
+    }
+
     return static_cast<unsigned int>(std::log2(constantValue) + 1);
 }

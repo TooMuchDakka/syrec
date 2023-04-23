@@ -23,7 +23,7 @@ namespace parser {
         std::unordered_map<std::string, SignalAccessRestriction> signalAccessRestrictions;
         std::optional<std::string>                               lastDeclaredLoopVariable;
 
-        explicit SharedVisitorData(const ParserConfig parserConfig) :
+        explicit SharedVisitorData(const ParserConfig& parserConfig) :
             parserConfig(std::make_unique<ParserConfig>(parserConfig)),
             currentSymbolTableScope(std::make_shared<SymbolTable>()),
             currentModuleCallNestingLevel(0),

@@ -55,6 +55,8 @@ namespace valueLookup {
         [[nodiscard]] virtual bool canStoreValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const = 0;
         [[nodiscard]] virtual std::any extractPartsOfValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const = 0;
         [[nodiscard]] virtual std::any transformExistingValueByMergingWithNewOne(const std::any& currentValue, const std::any& newValue, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partsToUpdate) const = 0;
+        [[nodiscard]] virtual std::any getMaximumValueStoreableInNBits(unsigned int numBits) const                                                                                                                      = 0;
+        [[nodiscard]] virtual std::any wrapValueOnOverflow(const std::any& value, unsigned int numBitsOfStorage) const                                                                                                        = 0;
     };
 
     /*

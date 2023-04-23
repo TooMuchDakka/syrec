@@ -16,7 +16,9 @@ namespace valueLookup {
         [[nodiscard]] bool     canStoreValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const override;
         [[nodiscard]] std::any extractPartsOfValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const override;
         [[nodiscard]] std::any transformExistingValueByMergingWithNewOne(const std::any& currentValue, const std::any& newValue, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partsToUpdate) const override;
-
+        [[nodiscard]] std::any getMaximumValueStoreableInNBits(unsigned int numBits) const override;
+        [[nodiscard]] std::any wrapValueOnOverflow(const std::any& value, unsigned int numBitsOfStorage) const override;  
+        
         [[nodiscard]] static bool         isValueStorableInBitrange(unsigned int value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace);
         [[nodiscard]] static unsigned int extractPartsOfSignalValue(unsigned int value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partToFetch);
         [[nodiscard]] static unsigned int transformExistingSignalValueByMergingWithNewOne(unsigned int currentValue, unsigned int newValue, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partsToUpdate);

@@ -518,15 +518,38 @@ void BaseValueLookup<Vt>::updateStoredValueFor(const std::vector<std::optional<u
     }
 
     const auto accessedValueOfLastDimension = (*transformedAccessedDimensions).back();
+    const auto numBitsOfStorage = bitRange.has_value()
+        ? (bitRange->second - bitRange->first) + 1
+        : signalInformation.bitWidth;
+
+    const Vt& valueToStore = std::any_cast<Vt>(wrapValueOnOverflow(valueToStore, numBitsOfStorage));
     if (valueLookupLayer->layerData.count(accessedValueOfLastDimension) == 0) {
-        valueLookupLayer->layerData.insert(std::pair(accessedValueOfLastDimension, newValue));
-    } else {
+        valueLookupLayer->layerData.insert(std::pair(accessedValueOfLastDimension, valueToStore));
+    }
+    else {
         auto& currentValue = valueLookupLayer->layerData[accessedValueOfLastDimension];
-        // The bit range to be update for the signal must be used to update the corresponding bit range in the stored value
-        if (currentValue.has_value() && bitRange.has_value()) {
-            currentValue.emplace(std::any_cast<Vt>(transformExistingValueByMergingWithNewOne(*currentValue, newValue, *bitRange)));
-        } else {
-            currentValue.emplace(newValue);
+        if (!currentValue.has_value()) {
+            currentValue.emplace(valueToStore);
+        }
+        else {
+            /*
+             * If we are updating a specific bit range, we need to:
+             * I.   Extract the current value for said bit range
+             * II.  Update it with the new value (by addition)
+             * III. Update the corresponding bits back in the signal
+             *
+             */
+            if (bitRange.has_value()) {
+              currentValue = std::any_cast<Vt>(extractPartsOfValue(*currentValue, *bitRange));
+            }
+            const Vt& combinedResultToStore = std::any_cast<Vt>(wrapValueOnOverflow(newValue + *currentValue, numBitsOfStorage));
+
+            if (bitRange.has_value()) {
+                currentValue.emplace(std::any_cast<Vt>(transformExistingValueByMergingWithNewOne(*currentValue, combinedResultToStore, *bitRange)));
+            }
+            else {
+                currentValue.emplace(combinedResultToStore);
+            }
         }
     }
 }

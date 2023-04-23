@@ -64,6 +64,7 @@ std::any SyReCExpressionVisitor::visitExpressionFromSignal(SyReCParser::Expressi
             const auto constantSignalValueEvaluated = *tryEvaluateNumber(constantSignalValue, determineContextStartTokenPositionOrUseDefaultOne(context->signal()));
             bitWidthOfSignal                        = ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(constantSignalValueEvaluated);
             constantSignalValue                     = std::make_shared<syrec::Number>(constantSignalValueEvaluated);
+            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(constantSignalValueEvaluated, std::make_optional(bitWidthOfSignal)));
         }
 
         expressionWrapperForSignal = std::make_shared<syrec::NumericExpression>(constantSignalValue, bitWidthOfSignal);

@@ -1,5 +1,7 @@
 #include "core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp"
 
+#include <cmath>
+
 using namespace valueLookup;
 
 bool SignalValueLookup::canStoreValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const {
@@ -99,4 +101,26 @@ unsigned int SignalValueLookup::transformExistingSignalValueByMergingWithNewOne(
     const auto currentValueWithAccessBitrangeZeroed = (currentValue & layerMask) | (currentValue & layerMaskForBitsBeforeAccessedBitRange);
     const auto newValueShifted                      = newValue << partsToUpdate.first;
     return currentValueWithAccessBitrangeZeroed | newValueShifted;
+}
+
+std::any SignalValueLookup::getMaximumValueStoreableInNBits(const unsigned numBits) const {
+    if (numBits == 0) {
+        return 0;
+    }
+
+    return static_cast<unsigned int>(std::pow(2, numBits)) - 1;
+}
+
+// TODO: CONSTANT_PROPAGATION: Find a better way of calculating remaining value after wrap around
+std::any SignalValueLookup::wrapValueOnOverflow(const std::any& value, const unsigned numBitsOfStorage) const {
+    const auto valueToCheck                        = std::any_cast<unsigned int>(value);
+    const auto maximumValueStorableInBitsOfStorage = std::any_cast<unsigned int>(getMaximumValueStoreableInNBits(numBitsOfStorage));
+    if (valueToCheck <= maximumValueStorableInBitsOfStorage) {
+        return value;
+    }
+
+    /*
+     * We need to add 1 to the maximum storeable value in the given bit range to account for the fact that MAX + 1 = 0
+     */ 
+    return valueToCheck % (maximumValueStorableInBitsOfStorage + 1);
 }

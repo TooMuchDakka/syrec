@@ -320,6 +320,10 @@ std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> Symbol
 }
 
 std::vector<std::optional<unsigned>> SymbolTable::tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable) {
+    if (accessedSignalParts->indexes.empty() && accessedSignalParts->var->dimensions.size() == 1 && accessedSignalParts->var->dimensions.front() == 1) {
+        return { std::make_optional(0) };
+    }
+
     // TODO: Do we need to insert an entry into this vector when working with loop variables or 1D signals (for the latter it seems natural)
     std::vector<std::optional<unsigned int>> transformedDimensionAccess;
     if (!accessedSignalParts->indexes.empty() && !isAccessedSignalLoopVariable) {
@@ -341,6 +345,12 @@ std::vector<std::optional<unsigned>> SymbolTable::tryTransformAccessedDimensions
 
 // TODO: CONSTANT_PROPAGATION: What should happen if the value cannot be stored inside the accessed signal part
 // TODO: CONSTANT_PROPAGATION: Should it be the responsibility of the caller to validate the assigned to signal part prior to this call ?
+/*
+ * TODO: CONSTANT_PROPAGATION: What should happen on value overflow (more of a problem for the parser since it provides the new value as a parameter)
+ * Think about the following problem: Assume a.0 += 1; a.0 += 1; What should happen now ? (Use overflow semantics and assume 1 or 0) ?
+ *
+ * Offer configuration to either overflow or invalidate value on overflow
+ */ 
 void SymbolTable::updateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignalParts, unsigned int newValue) const {
     const auto& symbolTableEntryForVariable = getEntryForVariable(assignedToSignalParts->var->name);
     if (symbolTableEntryForVariable == nullptr || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {

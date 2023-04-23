@@ -52,7 +52,12 @@ std::any SyReCStatementVisitor::visitStatementList(SyReCParser::StatementListCon
 }
 
 std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatementContext* context) {
+    const auto backupOfConstantPropagationFlag = sharedData->parserConfig->performConstantPropagation;
+
+    sharedData->parserConfig->performConstantPropagation = false;
     const auto assignedToSignal             = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->signal());
+    sharedData->parserConfig->performConstantPropagation = backupOfConstantPropagationFlag;
+
     bool       allSemanticChecksOk          = assignedToSignal.has_value() && (*assignedToSignal)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->signal()->IDENT()->getSymbol(), *(*assignedToSignal)->getAsVariableAccess());
     bool       needToResetSignalRestriction = false;
 
@@ -395,11 +400,19 @@ std::any SyReCStatementVisitor::visitSkipStatement(SyReCParser::SkipStatementCon
     return 0;
 }
 
+// TODO: CONSTANT_PROPAGATION: Swapping restrictions and values
+// TODO: CONSTANT_PROPAGATOIN: Maybe find a better solution to toggleing constant propagation
 std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementContext* context) {
-    const auto swapLhsOperand = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->lhsOperand);
+    const auto backupOfConstantPropagationFlag = sharedData->parserConfig->performConstantPropagation;
+
+    sharedData->parserConfig->performConstantPropagation = false;
+    const auto swapLhsOperand                            = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->lhsOperand);
+    sharedData->parserConfig->performConstantPropagation = backupOfConstantPropagationFlag;
     const bool lhsOperandOk   = swapLhsOperand.has_value() && (*swapLhsOperand)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->lhsOperand->IDENT()->getSymbol(), *(*swapLhsOperand)->getAsVariableAccess());
 
-    const auto swapRhsOperand = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->rhsOperand);
+    sharedData->parserConfig->performConstantPropagation = false;
+    const auto swapRhsOperand                            = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->rhsOperand);
+    sharedData->parserConfig->performConstantPropagation = backupOfConstantPropagationFlag;
     const bool rhsOperandOk   = swapRhsOperand.has_value() && (*swapRhsOperand)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->rhsOperand->IDENT()->getSymbol(), *(*swapRhsOperand)->getAsVariableAccess());
 
     if (!lhsOperandOk || !rhsOperandOk) {
@@ -467,8 +480,13 @@ std::any SyReCStatementVisitor::visitUnaryStatement(SyReCParser::UnaryStatementC
         createError(mapAntlrTokenPosition(context->unaryOp), InvalidUnaryOperation);
     }
 
+    const auto backupOfConstantPropagationFlag = sharedData->parserConfig->performConstantPropagation;
+
+    sharedData->parserConfig->performConstantPropagation = false;
     // TODO: Is a sort of broadcasting check required (i.e. if a N-D signal is accessed and broadcasting is not supported an error should be created and otherwise the statement will be simplified [one will be created for every accessed dimension instead of one for the whole signal])
-    const auto accessedSignal = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->signal());
+    const auto accessedSignal                            = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->signal());
+    sharedData->parserConfig->performConstantPropagation = backupOfConstantPropagationFlag;
+
     allSemanticChecksOk &= accessedSignal.has_value() && (*accessedSignal)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->signal()->IDENT()->getSymbol(), *(*accessedSignal)->getAsVariableAccess());
     if (allSemanticChecksOk) {
         // TODO: Add mapping from custom operation enum to internal "numeric" flag
