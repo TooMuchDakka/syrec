@@ -176,7 +176,6 @@ INSTANTIATE_TEST_SUITE_P(
                     return std::make_optional(SignalValueLookupTest::determineValueForBitRangeFromValue(currentDefaultValue, *accessedBitRange));
                 })
         ),
-        
         [](const testing::TestParamInfo<SignalValueLookupTest::ParamType>& info) {
             auto testNameToTransform = std::get<0>(info.param);
             std::replace(testNameToTransform.begin(), testNameToTransform.end(), '-', '_');

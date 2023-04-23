@@ -77,6 +77,10 @@ namespace valueLookup {
             return determineValueForBitRangeFromValue(defaultValue, bitRange);
         }
 
+        [[nodiscard]] static SignalValueLookup::ptr createZeroedSignalValueLookup() {
+            return std::make_shared<SignalValueLookup>(defaultSignalBitwidth, defaultSignalDimensions, defaultValue);
+        }
+
         static void resetAllValuesTo(const SignalValueLookup::ptr& signalValueLookup, const unsigned int newDefaultValue) {
             std::vector<std::optional<unsigned int>> dimensionAccessToReset(defaultSignalDimensions.size(), 0);
             std::size_t                              dimensionIdx        = defaultSignalDimensions.size() - 1;

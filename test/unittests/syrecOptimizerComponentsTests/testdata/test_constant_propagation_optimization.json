@@ -1,4 +1,478 @@
 {
+  "updateOfBitsOfOutParameter": {
+    "circuit": "module main(in a(4), out b[2](4), inout c(4)) b[0].0 += 1; b[0].1 += 1; b[0].2 += 1; b[0].3 += 1; b[1].0 += b[0].0; b[1].1 += b[0].1; b[1].2 += b[0].2; b[1].2 += b[0].2; b[1].3 += b[0].3; c.0 += (b[0].0 + a.0); c.1 += (b[0].1 + a.0); c.2 += (b[0].2 + a.0); c.3 += (b[0].3 + a.0); c.0 += (b[1].0 + a.0); c.1 += (b[1].1 + a.0); c.2 += (b[1].2 + a.0); c.3 += (b[1].3 + a.0)",
+    "expectedCircuit": "module main(in a(4), out b[2](4), inout c(4)) b[0].0 += 1; b[0].1 += 1; b[0].2 += 1; b[0].3 += 1; b[1].0 += 1; b[1].1 += 1; b[1].2 += 1; b[1].2 += 1; b[1].3 += 1; c.0 += (1 + a.0); c.1 += (1 + a.0); c.2 += (1 + a.0); c.3 += (1 + a.0); c.0 += (1 + a.0); c.1 += (1 + a.0); c.2 += (1 + a.0); c.3 += (1 + a.0)"
+  },
+  "updateOfBitsOfWireLocal": {
+    "circuit": "",
+    "expectedCircuit": "bla"
+  },
+  "updateBitRangeOfOutParameter": {
+    "circuit": "module main(in a(4), out b[2](4), inout c(4)) b[0].0:0 += 1; c.0 += b[0].0; c.0 += b[0].0:0; b[0].0:1 += 2; c.0:1 += b[0].0:1; b[0].0:2 += 5; c += b[0].0:2; b[0].1 += 1; c += b[0].0:2; b[0].2:3 += 2; b[0].1:2 += 1",
+    "expectedCircuit": ""
+  },
+  "updateValueOfDimensionOfOutParameter": {
+    "circuit": "module main(in a(4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; c[1] += b[1]; c[0] += b[0]; c[1] += b[1]; c[1] += b[0]",
+    "expectedCircuit": "module main(in a(4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; c[1] += 0; c[0] += 9; c[1] += 6; c[1] += 9"
+  },
+  "updateBitOfValueOfDimensionOfOutParameter": {
+    "circuit": "module main(out b[2](2), inout c[2](2)) b[0].0 += 1; b[0].1 += 0; c[0].0 += b[0].0; c[0].1 += b[0].1; c[1].0 += b[1].0; c[1].1 += b[1].1",
+    "expectedCircuit": "module main(out b[2](2), inout c[2](2)) b[0].0 += 1; b[0].1 += 0; c[0].0 += 1; c[0].1 += 0; c[1].0 += 0; c[1].1 += 0"
+  },
+  "updateBitRangeOfValueOfDimensionOfOutParameter": {
+    "circuit": "module main(out b[2](4), inout c[2](4)) b[0].1:2 += 3; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3",
+    "expectedCircuit": "module main(out b[2](4), inout c[2](4)) b[0].1:2 += 3; c[0].0 += b[0].0; c[0].1 += 1; c[0].2 += 1; c[0].3 += 0; c[1].0 += 0; c[1].1 += 0; c[1].2 += 0; c[1].3 += 0"
+  },
+  "updateBitOf1DSignalAndOmittingDimensionAccessStillUpdatesValue": {
+    "circuit": "module main(out b(4), inout c(4)) b.1 += 1; b.3 += 1; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3",
+    "expectedCircuit": "module main(out b(4), inout c(4)) b.1 += 1; b.3 += 1; c.0 += 0; c.1 += 1; c.2 += 0; c.3 += 1"
+  },
+  "updateBitRangeOf1DSignalAndOmittingDimensionAccessStillUpdatesValue": {
+    "circuit": "module main(out b(4), inout c(4)) b.1:2 += 3; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3",
+    "expectedCircuit": "module main(out b(4), inout c(4)) b.1:2 += 3; c.0 += 0; c.1 += 1; c.2 += 1; c.3 += 0"
+  },
+  "updatingFullSignalOnlyWorksFor1DSignals": {
+    "circuit": "module main(out b(4), inout c(4)) b += 9; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c += b",
+    "expectedCircuit": "module main(out b(4), inout c(4)) b += 9; c.0 += 1; c.1 += 0; c.2 += 0; c.3 += 1; c += 9"
+  },
+  "overwritePreviouslyWrittenBitsByWritingNewValueToBitRange": {
+    "circuit": "module main(in a(4), out b[2](4), inout c[2](4)) b[0].0 += 1; b[0].2 += 1; c[0] += b[0]; b[1].1 += 1; b[1].3 += 1; c[1] += b[1]; b[0] += 17; c[0] += 11; c[1] += c[0]; c[0] += b[0]",
+    "expectedCircuit": "module main(in a(4), out b[2](4), inout c[2](4))"
+  },
+  "assigningUnknownValueToBitDestroysValue": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b.0 += a.0; b.3 += a.3; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b.0 += a.0; b.3 += a.3; c.0 += b.0; c.1 += 0; c.2 += 0; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += 0; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningUnknownValueToBitrangeDestroysValueForOverlappingBitsAndBitRangesAndDisablesValueForValueOfDimension": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b.1:2 += a.1:2; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b.1:2 += a.1:2; c.0 += 0; c.1 += b.1; c.2 += b.2; c.3 += 0; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningUnknownValueToValueOfDimensionDestroysAllValueForValueOfDimension": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += a[0]; b.3 += a.3; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b.0 += a.0; b.3 += a.3; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningValueToUnknownBitOfSignalDestroysAllsValuesForSignal": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningValueToUnknownBitOfValueOfSignalDestroysAllsValuesForValueOfDimensionForSignal": {
+    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; for $i = 0 to 1 step 1 do b[0].$i += 0 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; for $i = 0 to 1 step 1 do b[0].$i += 0 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += 0; c[1].1 += 0; c[1].2 += 0; c[1].3 += 0; c[1].0:1 += 0; c[1].0:2 += 0; c[1].0:3 += 0; c[1].1:2 += 0; c[1].1:3 += 0; c[1].2:3 += 0; c[0] += b[0]; c[1] += 0; c += b"
+  },
+  "assigningUnknownValueToUnknownBitOfSignalDestroysAllValuesForValueOfDimension": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i += a.0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i += a.0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningUnknownValueToBitRangeWithUnknownStartOfValueOfSignalDestroyAllValuesForValueOfDimension": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i:0 += a.$i:0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i:0 += a.$i:0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningUnknownValueToBitRangeWithUnknownEndOfValueOfSignalDestroyAllValuesForValueOfDimension": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.0:$i += a.0:$i rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.0:$i += a.0:$i rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningUnknownValueToUnknownValueOfDimensionDestroysAllValuesForAllValuesOfDimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; for $i = 0 to 1 step 1 do b[$i] += a rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; for $i = 0 to 1 step 1 do b[$i] += a rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b"
+  },
+  "assigningValueToBitOfUnknownValueOfDimensionDestroysBitValueForAllValuesDimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].0 += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].0 += 1 rof; c[0].0 += b[0].0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 1; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += 0; c[0].1:3 += 4; c[0].2:3 += 2; c[1].0 += 0; c[1].1 += 1; c[1].2 += 1; c[1].3 += 0; c[1].0:1 += 2; c[1].0:2 += b[1].6; c[1].0:3 += 6; c[1].1:2 += 3; c[1].1:3 += 3; c[1].2:3 += 1; c[0] += b[0]; c[1] += 6; c += b"
+  },
+  "assigningValueToBitRangeOfUnknownValueOfDimensionDestroysValueForBitRangeForAllValuesDimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].1:2 += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].1:2 += 1 rof; c[0].0 += 0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += 0; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += 0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += 0; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b"
+  },
+  "assigningValueToBitRangeWithUnknownStartOfUnknownValueOfDimensionDestroysAllValuesForAllValuesOfDimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].$i:2 += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].$i:2 += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b"
+  },
+  "assigningValueToBitRangeWithUnknownEndOfUnknownValueOfDimensionDestroysAllValuesForAllValuesOfDimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].0:$i += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].0:$i += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b"
+  },
+
+  "assigningUnknownValueToWholeSignalDestroysAllValuesFor1DSignal": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b += a; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:1; c.0:3 += b.0:3; c.1:2 += b.1:2; c.1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b += a; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:1; c.0:3 += b.0:3; c.1:2 += b.1:2; c.1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningValueToUnknownGlobalBitDestroysAllValuesFor1DSignal": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningValueToGlobalBitRangeWithUnknownEndOfWholeSignalDestroysAllValuesFor1DSignal": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.2:$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i.2 += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+  "assigningValueToGlobalBitRangeWithUnknownStartOfWholeSignalDestroysAllValuesFor1DSignal": {
+    "circuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i.2 += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
+    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i.2 += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
+  },
+
+
+  "assigningMaximumValueStorableInBitPlusOneWrapsAroundCorrectly": {
+    "circuit": "module main(out b(4), out c[2](4)) b.0 += 2; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3 c[1] += b",
+    "expectedCircuit": "module main(out b(4), out c[2](4)) b.0 += 2; c[0].0 += 1; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1] += 1"
+  },
+  "assigningTooLargeValueToBitOverflowsCorrectly": {
+    "circuit": "module main(out b(4), out c[2](4)) b.0 += 4; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3 c[1] += b",
+    "expectedCircuit": "module main(out b(4), out c[2](4)) b.0 += 4; c[0].0 += 0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1] += 0"
+  },
+  "assigningMaximumValueStorableInBitRangePlusOneWrapsAroundCorrectly": {
+    "circuit": "module main(out b(4), out c[3](4)) b.1:2 += 4; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
+    "expectedCircuit": "module main(out b(4), out c[3](4)) b.1:2 += 4; c[0].0 += 0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1].0:1 += 0; c[1].0:2 += 0; c[1].0:3 += 0; c[1].1:2 += 0; c[1].1:3 += 0; c[1].2:3 += 0; c[2] += 0"
+  },
+  "assigningTooLargeValueToBitRangeOverflowsCorrectly": {
+    "circuit": "module main(out b(4), out c[3](4)) b.1:2 += 7; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
+    "expectedCircuit": "module main(out b(4), out c[3](4)) b.1:2 += 7; c[0].0 += 0; c[0].1 += 1; c[0].2 += 1; c[0].3 += 0; c[1].0:1 += 2; c[1].0:2 += 6; c[1].0:3 += 6; c[1].1:2 += 3; c[1].1:3 += 3; c[1].2:3 += 1; c[2] += 6"
+  },
+  "assigningMaximumValueStorableInValueOfDimensionPlusOneWrapsAroundCorrectly": {
+    "circuit": "module main(out b(4), out c[3](4)) b[0] += 16; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
+    "expectedCircuit": "module main(out b(4), out c[3](4)) b.1:2 += 16; c[0].0 += 0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1].0:1 += 0; c[1].0:2 += 0; c[1].0:3 += 0; c[1].1:2 += 0; c[1].1:3 += 0; c[1].2:3 += 0; c[2] += 0"
+  },
+  "assigningTooLargeValueToValueOfDimensionOverflowsCorrectly": {
+    "circuit": "module main(out b(4), out c[2](4)) b[0] += 16; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
+    "expectedCircuit": "module main(out b(4), out c[2](4)) b[0] += 16; c[0].0 += 0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1].0:1 += 0; c[1].0:2 += 0; c[1].0:3 += 0; c[1].1:2 += 0; c[1].1:3 += 0; c[1].2:3 += 0; c[2] += 0"
+  },
+  "assingingTooLargeValueToWholeSignalFor1DSignalOverflowsCorrectly": {
+    "circuit": "module main(out b(4), out c[2](4)) b[0] += 18; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
+    "expectedCircuit": "module main(out b(4), out c[2](4)) b[0] += 18; c[0].0 += 0; c[0].1 += 1; c[0].2 += 0; c[0].3 += 0; c[1].0:1 += 2; c[1].0:2 += 2; c[1].0:3 += 2; c[1].1:2 += 1; c[1].1:3 += 1; c[1].2:3 += 0; c[2] += 2"
+  },
+
+
+  "assigningValueToNotFullySpecifiedValueOfDimensionDestroysValuesInSubsequentDimensions": {
+    "circuit": "TEST both assigning unknown value (i.e. another readonly signal) and a concrete value, either a constant or an optimized signal access for all subsequent tests"
+  },
+  "assigningValueToBitOfNotFullySpecifiedOnAccessOnValueOfDimensionDestroysValuesInSubsequentDimensions": {
+
+  },
+  "assigningValueToUnknownBitOfNotFullySpecifiedOnAccessOnValueOfDimensionDestroysValuesInSubsequentDimensions": {
+
+  },
+  "assigningValueToBitRangeOfNotFullySpecifiedAcessOnValueOfDimensionDestroysValuesInSubsequentDimensions": {
+
+  },
+  "assigningValueToUnknownBitRangeOfNotFullySpecifiedAcessOnValueOfDimensionDestroysValuesInSubsequentDimensions": {
+
+  },
+
+  "assigningValueToNotFullySpecifiedUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
+
+  },
+  "assigningValueToBitOfNotFullySpecifiedAccessOnUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
+
+  },
+  "assigningValueToUnknownBitOfNotFullySpecifiedAccessOnUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
+
+  },
+  "assigningValueToBitRangeOfNotFullySpecifiedAcessOnUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
+
+  },
+  "assigningValueToUnknownBitRangeOfNotFullySpecifiedAcessOnUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
+
+  },
+
+  "liftRestrictionFromCompletelyBlockedSignalByUnblockingWholeSignal": {
+    "circuit": "module main(in a[2](16), out b[2](16), out c[2](16), out d[2](16)) b += a; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](16), out b[2](16), out c[2](16), out d[2](16)) b += a; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromCompletelyBlockedSignalByUnblockingGlobalBit": {
+    "circuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b += a; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; d[0].0 += b[0].0; d[0].1 += b[0].1; d[1].0 += b[1].0; d[1].1 += b[1].1",
+    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b += a; d[0] += b[0]; d[1] += b[1]; b.0 += 0; d[0].0 += 0; d[0].1 += b[0].1; d[1].0 += 0; d[1].1 += b[1].1"
+  },
+  "liftRestrictionFromCompletelyBlockedSignalByUnblockingGlobalBitRange": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b += a; d[0] += b[0]; d[1] += b[1]; b.1:2 += c.1:2; d[0].0 += b[0].0; d[0].1 += b[0].1; d[1].0 += b[1].0; d[1].1 += b[1].1; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b += a; d[0] += b[0]; d[1] += b[1]; b.0 += 0; d[0].0 += b[0].0; d[0].1 += 0; d[1].0 += b[1].0; d[1].1 += b[1].1; d[0] += b[0]; d[1] += b[1]"
+  },
+  "liftRestrictionFromCompletelyBlockedSignalByUnblockingValueOfLastDimension": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b += a; d[0] += b[0]; d[1] += b[1]; b[1] += c[0]; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b += a; d[0] += b[0]; d[1] += b[1]; b[1] += c[0]; d[0] += 0; d[1] += b[1]"
+  },
+  "liftRestrictionFromCompletelyBlockedSignalByUnblockingValueOfIntermediateDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b += a; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0][1] += c[0][0]; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b += a; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0][1] += c[0][0]; d[0][0] += b[0][0]; d[0][1] += 0"
+  },
+  "liftRestrictionFromCompletelyBlockedSignalByUnblockingWholeDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b += a; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0][1] += c[0][0]; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b += a; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0] += 0; d[0][1] += 0"
+  },
+  "liftRestrictionFromCompletelyBlockedSignalByUnblockingBitOfMultipleDimensions": {
+    "circuit": "This should not work but instead destroy both signal values"
+  },
+  "liftRestrictionFromCompletelyBlockedSignalByUnblockingBitRangeOfMultipleDimensions": {
+    "circuit": "This should not work but instead destroy both signal values"
+  },
+  "liftRestrictionFromCompletelyBlockedSignalByUnblockingValueOfDimensionForMultipleDimensions": {
+    "circuit": "This should not work but instead destroy both signal values"
+  },
+
+  "liftRestrictionFromGloballyBlockedBitByUnblockingWholeSignal": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromGloballyBlockedBitByUnblockingAnyOtherBitGloballyLeavesRestrictionUnchanged": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b.1 += c.1; b.2 += c.2; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b.1 += c.1; b.2 += c.2; d[0] += b[0]; d[1] += b[1]"
+  },
+  "liftRestrictionFromGloballyBlockedBitByUnblockingSameBitGlobally": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromGloballyBlockedBitByUnblockingBitInSubdimensionOnlyLiftsRestrictionForSubdimension": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b[0].0 += c[0].0; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b[0].0 += c[0].0; d[0] += b[0]; d[1] += b[1]"
+  },
+
+  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingWholeSignal": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0:2 += a.0:2; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b += a; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingNonOverlappingBitRangeGloballyLeavesRestrictionUnchanged": {
+    "circuit": "module main(in a[2](5), out b[2](5), out c[2](5), out d[2](5)) b.1:2 += a.0:1; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; b.3:5 += c.0:2 d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](5), out b[2](5), out c[2](5), out d[2](5)) b.1:2 += a.0:1; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; b.3:5 += c.0:2 d[0] += b[0]; d[1] += b[1]"
+  },
+  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingMultipleOverlappingGlobalBitRanges": {
+    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; b.2:3 += c.0:1 d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b.0:1 += 0; b.2:3 += 0; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingValueOfSubdimensionLeavesRestrictionForOtherValuesOfDimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b[0] += c[0]; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b[0] += 0; d[0] += 0; d[1] += b[1]"
+  },
+  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingOneBitOfValueOfSubdimensionLeavesRestrictionForRemainingBitRangeAndLiftsOnlyForUnblockedBitForValueOfDimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b[0].0 += c[0].0; d[0] += b[0]; d[1] += b[1]; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b[0].0 += 0; d[0] += b[0]; d[1] += b[1]; d[0].0 += 0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3"
+  },
+  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingOverlappingBitRangeOfValueOfSubdimensionLeavesNonOverlappedBitsGloballyRestrictedAndLiftsItForOverlappingOnesInSubdimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.1:3 += a.1:3; d[0] += b[0]; d[1] += b[1]; b[0].0:2 += c[0].0:2; d[0] += b[0]; d[1] += b[1]; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.1:3 += a.1:3; d[0] += b[0]; d[1] += b[1]; b[0].0:2 += 0; d[0] += b[0]; d[1] += b[1]; d[0].0 += 0; d[0].1 += 0; d[0].2 += 0; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3"
+  },
+
+  "liftRestrictionFromBlockedValueOfDimenisonByUnblockingWholeSignal": {
+    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitOfValueOfSameDimension": {
+    "circuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1 += c[0].0; d[0].0 += b[0].0; d[0].1 += b[0].1; d[1].0 += b[1].0; d[1].1 += b[1].1",
+    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1 += 0; d[0].0 += b[0].0; d[0].1 += 0; d[1].0 += 0; d[1].1 += 0"
+  },
+  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitRangeOfValueOfSameDimension": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1:2 += c[0].0:1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
+    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1 += 0; d[0].0 += b[0].0; d[0].1 += 0; d[0].2 += 0; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
+  },
+  "liftRestrictionFromBlockedValueOfDimensionByUnblockingWholeDimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitGlobally": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b.1 += c.0; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
+    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b.1 += c.0; d[0].0 += b[0].0; d[0].1 += 0; d[0].2 +=b[0].2; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
+  },
+  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitRangeGlobally": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1:2 += c[0].0:1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
+    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1 += 0; d[0].0 += b[0].0; d[0].1 += 0; d[0].2 += 0; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
+  },
+  "liftRestrictionFromBlockedValueOfDimensionByUnblockingValueOfParentDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0].0 += 0; d[0][0].1 += 0; d[0][0].2 += 0; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
+  },
+  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitOfValueOfParentDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0 += c[0].0; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0 += c[0].0; d[0][0].0 += 0; d[0][0].1 += b[0][0].1; d[0][0].2 += d[0][0].2; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
+  },
+  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitRangeOfValueOfParentDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1:2 += c[0].1:2; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0].0 += b[0][0].0; d[0][0].1 += 0; d[0][0].2 += 0; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
+  },
+
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingWholeSignal": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingGlobalBit": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingGlobalBitRange": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingWholeDimension": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitOfWholeBlockedDimension": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitRangeOfWholeBlockedDimension": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingValueOfBlockedDimension": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitOfValueOfBlockedDimension": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitRangeOfValueOfBlockedDimension": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingWholeParentDimension": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitOfWholeParentDimension": {
+
+  },
+  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitRangeOfWholeParentDimension": {
+
+  },
+
+  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingWholeSignal": {
+
+  },
+  "liftRestrictionFromBLockedBitOfWholeDimensionByUnblockingBitGlobally": {
+
+  },
+  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitForValueOfDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockignBitRangeOfValueOfDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitForWholeDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitRangeForWholeDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitOfParentDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitRangeOfParentDimension": {
+
+  },
+
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingWholeSignal": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitGlobally": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingOverlappingBitRangeGlobally": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingValueOfDimensionLiftsRestrictionForValueOfDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingWholeDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingParentDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitOfValueOfDimensionLiftsRestrictionForValueOfDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitOfWholeDimensionLiftsRestrictionForBitForWholeDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitInParentDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitRangeOfValueOfDimensionLiftsRestrictionForValueOfDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitRangeOfWholeDimensionLiftsRestrictionForBitForWholeDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitRangeInParentDimension": {
+
+  },
+
+
+
+  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingWholeSignal": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += 0; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromBLockedBitOfValueOfDimensionByUnblockingBitGlobally": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += 0; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitForValueOfDimension": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b[0].0 += c[0].0; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += 0; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockignBitRangeOfValueOfDimension": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b[0].0:1 += c[0].0:1; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += 0; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitForWholeDimension": {
+    "circuit": "TODO",
+    "expectedCircuit": ""
+  },
+  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitRangeForWholeDimension": {
+    "circuit": "TODO",
+    "expectedCircuit": ""
+  },
+  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitOfParentDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][0].0 += a[0][0].0; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0 += c[0].0; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][0].0 += a[0][0].0; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0 += 0; d[0][0] += 0; d[0][1] += 0"
+  },
+  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitRangeOfParentDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][0].1 += a[0][0].1; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0:1 += c[0].0:1; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][0].0 += a[0][0].0; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0:1 += 0; d[0][0] += 0; d[0][1] += 0"
+  },
+
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingWholeSignal": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitGlobally": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; d[0].0 += 0; d[0].1 += 0; d[0].2 += 0; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingOverlappingBitRangeGlobally": {
+    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3",
+    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; d[0].0 += 0; d[0].1 += 0; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0; d[1].3 += 0"
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingValueOfDimensionLiftsRestrictionForValueOfDimension": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b[0] += c[0]; d[0] += b[0]; d[1] += b[1]",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingWholeDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingParentDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0] += 0; d[0][1] += 0"
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitOfValueOfDimensionLiftsRestrictionForValueOfDimension": {
+    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b[0].1 += c[0].1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b[0].1 += c[0].1 += c; d[0].0 += 0; d[0].1 += 0; d[0].2 += b[0].2; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitOfWholeDimensionLiftsRestrictionForBitForWholeDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitInParentDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1 += c[0].1; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1 += c[0].1; d[0][0].0 += 0; d[0][0].1 += 0; d[0][0].2 += b[0][0].2; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitRangeOfValueOfDimensionLiftsRestrictionForValueOfDimension": {
+    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0].1:3 += a[0].1:3; d[0] += b[0]; d[1] += b[1]; b[0].1:2 += c[0].1:2; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3",
+    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b[0].1 += c[0].1 += c; d[0].0 += 0; d[0].1 += 0; d[0].2 += 0; d[0].3 += b[0].3; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0; d[1].3 += 0"
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitRangeOfWholeDimensionLiftsRestrictionForBitForWholeDimension": {
+
+  },
+  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitRangeInParentDimension": {
+    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].0:3 += a[0][1].0:3; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1:2 += c[0].1:2; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
+    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1 += c[0].1; d[0][0].0 += b[0][0].0; d[0][0].1 += 0; d[0][0].2 += 0; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
+  },
+
+  "swap statement tests TODO": {
+
+  },
+
+  "updateOfBitsOfInoutParameter": {
+    "circuit": "a",
+    "expectedCircuit": "b"
+  },
   "simplePropagationExample": {
     "circuit": "module main(in a(16), out b(16), out c(16)) c += (2 + 10); c -= (b + 1); b.0:2 += c.0:2; c.0:2 += 3; b += 10",
     "expectedCircuit": "module main(in a(16), out b(16), out c(16)) c += 12"
