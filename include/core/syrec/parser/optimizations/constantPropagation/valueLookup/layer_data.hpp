@@ -143,6 +143,9 @@ private:
                 }
             }
         }
+        else {
+            applyLambda(layerData, accessedDimensions.at(currDimension));
+        }
     }
 };
 

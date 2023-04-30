@@ -90,6 +90,7 @@ void DimensionPropagationBlocker::liftRestrictionForBitRange(const std::optional
             (*dimensionBitRangeRestriction)->liftRestrictionFor(blockedBitRange);
             if (!(*dimensionBitRangeRestriction)->hasAnyRestrictions()) {
                 dimensionBitRangeRestriction->reset();
+                dimensionBitRangeRestriction.reset();
             }
 
             /*
@@ -257,8 +258,23 @@ bool DimensionPropagationBlocker::tryTrimAlreadyBlockedPartsFromRestriction(cons
 
     if (dimensionBitRangeAccessRestriction.has_value()) {
         if (accessedBitRange.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessRestrictedTo(*accessedBitRange)) {
-            
-        } else if (!accessedBitRange.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessCompletelyRestricted()) {
+            const auto& existingDimensionWideBitRangeRestrictions = (*dimensionBitRangeAccessRestriction)->getRestrictionsOverlappingBitRangeAccess(*accessedBitRange);
+            const auto& optionalAccessedBitRange                          = *accessedBitRange;
+            for (auto existingOverlappingRestriction = existingDimensionWideBitRangeRestrictions.cbegin(); existingOverlappingRestriction != existingDimensionWideBitRangeRestrictions.cend();) {
+                const auto firstOverlappingBit = optionalAccessedBitRange.first < existingOverlappingRestriction->first
+                    ? existingOverlappingRestriction->first
+                    : optionalAccessedBitRange.first;
+
+                const auto lastOverlappingBit = optionalAccessedBitRange.second > existingOverlappingRestriction->second
+                    ? existingOverlappingRestriction->second
+                    : optionalAccessedBitRange.second;
+
+                bitRangeAccess.liftRestrictionFor(BitRangeAccessRestriction::BitRangeAccess(firstOverlappingBit, lastOverlappingBit));
+                ++existingOverlappingRestriction;
+            }
+            return true;
+        }
+        if (!accessedBitRange.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessCompletelyRestricted()) {
             bitRangeAccess.liftAllRestrictions();
             return true;
         }

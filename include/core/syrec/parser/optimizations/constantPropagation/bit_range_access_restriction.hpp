@@ -18,6 +18,7 @@ namespace optimizations {
         [[nodiscard]] bool isAccessRestrictedToWholeRange(const BitRangeAccess& specificBitRange) const;
         [[nodiscard]] bool hasAnyRestrictions() const;
         [[nodiscard]] std::vector<BitRangeAccess> getRestrictions() const;
+        [[nodiscard]] std::vector<BitRangeAccess> getRestrictionsOverlappingBitRangeAccess(const BitRangeAccess& specificBitRange) const;
 
         void liftRestrictionFor(const BitRangeAccess& specificBitRange);
         void liftAllRestrictions();

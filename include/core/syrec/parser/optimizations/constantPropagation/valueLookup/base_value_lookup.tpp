@@ -168,7 +168,7 @@ void BaseValueLookup<Vt>::invalidateStoredValueForBitrange(const std::vector<std
 }
 
 template<typename Vt>
-void BaseValueLookup<Vt>::liftRestrictionsOfDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) {
+void BaseValueLookup<Vt>::liftRestrictionsOfDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
     const optimizations::BitRangeAccessRestriction::BitRangeAccess& transformedBitRangeAccess = bitRange.has_value() ? *bitRange : optimizations::BitRangeAccessRestriction::BitRangeAccess(0, signalInformation.bitWidth - 1);
     dimensionAccessRestrictions->applyRecursivelyStartingFrom(
             0,
@@ -504,7 +504,10 @@ std::optional<Vt> BaseValueLookup<Vt>::tryFetchValueFor(const std::vector<std::o
 template<typename Vt>
 // TODO: Should we check that the new value is actually storable in the given bit range (and what should happen to the stored value if this is not the case, should we truncate the new value, clear the existing one, etc.)
 void BaseValueLookup<Vt>::updateStoredValueFor(const std::vector<std::optional<unsigned>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange, const Vt& newValue) const {
-    const auto& transformedAccessedDimensions = !isValueLookupBlockedFor(accessedDimensions, bitRange) ? transformAccessOnDimensions(accessedDimensions) : std::vector<unsigned int>(0);
+    const auto& transformedAccessedDimensions = !isValueLookupBlockedFor(accessedDimensions, bitRange)
+        ? transformAccessOnDimensions(accessedDimensions)
+        : std::nullopt;
+
     // TODO: What should happen in case that one tries to update more than one value of a dimension ?
     if (!transformedAccessedDimensions.has_value()) {
         return;
@@ -522,7 +525,7 @@ void BaseValueLookup<Vt>::updateStoredValueFor(const std::vector<std::optional<u
         ? (bitRange->second - bitRange->first) + 1
         : signalInformation.bitWidth;
 
-    const Vt& valueToStore = std::any_cast<Vt>(wrapValueOnOverflow(valueToStore, numBitsOfStorage));
+    const Vt valueToStore = std::any_cast<Vt>(wrapValueOnOverflow(valueToStore, numBitsOfStorage));
     if (valueLookupLayer->layerData.count(accessedValueOfLastDimension) == 0) {
         valueLookupLayer->layerData.insert(std::pair(accessedValueOfLastDimension, valueToStore));
     }
@@ -539,17 +542,14 @@ void BaseValueLookup<Vt>::updateStoredValueFor(const std::vector<std::optional<u
              * III. Update the corresponding bits back in the signal
              *
              */
-            if (bitRange.has_value()) {
-              currentValue = std::any_cast<Vt>(extractPartsOfValue(*currentValue, *bitRange));
-            }
-            const Vt& combinedResultToStore = std::any_cast<Vt>(wrapValueOnOverflow(newValue + *currentValue, numBitsOfStorage));
 
-            if (bitRange.has_value()) {
-                currentValue.emplace(std::any_cast<Vt>(transformExistingValueByMergingWithNewOne(*currentValue, combinedResultToStore, *bitRange)));
-            }
-            else {
-                currentValue.emplace(combinedResultToStore);
-            }
+            const Vt newValueToStore = std::any_cast<Vt>(wrapValueOnOverflow(newValue, numBitsOfStorage));
+            const auto bitRangeToUpdate = bitRange.has_value()
+                ? *bitRange
+                : ::optimizations::BitRangeAccessRestriction::BitRangeAccess(std::pair(0, signalInformation.bitWidth - 1));
+
+            const Vt updatedCurrentValue = std::any_cast<Vt>(transformExistingValueByMergingWithNewOne(*currentValue, newValueToStore, bitRangeToUpdate));
+            currentValue.emplace(updatedCurrentValue);
         }
     }
 }
@@ -600,14 +600,9 @@ bool BaseValueLookup<Vt>::isValueLookupBlockedFor(const std::vector<std::optiona
 }
 
 template<typename Vt>
-void BaseValueLookup<Vt>::transformRelativeDimensionAccess(std::vector<std::optional<unsigned int>>& transformedDimensionAccessContainer, const std::vector<unsigned int>& relativeDimensionAccess, const std::vector<std::optional<unsigned>>& accessedDimensions) {
-    for (std::size_t i = 0; i < transformedDimensionAccessContainer.size(); ++i) {
-        if (i < accessedDimensions.size() && accessedDimensions.at(i).has_value()) {
-            transformedDimensionAccessContainer.at(i) = *accessedDimensions.at(i);
-        }
-        else {
-            transformedDimensionAccessContainer.at(i) = relativeDimensionAccess.at(i);
-        }
+void BaseValueLookup<Vt>::copyRelativeDimensionAccess(const unsigned int offsetToRelativeDimensionInOriginalDimensionAccess, std::vector<std::optional<unsigned int>>& dimensionAccessContainer, const std::vector<unsigned int>& relativeDimensionAccess) {
+    for (std::size_t i = 0; i < relativeDimensionAccess.size(); ++i) {
+        dimensionAccessContainer.at(offsetToRelativeDimensionInOriginalDimensionAccess + i) = relativeDimensionAccess.at(i);
     }
 }
 
@@ -638,40 +633,61 @@ void BaseValueLookup<Vt>::copyRestrictionsAndUnrestrictedValuesFrom(
         ? optionallyAccessedBitRangeOfRhsAssignmentOperand->first
         : 0;
 
-    std::vector<std::optional<unsigned int>> transformedLhsAssignmentOperandDimensionAccess(signalInformation.valuesPerDimension.size(), std::nullopt);
-    std::vector<std::optional<unsigned int>> transformedRhsAssignmentOperandDimensionAccess(signalInformation.valuesPerDimension.size(), std::nullopt);
+    const auto offsetToDimensionWithVaryingValueOfLhs = accessedDimensionsOfLhsAssignmentOperand.size();
+    const auto offsetToDimensionWithVaryingValueOfRhs = accessedDimensionsOfRhsAssignmentOperand.size();
 
-     applyToBitsOfLastLayer(
-        accessedDimensionsOfRhsAssignmentOperand, 
-        optionallyAccessedBitRangeOfRhsAssignmentOperand,
-         [
-            &transformedLhsAssignmentOperandDimensionAccess,
-            &transformedRhsAssignmentOperandDimensionAccess,
-            &accessedDimensionsOfLhsAssignmentOperand,
-            &accessedDimensionsOfRhsAssignmentOperand, 
+    std::vector<std::optional<unsigned int>> transformedLhsAssignmentOperandDimensionAccess(signalInformation.valuesPerDimension.size(), std::nullopt);
+    for (std::size_t dimensionIdx = 0; dimensionIdx < offsetToDimensionWithVaryingValueOfLhs; ++dimensionIdx) {
+        transformedLhsAssignmentOperandDimensionAccess.at(dimensionIdx) = accessedDimensionsOfLhsAssignmentOperand.at(dimensionIdx);
+    }
+
+    std::vector<std::optional<unsigned int>> transformedRhsAssignmentOperandDimensionAccess(offsetToDimensionWithVaryingValueOfRhs + signalInformation.valuesPerDimension.size(), std::nullopt);
+    for (std::size_t dimensionIdx = 0; dimensionIdx < offsetToDimensionWithVaryingValueOfRhs; ++dimensionIdx) {
+        transformedRhsAssignmentOperandDimensionAccess.at(dimensionIdx) = accessedDimensionsOfRhsAssignmentOperand.at(dimensionIdx);
+    }
+
+    const auto& numBitsToCheck = optionallyAccessedBitRangeOfLhsAssignmentOperand.has_value()
+        ? (optionallyAccessedBitRangeOfLhsAssignmentOperand->second - optionallyAccessedBitRangeOfLhsAssignmentOperand->first) + 1
+        : signalInformation.bitWidth;
+
+    std::vector<unsigned int> relativeDimensionAccessContainer(signalInformation.valuesPerDimension.size() - offsetToDimensionWithVaryingValueOfLhs, 0);
+
+    applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(
+        offsetToDimensionWithVaryingValueOfLhs,
+        0,
+        transformedLhsAssignmentOperandDimensionAccess,
+        numBitsToCheck,
+        relativeDimensionAccessContainer,
+        [
             firstAccessedBitOfLhsAssignmentOperand,
+            offsetToDimensionWithVaryingValueOfLhs,
+            &transformedLhsAssignmentOperandDimensionAccess,
+
             firstAccessedBitOfRhsAssignmentOperand,
+            offsetToDimensionWithVaryingValueOfRhs,
+            &transformedRhsAssignmentOperandDimensionAccess,
             &valueLookupOfRhsOperand,
             this
-            ](const std::vector<unsigned int>& relativeDimensionAccess, unsigned int relativeBitIdx) {
-                transformRelativeDimensionAccess(transformedLhsAssignmentOperandDimensionAccess, relativeDimensionAccess, accessedDimensionsOfLhsAssignmentOperand);
-                transformRelativeDimensionAccess(transformedRhsAssignmentOperandDimensionAccess, relativeDimensionAccess, accessedDimensionsOfRhsAssignmentOperand);
-                
-                const auto accessedBitOfLhs = firstAccessedBitOfLhsAssignmentOperand + relativeBitIdx;
-                const auto accessedBitOfRhs = firstAccessedBitOfRhsAssignmentOperand + relativeBitIdx;
+        ](const std::vector<unsigned int>& relativeDimensionAccess, unsigned int relativeBitIdx) {
+            copyRelativeDimensionAccess(offsetToDimensionWithVaryingValueOfLhs, transformedLhsAssignmentOperandDimensionAccess, relativeDimensionAccess);
+            copyRelativeDimensionAccess(offsetToDimensionWithVaryingValueOfRhs, transformedRhsAssignmentOperandDimensionAccess, relativeDimensionAccess);
 
-                const auto& accessedBitOfLhsOperand(std::pair(accessedBitOfLhs, accessedBitOfLhs));
-                const auto& accessedBitOfRhsOperand(std::pair(accessedBitOfRhs, accessedBitOfRhs));
+            const auto accessedBitOfLhs = firstAccessedBitOfLhsAssignmentOperand + relativeBitIdx;
+            const auto accessedBitOfRhs = firstAccessedBitOfRhsAssignmentOperand + relativeBitIdx;
 
-                const auto& fetchedValueForRhsOperandBit = valueLookupOfRhsOperand.tryFetchValueFor(transformedRhsAssignmentOperandDimensionAccess, accessedBitOfRhsOperand);
-                if (fetchedValueForRhsOperandBit.has_value()) {
-                    liftRestrictionsOfDimensions(transformedLhsAssignmentOperandDimensionAccess, accessedBitOfLhsOperand);
-                    updateStoredValueFor(transformedLhsAssignmentOperandDimensionAccess, accessedBitOfLhsOperand, *fetchedValueForRhsOperandBit);
-                }
-                else {
-                    invalidateStoredValueForBitrange(transformedLhsAssignmentOperandDimensionAccess, accessedBitOfLhsOperand); 
-                }
-        });
+            const auto& accessedBitRangeOfLhsOperand(std::pair(accessedBitOfLhs, accessedBitOfLhs));
+            const auto& accessedBitRangeOfRhsOperand(std::pair(accessedBitOfRhs, accessedBitOfRhs));
+
+            const auto& fetchedValueForRhsOperandBit = valueLookupOfRhsOperand.tryFetchValueFor(transformedRhsAssignmentOperandDimensionAccess, accessedBitRangeOfRhsOperand);
+            if (fetchedValueForRhsOperandBit.has_value()) {
+                liftRestrictionsOfDimensions(transformedLhsAssignmentOperandDimensionAccess, accessedBitRangeOfLhsOperand);
+                updateStoredValueFor(transformedLhsAssignmentOperandDimensionAccess, accessedBitRangeOfLhsOperand, *fetchedValueForRhsOperandBit);
+            }
+            else {
+                invalidateStoredValueForBitrange(transformedLhsAssignmentOperandDimensionAccess, accessedBitRangeOfLhsOperand); 
+            }
+        }
+    );
 }
 
 template<typename Vt>
@@ -715,3 +731,119 @@ void BaseValueLookup<Vt>::applyToLastLayerBitsWithRelativeDimensionAccessInforma
         }
     }
 }
+
+template<typename Vt>
+void BaseValueLookup<Vt>::swapValuesAndRestrictionsBetween(
+    const std::vector<std::optional<unsigned>>& accessedDimensionsOfLhsAssignmentOperand, 
+    const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& optionallyAccessedBitRangeOfLhsAssignmentOperand, 
+    const std::vector<std::optional<unsigned>>& accessedDimensionsOfRhsAssignmentOperand, 
+    const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& optionallyAccessedBitRangeOfRhsAssignmentOperand,
+    const BaseValueLookup<Vt>& other) {
+
+    const auto& firstAccessedBitOfLhsAssignmentOperand = optionallyAccessedBitRangeOfLhsAssignmentOperand.has_value()
+        ? optionallyAccessedBitRangeOfLhsAssignmentOperand->first
+        : 0;
+
+    const auto& firstAccessedBitOfRhsAssignmentOperand = optionallyAccessedBitRangeOfRhsAssignmentOperand.has_value()
+        ? optionallyAccessedBitRangeOfRhsAssignmentOperand->first
+        : 0;
+
+    const auto offsetToDimensionWithVaryingValueOfLhs = accessedDimensionsOfLhsAssignmentOperand.size();
+    const auto offsetToDimensionWithVaryingValueOfRhs = accessedDimensionsOfRhsAssignmentOperand.size();
+
+    std::vector<std::optional<unsigned int>> transformedLhsAssignmentOperandDimensionAccess(signalInformation.valuesPerDimension.size(), std::nullopt);
+    for (std::size_t dimensionIdx = 0; dimensionIdx < offsetToDimensionWithVaryingValueOfLhs; ++dimensionIdx) {
+        transformedLhsAssignmentOperandDimensionAccess.at(dimensionIdx) = accessedDimensionsOfLhsAssignmentOperand.at(dimensionIdx);
+    }
+
+    std::vector<std::optional<unsigned int>> transformedRhsAssignmentOperandDimensionAccess(offsetToDimensionWithVaryingValueOfRhs + signalInformation.valuesPerDimension.size(), std::nullopt);
+    for (std::size_t dimensionIdx = 0; dimensionIdx < offsetToDimensionWithVaryingValueOfRhs; ++dimensionIdx) {
+        transformedRhsAssignmentOperandDimensionAccess.at(dimensionIdx) = accessedDimensionsOfRhsAssignmentOperand.at(dimensionIdx);
+    }
+
+    const auto& numBitsToCheck = optionallyAccessedBitRangeOfLhsAssignmentOperand.has_value()
+        ? (optionallyAccessedBitRangeOfLhsAssignmentOperand->second - optionallyAccessedBitRangeOfLhsAssignmentOperand->first) + 1
+        : signalInformation.bitWidth;
+
+    std::vector<unsigned int> relativeDimensionAccessContainer(signalInformation.valuesPerDimension.size() - offsetToDimensionWithVaryingValueOfLhs, 0);
+
+    applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(
+        offsetToDimensionWithVaryingValueOfLhs,
+        0,
+        transformedLhsAssignmentOperandDimensionAccess,
+        numBitsToCheck,
+        relativeDimensionAccessContainer,
+        [
+            firstAccessedBitOfLhsAssignmentOperand,
+            offsetToDimensionWithVaryingValueOfLhs,
+            &transformedLhsAssignmentOperandDimensionAccess,
+
+            firstAccessedBitOfRhsAssignmentOperand,
+            offsetToDimensionWithVaryingValueOfRhs,
+            &transformedRhsAssignmentOperandDimensionAccess,
+            &other,
+            this
+        ](const std::vector<unsigned int>& relativeDimensionAccess, unsigned int relativeBitIdx) {
+            copyRelativeDimensionAccess(offsetToDimensionWithVaryingValueOfLhs, transformedLhsAssignmentOperandDimensionAccess, relativeDimensionAccess);
+            copyRelativeDimensionAccess(offsetToDimensionWithVaryingValueOfRhs, transformedRhsAssignmentOperandDimensionAccess, relativeDimensionAccess);
+
+            const auto accessedBitOfLhs = firstAccessedBitOfLhsAssignmentOperand + relativeBitIdx;
+            const auto accessedBitOfRhs = firstAccessedBitOfRhsAssignmentOperand + relativeBitIdx;
+
+            const auto& accessedBitRangeOfLhsOperand(std::pair(accessedBitOfLhs, accessedBitOfLhs));
+            const auto& accessedBitRangeOfRhsOperand(std::pair(accessedBitOfRhs, accessedBitOfRhs));
+
+            const auto& valueOfLhsOperandBit = tryFetchValueFor(transformedLhsAssignmentOperandDimensionAccess, accessedBitRangeOfLhsOperand);
+            const auto& valueOfRhsOperandBit = other.tryFetchValueFor(transformedRhsAssignmentOperandDimensionAccess, accessedBitRangeOfRhsOperand);
+
+            if (valueOfLhsOperandBit.has_value()) {
+                other.liftRestrictionsOfDimensions(transformedRhsAssignmentOperandDimensionAccess, accessedBitRangeOfRhsOperand);
+                other.updateStoredValueFor(transformedRhsAssignmentOperandDimensionAccess, accessedBitRangeOfRhsOperand, *valueOfLhsOperandBit);
+            }
+            else {
+                other.invalidateStoredValueForBitrange(transformedRhsAssignmentOperandDimensionAccess, accessedBitRangeOfRhsOperand);
+            }
+
+            if (valueOfRhsOperandBit.has_value()) {
+                liftRestrictionsOfDimensions(transformedLhsAssignmentOperandDimensionAccess, accessedBitRangeOfLhsOperand);
+                updateStoredValueFor(transformedLhsAssignmentOperandDimensionAccess, accessedBitRangeOfLhsOperand, *valueOfRhsOperandBit);
+            }
+            else {
+                invalidateStoredValueForBitrange(transformedLhsAssignmentOperandDimensionAccess, accessedBitRangeOfLhsOperand);
+            }
+        }
+    );
+}
+
+template<typename Vt>
+template<typename Fn>
+void BaseValueLookup<Vt>::applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(unsigned int dimensionToStartFrom, unsigned int currentDimension, const std::vector<std::optional<unsigned>>& accessedDimensions, unsigned int numAccessedBits, std::vector<unsigned int>& relativeDimensionAccess, Fn&& applyLambda) {
+    if (currentDimension == accessedDimensions.size()) {
+        for (unsigned int i = 0; i < numAccessedBits; ++i) {
+            applyLambda(relativeDimensionAccess, i);   
+        }
+        return;
+    }
+
+    const auto& accessedValueOfDimension = currentDimension < accessedDimensions.size()
+        ? accessedDimensions.at(currentDimension)
+        : std::nullopt;
+
+    if (currentDimension < dimensionToStartFrom) {
+        applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(dimensionToStartFrom, currentDimension + 1, accessedDimensions, numAccessedBits, relativeDimensionAccess, applyLambda);    
+    }
+    else {
+        const auto relativeDimensionIdx = currentDimension - dimensionToStartFrom;
+        if (accessedValueOfDimension.has_value()) {
+            relativeDimensionAccess.at(relativeDimensionIdx) = 0;
+            applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(dimensionToStartFrom, currentDimension + 1, accessedDimensions, numAccessedBits, relativeDimensionAccess, applyLambda);
+        }
+        else {
+            for (auto i = 0; i < signalInformation.valuesPerDimension.at(currentDimension); ++i) {
+                relativeDimensionAccess.at(relativeDimensionIdx) = i;
+                applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(dimensionToStartFrom, currentDimension + 1, accessedDimensions, numAccessedBits, relativeDimensionAccess, applyLambda);
+            }   
+        }
+    }
+}
+

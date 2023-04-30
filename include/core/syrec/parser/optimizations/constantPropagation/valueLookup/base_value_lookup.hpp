@@ -31,7 +31,7 @@ namespace valueLookup {
         void invalidateAllStoredValuesForSignal() const;
 
         void liftRestrictionsFromWholeSignal() const;
-        void liftRestrictionsOfDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange);
+        void liftRestrictionsOfDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const;
 
         [[nodiscard]] std::optional<Vt> tryFetchValueFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const;
         void                            updateStoredValueFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange, const Vt& newValue) const;
@@ -42,6 +42,14 @@ namespace valueLookup {
             const std::vector<std::optional<unsigned int>>&                                accessedDimensionsOfRhsAssignmentOperand,
             const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& optionallyAccessedBitRangeOfRhsAssignmentOperand,
             const BaseValueLookup<Vt>&                                                     valueLookupOfRhsOperand
+        );
+
+        void swapValuesAndRestrictionsBetween(
+                const std::vector<std::optional<unsigned int>>&                                accessedDimensionsOfLhsAssignmentOperand,
+                const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& optionallyAccessedBitRangeOfLhsAssignmentOperand,
+                const std::vector<std::optional<unsigned int>>&                                accessedDimensionsOfRhsAssignmentOperand,
+                const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& optionallyAccessedBitRangeOfRhsAssignmentOperand,
+                const BaseValueLookup<Vt>&                                                     other
         );
 
     protected:
@@ -63,7 +71,6 @@ namespace valueLookup {
         [[nodiscard]] virtual bool     canStoreValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const                                                      = 0;
         [[nodiscard]] virtual std::any extractPartsOfValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const                                                = 0;
         [[nodiscard]] virtual std::any transformExistingValueByMergingWithNewOne(const std::any& currentValue, const std::any& newValue, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partsToUpdate) const = 0;
-        [[nodiscard]] virtual std::any getMaximumValueStoreableInNBits(unsigned int numBits) const                                                                                                                            = 0;
         [[nodiscard]] virtual std::any wrapValueOnOverflow(const std::any& value, unsigned int numBitsOfStorage) const                                                                                                        = 0;
 
     private:
@@ -73,8 +80,10 @@ namespace valueLookup {
         template<typename Fn>
         void applyToLastLayerBitsWithRelativeDimensionAccessInformation(unsigned int currentDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, unsigned int numAccessedBits, std::vector<unsigned int>& relativeDimensionAccess, Fn&& applyLambda);
 
-        static void transformRelativeDimensionAccess(std::vector<std::optional<unsigned int>>& transformedDimensionAccessContainer, const std::vector<unsigned int>& relativeDimensionAccess, const std::vector<std::optional<unsigned int>>& accessedDimensions);
+        template<typename Fn>
+        void applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(unsigned int dimensionToStartFrom, unsigned int currentDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, unsigned int numAccessedBits, std::vector<unsigned int>& relativeDimensionAccess, Fn&& applyLambda);
 
+        static void copyRelativeDimensionAccess(const unsigned int offsetToRelativeDimensionInOriginalDimensionAccess, std::vector<std::optional<unsigned int>>& dimensionAccessContainer, const std::vector<unsigned int>& relativeDimensionAccess);
         /*
         void liftRestrictionIfBitIsNotRestrictedAndHasValue(
                 const std::vector<unsigned int>&                                relativeDimensionAccess,

@@ -23,7 +23,7 @@ bool BitRangeAccessRestriction::isAccessRestrictedTo(const BitRangeAccess& speci
 }
 
 bool BitRangeAccessRestriction::isAccessRestrictedToWholeRange(const BitRangeAccess& specificBitRange) const {
-    std::vector<RestrictionRegion>::const_iterator firstOverlappingRestrictionRegion;
+    auto firstOverlappingRestrictionRegion = restrictionRegions.cend();
     for (auto restrictionRegionIterator = restrictionRegions.cbegin(); restrictionRegionIterator != restrictionRegions.cend();) {
         if (restrictionRegionIterator->doesIntersectWith(specificBitRange)) {
             firstOverlappingRestrictionRegion = restrictionRegionIterator;
@@ -70,6 +70,33 @@ std::vector<BitRangeAccessRestriction::BitRangeAccess> BitRangeAccessRestriction
     return transformedRestrictions;
 }
 
+std::vector<BitRangeAccessRestriction::BitRangeAccess> BitRangeAccessRestriction::getRestrictionsOverlappingBitRangeAccess(const BitRangeAccess& specificBitRange) const {
+    if (restrictionRegions.empty()) {
+        return {};
+    }
+
+    auto relevantRestrictionRegions = restrictionRegions;
+    relevantRestrictionRegions.erase(
+    std::remove_if(
+        relevantRestrictionRegions.begin(),
+        relevantRestrictionRegions.end(),
+        [&specificBitRange](const RestrictionRegion& restrictedRegion) {
+            return !restrictedRegion.doesIntersectWith(specificBitRange);
+        }),
+    relevantRestrictionRegions.end()
+    );
+
+    std::vector<BitRangeAccess> transformedRestrictions(relevantRestrictionRegions.size());
+    std::transform(
+    relevantRestrictionRegions.cbegin(),
+    relevantRestrictionRegions.cend(),
+    transformedRestrictions.begin(),
+    [](const RestrictionRegion& restrictedRegion) {
+        return BitRangeAccess(std::make_pair(restrictedRegion.start, restrictedRegion.end));
+    });
+    return transformedRestrictions;
+}
+
 void BitRangeAccessRestriction::liftAllRestrictions() {
     restrictionRegions.clear();
 }
@@ -86,7 +113,7 @@ void BitRangeAccessRestriction::liftRestrictionFor(const BitRangeAccess& specifi
             const auto lastOverlappingBit = std::min(specificBitRange.second, restrictedRegionsIterator->end);
             if (specificBitRange.first < restrictedRegionsIterator->start) {
                 if (lastOverlappingBit == restrictedRegionsIterator->end) {
-                    restrictionRegions.erase(restrictedRegionsIterator);
+                    restrictedRegionsIterator = restrictionRegions.erase(restrictedRegionsIterator);
                 }
                 else {
                     restrictedRegionsIterator->resize(specificBitRange.second + 1, restrictedRegionsIterator->end - 1);
@@ -98,7 +125,7 @@ void BitRangeAccessRestriction::liftRestrictionFor(const BitRangeAccess& specifi
                 const bool hasRemainingRestrictionAfterLiftedOne   = lastOverlappingBit < restrictedRegionsIterator->end;
 
                 if (!hasRemainingRestrictionPriorToLiftedOne && !hasRemainingRestrictionAfterLiftedOne) {
-                    restrictionRegions.erase(restrictedRegionsIterator);
+                    restrictedRegionsIterator = restrictionRegions.erase(restrictedRegionsIterator);
                 }
                 else if (hasRemainingRestrictionPriorToLiftedOne && !hasRemainingRestrictionAfterLiftedOne) {
                     restrictedRegionsIterator->resize(restrictedRegionsIterator->start, firstOverlappingBit - 1);
@@ -128,7 +155,8 @@ void BitRangeAccessRestriction::restrictAccessTo(const BitRangeAccess& specificB
 
     if (firstOverlappingRestrictionRegion == restrictionRegions.end()) {
         if (restrictionRegions.empty()) {
-            restrictionRegions.emplace_back(RestrictionRegion(specificBitRange.first, specificBitRange.second));            
+            restrictionRegions.emplace_back(RestrictionRegion(specificBitRange.first, specificBitRange.second));
+            return;
         }
 
         /*
@@ -150,6 +178,8 @@ void BitRangeAccessRestriction::restrictAccessTo(const BitRangeAccess& specificB
             } else {
                 restrictionRegionPriorToSpecificOneSharingBorder->resize(restrictionRegionPriorToSpecificOneSharingBorder->start, specificBitRange.second);
             }
+        } else {
+            restrictionRegions.emplace_back(RestrictionRegion(specificBitRange.first, specificBitRange.second));
         }
         return;
     }
