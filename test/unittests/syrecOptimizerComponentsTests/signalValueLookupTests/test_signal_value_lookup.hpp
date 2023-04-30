@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp"
+#include "core/syrec/parser/utils/bit_helpers.hpp"
 
 #include <vector>
 
@@ -26,6 +27,7 @@ namespace valueLookup {
         constexpr static unsigned int                 defaultValue            = 230; // 1110 0110
 
         constexpr static unsigned int                                               lockedValueOfFirstDimension                              = 1;
+        constexpr static unsigned int                                               lockedOtherValueOfFirstDimension                         = 2;
         constexpr static unsigned int                                               lockedValueOfSecondDimension                             = 3;
         constexpr static unsigned int                                               lockedValueOfThirdDimension                              = 1;
         constexpr static unsigned int                                               firstBlockedBitOfDefaultBitRange = 2;
@@ -56,21 +58,7 @@ namespace valueLookup {
         }
 
         [[nodiscard]] static unsigned int determineValueForBitRangeFromValue(const unsigned int value, const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) {
-            if (bitRange.first == bitRange.second) {
-                return (value & (1 << bitRange.first)) >> bitRange.first;
-            }
-
-            unsigned int maskingBitMask = UINT_MAX;
-            if (bitRange.first > 0) {
-                maskingBitMask <<= bitRange.first;
-            }
-
-            if (bitRange.second > 0) {
-                maskingBitMask <<= defaultSignalBitwidth - (bitRange.second + 1);
-                maskingBitMask >>= defaultSignalBitwidth - (bitRange.second + 1);
-            }
-
-            return (value & maskingBitMask) >> bitRange.first;
+            return BitHelpers::extractBitsFromValue(value, bitRange);
         }
 
         [[nodiscard]] static unsigned int determineExpectedValueForBitRange(const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) {
@@ -147,7 +135,6 @@ namespace valueLookup {
 
         void checkThatNoValueCanBeFetchedForValuesOrBitRangesOfIntermediateDimensions() const {
             std::vector<std::optional<unsigned int>> accessedDimensions;
-            const auto&                              x = signalValueLookup->tryFetchValueFor(accessedDimensions, std::nullopt);
             ASSERT_NO_FATAL_FAILURE(assertThatNoValueCanBeFetched(accessedDimensions, std::nullopt));
 
             for (unsigned int dimension = 0; dimension < defaultSignalDimensions.size() - 1; ++dimension) {
@@ -213,76 +200,6 @@ namespace valueLookup {
                 }
             }
         }
-        
-        void createAndCheckConditionForAllDimensionAndBitrangeCombinationsOther(
-            const std::vector<unsigned int>& dimensions,
-            const ExpectedRestrictionStatusLookup& expectedRestrictionStatusLookup,
-            const ExpectedValueLookup& expectedValueLookup) const {
-
-            const std::size_t         maxCombinationSize = dimensions.size();
-            std::size_t combinationSize = 1;
-            std::vector<std::optional<unsigned int>> combination(combinationSize);
-            std::size_t               idx = 0;
-
-            while (combinationSize <= maxCombinationSize) {
-                const unsigned int numValuesForPosition = dimensions.at(idx);
-                for (unsigned int value = 0; value <= numValuesForPosition; ++value) {
-                    combination.at(idx) = value == numValuesForPosition ? std::nullopt : std::make_optional(value);
-
-                    ASSERT_NO_FATAL_FAILURE(assertThatValuesMatch(
-                            combination,
-                            std::nullopt,
-                            expectedRestrictionStatusLookup,
-                            expectedValueLookup));
-
-                    std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> accessedBitRange = std::make_optional(optimizations::BitRangeAccessRestriction::BitRangeAccess(0, 0));
-                    for (unsigned int bitRangeStart = 0; bitRangeStart < defaultSignalBitwidth; ++bitRangeStart) {
-                        (*accessedBitRange).first  = bitRangeStart;
-                        (*accessedBitRange).second = bitRangeStart;
-
-                        ASSERT_NO_FATAL_FAILURE(assertThatValuesMatch(
-                                combination,
-                                accessedBitRange,
-                                expectedRestrictionStatusLookup,
-                                expectedValueLookup));
-
-                        for (unsigned int bitRangeEnd = bitRangeStart; bitRangeEnd < defaultSignalBitwidth; ++bitRangeEnd) {
-                            ASSERT_NO_FATAL_FAILURE(assertThatValuesMatch(
-                                    combination,
-                                    accessedBitRange,
-                                    expectedRestrictionStatusLookup,
-                                    expectedValueLookup));
-                        }
-                    }
-                }
-
-                combination.at(idx) = 0;
-                bool backtracking   = idx > 0;
-                const bool hadToBacktrack = backtracking;
-                while (backtracking) {
-                    idx--;
-                    const unsigned valuesForPrevPosition = dimensions.at(idx);
-                    const auto&    currentValueAtPrevPosition = *combination.at(idx);
-                    //if (currentValueAtPrevPosition + 1 >= valuesForPrevPosition) {
-                    if (currentValueAtPrevPosition + 1 > valuesForPrevPosition) {
-                        combination.at(idx) = 0;
-                        backtracking        = idx > 0;
-                    } else {
-                        combination.at(idx) = currentValueAtPrevPosition + 1;
-                        idx++;
-                        backtracking = false;
-                    }   
-                }
-
-                if (!hadToBacktrack && idx == 0) {
-                    combinationSize++;
-                    idx = combinationSize - 1;
-                    combination.emplace_back(0);
-                } else if (hadToBacktrack && idx == 0 && combination.at(0) == 0) {
-                    break;
-                }
-            }
-        }
 
         void createAndCheckConditionForAllDimensionAndBitrangeCombinations(
                 const std::vector<unsigned int>&       dimensions,
@@ -316,6 +233,7 @@ namespace valueLookup {
                                 expectedValueLookup));
 
                         for (unsigned int bitRangeEnd = bitRangeStart; bitRangeEnd < defaultSignalBitwidth; ++bitRangeEnd) {
+                            (*accessedBitRange).second = bitRangeEnd;
                             ASSERT_NO_FATAL_FAILURE(assertThatValuesMatch(
                                     combination,
                                     accessedBitRange,
