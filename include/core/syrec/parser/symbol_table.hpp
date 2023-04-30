@@ -42,6 +42,9 @@ namespace parser {
         void                                  invalidateStoredValuesFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void                                      updateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignalParts, unsigned int newValue) const;
 
+        void updateViaSignalAssignment(const syrec::VariableAccess::ptr& assignmentLhsOperand, const syrec::VariableAccess::ptr& assignmentRhsOperand) const;
+        void swap(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const;
+
         [[nodiscard]] std::set<std::string> getUnusedLiterals() const;
         [[nodiscard]] std::vector<bool>     determineIfModuleWasUsed(const syrec::Module::vec& modules) const;
         // END

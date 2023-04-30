@@ -67,6 +67,8 @@ namespace parser {
 
         void tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const;
         void invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(const syrec::Module::ptr& calledModule, const std::vector<std::string>& calleeArguments) const;
+        void invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts) const;
+        [[nodiscard]] bool areAccessedValuesForDimensionAndBitsConstant(const syrec::VariableAccess::ptr& accessedSignalParts) const;
     };
 } // namespace parser
 #endif

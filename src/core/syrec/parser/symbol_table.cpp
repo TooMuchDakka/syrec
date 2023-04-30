@@ -364,3 +364,46 @@ void SymbolTable::updateStoredValueFor(const syrec::VariableAccess::ptr& assigne
 
     signalValueLookup->updateStoredValueFor(transformedDimensionAccess, transformedBitRangeAccess, newValue);
 }
+
+void SymbolTable::updateViaSignalAssignment(const syrec::VariableAccess::ptr& assignmentLhsOperand, const syrec::VariableAccess::ptr& assignmentRhsOperand) const {
+    const auto& symbolTableEntryForLhsVariable = getEntryForVariable(assignmentLhsOperand->var->name);
+    const auto& symbolTableEntryForRhsVariable = getEntryForVariable(assignmentRhsOperand->var->name);
+
+    // TODO: Are these checks necessary or can we require the caller to validate its arguments and throw an exception otherwise.
+    // TODO: One could also invalidate the lhs if the rhs either has not value, is not an inout / out parameter or has not corresponding symbol table entry
+    if (symbolTableEntryForLhsVariable == nullptr || !symbolTableEntryForLhsVariable->optionalValueLookup.has_value() 
+        || symbolTableEntryForRhsVariable == nullptr || !symbolTableEntryForRhsVariable->optionalValueLookup.has_value()) {
+        return;
+    }
+
+    const auto& signalValueLookupOfLhsVariable = *symbolTableEntryForLhsVariable->optionalValueLookup;
+    const auto& signalValueLookupOfRhsVariable = *symbolTableEntryForRhsVariable->optionalValueLookup;
+
+    signalValueLookupOfLhsVariable->copyRestrictionsAndUnrestrictedValuesFrom(
+        tryTransformAccessedDimensions(assignmentLhsOperand, false), tryTransformAccessedBitRange(assignmentLhsOperand),
+        tryTransformAccessedDimensions(assignmentRhsOperand, false), tryTransformAccessedBitRange(assignmentRhsOperand),
+        *signalValueLookupOfRhsVariable
+    );
+}
+
+void SymbolTable::swap(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const {
+    const auto& symbolTableEntryForLhsVariable = getEntryForVariable(swapLhsOperand->var->name);
+    const auto& symbolTableEntryForRhsVariable = getEntryForVariable(swapRhsOperand->var->name);
+    
+    // TODO: Are these checks necessary or can we require the caller to validate its arguments and throw an exception otherwise.
+    // TODO: One could also invalidate the lhs if the rhs either has not value, is not an inout / out parameter or has not corresponding symbol table entry
+    if (symbolTableEntryForLhsVariable == nullptr || !symbolTableEntryForLhsVariable->optionalValueLookup.has_value() 
+        || symbolTableEntryForRhsVariable == nullptr || !symbolTableEntryForRhsVariable->optionalValueLookup.has_value()) {
+        return;
+    }
+
+    const auto& signalValueLookupOfLhsVariable = *symbolTableEntryForLhsVariable->optionalValueLookup;
+    const auto& signalValueLookupOfRhsVariable = *symbolTableEntryForLhsVariable->optionalValueLookup;
+
+    signalValueLookupOfLhsVariable->swapValuesAndRestrictionsBetween(
+            tryTransformAccessedDimensions(swapLhsOperand, false), tryTransformAccessedBitRange(swapLhsOperand),
+            tryTransformAccessedDimensions(swapRhsOperand, false), tryTransformAccessedBitRange(swapRhsOperand),
+        *signalValueLookupOfRhsVariable
+    );
+}
+

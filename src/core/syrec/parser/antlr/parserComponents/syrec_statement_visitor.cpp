@@ -13,6 +13,11 @@
 
 #include <fmt/format.h>
 
+/*
+ * TODO: General todo, when checking if both operands have the same dimensions(and also the same values per accessed dimension)
+ * we also need to take partial dimension accesses into account (i.e. a[2][4] += b with a = out a[4][6][2][1] and b in[2][1])
+ */ 
+
 using namespace parser;
 
 std::any SyReCStatementVisitor::visitStatementList(SyReCParser::StatementListContext* context) {
@@ -81,7 +86,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
     }
 
     sharedData->shouldSkipSignalAccessRestrictionCheck = false;
-    // TODO: Check if signal widht of left and right operand of assign statement match (similar to swap statement ?)
+    // TODO: Check if signal width of left and right operand of assign statement match (similar to swap statement ?)
     const auto assignmentOpRhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->expression());
     allSemanticChecksOk &= assignmentOpRhsOperand.has_value();
     sharedData->shouldSkipSignalAccessRestrictionCheck = true;
@@ -93,8 +98,10 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
         if (requiresBroadcasting(lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
             if (!sharedData->parserConfig->supportBroadcastingExpressionOperands) {
                 createError(determineContextStartTokenPositionOrUseDefaultOne(context->signal()), fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandAccessedDimensionsNumValuesPerDimension.size(), rhsOperandNumValuesPerAccessedDimension.size()));
+                invalidateStoredValueFor(lhsOperandVariableAccess);
             } else {
                 createError(determineContextStartTokenPositionOrUseDefaultOne(context->signal()), "Broadcasting of operands is currently not supported");
+                invalidateStoredValueFor(lhsOperandVariableAccess);
             }
         } else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(mapAntlrTokenPosition(context->signal()->start), lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
             // TODO: CONSTANT_PROPAGATION: Invalidate stored values if rhs is not constant
@@ -112,7 +119,9 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                             *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
                             exprContainingNewValue));
         }
-        // TODO: CONSTANT_PROPAGATION: Invalidate stored values if rhs is not constant
+        else {
+            invalidateStoredValueFor(lhsOperandVariableAccess);
+        }
         /*
          * Theoretically we can ignore out of range accesses since the would not destroy the value for any valid value of a dimension.
          * What should happen if either the bit range access or value of dimension access is out of range (the latter should be covered by the above statement) or is malformed (i.e. syntax errors). Our visitor would not return any value, so what should we update now
@@ -124,7 +133,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
     } else if (assignedToSignal.has_value() && (*assignedToSignal)->isVariableAccess()) {
         // If we can determine which parts of the signal on the lhs of the assignment statement were accessed, we simply invalidate them in case not all semantic checks for the latter where correct
         const auto& assignedToSignalParts = *(*assignedToSignal)->getAsVariableAccess();
-        sharedData->currentSymbolTableScope->invalidateStoredValuesFor(assignedToSignalParts);
+        invalidateStoredValueFor(assignedToSignalParts);
     }
 
     if (sharedData->optionalExpectedExpressionSignalWidth.has_value()) {
@@ -415,7 +424,15 @@ std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementCon
     sharedData->parserConfig->performConstantPropagation = backupOfConstantPropagationFlag;
     const bool rhsOperandOk   = swapRhsOperand.has_value() && (*swapRhsOperand)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->rhsOperand->IDENT()->getSymbol(), *(*swapRhsOperand)->getAsVariableAccess());
 
+    // In case any of the operands of the swap operation cannot be determined, we try to check if we could at least determine one of them. If that is the case, invalidate the accessed signal parts of the latter.
     if (!lhsOperandOk || !rhsOperandOk) {
+        if (swapLhsOperand.has_value() && (*swapLhsOperand)->isVariableAccess()) {
+            const auto lhsAccessedSignal = *(*swapLhsOperand)->getAsVariableAccess();
+            invalidateStoredValueFor(lhsAccessedSignal);
+        } else if (swapRhsOperand.has_value() && (*swapRhsOperand)->isVariableAccess()) {
+            const auto rhsAccessedSignal = *(*swapRhsOperand)->getAsVariableAccess();
+            invalidateStoredValueFor(rhsAccessedSignal);
+        }
         return 0;
     }
 
@@ -437,6 +454,8 @@ std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementCon
     if (lhsNumAffectedDimensions != rhsNumAffectedDimensions) {
         // TODO: Error position
         createError(mapAntlrTokenPosition(context->start), fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAffectedDimensions, rhsNumAffectedDimensions));
+        invalidateStoredValueFor(lhsAccessedSignal);
+        invalidateStoredValueFor(rhsAccessedSignal);
         allSemanticChecksOk = false;
     } else if (lhsAccessedSignal->indexes.empty() && rhsAccessedSignal->indexes.empty()) {
         const auto& lhsSignalDimensions = lhsAccessedSignal->getVar()->dimensions;
@@ -448,6 +467,8 @@ std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementCon
             if (!continueCheck) {
                 // TODO: Error position
                 createError(mapAntlrTokenPosition(context->start), fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsSignalDimensions.at(dimensionIdx), rhsSignalDimensions.at(dimensionIdx)));
+                invalidateStoredValueFor(lhsAccessedSignal);
+                invalidateStoredValueFor(rhsAccessedSignal);
                 allSemanticChecksOk = false;
             }
         }
@@ -463,13 +484,25 @@ std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementCon
     if (lhsAccessedSignalWidthEvaluated.has_value() && rhsAccessedSignalWidthEvaluated.has_value() && *lhsAccessedSignalWidthEvaluated != *rhsAccessedSignalWidthEvaluated) {
         // TODO: Error position
         createError(mapAntlrTokenPosition(context->start), fmt::format(InvalidSwapSignalWidthMissmatch, *lhsAccessedSignalWidthEvaluated, *rhsAccessedSignalWidthEvaluated));
+        invalidateStoredValueFor(lhsAccessedSignal);
+        invalidateStoredValueFor(rhsAccessedSignal);
         return 0;
     }
+
+    if (areAccessedValuesForDimensionAndBitsConstant(lhsAccessedSignal) && areAccessedValuesForDimensionAndBitsConstant(rhsAccessedSignal)) {
+        sharedData->currentSymbolTableScope->swap(lhsAccessedSignal, rhsAccessedSignal);
+    }
+    else {
+        invalidateStoredValueFor(lhsAccessedSignal);
+        invalidateStoredValueFor(rhsAccessedSignal);
+    }
+
 
     addStatementToOpenContainer(std::make_shared<syrec::SwapStatement>(lhsAccessedSignal, rhsAccessedSignal));
     return 0;
 }
 
+// TODO: CONSTANT_PROPAGATION: Update of signal value for unary statement (i.e. ++= a;)
 std::any SyReCStatementVisitor::visitUnaryStatement(SyReCParser::UnaryStatementContext* context) {
     bool       allSemanticChecksOk = true;
     const auto unaryOperation      = getDefinedOperation(context->unaryOp);
@@ -711,21 +744,51 @@ void SyReCStatementVisitor::liftRestrictionToAssignedToPartOfSignal(const syrec:
 // TODO: CONSTANT_PROPAGATION: Handling of out of range indizes for dimension or bit range
 // TODO: CONSTANT_PROPAGATION: In case the rhs expr was a constant, should we trim its value in case it cannot be stored in the lhs ?
 void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const {
-    if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(exprContainingNewValue); numericExpr != nullptr) {
-        if (!numericExpr->value->isConstant()) {
-            sharedData->currentSymbolTableScope->invalidateStoredValuesFor(assignedToVariableParts);
-            return;    
-        }
+    const auto invalidateAccessedBitRange = assignedToVariableParts->range.has_value()
+        && (!assignedToVariableParts->range->first->isConstant() || !assignedToVariableParts->range->second->isConstant());
 
-        /*
-         * If we cannot determine which bits of the signal should be updated we instead invalidate the currently stored value
-         */
-        if (assignedToVariableParts->range.has_value() && (!assignedToVariableParts->range->first->isConstant() || !assignedToVariableParts->range->second->isConstant())) {
-            sharedData->currentSymbolTableScope->invalidateStoredValuesFor(assignedToVariableParts);
+    const auto accessedAnyNonConstantValueOfDimension = std::any_of(
+            assignedToVariableParts->indexes.cbegin(),
+            assignedToVariableParts->indexes.cend(),
+            [](const syrec::expression::ptr& valueOfDimensionExpr) {
+                if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(valueOfDimensionExpr); numericExpr != nullptr) {
+                    return numericExpr->value->isConstant();
+                }
+                return true;
+            });
+
+    const auto& constantValueOfExprContainingNewValue = std::dynamic_pointer_cast<syrec::NumericExpression>(exprContainingNewValue);
+    const auto& variableToCopyValuesAndRestrictionsFrom           = std::dynamic_pointer_cast<syrec::VariableExpression>(exprContainingNewValue);
+
+    /*
+     * We should invalidate the assigned to signal parts if we cannot determine:
+     * I.   Which bits were accessed (this could be either if the expression is not constant or one is using a loop variable in a loop that will not be unrolled)
+     * II.  Which value of any accessed dimension will be effected (this could be either if the expression is not constant or one is using a loop variable in a loop that will not be unrolled)
+     * III. The rhs side of the assignment is not a constant value or a variable access
+     * IV.  Either I. or II. does not hold for the defined variable access on the rhs
+     *
+     */
+    bool shouldInvalidateInsteadOfUpdateAssignedToVariable = 
+        !areAccessedValuesForDimensionAndBitsConstant(assignedToVariableParts)
+        || (constantValueOfExprContainingNewValue == nullptr && variableToCopyValuesAndRestrictionsFrom == nullptr);
+
+    if (!shouldInvalidateInsteadOfUpdateAssignedToVariable && constantValueOfExprContainingNewValue != nullptr) {
+        shouldInvalidateInsteadOfUpdateAssignedToVariable &= constantValueOfExprContainingNewValue->value->isConstant();
+    }
+
+    if (shouldInvalidateInsteadOfUpdateAssignedToVariable) {
+        invalidateStoredValueFor(assignedToVariableParts);
+    }
+    else {
+        if (constantValueOfExprContainingNewValue != nullptr) {
+            sharedData->currentSymbolTableScope->updateStoredValueFor(assignedToVariableParts, constantValueOfExprContainingNewValue->value->evaluate({}));
         }
         else {
-            const unsigned int exprContainingNewValueEvaluated = numericExpr->value->evaluate({});
-            sharedData->currentSymbolTableScope->updateStoredValueFor(assignedToVariableParts, exprContainingNewValueEvaluated);            
+            if (!areAccessedValuesForDimensionAndBitsConstant(variableToCopyValuesAndRestrictionsFrom->var)) {
+                invalidateStoredValueFor(assignedToVariableParts);
+            } else {
+                sharedData->currentSymbolTableScope->updateViaSignalAssignment(assignedToVariableParts, variableToCopyValuesAndRestrictionsFrom->var);   
+            }
         }
     }
 }
@@ -744,5 +807,25 @@ void SyReCStatementVisitor::invalidateValuesForVariablesUsedAsParametersChangeab
         }
         parameterIdx++;
     }
+}
+
+void SyReCStatementVisitor::invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts) const {
+    sharedData->currentSymbolTableScope->invalidateStoredValuesFor(assignedToVariableParts);
+}
+
+bool SyReCStatementVisitor::areAccessedValuesForDimensionAndBitsConstant(const syrec::VariableAccess::ptr& accessedSignalParts) const {
+    const auto invalidateAccessedBitRange = accessedSignalParts->range.has_value() && (!accessedSignalParts->range->first->isConstant() || !accessedSignalParts->range->second->isConstant());
+
+    const auto accessedAnyNonConstantValueOfDimension = std::any_of(
+            accessedSignalParts->indexes.cbegin(),
+            accessedSignalParts->indexes.cend(),
+            [](const syrec::expression::ptr& valueOfDimensionExpr) {
+                if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(valueOfDimensionExpr); numericExpr != nullptr) {
+                    return numericExpr->value->isConstant();
+                }
+                return true;
+            });
+
+    return !invalidateAccessedBitRange && !accessedAnyNonConstantValueOfDimension;
 }
 
