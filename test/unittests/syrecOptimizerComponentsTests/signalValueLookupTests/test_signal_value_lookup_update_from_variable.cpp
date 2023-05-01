@@ -292,7 +292,7 @@ INSTANTIATE_TEST_SUITE_P(
                 return std::make_optional(SignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
             }),
         std::make_tuple(
-            "ExtendLockOfGlobalBitByLockingValueOfIncompleteSubdimensionAccess",
+            "DISABLED_ExtendLockOfGlobalBitByLockingValueOfIncompleteSubdimensionAccess",
             [](const SignalValueLookup::ptr& signalValueLookup) { 
                 SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
                 SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);

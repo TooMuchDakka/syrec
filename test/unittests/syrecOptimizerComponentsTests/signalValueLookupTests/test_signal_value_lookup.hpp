@@ -27,7 +27,7 @@ namespace valueLookup {
         constexpr static unsigned int                 defaultValue            = 230; // 1110 0110
 
         constexpr static unsigned int                                               lockedValueOfFirstDimension                              = 1;
-        constexpr static unsigned int                                               lockedOtherValueOfFirstDimension                         = 2;
+        constexpr static unsigned int                                               lockedOtherValueOfFirstDimension                         = 0;
         constexpr static unsigned int                                               lockedValueOfSecondDimension                             = 3;
         constexpr static unsigned int                                               lockedValueOfThirdDimension                              = 1;
         constexpr static unsigned int                                               firstBlockedBitOfDefaultBitRange = 2;
