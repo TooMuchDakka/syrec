@@ -102,43 +102,40 @@ void BitRangeAccessRestriction::liftAllRestrictions() {
 }
 
 void BitRangeAccessRestriction::liftRestrictionFor(const BitRangeAccess& specificBitRange) {
-    for (auto restrictedRegionsIterator = restrictionRegions.begin(); restrictedRegionsIterator != restrictionRegions.end();) {
-        if (restrictedRegionsIterator->start > specificBitRange.second) {
+    for (std::size_t i = 0; i < restrictionRegions.size(); ++i) {
+        RestrictionRegion& restrictedRegion = restrictionRegions.at(i);
+        if (restrictedRegion.start > specificBitRange.second) {
             break;
         }
 
-        if (!restrictedRegionsIterator->doesIntersectWith(specificBitRange)) {
-            ++restrictedRegionsIterator;
-        } else {
-            const auto lastOverlappingBit = std::min(specificBitRange.second, restrictedRegionsIterator->end);
-            if (specificBitRange.first < restrictedRegionsIterator->start) {
-                if (lastOverlappingBit == restrictedRegionsIterator->end) {
-                    restrictedRegionsIterator = restrictionRegions.erase(restrictedRegionsIterator);
-                }
-                else {
-                    restrictedRegionsIterator->resize(specificBitRange.second + 1, restrictedRegionsIterator->end - 1);
-                    ++restrictedRegionsIterator;
-                }
+        if (!restrictedRegion.doesIntersectWith(specificBitRange)) {
+            continue;
+        }
+
+        const auto lastOverlappingBit = std::min(specificBitRange.second, restrictedRegion.end);
+        const bool hasRemainingRestrictionAfterLastOverlappingBit = lastOverlappingBit < restrictedRegion.end;
+
+        if (specificBitRange.first < restrictedRegion.start) {
+            if (!hasRemainingRestrictionAfterLastOverlappingBit) {
+                restrictionRegions.erase(std::next(restrictionRegions.begin(), i));
             } else {
-                const auto firstOverlappingBit                     = std::max(specificBitRange.first, restrictedRegionsIterator->start);
-                const bool hasRemainingRestrictionPriorToLiftedOne = firstOverlappingBit > restrictedRegionsIterator->start;
-                const bool hasRemainingRestrictionAfterLiftedOne   = lastOverlappingBit < restrictedRegionsIterator->end;
+                restrictedRegion.resize(specificBitRange.second + 1, restrictedRegion.end);
+            }
+        }
+        else {
+            const auto firstOverlappingBit = std::max(specificBitRange.first, restrictedRegion.start);
+            const bool hasRemainingRestrictionPriorToLiftedOne = firstOverlappingBit > restrictedRegion.start;
 
-                if (!hasRemainingRestrictionPriorToLiftedOne && !hasRemainingRestrictionAfterLiftedOne) {
-                    restrictedRegionsIterator = restrictionRegions.erase(restrictedRegionsIterator);
-                }
-                else if (hasRemainingRestrictionPriorToLiftedOne && !hasRemainingRestrictionAfterLiftedOne) {
-                    restrictedRegionsIterator->resize(restrictedRegionsIterator->start, firstOverlappingBit - 1);
-                } else if (!hasRemainingRestrictionPriorToLiftedOne && hasRemainingRestrictionAfterLiftedOne) {
-                    restrictedRegionsIterator->resize(lastOverlappingBit + 1, restrictedRegionsIterator->end);
-                } else {
-                    restrictedRegionsIterator->resize(restrictedRegionsIterator->start, firstOverlappingBit - 1);
-                    restrictionRegions.insert(std::next(restrictedRegionsIterator), RestrictionRegion(lastOverlappingBit + 1, restrictedRegionsIterator->end));
-                }
-
-                if (hasRemainingRestrictionPriorToLiftedOne || hasRemainingRestrictionAfterLiftedOne) {
-                    ++restrictedRegionsIterator;
-                }
+            if (!hasRemainingRestrictionPriorToLiftedOne && !hasRemainingRestrictionAfterLastOverlappingBit) {
+                restrictionRegions.erase(std::next(restrictionRegions.begin(), i));
+            } else if (hasRemainingRestrictionPriorToLiftedOne && !hasRemainingRestrictionAfterLastOverlappingBit) {
+                restrictedRegion.resize(restrictedRegion.start, firstOverlappingBit - 1);
+            } else if (!hasRemainingRestrictionPriorToLiftedOne && hasRemainingRestrictionAfterLastOverlappingBit) {
+                restrictedRegion.resize(lastOverlappingBit + 1, restrictedRegion.end);
+            } else {
+                restrictionRegions.insert(std::next(restrictionRegions.begin(), i + 1), RestrictionRegion(lastOverlappingBit + 1, restrictedRegion.end));
+                restrictedRegion.resize(restrictedRegion.start, firstOverlappingBit - 1);
+                i++;
             }
         }
     }

@@ -177,16 +177,12 @@ bool DimensionPropagationBlocker::isSubstitutionBlockedFor(const std::optional<u
     if (!bitRange.has_value()) {
         if (valueOfDimension.has_value()) {
             if (ignoreNotFullwidthBitRangeRestrictions) {
-                return (dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessCompletelyRestricted())
-                    || std::any_of(
-                        perValueOfDimensionBitRangeAccessRestrictionLookup.cbegin(),
-                        perValueOfDimensionBitRangeAccessRestrictionLookup.cend(),
-                        [](const auto& mapEntry) {
-                            const BitRangeAccessRestriction::ptr perValueOfDimensionRestriction = mapEntry.second;
-                            return perValueOfDimensionRestriction->isAccessCompletelyRestricted();
-                    });
+                const bool isDimensionCompletelyBlocked = dimensionBitRangeAccessRestriction.has_value() && (*dimensionBitRangeAccessRestriction)->isAccessCompletelyRestricted();
+                const bool isAccessedValueOfDimensionCompletelyBlocked = perValueOfDimensionBitRangeAccessRestrictionLookup.count(*valueOfDimension) != 0
+                    && perValueOfDimensionBitRangeAccessRestrictionLookup.at(*valueOfDimension)->isAccessCompletelyRestricted();
+                return isDimensionCompletelyBlocked || isAccessedValueOfDimensionCompletelyBlocked;
             }
-            return dimensionBitRangeAccessRestriction.has_value() || !perValueOfDimensionBitRangeAccessRestrictionLookup.empty();
+            return dimensionBitRangeAccessRestriction.has_value() || perValueOfDimensionBitRangeAccessRestrictionLookup.count(*valueOfDimension) != 0;
         }
 
         const bool isBlockedForWholeDimension = dimensionBitRangeAccessRestriction.has_value()
@@ -301,8 +297,9 @@ bool DimensionPropagationBlocker::tryTrimAlreadyBlockedPartsFromRestriction(cons
         return false;
     }
 
+    const bool hasRestrictionsForEveryValueOfDimension = perValueOfDimensionBitRangeAccessRestrictionLookup.size() == numValuesForDimension;
     // TODO: In case that no specific value of the dimension is specified, we can only update the given bit range access if it is fully covered in all values of the dimension
-    const bool isAccessedBitRangeCoveredInAllValuesOfDimension = std::all_of(
+    const bool isAccessedBitRangeCoveredInAllValuesOfDimension = hasRestrictionsForEveryValueOfDimension && std::all_of(
             perValueOfDimensionBitRangeAccessRestrictionLookup.cbegin(),
             perValueOfDimensionBitRangeAccessRestrictionLookup.cend(),
             [&accessedBitRange](const auto& mapEntry) {
@@ -312,6 +309,7 @@ bool DimensionPropagationBlocker::tryTrimAlreadyBlockedPartsFromRestriction(cons
                 }
                 return perValueOfDimensionBitRangeRestriction->isAccessCompletelyRestricted();
             });
+
     if (isAccessedBitRangeCoveredInAllValuesOfDimension) {
         bitRangeAccess.liftAllRestrictions();
         return true;

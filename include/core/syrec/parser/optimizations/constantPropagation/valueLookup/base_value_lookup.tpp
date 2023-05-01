@@ -152,8 +152,8 @@ void BaseValueLookup<Vt>::invalidateStoredValueForBitrange(const std::vector<std
                     // Since we are already blocking the bit range in the parent dimension and due to our assumption that restrictions in subsequent dimensions are always more specific,
                     // we can lift the bit range restriction from the latter.
                     for (const auto& nextLayerLink: nextLayerLinks) {
-                        nextLayerLink->applyRecursively([&restriction, valueOfLastAccessedDimension](const optimizations::DimensionPropagationBlocker::ptr& nextLayerDimensionPropagationBlocker) {
-                            nextLayerDimensionPropagationBlocker->liftRestrictionForBitRange(valueOfLastAccessedDimension, restriction);
+                        nextLayerLink->applyRecursively([&restriction](const optimizations::DimensionPropagationBlocker::ptr& nextLayerDimensionPropagationBlocker) {
+                            nextLayerDimensionPropagationBlocker->liftRestrictionForBitRange(std::nullopt, restriction);
                         });
                     }
                 }
@@ -636,12 +636,12 @@ void BaseValueLookup<Vt>::copyRestrictionsAndUnrestrictedValuesFrom(
     const auto offsetToDimensionWithVaryingValueOfLhs = accessedDimensionsOfLhsAssignmentOperand.size();
     const auto offsetToDimensionWithVaryingValueOfRhs = accessedDimensionsOfRhsAssignmentOperand.size();
 
-    std::vector<std::optional<unsigned int>> transformedLhsAssignmentOperandDimensionAccess(signalInformation.valuesPerDimension.size(), std::nullopt);
+    std::vector<std::optional<unsigned int>> transformedLhsAssignmentOperandDimensionAccess(getSignalInformation().valuesPerDimension.size(), std::nullopt);
     for (std::size_t dimensionIdx = 0; dimensionIdx < offsetToDimensionWithVaryingValueOfLhs; ++dimensionIdx) {
         transformedLhsAssignmentOperandDimensionAccess.at(dimensionIdx) = accessedDimensionsOfLhsAssignmentOperand.at(dimensionIdx);
     }
 
-    std::vector<std::optional<unsigned int>> transformedRhsAssignmentOperandDimensionAccess(offsetToDimensionWithVaryingValueOfRhs + signalInformation.valuesPerDimension.size(), std::nullopt);
+    std::vector<std::optional<unsigned int>> transformedRhsAssignmentOperandDimensionAccess(valueLookupOfRhsOperand.getSignalInformation().valuesPerDimension.size(), std::nullopt);
     for (std::size_t dimensionIdx = 0; dimensionIdx < offsetToDimensionWithVaryingValueOfRhs; ++dimensionIdx) {
         transformedRhsAssignmentOperandDimensionAccess.at(dimensionIdx) = accessedDimensionsOfRhsAssignmentOperand.at(dimensionIdx);
     }
@@ -751,12 +751,12 @@ void BaseValueLookup<Vt>::swapValuesAndRestrictionsBetween(
     const auto offsetToDimensionWithVaryingValueOfLhs = accessedDimensionsOfLhsAssignmentOperand.size();
     const auto offsetToDimensionWithVaryingValueOfRhs = accessedDimensionsOfRhsAssignmentOperand.size();
 
-    std::vector<std::optional<unsigned int>> transformedLhsAssignmentOperandDimensionAccess(signalInformation.valuesPerDimension.size(), std::nullopt);
+    std::vector<std::optional<unsigned int>> transformedLhsAssignmentOperandDimensionAccess(getSignalInformation().valuesPerDimension.size(), std::nullopt);
     for (std::size_t dimensionIdx = 0; dimensionIdx < offsetToDimensionWithVaryingValueOfLhs; ++dimensionIdx) {
         transformedLhsAssignmentOperandDimensionAccess.at(dimensionIdx) = accessedDimensionsOfLhsAssignmentOperand.at(dimensionIdx);
     }
 
-    std::vector<std::optional<unsigned int>> transformedRhsAssignmentOperandDimensionAccess(offsetToDimensionWithVaryingValueOfRhs + signalInformation.valuesPerDimension.size(), std::nullopt);
+    std::vector<std::optional<unsigned int>> transformedRhsAssignmentOperandDimensionAccess(other.getSignalInformation().valuesPerDimension.size(), std::nullopt);
     for (std::size_t dimensionIdx = 0; dimensionIdx < offsetToDimensionWithVaryingValueOfRhs; ++dimensionIdx) {
         transformedRhsAssignmentOperandDimensionAccess.at(dimensionIdx) = accessedDimensionsOfRhsAssignmentOperand.at(dimensionIdx);
     }
@@ -813,6 +813,11 @@ void BaseValueLookup<Vt>::swapValuesAndRestrictionsBetween(
             }
         }
     );
+}
+
+template<typename Vt>
+optimizations::SignalDimensionInformation BaseValueLookup<Vt>::getSignalInformation() const {
+    return signalInformation;
 }
 
 template<typename Vt>

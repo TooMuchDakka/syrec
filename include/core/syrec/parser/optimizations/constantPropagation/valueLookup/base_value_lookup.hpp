@@ -52,6 +52,8 @@ namespace valueLookup {
                 const BaseValueLookup<Vt>&                                                     other
         );
 
+        [[nodiscard]] optimizations::SignalDimensionInformation getSignalInformation() const;
+
     protected:
         const optimizations::SignalDimensionInformation                             signalInformation;
         const LayerData<optimizations::DimensionPropagationBlocker::ptr>::ptr       dimensionAccessRestrictions;
