@@ -43,12 +43,12 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -79,14 +79,14 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
                     if ((*accessedDimensions.at(1)) == SignalValueLookupTest::lockedValueOfSecondDimension) {
                         if (accessedBitRange.has_value()) {
-                            return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                            return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                         }
                         return std::make_optional(SignalValueLookupTest::defaultValue);
                     }
@@ -94,7 +94,7 @@ INSTANTIATE_TEST_SUITE_P(
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -112,27 +112,27 @@ INSTANTIATE_TEST_SUITE_P(
                         if (!accessedBitRange.has_value()) {
                             return true;
                         }
-                        return !SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange);
+                        return !BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange);
                     }
                     return false;
                 }
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
                     if (accessedBitRange.has_value()) {
-                        if (SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange)) {
-                            return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                        if (BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange)) {
+                            return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                         }
                     }
                     return std::nullopt;
                 }
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -154,7 +154,7 @@ INSTANTIATE_TEST_SUITE_P(
                             if (!accessedBitRange.has_value()) {
                                 return true;
                             }
-                            return !SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange);
+                            return !BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange);
                         }
                     }
                     return false;
@@ -162,22 +162,22 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
                     if ((*accessedDimensions.at(1)) == SignalValueLookupTest::lockedValueOfSecondDimension) {
-                        if (accessedBitRange.has_value() && SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange)) {
-                            if (SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange)) {
-                                return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                        if (accessedBitRange.has_value() && BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange)) {
+                            if (BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange)) {
+                                return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                             }
                         }
                     }
                     return std::nullopt;
                 }
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -225,21 +225,21 @@ INSTANTIATE_TEST_SUITE_P(
                 }
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
                     if ((*accessedDimensions.at(1)) == SignalValueLookupTest::lockedValueOfSecondDimension && (*accessedDimensions.at(2)) == SignalValueLookupTest::lockedValueOfThirdDimension) {
                         if (accessedBitRange.has_value()) {
-                            return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                            return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                         }
                         return std::make_optional(SignalValueLookupTest::defaultValue);
                     }
                     return std::nullopt;
                 }
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -279,21 +279,21 @@ INSTANTIATE_TEST_SUITE_P(
                 }
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
                     if ((*accessedDimensions.at(1)) == SignalValueLookupTest::lockedValueOfSecondDimension) {
                         if (accessedBitRange.has_value()) {
-                            return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                            return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                         }
                         return std::make_optional(SignalValueLookupTest::defaultValue);
                     }
                     return std::nullopt;
                 }
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -309,20 +309,20 @@ INSTANTIATE_TEST_SUITE_P(
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
-                    if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions) || !accessedBitRange.has_value()) {
+                    if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions) || !accessedBitRange.has_value()) {
                         return true;
                     }
 
                     if ((*accessedDimensions.at(2)) != SignalValueLookupTest::lockedValueOfThirdDimension) {
                         return true;
                     }
-                    return !SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
+                    return !BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
                 }
 
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
@@ -335,13 +335,13 @@ INSTANTIATE_TEST_SUITE_P(
                         return std::nullopt;
                     }
 
-                    if (SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
-                        return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    if (BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
+                        return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                     }
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -357,16 +357,16 @@ INSTANTIATE_TEST_SUITE_P(
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
-                    if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions) || !accessedBitRange.has_value()) {
+                    if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions) || !accessedBitRange.has_value()) {
                         return true;
                     }
-                    return !SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
+                    return !BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
                 }
 
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
@@ -375,13 +375,13 @@ INSTANTIATE_TEST_SUITE_P(
                         return std::nullopt;
                     }
 
-                    if (SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
-                        return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    if (BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
+                        return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                     }
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -395,12 +395,12 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -414,12 +414,12 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -437,26 +437,26 @@ INSTANTIATE_TEST_SUITE_P(
                     if (!accessedBitRange.has_value()) {
                         return true;
                     }
-                    return !SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
+                    return !BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
                 }
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
                     if (accessedBitRange.has_value()) {
-                        if (SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
-                            return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                        if (BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
+                            return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                         }
                     }
                     return std::nullopt;
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -474,26 +474,26 @@ INSTANTIATE_TEST_SUITE_P(
                     if (!accessedBitRange.has_value()) {
                         return true;
                     }
-                    return !SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
+                    return !BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
                 }
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
                     if (accessedBitRange.has_value()) {
-                        if (SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
-                            return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                        if (BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
+                            return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                         }
                     }
                     return std::nullopt;
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -511,26 +511,26 @@ INSTANTIATE_TEST_SUITE_P(
                     if (!accessedBitRange.has_value()) {
                         return true;
                     }
-                    return !SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
+                    return !BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange);
                 }
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
                     if (accessedBitRange.has_value()) {
-                        if (SignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
-                            return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                        if (BaseSignalValueLookupTest::doesBitrangeLieWithin(*accessedBitRange, SignalValueLookupTest::defaultNonOverlappingBitRange)) {
+                            return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                         }
                     }
                     return std::nullopt;
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -544,12 +544,12 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -569,7 +569,7 @@ INSTANTIATE_TEST_SUITE_P(
                         if (!accessedBitRange.has_value()) {
                             return true;
                         }
-                        return SignalValueLookupTest::doesBitrangeOverlapOther(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange);
+                        return BaseSignalValueLookupTest::doesBitrangeOverlapOther(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange);
                     }
                     else {
                         return false;
@@ -581,24 +581,24 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
-                    if ((accessedBitRange.has_value() && SignalValueLookupTest::doesBitrangeOverlapOther(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange))
+                    if ((accessedBitRange.has_value() && BaseSignalValueLookupTest::doesBitrangeOverlapOther(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange))
                         || !accessedBitRange.has_value()) {
                         return std::nullopt;
                     }
 
                     if (accessedBitRange.has_value()) {
-                        return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                        return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                     }
                     return std::make_optional(SignalValueLookupTest::defaultValue);
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -628,7 +628,7 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
@@ -639,7 +639,7 @@ INSTANTIATE_TEST_SUITE_P(
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -671,7 +671,7 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
@@ -682,7 +682,7 @@ INSTANTIATE_TEST_SUITE_P(
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             }),
@@ -703,7 +703,7 @@ INSTANTIATE_TEST_SUITE_P(
                         if (!accessedBitRange.has_value()) {
                             return true;
                         }
-                        return SignalValueLookupTest::doesBitrangeOverlapOther(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange);
+                        return BaseSignalValueLookupTest::doesBitrangeOverlapOther(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange);
                     } else {
                         return false;
                     }
@@ -713,23 +713,24 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions)) {
                     return std::nullopt;
                 }
 
                 if ((*accessedDimensions.at(0)) == SignalValueLookupTest::lockedValueOfFirstDimension) {
-                    if ((accessedBitRange.has_value() && SignalValueLookupTest::doesBitrangeOverlapOther(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange)) || !accessedBitRange.has_value()) {
+                    if ((accessedBitRange.has_value() && BaseSignalValueLookupTest::doesBitrangeOverlapOther(*accessedBitRange, SignalValueLookupTest::defaultBlockedBitRange)) || !accessedBitRange.has_value()) {
                         return std::nullopt;
                     }
 
                     if (accessedBitRange.has_value()) {
-                        return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                        return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
+                        //return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                     }
                     return std::make_optional(SignalValueLookupTest::defaultValue);
                 }
 
                 if (accessedBitRange.has_value()) {
-                    return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                    return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
                 }
                 return std::make_optional(SignalValueLookupTest::defaultValue);
             })),

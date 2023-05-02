@@ -13,56 +13,56 @@ INSTANTIATE_TEST_SUITE_P(
             std::make_tuple(
                 "DISABLED_LiftRestrictionFromCompletelyBlockedSignalWithAssignmentOfEmptySignal",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
-                    const auto& other = SignalValueLookupTest::createZeroedSignalValueLookup();
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    const auto& other = SignalValueLookupTest::SignalValueLookupTest::createDefaultZeroInitializedSignalValueLookup();
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> { return std::nullopt; }),
             std::make_tuple(
                 "DISABLED_LiftRestrictionFromCompletelyBlockedSignalWithAssignmentOfGlobalSignal",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
-                    const auto& other = SignalValueLookupTest::createZeroedSignalValueLookup();
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    const auto& other = SignalValueLookupTest::SignalValueLookupTest::createDefaultZeroInitializedSignalValueLookup();
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> { return std::nullopt; }),
             std::make_tuple(
                 "DISABLED_LiftRestrictionFromCompletelyBlockedSignalWithAssignmentOfBitRangeOfSignal",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
-                    const auto& other = SignalValueLookupTest::createZeroedSignalValueLookup();
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    const auto& other = SignalValueLookupTest::SignalValueLookupTest::createDefaultZeroInitializedSignalValueLookup();
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> { return std::nullopt; }),
             std::make_tuple(
                 "DISABLED_LiftRestrictionFromCompletelyBlockedSignalWithAssignmentOfValueOfDimensionOfFullySpecifiedDimensionAccessOfSignal",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
-                    const auto& other = SignalValueLookupTest::createZeroedSignalValueLookup();
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    const auto& other = SignalValueLookupTest::SignalValueLookupTest::createDefaultZeroInitializedSignalValueLookup();
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> { return std::nullopt; }),
             std::make_tuple(
                 "DISABLED_LiftRestrictionFromCompletelyBlockedSignalWithAssignmentOfValueOfDimensionOfIncompleteDimensionAccessOfSignal",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
-                    const auto& other = SignalValueLookupTest::createZeroedSignalValueLookup();
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    const auto& other = SignalValueLookupTest::SignalValueLookupTest::createDefaultZeroInitializedSignalValueLookup();
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> { return std::nullopt; }),
             std::make_tuple(
                 "DISABLED_LiftRestrictionFromCompletelyBlockedSignalWithAssignmentOfIncompleteDimensionAccessOfBitOfSignal",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
-                    const auto& other = SignalValueLookupTest::createZeroedSignalValueLookup();
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    const auto& other = SignalValueLookupTest::SignalValueLookupTest::createDefaultZeroInitializedSignalValueLookup();
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> { return std::nullopt; }),
             std::make_tuple(
                 "DISABLED_LiftRestrictionFromCompletelyBlockedSignalWithAssignmentOfIncompleteDimensionAccessOfBitRangeOfSignal",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
-                    const auto& other = SignalValueLookupTest::createZeroedSignalValueLookup();
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    const auto& other = SignalValueLookupTest::SignalValueLookupTest::createDefaultZeroInitializedSignalValueLookup();
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> { return std::nullopt; })

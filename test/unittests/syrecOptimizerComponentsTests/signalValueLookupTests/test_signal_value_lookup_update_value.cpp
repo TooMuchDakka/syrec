@@ -13,7 +13,7 @@ INSTANTIATE_TEST_SUITE_P(
             std::make_tuple(
                 "UpdateValueOfBit",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
                     signalValueLookup->updateStoredValueFor(
                             {SignalValueLookupTest::lockedValueOfFirstDimension,
                              SignalValueLookupTest::lockedValueOfSecondDimension,
@@ -23,7 +23,7 @@ INSTANTIATE_TEST_SUITE_P(
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                    if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
+                    if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
                         return std::nullopt;
 
                     const bool accessedUpdatedDimension =
@@ -44,7 +44,7 @@ INSTANTIATE_TEST_SUITE_P(
             std::make_tuple(
                 "UpdateValueOfBitRange",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
                     signalValueLookup->updateStoredValueFor(
                         {SignalValueLookupTest::lockedValueOfFirstDimension,
                          SignalValueLookupTest::lockedValueOfSecondDimension,
@@ -55,7 +55,7 @@ INSTANTIATE_TEST_SUITE_P(
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                    if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
+                    if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
                         return std::nullopt;
 
                     const bool accessedUpdatedDimension =
@@ -77,7 +77,7 @@ INSTANTIATE_TEST_SUITE_P(
             std::make_tuple(
                 "UpdateCompleteValue",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
                     signalValueLookup->updateStoredValueFor(
                             {SignalValueLookupTest::lockedValueOfFirstDimension,
                              SignalValueLookupTest::lockedValueOfSecondDimension,
@@ -88,7 +88,7 @@ INSTANTIATE_TEST_SUITE_P(
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                    if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
+                    if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
                         return std::nullopt;
 
                     const bool accessedUpdatedDimension =
@@ -109,7 +109,7 @@ INSTANTIATE_TEST_SUITE_P(
             std::make_tuple(
                 "UpdateBitOfAlreadySetValue",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
                     signalValueLookup->updateStoredValueFor(
                         {SignalValueLookupTest::lockedValueOfFirstDimension,
                          SignalValueLookupTest::lockedValueOfSecondDimension,
@@ -126,7 +126,7 @@ INSTANTIATE_TEST_SUITE_P(
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                    if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
+                    if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
                         return std::nullopt;
 
                     const bool accessedUpdatedDimension = 
@@ -146,7 +146,7 @@ INSTANTIATE_TEST_SUITE_P(
             std::make_tuple(
                 "UpdateBitRangeOfAlreadySetValue",
                 [](const SignalValueLookup::ptr& signalValueLookup) {
-                    SignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
+                    BaseSignalValueLookupTest::resetAllValuesTo(signalValueLookup, 0);
                     signalValueLookup->updateStoredValueFor(
                             {SignalValueLookupTest::lockedValueOfFirstDimension,
                              SignalValueLookupTest::lockedValueOfSecondDimension,
@@ -157,7 +157,7 @@ INSTANTIATE_TEST_SUITE_P(
                 },
                 [](const UserDefinedDimensionAccess&, const OptionalBitRangeAccess&) { return false; },
                 [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                    if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
+                    if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
                         return std::nullopt;
 
                     const bool accessedUpdatedDimension =

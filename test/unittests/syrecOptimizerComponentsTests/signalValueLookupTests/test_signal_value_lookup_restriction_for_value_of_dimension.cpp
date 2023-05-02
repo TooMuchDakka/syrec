@@ -40,14 +40,14 @@ INSTANTIATE_TEST_SUITE_P(
                 return false;
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess& accessedBitRange) -> std::optional<unsigned int> {
-                if (!SignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
+                if (!BaseSignalValueLookupTest::isFullySpecifiedDimensionAccess(accessedDimensions))
                     return std::nullopt;
 
                 if (!accessedBitRange.has_value()) {
                     return std::make_optional(SignalValueLookupTest::defaultValue);
                 }
 
-                return std::make_optional(SignalValueLookupTest::determineExpectedValueForBitRange(*accessedBitRange));
+                return std::make_optional(BaseSignalValueLookupTest::determineValueForBitRangeFromValue(SignalValueLookupTest::defaultValue, *accessedBitRange));
             })),
          [](const testing::TestParamInfo<SignalValueLookupTest::ParamType>& info) {
             auto testNameToTransform = std::get<0>(info.param);
