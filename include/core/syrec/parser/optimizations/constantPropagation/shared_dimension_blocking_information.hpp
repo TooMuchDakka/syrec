@@ -10,10 +10,10 @@
 namespace optimizations {
     struct SignalDimensionInformation {
         const unsigned int               bitWidth;
-        const std::vector<unsigned int>& valuesPerDimension;
+        const std::vector<unsigned int> valuesPerDimension;
 
-        explicit SignalDimensionInformation(unsigned int bitWidth, const std::vector<unsigned int>& valuesPerDimension):
-            bitWidth(bitWidth), valuesPerDimension(valuesPerDimension) {}
+        explicit SignalDimensionInformation(unsigned int bitWidth, std::vector<unsigned int> valuesPerDimension):
+            bitWidth(bitWidth), valuesPerDimension(std::move(valuesPerDimension)) {}
     };
 
     struct SharedBlockerInformation {
