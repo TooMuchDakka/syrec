@@ -525,16 +525,13 @@ void BaseValueLookup<Vt>::updateStoredValueFor(const std::vector<std::optional<u
         ? (bitRange->second - bitRange->first) + 1
         : signalInformation.bitWidth;
 
-    const Vt valueToStore = std::any_cast<Vt>(wrapValueOnOverflow(valueToStore, numBitsOfStorage));
+    Vt valueToStore = std::any_cast<Vt>(wrapValueOnOverflow(newValue, numBitsOfStorage));
     if (valueLookupLayer->layerData.count(accessedValueOfLastDimension) == 0) {
         valueLookupLayer->layerData.insert(std::pair(accessedValueOfLastDimension, valueToStore));
     }
     else {
         auto& currentValue = valueLookupLayer->layerData[accessedValueOfLastDimension];
-        if (!currentValue.has_value()) {
-            currentValue.emplace(valueToStore);
-        }
-        else {
+        if (currentValue.has_value()) {
             /*
              * If we are updating a specific bit range, we need to:
              * I.   Extract the current value for said bit range
@@ -542,15 +539,13 @@ void BaseValueLookup<Vt>::updateStoredValueFor(const std::vector<std::optional<u
              * III. Update the corresponding bits back in the signal
              *
              */
-
-            const Vt newValueToStore = std::any_cast<Vt>(wrapValueOnOverflow(newValue, numBitsOfStorage));
             const auto bitRangeToUpdate = bitRange.has_value()
                 ? *bitRange
                 : ::optimizations::BitRangeAccessRestriction::BitRangeAccess(std::pair(0, signalInformation.bitWidth - 1));
 
-            const Vt updatedCurrentValue = std::any_cast<Vt>(transformExistingValueByMergingWithNewOne(*currentValue, newValueToStore, bitRangeToUpdate));
-            currentValue.emplace(updatedCurrentValue);
+            valueToStore = std::any_cast<Vt>(transformExistingValueByMergingWithNewOne(*currentValue, valueToStore, bitRangeToUpdate));
         }
+        valueLookupLayer->layerData.insert_or_assign(accessedValueOfLastDimension, valueToStore);
     }
 }
 
@@ -732,6 +727,7 @@ void BaseValueLookup<Vt>::applyToLastLayerBitsWithRelativeDimensionAccessInforma
     }
 }
 
+// TODO: CONSTANT_PROPAGATION: Currently only constant values for the accessed values of the dimensions are supported
 template<typename Vt>
 void BaseValueLookup<Vt>::swapValuesAndRestrictionsBetween(
     const std::vector<std::optional<unsigned>>& accessedDimensionsOfLhsAssignmentOperand, 

@@ -33,7 +33,7 @@ namespace valueLookup {
         constexpr static unsigned int                 defaultRhsValue         = 170;
         constexpr static unsigned int                 defaultRhsBitRangeSizedValue = 5;
 
-        const static inline std::vector<unsigned int> defaultRhsIntermediateSignalDimensions = {1, 4};
+        const static inline std::vector<unsigned int> defaultRhsIntermediateSignalDimensions = {4, 2};
         const static inline std::vector<unsigned int> defaultRhs1DSignalDimensions = {1};
 
         constexpr static unsigned int lhsLockedValueOfFirstDimension = 1;
@@ -94,7 +94,7 @@ namespace valueLookup {
                     signalValueLookup->invalidateStoredValueForBitrange({rhsLockedValueOfFirstDimension }, rhsDefaultLockedBitRange);
                     break;
                 case FORINTERMEDIATEACCESS:
-                    signalValueLookup->invalidateStoredValueForBitrange({rhsLockedValueOfFirstDimension, rhsLockedValueOfSecondDimension}, rhsDefaultLockedBitRange);
+                    signalValueLookup->invalidateStoredValueForBitrange({rhsLockedValueOfSecondDimension, rhsLockedValueOfThirdDimension}, rhsDefaultLockedBitRange);
                     break;
                 default:
                     signalValueLookup->invalidateStoredValueForBitrange({rhsLockedValueOfFirstDimension, rhsLockedValueOfSecondDimension, rhsLockedValueOfThirdDimension}, rhsDefaultLockedBitRange);
@@ -117,6 +117,7 @@ namespace valueLookup {
 
         const SignalValueLookup::ptr lhsSwapOperand = lhsOperandSetup();
         const SignalValueLookup::ptr rhsSwapOperand = rhsOperandSetup();
+
         ASSERT_TRUE(lhsSwapOperand != nullptr) << "LHs operand of swap operation cannot be null";
         ASSERT_TRUE(rhsSwapOperand != nullptr) << "RHs operand of swap operation cannot be null";
 
