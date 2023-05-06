@@ -23,6 +23,7 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/truthTable/truth_table.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/io/pla_parser.cpp
       
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/assignment_signal_access_restriction.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/custom_semantic_errors.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_comparer.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/expression_evaluation_result.cpp
@@ -66,6 +67,7 @@ add_library(
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/assignment_signal_access_restriction.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/custom_semantic_errors.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_comparer.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_evaluation_result.hpp

@@ -543,19 +543,6 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(c
     return std::nullopt;
 }
 
-std::optional<SignalAccessRestriction> SyReCCustomBaseVisitor::tryGetSignalAccessRestriction(const std::string& signalIdent) const {
-    auto signalRestrictionEntry = sharedData->signalAccessRestrictions.find(signalIdent);
-    return signalRestrictionEntry != sharedData->signalAccessRestrictions.end() ? std::make_optional(signalRestrictionEntry->second) : std::nullopt;
-}
-
-void SyReCCustomBaseVisitor::updateSignalRestriction(const std::string& signalIdent, const SignalAccessRestriction& updatedRestriction) {
-    if (sharedData->signalAccessRestrictions.count(signalIdent) == 0) {
-        return;
-    }
-
-    sharedData->signalAccessRestrictions.insert_or_assign(signalIdent, updatedRestriction);
-}
-
 bool SyReCCustomBaseVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(const TokenPosition& positionOfOptionalError, const std::vector<unsigned>& lhsOperandNumValuesPerDimension, const std::vector<unsigned>& rhsOperandNumValuesPerDimension) {
     if (const auto dimensionsWithMissmatchedNumValues = getDimensionsWithMissmatchedNumberOfValues(lhsOperandNumValuesPerDimension, rhsOperandNumValuesPerDimension); !dimensionsWithMissmatchedNumValues.empty()) {
         std::vector<std::string> perDimensionErrorBuffer;
@@ -639,41 +626,9 @@ bool SyReCCustomBaseVisitor::validateSemanticChecksIfDimensionExpressionIsConsta
 }
 
 // TODO: Handling of partial bit ranges (i.e. .2:$i) when evaluating bit range !!!
-bool SyReCCustomBaseVisitor::isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const TokenPosition& optionalEvaluationErrorPosition) {
-    const auto signalAccessRestriction = tryGetSignalAccessRestriction(accessedSignalPart->getVar()->name);
-    if (!signalAccessRestriction.has_value()) {
-        return false;
-    }
-
-    if ((accessedSignalPart->indexes.empty() && !accessedSignalPart->range.has_value()) || signalAccessRestriction->isAccessRestrictedOnWholeSignal()) {
-        return true;
-    }
-
-    const bool wasBitOrRangeAccessDefined = accessedSignalPart->range.has_value();
-
-    // TODO: Do we need to be able to distinguish between an evaluation error due to a division by zero or simply because the compile
-    // time expression cannot be evaluated ? If the latter is the case, is a check for a block of the complete signal enough ?
-    const std::optional<SignalAccessRestriction::SignalAccess> evaluatedBitOrRangeAccess =
-            wasBitOrRangeAccessDefined ? tryEvaluateBitOrRangeAccess(*accessedSignalPart->range, optionalEvaluationErrorPosition) : std::nullopt;
-
-    if (evaluatedBitOrRangeAccess.has_value() && signalAccessRestriction->isAccessRestrictedToBitRange(*evaluatedBitOrRangeAccess)) {
-        return true;
-    }
-
-    std::optional<unsigned int> accessedValueForDimension;
-    for (std::size_t dimensionIdx = 0; dimensionIdx < accessedSignalPart->indexes.size(); ++dimensionIdx) {
-        const auto& accessedDimensionExpr = accessedSignalPart->indexes.at(dimensionIdx);
-        if (auto const* numeric = dynamic_cast<syrec::NumericExpression*>(accessedDimensionExpr.get())) {
-            accessedValueForDimension = canEvaluateNumber(numeric->value) ? tryEvaluateNumber(numeric->value, optionalEvaluationErrorPosition) : std::nullopt;
-        }
-
-        if (signalAccessRestriction->isAccessRestrictedToDimension(dimensionIdx) || (accessedValueForDimension.has_value() && signalAccessRestriction->isAccessRestrictedToValueOfDimension(dimensionIdx, *accessedValueForDimension))) {
-            return true;
-        }
-
-        if (dimensionIdx + 1 == accessedSignalPart->indexes.size() && accessedValueForDimension.has_value() && evaluatedBitOrRangeAccess.has_value() && signalAccessRestriction->isAccessRestrictedToBitRange(dimensionIdx, *accessedValueForDimension, *evaluatedBitOrRangeAccess)) {
-            return true;
-        }
-    }
-    return false;
+bool SyReCCustomBaseVisitor::isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const TokenPosition& optionalEvaluationErrorPosition) const {
+    const auto& existingSignalAccessRestriction = sharedData->getSignalAccessRestriction();
+    return existingSignalAccessRestriction.has_value()
+        ? (*existingSignalAccessRestriction)->isAccessRestrictedTo(accessedSignalPart)
+        : false;
 }

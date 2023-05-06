@@ -58,8 +58,6 @@ namespace parser {
         [[nodiscard]] std::optional<unsigned int>            applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand, const TokenPosition& potentialErrorPosition);
 
         std::optional<SignalAccessRestriction::SignalAccess> tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const TokenPosition& optionalEvaluationErrorPosition);
-        [[nodiscard]] std::optional<SignalAccessRestriction> tryGetSignalAccessRestriction(const std::string& signalIdent) const;
-        void                                                 updateSignalRestriction(const std::string& signalIdent, const SignalAccessRestriction& updatedRestriction);
 
         std::any visitSignal(SyReCParser::SignalContext* context) override;
         std::any visitNumberFromConstant(SyReCParser::NumberFromConstantContext* context) override;
@@ -115,7 +113,7 @@ namespace parser {
         [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(const antlr4::Token* dimensionToken, size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult);
         [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
         [[nodiscard]] bool                                                             validateBitOrRangeAccessOnSignal(const antlr4::Token* bitOrRangeStartToken, const syrec::Variable::ptr& accessedVariable, const std::pair<syrec::Number::ptr, syrec::Number::ptr>& bitOrRangeAccess);
-        [[nodiscard]] bool                                                             isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const TokenPosition& optionalEvaluationErrorPosition);
+        [[nodiscard]] bool                                                             isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const TokenPosition& optionalEvaluationErrorPosition) const;
     };
 }
 #endif

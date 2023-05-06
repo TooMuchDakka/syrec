@@ -14,8 +14,8 @@ namespace optimizations {
     public:
         typedef std::shared_ptr<DimensionPropagationBlocker> ptr;
         
-        explicit DimensionPropagationBlocker(const unsigned int dimension, const SignalDimensionInformation& signalInformation):
-            isDimensionCompletelyBlocked(false), signalInformation(signalInformation), dimensionBitRangeAccessRestriction(std::nullopt), perValueOfDimensionBitRangeAccessRestrictionLookup({}), numValuesForDimension(signalInformation.valuesPerDimension.at(dimension)) {}
+        explicit DimensionPropagationBlocker(const unsigned int dimension, SignalDimensionInformation signalInformation):
+            isDimensionCompletelyBlocked(false), signalInformation(std::move(signalInformation)), dimensionBitRangeAccessRestriction(std::nullopt), perValueOfDimensionBitRangeAccessRestrictionLookup({}), numValuesForDimension(signalInformation.valuesPerDimension.at(dimension)) {}
 
         [[nodiscard]] bool isSubstitutionBlockedFor(const std::optional<unsigned int>& valueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& bitRange, bool ignoreNotFullwidthBitRangeRestrictions = false, bool ignoreSmallerThanAccessedBitranges = false) const;
 
@@ -29,10 +29,10 @@ namespace optimizations {
         [[nodiscard]] bool tryTrimAlreadyBlockedPartsFromRestriction(const std::optional<unsigned int>& accessedValueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange, BitRangeAccessRestriction& bitRangeAccess) const;
 
     private:
-        bool                                                   isDimensionCompletelyBlocked;
-        const SignalDimensionInformation&                      signalInformation;
-        std::optional<BitRangeAccessRestriction::ptr>         dimensionBitRangeAccessRestriction;
-        std::map<unsigned int, BitRangeAccessRestriction::ptr> perValueOfDimensionBitRangeAccessRestrictionLookup;
+        bool                                                    isDimensionCompletelyBlocked;
+        const SignalDimensionInformation                        signalInformation;
+        std::optional<BitRangeAccessRestriction::ptr>           dimensionBitRangeAccessRestriction;
+        std::map<unsigned int, BitRangeAccessRestriction::ptr>  perValueOfDimensionBitRangeAccessRestrictionLookup;
         const unsigned int numValuesForDimension;
     };
 };

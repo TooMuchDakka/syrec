@@ -74,7 +74,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
             sharedData->optionalExpectedExpressionSignalWidth.emplace((*(*assignedToSignal)->getAsVariableAccess())->getVar()->bitwidth);
         }
 
-        restrictAccessToAssignedToPartOfSignal(*(*assignedToSignal)->getAsVariableAccess(), determineContextStartTokenPositionOrUseDefaultOne(context));
+        sharedData->createSignalAccessRestriction(*(*assignedToSignal)->getAsVariableAccess());
         needToResetSignalRestriction = true;
     }
 
@@ -140,8 +140,14 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
         sharedData->optionalExpectedExpressionSignalWidth.reset();
     }
 
+    /*
+     * TODO: CONSTANT_PROPAGATION:
+     * Signal access restrictions can be "trashed" since functionality is already provided by signal value lookup.
+     * What we do need is to refactor the dimension propagation blocked functionality into a separate class
+     */ 
     if (needToResetSignalRestriction) {
-        liftRestrictionToAssignedToPartOfSignal(*(*assignedToSignal)->getAsVariableAccess(), determineContextStartTokenPositionOrUseDefaultOne(context));
+        const auto assignedToSignalIdent = (*(*assignedToSignal)->getAsVariableAccess())->getVar()->name;
+        sharedData->resetSignalAccessRestriction();
     }
 
     return 0;
@@ -609,154 +615,9 @@ bool SyReCStatementVisitor::areExpressionsEqual(const ExpressionEvaluationResult
     return areSyntacticallyEquivalent(firstExpr->getAsExpression().value(), otherExpr->getAsExpression().value());
 }
 
-void SyReCStatementVisitor::restrictAccessToAssignedToPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalPart, const TokenPosition& optionalEvaluationErrorPosition) {
-    // a[$i][2][3].0
-    // a[2][3][($i + 2)].$i:0
-    // a[2][($i + ($i + 5))] = 0
-    // a[$i]
-    // a[$i].0:($i + ($i / 10)) = 0
-    // a
-
-    const std::string& assignedToSignalIdent   = assignedToSignalPart->getVar()->name;
-    auto               signalAccessRestriction = tryGetSignalAccessRestriction(assignedToSignalIdent);
-    if (!signalAccessRestriction.has_value()) {
-        sharedData->signalAccessRestrictions.insert({assignedToSignalIdent, SignalAccessRestriction(assignedToSignalPart->getVar())});
-        signalAccessRestriction.emplace(*tryGetSignalAccessRestriction(assignedToSignalIdent));
-    }
-
-    const std::optional<SignalAccessRestriction::SignalAccess> evaluatedBitOrRangeAccess =
-            assignedToSignalPart->range.has_value() ? tryEvaluateBitOrRangeAccess(*assignedToSignalPart->range, optionalEvaluationErrorPosition) : std::nullopt;
-
-    if (evaluatedBitOrRangeAccess.has_value() && signalAccessRestriction->isAccessRestrictedToBitRange(*evaluatedBitOrRangeAccess)) {
-        return;
-    }
-
-    if (assignedToSignalPart->indexes.empty()) {
-        if (!evaluatedBitOrRangeAccess.has_value()) {
-            signalAccessRestriction->blockAccessOnSignalCompletely();
-        } else {
-            signalAccessRestriction->restrictAccessToBitRange(*evaluatedBitOrRangeAccess);
-        }
-        updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
-        return;
-    }
-
-    for (std::size_t dimensionIdx = 0; dimensionIdx < assignedToSignalPart->indexes.size(); ++dimensionIdx) {
-        if (signalAccessRestriction->isAccessRestrictedToDimension(dimensionIdx)) {
-            return;
-        }
-
-        std::optional<unsigned int> accessedValueForDimension = std::nullopt;
-        if (auto const* numeric = dynamic_cast<syrec::NumericExpression*>(assignedToSignalPart->indexes.at(dimensionIdx).get())) {
-            if (canEvaluateNumber(numeric->value)) {
-                accessedValueForDimension = tryEvaluateNumber(numeric->value, optionalEvaluationErrorPosition);
-            }
-        }
-
-        if (accessedValueForDimension.has_value() && signalAccessRestriction->isAccessRestrictedToValueOfDimension(dimensionIdx, accessedValueForDimension.value())) {
-            return;
-        }
-    }
-
-    const std::size_t           lastDimensionIdx          = assignedToSignalPart->indexes.size() - 1;
-    std::optional<unsigned int> accessedValueForDimension = std::nullopt;
-    if (auto const* numeric = dynamic_cast<syrec::NumericExpression*>(assignedToSignalPart->indexes.at(lastDimensionIdx).get())) {
-        if (canEvaluateNumber(numeric->value)) {
-            accessedValueForDimension = tryEvaluateNumber(numeric->value, optionalEvaluationErrorPosition);
-        }
-    }
-
-    if (accessedValueForDimension.has_value()) {
-        if (evaluatedBitOrRangeAccess.has_value()) {
-            signalAccessRestriction->restrictAccessToBitRange(lastDimensionIdx, *accessedValueForDimension, *evaluatedBitOrRangeAccess);
-        } else {
-            signalAccessRestriction->restrictAccessToValueOfDimension(lastDimensionIdx, *accessedValueForDimension);
-        }
-    } else {
-        if (evaluatedBitOrRangeAccess.has_value()) {
-            signalAccessRestriction->restrictAccessToBitRange(lastDimensionIdx, *evaluatedBitOrRangeAccess);
-        } else {
-            if (lastDimensionIdx == 0) {
-                /*
-                  * Accessing either a bit range for which we cannot determine which bits were accessed or accessing any value of the first dimension,
-                  * allows one to restrict the access to the whole signal for both 1-D as well as N-D signals since the restriction status of subsequent dimensions
-                  * depends on the prior ones
-                 */
-                signalAccessRestriction->blockAccessOnSignalCompletely();
-            } else {
-                // Accessing either a bit range for which we cannot determine which bits were accessed or accessing any value of a dimension, allows one to restrict the access to the whole dimension
-                signalAccessRestriction->restrictAccessToDimension(lastDimensionIdx);
-            }
-        }
-    }
-    updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
-}
-
-void SyReCStatementVisitor::liftRestrictionToAssignedToPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalPart, const TokenPosition& optionalEvaluationErrorPosition) {
-    auto signalAccessRestriction = tryGetSignalAccessRestriction(assignedToSignalPart->getVar()->name);
-    if (!signalAccessRestriction.has_value()) {
-        return;
-    }
-
-    const std::string                                          assignedToSignalIdent      = assignedToSignalPart->getVar()->name;
-    const bool                                                 wasBitOrRangeAccessDefined = assignedToSignalPart->range.has_value();
-    const std::optional<SignalAccessRestriction::SignalAccess> evaluatedBitOrRangeAccess =
-            wasBitOrRangeAccessDefined ? tryEvaluateBitOrRangeAccess(*assignedToSignalPart->range, optionalEvaluationErrorPosition) : std::nullopt;
-
-    if (assignedToSignalPart->indexes.empty()) {
-        if (evaluatedBitOrRangeAccess.has_value()) {
-            signalAccessRestriction->liftAccessRestrictionForBitRange(*evaluatedBitOrRangeAccess);
-            updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
-        } else {
-            sharedData->signalAccessRestrictions.erase(assignedToSignalIdent);
-        }
-        return;
-    }
-
-    const std::size_t           lastAccessedDimensionIdx = assignedToSignalPart->indexes.size() - 1;
-    std::optional<unsigned int> accessedValueForDimension;
-    const auto&                 accessedDimensionExpr = assignedToSignalPart->indexes.at(lastAccessedDimensionIdx);
-    if (auto const* numeric = dynamic_cast<syrec::NumericExpression*>(accessedDimensionExpr.get())) {
-        accessedValueForDimension = canEvaluateNumber(numeric->value) ? tryEvaluateNumber(numeric->value, optionalEvaluationErrorPosition) : std::nullopt;
-    }
-
-    if (accessedValueForDimension.has_value()) {
-        if (evaluatedBitOrRangeAccess.has_value()) {
-            signalAccessRestriction->liftAccessRestrictionForBitRange(lastAccessedDimensionIdx, *accessedValueForDimension, *evaluatedBitOrRangeAccess);
-        } else {
-            signalAccessRestriction->liftAccessRestrictionForValueOfDimension(lastAccessedDimensionIdx, *accessedValueForDimension);
-        }
-        updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
-    } else {
-        if (evaluatedBitOrRangeAccess.has_value()) {
-            signalAccessRestriction->liftAccessRestrictionForBitRange(lastAccessedDimensionIdx, *evaluatedBitOrRangeAccess);
-        } else {
-            if (assignedToSignalPart->indexes.size() == 1) {
-                sharedData->signalAccessRestrictions.erase(assignedToSignalIdent);
-                return;
-            }
-            signalAccessRestriction->liftAccessRestrictionForDimension(lastAccessedDimensionIdx);
-        }
-        updateSignalRestriction(assignedToSignalIdent, signalAccessRestriction.value());
-    }
-}
-
 // TODO: CONSTANT_PROPAGATION: Handling of out of range indizes for dimension or bit range
 // TODO: CONSTANT_PROPAGATION: In case the rhs expr was a constant, should we trim its value in case it cannot be stored in the lhs ?
 void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const {
-    const auto invalidateAccessedBitRange = assignedToVariableParts->range.has_value()
-        && (!assignedToVariableParts->range->first->isConstant() || !assignedToVariableParts->range->second->isConstant());
-
-    const auto accessedAnyNonConstantValueOfDimension = std::any_of(
-            assignedToVariableParts->indexes.cbegin(),
-            assignedToVariableParts->indexes.cend(),
-            [](const syrec::expression::ptr& valueOfDimensionExpr) {
-                if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(valueOfDimensionExpr); numericExpr != nullptr) {
-                    return numericExpr->value->isConstant();
-                }
-                return true;
-            });
-
     const auto& constantValueOfExprContainingNewValue = std::dynamic_pointer_cast<syrec::NumericExpression>(exprContainingNewValue);
     const auto& variableToCopyValuesAndRestrictionsFrom           = std::dynamic_pointer_cast<syrec::VariableExpression>(exprContainingNewValue);
 
@@ -768,13 +629,11 @@ void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::Var
      * IV.  Either I. or II. does not hold for the defined variable access on the rhs
      *
      */
-    bool shouldInvalidateInsteadOfUpdateAssignedToVariable = 
+    const auto shouldInvalidateInsteadOfUpdateAssignedToVariable = 
         !areAccessedValuesForDimensionAndBitsConstant(assignedToVariableParts)
-        || (constantValueOfExprContainingNewValue == nullptr && variableToCopyValuesAndRestrictionsFrom == nullptr);
-
-    if (!shouldInvalidateInsteadOfUpdateAssignedToVariable && constantValueOfExprContainingNewValue != nullptr) {
-        shouldInvalidateInsteadOfUpdateAssignedToVariable &= constantValueOfExprContainingNewValue->value->isConstant();
-    }
+        || (constantValueOfExprContainingNewValue == nullptr && variableToCopyValuesAndRestrictionsFrom == nullptr)
+        || (constantValueOfExprContainingNewValue != nullptr && !constantValueOfExprContainingNewValue->value->isConstant());
+    
 
     if (shouldInvalidateInsteadOfUpdateAssignedToVariable) {
         invalidateStoredValueFor(assignedToVariableParts);
@@ -784,7 +643,20 @@ void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::Var
             sharedData->currentSymbolTableScope->updateStoredValueFor(assignedToVariableParts, constantValueOfExprContainingNewValue->value->evaluate({}));
         }
         else {
-            if (!areAccessedValuesForDimensionAndBitsConstant(variableToCopyValuesAndRestrictionsFrom->var)) {
+            const auto typeOfRhsOperandVariable       = variableToCopyValuesAndRestrictionsFrom->var->var->type;
+            bool       canRhsOperandVariableHaveValue;
+            switch (typeOfRhsOperandVariable) {
+                case syrec::Variable::Wire:
+                case syrec::Variable::Inout:
+                case syrec::Variable::Out:
+                    canRhsOperandVariableHaveValue = true;
+                    break;
+                default:
+                    canRhsOperandVariableHaveValue = false;
+                    break;
+            }
+            
+            if (!canRhsOperandVariableHaveValue || !areAccessedValuesForDimensionAndBitsConstant(variableToCopyValuesAndRestrictionsFrom->var)) {
                 invalidateStoredValueFor(assignedToVariableParts);
             } else {
                 sharedData->currentSymbolTableScope->updateViaSignalAssignment(assignedToVariableParts, variableToCopyValuesAndRestrictionsFrom->var);   
@@ -821,7 +693,7 @@ bool SyReCStatementVisitor::areAccessedValuesForDimensionAndBitsConstant(const s
             accessedSignalParts->indexes.cend(),
             [](const syrec::expression::ptr& valueOfDimensionExpr) {
                 if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(valueOfDimensionExpr); numericExpr != nullptr) {
-                    return numericExpr->value->isConstant();
+                    return !numericExpr->value->isConstant();
                 }
                 return true;
             });
