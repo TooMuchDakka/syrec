@@ -10,7 +10,9 @@ bool AssignmentSignalAccessRestriction::isAccessRestrictedTo(const syrec::Variab
 std::pair<unsigned, unsigned> AssignmentSignalAccessRestriction::initializeRestrictedBitRange(const syrec::VariableAccess::ptr& assignedToPartsOfSignal) {
     unsigned int accessedBitRangeStart = 0;
     unsigned int accessedBitRangeEnd   = assignedToPartsOfSignal->var->bitwidth - 1;
-    if (assignedToPartsOfSignal->range->first->isConstant() && assignedToPartsOfSignal->range->second->isConstant()) {
+    if (assignedToPartsOfSignal->range.has_value()
+        && assignedToPartsOfSignal->range->first->isConstant() 
+        && assignedToPartsOfSignal->range->second->isConstant()) {
         accessedBitRangeStart = assignedToPartsOfSignal->range->first->evaluate({});
         accessedBitRangeEnd   = assignedToPartsOfSignal->range->second->evaluate({});
     }
