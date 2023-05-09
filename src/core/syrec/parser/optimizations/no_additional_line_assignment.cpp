@@ -9,6 +9,41 @@
 
 using namespace optimizations;
 
+std::optional<syrec::expression::ptr> LineAwareOptimization::TreeTraversalNode::fetchStoredExpr() const {
+    if (!isInternalNode && std::holds_alternative<LeafData>(nodeData)) {
+        const auto& leafData = std::get<LeafData>(nodeData);
+
+        if (std::holds_alternative<std::shared_ptr<syrec::VariableExpression>>(leafData)) {
+            return std::make_optional<syrec::expression::ptr>(std::get<std::shared_ptr<syrec::VariableExpression>>(leafData));
+        }
+        if (std::holds_alternative<std::shared_ptr<syrec::NumericExpression>>(leafData)) {
+            return std::make_optional<syrec::expression::ptr>(std::get<std::shared_ptr<syrec::NumericExpression>>(leafData));
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<syrec_operation::operation> LineAwareOptimization::TreeTraversalNode::fetchStoredOperation() const {
+    return (isInternalNode && std::holds_alternative<InternalNodeData>(nodeData))
+        ? std::make_optional(std::get<syrec_operation::operation>(std::get<InternalNodeData>(nodeData)))
+        : std::nullopt;
+}
+
+std::optional<std::shared_ptr<syrec::BinaryExpression>> LineAwareOptimization::TreeTraversalNode::fetchReferenceBinaryExpr() const {
+    return (isInternalNode && std::holds_alternative<InternalNodeData>(nodeData))
+        ? std::make_optional(std::get<std::shared_ptr<syrec::BinaryExpression>>(std::get<InternalNodeData>(nodeData)))
+        : std::nullopt;
+}
+
+std::vector<std::size_t> LineAwareOptimization::PostOrderTreeTraversal::getTraversalIndexOfAllNodes() const {
+    std::vector<std::size_t> indizes(treeNodesInPostOrder.size(), 0);
+    for (std::size_t i = 0; i < indizes.size(); ++i) {
+        indizes[i] = i;
+    }
+    return indizes;
+}
+
+
 std::vector<std::size_t> LineAwareOptimization::PostOrderTreeTraversal::getTraversalIndexOfAllLeafNodes() const {
     return getEitherInternalOrLeafNodes(true);
 }
@@ -17,16 +52,29 @@ std::vector<std::size_t> LineAwareOptimization::PostOrderTreeTraversal::getTrave
     return getEitherInternalOrLeafNodes(false);
 }
 
+std::optional<std::size_t> LineAwareOptimization::PostOrderTreeTraversal::getTraversalIdxOfParentOfNode(std::size_t postOrderTraversalIdx) const {
+    return postOrderTraversalIdx < parentPerNodeLookup.size() && parentPerNodeLookup.at(postOrderTraversalIdx).has_value()
+        ? std::make_optional(*parentPerNodeLookup[postOrderTraversalIdx])
+        : std::nullopt;
+}
+
 std::optional<const LineAwareOptimization::TreeTraversalNode> LineAwareOptimization::PostOrderTreeTraversal::getParentOfNode(std::size_t postOrderTraversalIdx) const {
-    return postOrderTraversalIdx < parentPerNodeLookup.size()
-    ? std::make_optional(treeNodesInPostOrder[*parentPerNodeLookup[postOrderTraversalIdx]])
-    : std::nullopt;
+    const auto& traversalIdxOfParentNode = getTraversalIdxOfParentOfNode(postOrderTraversalIdx);
+    return traversalIdxOfParentNode.has_value() 
+        ? std::make_optional(treeNodesInPostOrder[*traversalIdxOfParentNode])
+        : std::nullopt;
 }
 
 
 std::optional<const LineAwareOptimization::TreeTraversalNode> LineAwareOptimization::PostOrderTreeTraversal::getNode(std::size_t postOrderTraversalIdx) const {
     return postOrderTraversalIdx < treeNodesInPostOrder.size()
         ? std::make_optional(treeNodesInPostOrder[postOrderTraversalIdx])
+        : std::nullopt;
+}
+
+std::optional<std::pair<std::size_t, std::size_t>> LineAwareOptimization::PostOrderTreeTraversal::getChildNodesForOperationNode(std::size_t postOrderTraversalIdxOfOperationNode) const {
+    return parentChildRelationLookup.count(postOrderTraversalIdxOfOperationNode) != 0
+        ? std::make_optional(parentChildRelationLookup.at(postOrderTraversalIdxOfOperationNode).childNodeTraversalIndizes)
         : std::nullopt;
 }
 
@@ -38,21 +86,27 @@ bool LineAwareOptimization::PostOrderTreeTraversal::areOperandsOnlyAdditionSubtr
         if (!treeNode.isInternalNode) {
             return true;
         }
-        return isOperationAdditionSubtractionOrXor(std::get<syrec_operation::operation>(treeNode.nodeData));
+        return isOperationAdditionSubtractionOrXor(*treeNode.fetchStoredOperation());
     });
 }
 
-bool LineAwareOptimization::PostOrderTreeTraversal::doOperandsOperateOnLeaveNodesOnly(const std::vector<syrec_operation::operation>& operands) const {
-    const auto&    leafNodeTraversalIndizes = getTraversalIndexOfAllLeafNodes();
+bool LineAwareOptimization::PostOrderTreeTraversal::doOperandsOperateOnLeafNodesOnly(const std::vector<syrec_operation::operation>& operands) const {
     const std::set operandsOfInterest(operands.cbegin(), operands.cend());
 
-    bool doOperandsOperateOnLeavesOnly = true;
-    for (std::size_t i = 0; i < leafNodeTraversalIndizes.size() && doOperandsOperateOnLeavesOnly; ++i) {
-        const auto& parentNodeOfLeaf    = *getParentOfNode(leafNodeTraversalIndizes[i]);
-        const auto  operandOfParentNode = std::get<syrec_operation::operation>(parentNodeOfLeaf.nodeData);
-        doOperandsOperateOnLeavesOnly &= operandsOfInterest.count(operandOfParentNode) != 0;
-    }
-    return doOperandsOperateOnLeavesOnly;
+    const auto& operationNodeTraversalIndizes = getTraversalIndexOfAllOperationNodes();
+    return std::all_of(
+    operationNodeTraversalIndizes.cbegin(),
+    operationNodeTraversalIndizes.cend(),
+    [this, &operandsOfInterest](const std::size_t operationNodeTraversalIdx) {
+        const auto  operation          = *getNode(operationNodeTraversalIdx)->fetchStoredOperation();
+        if (operandsOfInterest.count(operation) == 0) {
+            return true;
+        }
+
+        const auto& operandsOfOperationTraversalIndizes = getChildNodesForOperationNode(operationNodeTraversalIdx);
+        const auto& operandsOfOperation                 = std::make_pair(*getNode(operandsOfOperationTraversalIndizes->first), *getNode(operandsOfOperationTraversalIndizes->second));
+        return !operandsOfOperation.first.isInternalNode && !operandsOfOperation.second.isInternalNode;
+    });
 }
 
 bool LineAwareOptimization::PostOrderTreeTraversal::doTwoConsecutiveOperationNodesHaveNotAdditionSubtractionOrXorAsOperand() const {
@@ -63,18 +117,18 @@ bool LineAwareOptimization::PostOrderTreeTraversal::doTwoConsecutiveOperationNod
         [this](const std::size_t operationNodeTraversalIdx) {
             const auto& parentNode = getParentOfNode(operationNodeTraversalIdx);
             if (parentNode.has_value()) {
-                const auto operationOfCurrentNode = std::get<syrec_operation::operation>(getNode(operationNodeTraversalIdx)->nodeData);
-                const auto operationOfParentNode  = std::get<syrec_operation::operation>(parentNode->nodeData);
+                const auto operationOfCurrentNode = *getNode(operationNodeTraversalIdx)->fetchStoredOperation();
+                const auto operationOfParentNode  = *parentNode->fetchStoredOperation();
                 return !isOperationAdditionSubtractionOrXor(operationOfCurrentNode) && !isOperationAdditionSubtractionOrXor(operationOfParentNode);
             }
-            return false;
+            return true;
         }
     );
 }
 
-std::vector<std::optional<std::size_t>> LineAwareOptimization::PostOrderTreeTraversal::determineParentPerNode(const std::vector<TreeTraversalNode>& nodesInPostOrder) {
+void LineAwareOptimization::PostOrderTreeTraversal::determineParentChildRelations(const std::vector<TreeTraversalNode>& nodesInPostOrder) {
     std::stack<std::size_t>                 processedNodeIdxStack;
-    std::vector<std::optional<std::size_t>> parentLookup(nodesInPostOrder.size(), std::nullopt);
+    parentPerNodeLookup.resize(nodesInPostOrder.size(), std::nullopt);
 
     std::size_t currentTraversalIdx = 0;
     for (const auto& node: nodesInPostOrder) {
@@ -84,18 +138,18 @@ std::vector<std::optional<std::size_t>> LineAwareOptimization::PostOrderTreeTrav
             const auto& leftChildIdx = processedNodeIdxStack.top();
             processedNodeIdxStack.pop();
 
-            parentLookup[rightChildIdx] = currentTraversalIdx;
-            parentLookup[leftChildIdx]  = currentTraversalIdx;
+            parentPerNodeLookup[rightChildIdx] = currentTraversalIdx;
+            parentPerNodeLookup[leftChildIdx]  = currentTraversalIdx;
+            parentChildRelationLookup.insert({currentTraversalIdx, ParentChildTreeTraversalNodeRelation(currentTraversalIdx, std::make_pair(leftChildIdx, rightChildIdx))});
         }
         processedNodeIdxStack.push(currentTraversalIdx++);
     }
-    return parentLookup;
 }
 
 std::vector<std::size_t> LineAwareOptimization::PostOrderTreeTraversal::getEitherInternalOrLeafNodes(bool getLeafNodes) const {
     std::vector<std::size_t> matchingNodes;
     for (std::size_t i = 0; i < treeNodesInPostOrder.size(); ++i) {
-        if (!(getLeafNodes ^ treeNodesInPostOrder.at(i).isInternalNode)) {
+        if (getLeafNodes != treeNodesInPostOrder.at(i).isInternalNode) {
             matchingNodes.emplace_back(i);
         }
     }
@@ -104,31 +158,38 @@ std::vector<std::size_t> LineAwareOptimization::PostOrderTreeTraversal::getEithe
 
 
 std::optional<syrec::AssignStatement::vec> LineAwareOptimization::optimize(const std::shared_ptr<syrec::AssignStatement>& assignmentStatement) {
-    bool canTryAndOptimize;
-    switch (assignmentStatement->op) {
-        case syrec::AssignStatement::Add:
-        case syrec::AssignStatement::Subtract:
-        case syrec::AssignStatement::Exor:
-            canTryAndOptimize = true;
-            break;
-        default:
-            canTryAndOptimize = false;
-            break;
-    }
-
+    const auto& usedAssignmentOperation = tryMapAssignmentOperand(assignmentStatement->op);
     const auto& rhsAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentStatement->rhs);
-    canTryAndOptimize &= rhsAsBinaryExpr != nullptr;
-    if (!canTryAndOptimize) {
+    if (!usedAssignmentOperation.has_value() || rhsAsBinaryExpr == nullptr) {
         return std::nullopt;   
     }
+    
+    const auto postOrderRepresentation = createPostOrderRepresentation(assignmentStatement->rhs);
+    if (canOptimizeAssignStatement(*usedAssignmentOperation, postOrderRepresentation)) {
+        // TODO: Add 'simple' base optimization algorithm ???
+        if (postOrderRepresentation.areOperandsOnlyAdditionSubtractionOrXor()) {
+            return optimizeComplexAssignStatement(*usedAssignmentOperation, assignmentStatement->lhs, postOrderRepresentation);
+            //return optimizeAssignStatementWithOnlyAdditionSubtractionOrXorOperands(*usedAssignmentOperation, assignmentStatement->lhs, postOrderRepresentation);
+        }
+        return optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(assignmentStatement, postOrderRepresentation);
+    }
+    return std::make_optional(std::vector<syrec::AssignStatement::ptr>({assignmentStatement}));
+}
 
-    const auto x = createPostOrderRepresentation(assignmentStatement->rhs);
-
-    // TODO:
+std::optional<syrec_operation::operation> LineAwareOptimization::tryMapAssignmentOperand(unsigned assignmentOperand) {
+    switch (assignmentOperand) {
+        case syrec::AssignStatement::Add:
+            return std::make_optional(syrec_operation::operation::add_assign);
+        case syrec::AssignStatement::Subtract:
+            return std::make_optional(syrec_operation::operation::minus_assign);
+        case syrec::AssignStatement::Exor: 
+            return std::make_optional(syrec_operation::operation::xor_assign);
+    }
     return std::nullopt;
 }
 
-std::optional<syrec_operation::operation> LineAwareOptimization::tryInvertAssignmentOperation(syrec_operation::operation operation) {
+
+std::optional<syrec_operation::operation> LineAwareOptimization::tryInvertOperation(syrec_operation::operation operation) {
     std::optional<syrec_operation::operation> mappedToInverseOperation;
     switch (operation) {
         case syrec_operation::operation::add_assign:
@@ -139,6 +200,16 @@ std::optional<syrec_operation::operation> LineAwareOptimization::tryInvertAssign
             break;
         case syrec_operation::operation::xor_assign:
             mappedToInverseOperation.emplace(syrec_operation::operation::xor_assign);
+            break;
+
+        case syrec_operation::operation::addition:
+            mappedToInverseOperation.emplace(syrec_operation::operation::subtraction);
+            break;
+        case syrec_operation::operation::subtraction:
+            mappedToInverseOperation.emplace(syrec_operation::operation::addition);
+            break;
+        case syrec_operation::operation::bitwise_xor:
+            mappedToInverseOperation.emplace(syrec_operation::operation::bitwise_xor);
             break;
         default:
             break;
@@ -168,7 +239,7 @@ void LineAwareOptimization::traverseExpressionOperand(const syrec::expression::p
         const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
         traverseExpressionOperand(exprAsBinaryExpr->lhs, postOrderTraversalContainer);
         traverseExpressionOperand(exprAsBinaryExpr->rhs, postOrderTraversalContainer);
-        postOrderTraversalContainer.emplace_back(TreeTraversalNode::CreateInternalNode(*parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(exprAsBinaryExpr->op)));   
+        postOrderTraversalContainer.emplace_back(TreeTraversalNode::CreateInternalNode(std::make_tuple(exprAsBinaryExpr, *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(exprAsBinaryExpr->op))));   
     }
 }
 
@@ -191,4 +262,422 @@ bool LineAwareOptimization::isOperationAdditionSubtractionOrXor(syrec_operation:
         default:
             return false;
     }
+}
+
+bool LineAwareOptimization::isOperationAssociative(syrec_operation::operation operation) {
+    switch (operation) {
+        case syrec_operation::operation::addition:
+        case syrec_operation::operation::bitwise_xor:
+        case syrec_operation::operation::bitwise_and:
+        case syrec_operation::operation::bitwise_or:
+        case syrec_operation::operation::multiplication:
+        // TODO:
+        //case syrec_operation::operation::upper_bits_multiplication:
+        case syrec_operation::operation::equals:
+        case syrec_operation::operation::not_equals:
+        case syrec_operation::operation::logical_and:
+        case syrec_operation::operation::logical_or:
+            return true;
+        default:
+            return false;
+    }
+}
+
+
+bool LineAwareOptimization::canOptimizeAssignStatement(syrec_operation::operation assignmentOperand, const PostOrderTreeTraversal& postOrderTraversalContainer) {
+    bool canOptimize = assignmentOperand != syrec_operation::operation::addition
+        ? postOrderTraversalContainer.doOperandsOperateOnLeafNodesOnly({syrec_operation::operation::subtraction, syrec_operation::operation::bitwise_xor})
+        : true;
+
+    if (!postOrderTraversalContainer.areOperandsOnlyAdditionSubtractionOrXor()) {
+        canOptimize &= postOrderTraversalContainer.doTwoConsecutiveOperationNodesHaveNotAdditionSubtractionOrXorAsOperand();
+    }
+    return canOptimize;
+    
+}
+
+syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithOnlyAdditionSubtractionOrXorOperands(syrec_operation::operation assignmentOperand, const syrec::VariableAccess::ptr& assignStmtLhs, const PostOrderTreeTraversal& postOrderTraversalContainer) {
+    syrec::AssignStatement::vec createdAssignStatements;
+
+    std::set<std::size_t> visitedStatusPerNode;
+    std::map<std::size_t, syrec::expression::ptr> exprPerInternalNodeLookup;
+    /*
+     * The deepest node in the post order traversal is also the first node in our container storing the elements in post order
+     */
+    const auto traversalIdxOfDeepestOperationNode = *postOrderTraversalContainer.getTraversalIdxOfParentOfNode(0);
+    const auto deepestOperationNode               = *postOrderTraversalContainer.getNode(traversalIdxOfDeepestOperationNode);
+    const auto& traversalIndizesOfChildNodesOfDeepestOperationNode   = *postOrderTraversalContainer.getChildNodesForOperationNode(traversalIdxOfDeepestOperationNode);
+    const std::pair childNodesOfDeepestOperationNode                   = std::make_pair(
+      *postOrderTraversalContainer.getNode(traversalIndizesOfChildNodesOfDeepestOperationNode.first),
+      *postOrderTraversalContainer.getNode(traversalIndizesOfChildNodesOfDeepestOperationNode.second)
+    );
+
+    const auto binaryExprOfInitialAssignment = std::make_shared<syrec::BinaryExpression>(
+            *childNodesOfDeepestOperationNode.first.fetchStoredExpr(),
+            *parser::ParserUtilities::mapOperationToInternalFlag(*deepestOperationNode.fetchStoredOperation()),
+            *childNodesOfDeepestOperationNode.second.fetchStoredExpr());
+
+    const auto initialAssignmentFromDeepestBinaryExpr = std::make_shared<syrec::AssignStatement>(
+        assignStmtLhs,
+        *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperand),
+            binaryExprOfInitialAssignment);
+    
+    createdAssignStatements.emplace_back(initialAssignmentFromDeepestBinaryExpr);
+
+    for (const auto& traversalIdx : postOrderTraversalContainer.getTraversalIndexOfAllNodes()) {
+        const auto& parentOperationNodeTraversalIdx = postOrderTraversalContainer.getTraversalIdxOfParentOfNode(traversalIdx);
+        if (visitedStatusPerNode.count(traversalIdx) != 0 || !parentOperationNodeTraversalIdx.has_value()) {
+            continue;
+        }
+
+        const auto childNodeIndizes = *postOrderTraversalContainer.getChildNodesForOperationNode(*parentOperationNodeTraversalIdx);
+        const std::pair childNodesOfOperationNode = std::make_pair(*postOrderTraversalContainer.getNode(childNodeIndizes.first), *postOrderTraversalContainer.getNode(childNodeIndizes.second));
+
+        const bool needToInvertAssignmentOperation = assignmentOperand == syrec_operation::operation::minus_assign;
+        syrec_operation::operation assignmentOperandToUse          = assignmentOperand;
+        syrec::expression::ptr     rhsExprOfAssignment;
+
+        if (!childNodesOfOperationNode.first.isInternalNode || !childNodesOfOperationNode.second.isInternalNode) {
+            const auto& childLeafNode = !childNodesOfOperationNode.first.isInternalNode
+                ? childNodesOfOperationNode.first
+                : childNodesOfOperationNode.second;
+
+            assignmentOperandToUse = *postOrderTraversalContainer.getNode(*parentOperationNodeTraversalIdx)->fetchStoredOperation();
+            rhsExprOfAssignment    = *childLeafNode.fetchStoredExpr();
+
+            // TODO:
+            visitedStatusPerNode.insert(childNodeIndizes.first);
+        }
+        else {
+            const auto& grandParentOfCurrentNodeTraversalIdx = *postOrderTraversalContainer.getTraversalIdxOfParentOfNode(*parentOperationNodeTraversalIdx);
+            const auto  binaryExprOperand                    = *postOrderTraversalContainer.getNode(grandParentOfCurrentNodeTraversalIdx)->fetchStoredOperation();
+
+            const auto lhsOperandOfBinaryExpr = exprPerInternalNodeLookup.count(childNodeIndizes.first) != 0
+                ? exprPerInternalNodeLookup[childNodeIndizes.first]
+                : *childNodesOfOperationNode.first.fetchStoredExpr();
+
+            const auto rhsOperandOfBinaryExpr = exprPerInternalNodeLookup.count(childNodeIndizes.second) != 0
+                ? exprPerInternalNodeLookup[childNodeIndizes.second]
+                : *childNodesOfOperationNode.second.fetchStoredExpr();
+
+            const auto binaryExpr = std::make_shared<syrec::BinaryExpression>(
+                    lhsOperandOfBinaryExpr,
+                    *parser::ParserUtilities::mapOperationToInternalFlag(binaryExprOperand),
+                    rhsOperandOfBinaryExpr
+            );
+
+            rhsExprOfAssignment = binaryExpr;
+            visitedStatusPerNode.insert(childNodeIndizes.first);
+            visitedStatusPerNode.insert(childNodeIndizes.first);
+        }
+
+        if (needToInvertAssignmentOperation) {
+            assignmentOperandToUse = *tryInvertOperation(assignmentOperandToUse);
+        }
+        const auto createdAssignmentStatement = std::make_shared<syrec::AssignStatement>(
+                assignStmtLhs,
+                *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperandToUse),
+                rhsExprOfAssignment);
+
+        visitedStatusPerNode.insert(*parentOperationNodeTraversalIdx);
+        exprPerInternalNodeLookup.insert({*parentOperationNodeTraversalIdx, rhsExprOfAssignment});
+    }
+
+    return createdAssignStatements;
+}
+
+syrec::AssignStatement::vec LineAwareOptimization::optimizeComplexAssignStatement(syrec_operation::operation assignmentOperand, const syrec::VariableAccess::ptr& assignStmtLhs, const PostOrderTreeTraversal& postOrderTraversalContainer) {
+    const auto& operationNodesInPostOrder = postOrderTraversalContainer.getTraversalIndexOfAllOperationNodes();
+
+    const auto& rootOperationNode = std::find_if(
+    operationNodesInPostOrder.cbegin(),
+    operationNodesInPostOrder.cend(),
+    [&postOrderTraversalContainer](const std::size_t operationNodeTraversalIdx) {
+        return postOrderTraversalContainer.getParentOfNode(operationNodeTraversalIdx).has_value();
+    });
+
+    /*
+     * We can invert a subtraction to an addition by using the inverted inputs of the subtraction (i.e. (a - b) => (~a + ~b) ???)
+     * Since our optimizations only work when the subtraction and xor operation operate on leaf nodes only, we need to invert all other operation nodes with non-leaf nodes that use such operations
+     * Thus we need to identify which internal operation nodes use the subtraction operation and need to be inverted (i.e. x += (a - (b - (d - e))) => x+= (~a + (~b + (~d + ~e)))
+     */
+    std::set<std::size_t> operationNodesToInvert;
+    
+    syrec::AssignStatement::vec generatedAssignmentStatement;
+    for (std::size_t i = 0; i < operationNodesInPostOrder.size(); ++i) {
+        const auto& operationNodeTraversalIdx = operationNodesInPostOrder.at(i);
+
+        const auto& operationNode             = *postOrderTraversalContainer.getNode(operationNodeTraversalIdx);
+        const auto& childNodeTraversalIndizes = *postOrderTraversalContainer.getChildNodesForOperationNode(operationNodeTraversalIdx);
+        const auto& childNodes = std::pair(*postOrderTraversalContainer.getNode(childNodeTraversalIndizes.first), *postOrderTraversalContainer.getNode(childNodeTraversalIndizes.second));
+
+        const bool hasAnyLeafNodesAsChildren = !childNodes.first.isInternalNode || !childNodes.second.isInternalNode;
+        const bool isLeftChildALeaf          = hasAnyLeafNodesAsChildren && !childNodes.first.isInternalNode;
+        const bool isRightChildALeaf         = hasAnyLeafNodesAsChildren && !childNodes.second.isInternalNode;
+
+        const auto                 operationOfCurrentOperationNode = *operationNode.fetchStoredOperation();
+        const bool                 useInvertedAssignmentOperation = assignmentOperand == syrec_operation::operation::minus_assign;
+        syrec_operation::operation assignmentOperationToUse       = useInvertedAssignmentOperation ? *tryInvertOperation(assignmentOperand) : assignmentOperand;
+        
+        if (!hasAnyLeafNodesAsChildren) {   
+            continue;
+        }
+
+        syrec::expression::ptr     assignmentStmtRhsOperand;
+        syrec::VariableAccess::ptr assignmentStmtLhsOperand = assignStmtLhs;
+
+        if (isLeftChildALeaf ^ isRightChildALeaf) {
+            const auto& leafChildNode       = isLeftChildALeaf ? childNodes.first : childNodes.second;
+            assignmentOperationToUse = useInvertedAssignmentOperation ? *tryInvertOperation(operationOfCurrentOperationNode) : operationOfCurrentOperationNode;
+            /*
+             * Created assignment statement is: lhs a_op leaf_child (if a_op in { +=, ^= }
+             * Otherwise: lhs a_op^(-1) leaf_child
+             */
+            assignmentStmtRhsOperand = *leafChildNode.fetchStoredExpr();
+        } else {
+            /*
+             * The assignment statement for the operation node first in the post order traversal order uses the assignment operation of the original assignment statement
+             */
+            if (i == 0) {
+                assignmentOperationToUse = assignmentOperand;
+                assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
+                        *childNodes.first.fetchStoredExpr(),
+                        *parser::ParserUtilities::mapOperationToInternalFlag(*operationNode.fetchStoredOperation()),
+                        *childNodes.second.fetchStoredExpr());
+            } else {
+                const auto& traversalIndexOfParentOfCurrentOperationNode = *postOrderTraversalContainer.getTraversalIdxOfParentOfNode(operationNodeTraversalIdx);
+                const auto  parentNodeOfOperationNode                    = *postOrderTraversalContainer.getNode(traversalIndexOfParentOfCurrentOperationNode);
+                const auto  operationOfParentNode                        = *parentNodeOfOperationNode.fetchStoredOperation();
+
+                /*
+                * Assuming op_top is the operation of the parent operation node of the current operation node,
+                * the created assignment statement is lhs op_top lhs_rhs_expr op_rhs rhs_rhs_expr if (a_op in { +=, ^= }
+                * Otherwise: lhs op_top^(-1) lhs_rhs_expr op_rhs rhs_rhs_expr
+                */
+                assignmentOperationToUse = useInvertedAssignmentOperation ? *tryInvertOperation(operationOfParentNode) : operationOfParentNode;
+                assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
+                        *childNodes.first.fetchStoredExpr(),
+                        *parser::ParserUtilities::mapOperationToInternalFlag(*operationNode.fetchStoredOperation()),
+                        *childNodes.second.fetchStoredExpr());
+            }
+        }
+
+        const auto createdAssignmentStatement = std::make_shared<syrec::AssignStatement>(
+                assignmentStmtLhsOperand,
+                *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperationToUse),
+                assignmentStmtRhsOperand);
+
+        const auto potentiallySplitAssignmentStatement = splitAssignmentStatementIfAssignmentAndRhsExpressionOperationMatch(createdAssignmentStatement);
+        for (const auto& finalAssignmentStatement : potentiallySplitAssignmentStatement) {
+            generatedAssignmentStatement.emplace_back(finalAssignmentStatement);
+        }
+    }
+    
+    return generatedAssignmentStatement;
+}
+
+syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(const std::shared_ptr<syrec::AssignStatement>& assignStmt, const PostOrderTreeTraversal& postOrderTraversalContainer) {
+    const auto                        assignmentOperand = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(assignStmt->op);
+    const syrec::VariableAccess::ptr& assignStmtLhs     = assignStmt->lhs;
+
+    const auto& operationNodesInPostOrder = postOrderTraversalContainer.getTraversalIndexOfAllOperationNodes();
+
+    const auto& rootOperationNode = std::find_if(
+            operationNodesInPostOrder.cbegin(),
+            operationNodesInPostOrder.cend(),
+            [&postOrderTraversalContainer](const std::size_t operationNodeTraversalIdx) {
+                return postOrderTraversalContainer.getParentOfNode(operationNodeTraversalIdx).has_value();
+            });
+
+    /*
+     * We can invert a subtraction to an addition by using the inverted inputs of the subtraction (i.e. (a - b) => (~a + ~b) ???)
+     * Since our optimizations only work when the subtraction and xor operation operate on leaf nodes only, we need to invert all other operation nodes with non-leaf nodes that use such operations
+     * Thus we need to identify which internal operation nodes use the subtraction operation and need to be inverted (i.e. x += (a - (b - (d - e))) => x+= (~a + (~b + (~d + ~e)))
+     */
+    std::set<std::size_t> operationNodesToInvert;
+
+    std::set<std::size_t>       visitedOperationNodes;
+    syrec::AssignStatement::vec generatedAssignmentStatement;
+    syrec::AssignStatement::vec assignmentStatementsToRevert;
+    for (std::size_t i = 0; i < operationNodesInPostOrder.size(); ++i) {
+        bool        doesAssignmentStatementNeedToBeReset = false;
+        const auto& operationNodeTraversalIdx            = operationNodesInPostOrder.at(i);
+        if (visitedOperationNodes.count(operationNodeTraversalIdx) != 0) {
+            continue;
+        }
+        visitedOperationNodes.insert(operationNodeTraversalIdx);
+
+        const auto& operationNode             = *postOrderTraversalContainer.getNode(operationNodeTraversalIdx);
+        const auto& childNodeTraversalIndizes = *postOrderTraversalContainer.getChildNodesForOperationNode(operationNodeTraversalIdx);
+        const auto& childNodes                = std::pair(*postOrderTraversalContainer.getNode(childNodeTraversalIndizes.first), *postOrderTraversalContainer.getNode(childNodeTraversalIndizes.second));
+
+        const bool hasAnyLeafNodesAsChildren = !childNodes.first.isInternalNode || !childNodes.second.isInternalNode;
+        const bool isLeftChildALeaf          = hasAnyLeafNodesAsChildren && !childNodes.first.isInternalNode;
+        const bool isRightChildALeaf         = hasAnyLeafNodesAsChildren && !childNodes.second.isInternalNode;
+
+        const auto                 operationOfCurrentOperationNode = *operationNode.fetchStoredOperation();
+        const bool                 useInvertedAssignmentOperation  = assignmentOperand == syrec_operation::operation::minus_assign;
+        syrec_operation::operation assignmentOperationToUse        = useInvertedAssignmentOperation ? *tryInvertOperation(assignmentOperand) : assignmentOperand;
+
+        /*
+         * e += (a / ((c * d) + b))
+         *
+         * b += (c * d)
+         * e += (a / b)
+         * b -= (c * d)
+         */
+        if (!isOperationAdditionSubtractionOrXor(operationOfCurrentOperationNode)) {
+            if (i == 0) {
+                assignmentOperationToUse = assignmentOperand;
+            } else {
+                const auto& traversalIndexOfParentOfCurrentOperationNode = *postOrderTraversalContainer.getTraversalIdxOfParentOfNode(operationNodeTraversalIdx);
+                const auto  parentNodeOfOperationNode                    = *postOrderTraversalContainer.getNode(traversalIndexOfParentOfCurrentOperationNode);
+                const auto  operationOfParentNode                        = *parentNodeOfOperationNode.fetchStoredOperation();
+                assignmentOperationToUse                                 = useInvertedAssignmentOperation ? *tryInvertOperation(operationOfParentNode) : operationOfParentNode;
+            }
+
+            const auto& referenceBinaryExpr = *operationNode.fetchReferenceBinaryExpr();
+            const auto& lhsExpr             = referenceBinaryExpr->lhs;
+            const auto& rhsExpr             = referenceBinaryExpr->rhs;
+
+            // TODO: We since an operation node does not store its complete trailing expression, we need to either build it manually or retrieve it from the original assignment statement
+            /*const auto& lhsExpr = *childNodes.first.fetchReferenceBinaryExpr();
+            const auto& rhsExpr = *childNodes.second.fetchReferenceBinaryExpr();*/
+
+            assignmentOperationToUse            = operationOfCurrentOperationNode;
+            const auto assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
+                    lhsExpr,
+                    *parser::ParserUtilities::mapOperationToInternalFlag(operationOfCurrentOperationNode),
+                    rhsExpr);
+            const auto& assignmentStmt = std::make_shared<syrec::AssignStatement>(
+                    assignStmtLhs,
+                    *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperand),
+                    assignmentStmtRhsOperand);
+            generatedAssignmentStatement.emplace_back(assignmentStmt);
+            continue;
+        }
+
+        if (!hasAnyLeafNodesAsChildren) {
+            continue;
+        }
+
+        syrec::expression::ptr     assignmentStmtRhsOperand;
+        syrec::VariableAccess::ptr assignmentStmtLhsOperand = assignStmtLhs;
+
+        if (isLeftChildALeaf ^ isRightChildALeaf) {
+            const auto& leafChildNode = isLeftChildALeaf ? childNodes.first : childNodes.second;
+            assignmentOperationToUse  = useInvertedAssignmentOperation ? *tryInvertOperation(operationOfCurrentOperationNode) : operationOfCurrentOperationNode;
+            /*
+             * Created assignment statement is: lhs a_op leaf_child (if a_op in { +=, ^= }
+             * Otherwise: lhs a_op^(-1) leaf_child
+             */
+            assignmentStmtRhsOperand = *leafChildNode.fetchStoredExpr();
+        } else {
+            /*
+             * The assignment statement for the operation node first in the post order traversal order uses the assignment operation of the original assignment statement
+             */
+            if (i == 0) {
+                assignmentOperationToUse = assignmentOperand;
+                assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
+                        *childNodes.first.fetchStoredExpr(),
+                        *parser::ParserUtilities::mapOperationToInternalFlag(*operationNode.fetchStoredOperation()),
+                        *childNodes.second.fetchStoredExpr());
+            } else {
+                if (isOperationAdditionSubtractionOrXor(operationOfCurrentOperationNode)) {
+                    assignmentOperationToUse                        = useInvertedAssignmentOperation ? *tryInvertOperation(operationOfCurrentOperationNode) : operationOfCurrentOperationNode;
+                    const auto& lhsOperandOfRhsExprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(*childNodes.first.fetchStoredExpr());
+
+                    /*
+                     * If the current operation node has to leaf nodes as children and the operation op is either {+=, -= or ^= }, we add the assignment statement e_left op e_right
+                     * Additionally, this generated assignment statement needs to be reverted after the complete initial assignment was calculated to revert the made changes to the values of the operands
+                     */
+                    assignmentStmtLhsOperand             = lhsOperandOfRhsExprAsVariableAccess->var;
+                    assignmentStmtRhsOperand             = *childNodes.second.fetchStoredExpr();
+                    doesAssignmentStatementNeedToBeReset = true;
+                } else {
+                    const auto& traversalIndexOfParentOfCurrentOperationNode = *postOrderTraversalContainer.getTraversalIdxOfParentOfNode(operationNodeTraversalIdx);
+                    const auto  parentNodeOfOperationNode                    = *postOrderTraversalContainer.getNode(traversalIndexOfParentOfCurrentOperationNode);
+                    const auto  operationOfParentNode                        = *parentNodeOfOperationNode.fetchStoredOperation();
+
+                    /*
+                    * Assuming op_top is the operation of the parent operation node of the current operation node,
+                    * the created assignment statement is lhs op_top lhs_rhs_expr op_rhs rhs_rhs_expr if (a_op in { +=, ^= }
+                    * Otherwise: lhs op_top^(-1) lhs_rhs_expr op_rhs rhs_rhs_expr
+                    */
+                    assignmentOperationToUse = useInvertedAssignmentOperation ? *tryInvertOperation(operationOfParentNode) : operationOfParentNode;
+                    assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
+                            *childNodes.first.fetchStoredExpr(),
+                            *parser::ParserUtilities::mapOperationToInternalFlag(*operationNode.fetchStoredOperation()),
+                            *childNodes.second.fetchStoredExpr());
+                }
+            }
+        }
+
+        const auto createdAssignmentStatement = std::make_shared<syrec::AssignStatement>(
+                assignmentStmtLhsOperand,
+                *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperationToUse),
+                assignmentStmtRhsOperand);
+
+        const auto potentiallySplitAssignmentStatement = splitAssignmentStatementIfAssignmentAndRhsExpressionOperationMatch(createdAssignmentStatement);
+        for (const auto& finalAssignmentStatement: potentiallySplitAssignmentStatement) {
+            generatedAssignmentStatement.emplace_back(finalAssignmentStatement);
+            if (doesAssignmentStatementNeedToBeReset) {
+                const auto& assignmentStmtToCheck       = std::dynamic_pointer_cast<syrec::AssignStatement>(finalAssignmentStatement);
+                const auto  invertedAssignmentOperation = *tryInvertOperation(*tryMapAssignmentOperand(assignmentStmtToCheck->op));
+                const auto  invertedAssignmentStmt      = std::make_shared<syrec::AssignStatement>(
+                        assignmentStmtToCheck->lhs,
+                        *parser::ParserUtilities::mapOperationToInternalFlag(invertedAssignmentOperation),
+                        assignmentStmtToCheck->rhs);
+                assignmentStatementsToRevert.emplace_back(invertedAssignmentStmt);
+            }
+        }
+    }
+
+    for (const auto& invertedAssignmentStmt: assignmentStatementsToRevert) {
+        generatedAssignmentStatement.emplace_back(invertedAssignmentStmt);
+    }
+
+    return generatedAssignmentStatement;
+}
+
+
+bool LineAwareOptimization::doAssignmentAndRhsExpressionOperationMatch(syrec_operation::operation assignmentOperation, syrec_operation::operation rhsOperation) {
+    switch (assignmentOperation) {
+        case syrec_operation::operation::add_assign:
+            return rhsOperation == syrec_operation::operation::addition;
+        case syrec_operation::operation::minus_assign:
+            return rhsOperation == syrec_operation::operation::subtraction;
+        case syrec_operation::operation::xor_assign:
+            return rhsOperation == syrec_operation::operation::bitwise_xor;
+        default:
+            return false;
+    }
+}
+
+syrec::AssignStatement::vec LineAwareOptimization::splitAssignmentStatementIfAssignmentAndRhsExpressionOperationMatch(const std::shared_ptr<syrec::AssignStatement>& assignmentStatement) {
+    syrec::AssignStatement::vec createdAssignmentStatements;
+    if (const auto& rhsAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentStatement->rhs); rhsAsBinaryExpr != nullptr) {
+        const auto assignmentOperation = *tryMapAssignmentOperand(assignmentStatement->op);
+        const auto rhsOperation        = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(rhsAsBinaryExpr->op);
+        if (doAssignmentAndRhsExpressionOperationMatch(assignmentOperation, rhsOperation)) {
+            const auto assignmentStmtWithLhsOperandOfRhsExpr = std::make_shared<syrec::AssignStatement>(
+                    assignmentStatement->lhs,
+                    *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperation),
+                    rhsAsBinaryExpr->lhs);
+
+            const auto assignmentStmtWithRhsOperandOfRhsExpr = std::make_shared<syrec::AssignStatement>(
+                    assignmentStatement->lhs,
+                    *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperation),
+                    rhsAsBinaryExpr->rhs);
+            createdAssignmentStatements.emplace_back(assignmentStmtWithLhsOperandOfRhsExpr);
+            createdAssignmentStatements.emplace_back(assignmentStmtWithRhsOperandOfRhsExpr);
+        }
+        else {
+            createdAssignmentStatements.emplace_back(assignmentStatement);
+        }
+
+    } else {
+        createdAssignmentStatements.emplace_back(assignmentStatement);
+    }
+    return createdAssignmentStatements;
 }
