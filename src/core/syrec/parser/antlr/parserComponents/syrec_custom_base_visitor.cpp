@@ -4,6 +4,7 @@
 #include "core/syrec/parser/custom_semantic_errors.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/infix_iterator.hpp"
+#include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
 #include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
@@ -439,7 +440,7 @@ std::optional<unsigned> SyReCCustomBaseVisitor::applyBinaryOperation(syrec_opera
         return std::nullopt;
     }
 
-    return apply(operation, leftOperand, rightOperand);
+    return syrec_operation::apply(operation, leftOperand, rightOperand);
 }
 
 

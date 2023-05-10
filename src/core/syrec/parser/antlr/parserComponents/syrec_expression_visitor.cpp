@@ -4,6 +4,7 @@
 #include "core/syrec/parser/custom_semantic_errors.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
+#include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/value_broadcaster.hpp"
 
@@ -97,8 +98,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
         }
     }
 
-    const auto rhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->rhsOperand);
-
+    std::optional<ExpressionEvaluationResult::ptr> rhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->rhsOperand);
     std::optional<ExpressionEvaluationResult::ptr> result = std::nullopt;
     if (lhsOperand.has_value() && userDefinedOperation.has_value() && rhsOperand.has_value()) {
         const auto lhsOperandConversionToConstant = (*lhsOperand)->getAsConstant();
@@ -135,8 +135,38 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                 //const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
 
                 syrec::BinaryExpression::ptr createdBinaryExpr = std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression);
-                if (sharedData->parserConfig->reassociateExpressionsEnabled) {
-                    createdBinaryExpr = optimization::simplifyBinaryExpression(createdBinaryExpr);
+
+                /*
+                 * Since the synthesis without additional lines optimization could optimize a binary expression of the form e_left op e_right to e_left op = e_right
+                 * and in case our binary expression is of the form e_left - constant or constant - e_right, we need to prevent the optimization of the operand of the expression
+                 * that evaluated to a constant, in case a variable access was optimized per constant propagation, to prevent invalid assignment statements of the form constant -= e_left
+                 * which cannot be corrected due to the missing commutative property of the subtraction operation.
+                 *
+                */
+                if (sharedData->currentlyParsingAssignmentStmtRhs && sharedData->parserConfig->noAdditionalLineOptimizationEnabled 
+                    && sharedData->parserConfig->performConstantPropagation 
+                    && *userDefinedOperation == syrec_operation::operation::subtraction
+                    && (lhsOperandConversionToConstant.has_value() || rhsOperandConversionToConstant.has_value())) {
+
+                    const bool isLhsConstant = lhsOperandConversionToConstant.has_value();
+                    const auto& notConstantOperandAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(isLhsConstant ? *rhsOperandAsExpression : *lhsOperandAsExpression);
+
+                    sharedData->parserConfig->performConstantPropagation            = false;
+                    const auto  constantOperandReevaluatedWithoutConstantPropagation = *tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->rhsOperand);
+                    sharedData->parserConfig->performConstantPropagation            = true;
+
+                    std::shared_ptr<syrec::VariableExpression> constantOperandReevaluatedAsVariableAccess = nullptr;
+                    if (!constantOperandReevaluatedWithoutConstantPropagation->isConstantValue()) {
+                        constantOperandReevaluatedAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(*constantOperandReevaluatedWithoutConstantPropagation->getAsExpression());
+                    }
+
+                    if (notConstantOperandAsVariableAccess != nullptr && constantOperandReevaluatedAsVariableAccess != nullptr) {
+                        createdBinaryExpr = std::make_shared<syrec::BinaryExpression>(notConstantOperandAsVariableAccess, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), constantOperandReevaluatedAsVariableAccess);   
+                    }
+                } else {
+                    if (sharedData->parserConfig->reassociateExpressionsEnabled) {
+                        createdBinaryExpr = optimization::simplifyBinaryExpression(createdBinaryExpr);
+                    }    
                 }
 
                 // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
@@ -199,7 +229,7 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     const auto expressionToShiftEvaluated = (*expressionToShift)->getAsConstant();
 
     if (shiftAmountEvaluated.has_value() && expressionToShiftEvaluated.has_value()) {
-        const auto shiftOperationApplicationResult = apply(*definedShiftOperation, *expressionToShiftEvaluated, *shiftAmountEvaluated);
+        const auto shiftOperationApplicationResult = syrec_operation::apply(*definedShiftOperation, *expressionToShiftEvaluated, *shiftAmountEvaluated);
         if (shiftOperationApplicationResult.has_value()) {
             return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*shiftOperationApplicationResult, (*(*expressionToShift)->getAsExpression())->bitwidth()));
         }

@@ -11,6 +11,8 @@
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/value_broadcaster.hpp"
 
+#include "core/syrec/parser/optimizations/no_additional_line_assignment.hpp"
+
 #include <fmt/format.h>
 
 /*
@@ -86,9 +88,11 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
     }
 
     sharedData->shouldSkipSignalAccessRestrictionCheck = false;
+    sharedData->currentlyParsingAssignmentStmtRhs      = true;
     // TODO: Check if signal width of left and right operand of assign statement match (similar to swap statement ?)
     const auto assignmentOpRhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->expression());
     allSemanticChecksOk &= assignmentOpRhsOperand.has_value();
+    sharedData->currentlyParsingAssignmentStmtRhs      = false;
     sharedData->shouldSkipSignalAccessRestrictionCheck = true;
 
     if (allSemanticChecksOk) {
@@ -109,15 +113,56 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
 
             const auto& containerOfExpressionContainingNewValue = (*assignmentOpRhsOperand)->getAsExpression();
             const auto& exprContainingNewValue = *containerOfExpressionContainingNewValue;
-            // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
-            tryUpdateOrInvalidateStoredValueFor(assignedToSignalParts, exprContainingNewValue);
 
-            // TODO: Add mapping from custom operation enum to internal "numeric"
-            addStatementToOpenContainer(
-                    std::make_shared<syrec::AssignStatement>(
-                            assignedToSignalParts,
-                            *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
-                            exprContainingNewValue));
+            const auto assignStmt = std::make_shared<syrec::AssignStatement>(
+                    assignedToSignalParts,
+                    *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
+                    exprContainingNewValue);
+
+            /*
+             *
+             *I. 	((((a + b) + 2) * (3 - c) + 2)
+II.	(2 + ((3 - c) * (2 + (a + b))))
+
+
+Bsp:
+I. 	x0 ^= ((x1 + x2) - x3)
+II.	x0 -= (((x1 - x2) - x3) + (x1 - x4))
+III.	x0 ^= ((x1 + x2) / (x3 - x4))
+IV.	x5 ^= (((x0 * x1) * x1) + ((x2 * x1) + x3))
+
+
+x0 -= ((x1 + x2) - (x2 << 2))
+
+x0 -= (x1 + x2)
+x0 += (x2 << 2)
+
+x0 -= ((x1 + 2) << (2 - (x2 + 2)))
+
+x0 -= (x1 + 2)
+
+
+
+x0 -= (2 - (x2 + (x3 - ((x4 - x5) + (x6 - (x8 + x7))))))
+             *
+             *
+             */
+
+            syrec::AssignStatement::vec createdAssignmentStmts{assignStmt};
+            const std::optional<syrec::AssignStatement::vec> optimizedAssignmentStmt = sharedData->parserConfig->noAdditionalLineOptimizationEnabled
+                ? optimizations::LineAwareOptimization::optimize(assignStmt)
+                : std::nullopt;
+
+            if (optimizedAssignmentStmt.has_value()) {
+                createdAssignmentStmts = *optimizedAssignmentStmt;
+            }
+
+            for (const auto& assignmentStmt: createdAssignmentStmts) {
+                addStatementToOpenContainer(assignmentStmt);
+
+                // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
+                tryUpdateOrInvalidateStoredValueFor(assignedToSignalParts, exprContainingNewValue);
+            }
         }
         else {
             invalidateStoredValueFor(lhsOperandVariableAccess);

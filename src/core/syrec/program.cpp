@@ -56,6 +56,7 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
                                     config.reassociateExpressionEnabled,
                                     config.removalOfUnusedVariablesAndModulesEnabled,
                                     config.performConstantPropagation,
+                                    config.noAdditionalLineOptimizationEnabled,
                                     config.expectedMainModuleName));
     if (parsingResult.wasParsingSuccessful) {
         this->modulesVec = parsingResult.foundModules;

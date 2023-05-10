@@ -19,6 +19,7 @@ namespace parser {
         std::size_t                                              currentModuleCallNestingLevel;
         syrec::Number::loop_variable_mapping                     loopVariableMappingLookup;
         bool                                                     shouldSkipSignalAccessRestrictionCheck;
+        bool                                                     currentlyParsingAssignmentStmtRhs;
         std::optional<unsigned int>                              optionalExpectedExpressionSignalWidth;
         std::set<std::string>                                    evaluableLoopVariables;
         std::optional<std::string>                               lastDeclaredLoopVariable;

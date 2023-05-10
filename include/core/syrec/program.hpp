@@ -3,13 +3,7 @@
 #include "core/syrec/expression.hpp"
 #include "core/syrec/grammar.hpp"
 #include "core/syrec/module.hpp"
-#include "core/syrec/number.hpp"
-#include "core/syrec/statement.hpp"
-#include "core/syrec/variable.hpp"
 
-#include "core/syrec/parser/parser_config.hpp"
-
-#include <fstream>
 #include <vector>
 
 namespace syrec {
@@ -20,17 +14,20 @@ namespace syrec {
             bool reassociateExpressionEnabled = false,
             bool removalOfUnusedVariablesAndModulesEnabled = false,
             bool performConstantPropagation = false,
+            bool noAdditionalLineOptimizationEnabled = false,
             std::string expectedMainModuleName = "main"):
             defaultBitwidth(bitwidth),
             reassociateExpressionEnabled(reassociateExpressionEnabled),
             removalOfUnusedVariablesAndModulesEnabled(removalOfUnusedVariablesAndModulesEnabled),
             performConstantPropagation(performConstantPropagation),
+            noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
             expectedMainModuleName(expectedMainModuleName)
         {};
-        unsigned defaultBitwidth;
-        bool     reassociateExpressionEnabled;
-        bool     removalOfUnusedVariablesAndModulesEnabled;
+        unsigned    defaultBitwidth;
+        bool        reassociateExpressionEnabled;
+        bool        removalOfUnusedVariablesAndModulesEnabled;
         bool        performConstantPropagation;
+        bool        noAdditionalLineOptimizationEnabled;
         std::string expectedMainModuleName;
     };
 

@@ -1,4 +1,5 @@
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
+#include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
 
 #include <tuple>
@@ -113,7 +114,7 @@ syrec::expression::ptr optimization::simplifyBinaryExpression(const syrec::expre
 
     const auto binaryOperationOfExpr = mappedFlagToEnum.value();
     if (lOperandConstValue.has_value() && rOperandConstValue.has_value()) {
-        if (const auto resultOfExprWithConstOperands = apply(binaryOperationOfExpr, *lOperandConstValue, *rOperandConstValue);
+        if (const auto resultOfExprWithConstOperands = syrec_operation::apply(binaryOperationOfExpr, *lOperandConstValue, *rOperandConstValue);
             resultOfExprWithConstOperands.has_value()) {
             return createExpressionForNumber(*resultOfExprWithConstOperands);
         }
@@ -179,7 +180,7 @@ syrec::expression::ptr optimization::simplifyBinaryExpression(const syrec::expre
                     if (lhsExprDividedIntoConstantAndNonExprOperand.has_value() && rhsExprDividedIntoConstantAndNonExprOperand.has_value()) {
                         return createBinaryExpression(
                                 createExpressionForNumber(
-                                        *apply(
+                                        *syrec_operation::apply(
                                                 syrec_operation::operation::addition,
                                                 std::get<unsigned int>(*lhsExprDividedIntoConstantAndNonExprOperand),
                                                 std::get<unsigned int>(*rhsExprDividedIntoConstantAndNonExprOperand))),
@@ -245,7 +246,7 @@ syrec::expression::ptr optimization::simplifyBinaryExpression(const syrec::expre
             * all simplify to: ((c1 * c2) * x)
             *
             */
-            const auto productOfParentAndChildConstOperand = apply(
+            const auto productOfParentAndChildConstOperand = syrec_operation::apply(
                     syrec_operation::operation::multiplication,
                     *constOperandOfParentExpr,
                     *constOperandOfChildBinaryExpr);
@@ -325,7 +326,7 @@ syrec::expression::ptr optimization::simplifyBinaryExpression(const syrec::expre
             * all simplify to:
             * ((c1 + c2) + x)
             */
-            const auto sumOfParentAndChildConstOperand = apply(
+            const auto sumOfParentAndChildConstOperand = syrec_operation::apply(
                     syrec_operation::operation::addition,
                     *constOperandOfParentExpr,
                     *constOperandOfChildBinaryExpr);

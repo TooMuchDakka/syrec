@@ -11,6 +11,7 @@ namespace parser {
         bool         reassociateExpressionsEnabled;
         bool         isRemovalOfUnusedVariablesAndModulesEnabled;
         bool         performConstantPropagation;
+        bool         noAdditionalLineOptimizationEnabled;
         std::string  expectedMainModuleName;
 
         explicit ParserConfig(
@@ -19,14 +20,16 @@ namespace parser {
                 const bool         supportBroadcastingAssignmentOperands       = false,
                 const bool         reassociateExpressionEnabled                = false,
                 const bool         isRemovalOfUnusedVariablesAndModulesEnabled = false,
-                const bool         performConstantPropagation = false,
-            std::string  expectedMainModuleName                      = "main"):
+                const bool         performConstantPropagation                  = false,
+                const bool         noAdditionalLineOptimizationEnabled         = false,
+                std::string  expectedMainModuleName                      = "main"):
                 cDefaultSignalWidth(defaultSignalWidth),
                 supportBroadcastingExpressionOperands(supportBroadcastingExpressionOperands),
                 supportBroadcastingAssignmentOperands(supportBroadcastingAssignmentOperands),
                 reassociateExpressionsEnabled(reassociateExpressionEnabled),
                 isRemovalOfUnusedVariablesAndModulesEnabled(isRemovalOfUnusedVariablesAndModulesEnabled),
                 performConstantPropagation(performConstantPropagation),
+                noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
                 expectedMainModuleName(std::move(expectedMainModuleName))
                 {}
 
@@ -38,6 +41,7 @@ namespace parser {
             reassociateExpressionsEnabled         = copy.reassociateExpressionsEnabled;
             isRemovalOfUnusedVariablesAndModulesEnabled = copy.isRemovalOfUnusedVariablesAndModulesEnabled;
             performConstantPropagation                  = copy.performConstantPropagation;
+            noAdditionalLineOptimizationEnabled         = copy.noAdditionalLineOptimizationEnabled;
             expectedMainModuleName                      = copy.expectedMainModuleName;
             return *this;
         }

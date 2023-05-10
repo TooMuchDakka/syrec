@@ -71,7 +71,6 @@ namespace optimizations {
         };
 
         [[nodiscard]] static std::optional<syrec_operation::operation> tryMapAssignmentOperand(unsigned int assignmentOperand);
-        [[nodiscard]] static std::optional<syrec_operation::operation> tryInvertOperation(syrec_operation::operation operation);
         [[nodiscard]] static PostOrderTreeTraversal                    createPostOrderRepresentation(const syrec::BinaryExpression::ptr& topLevelBinaryExpr);
         static void                                                    traverseExpressionOperand(const syrec::expression::ptr& expr, std::vector<TreeTraversalNode>& postOrderTraversalContainer);
         [[nodiscard]] static bool                                      isExpressionOperandLeafNode(const syrec::expression::ptr& expr);
