@@ -6,6 +6,7 @@
 
 #include "gtest/gtest.h"
 #include <algorithm>
+#include <fstream>
 #include <boost/dynamic_bitset.hpp>
 #include <nlohmann/json.hpp>
 #include <string>

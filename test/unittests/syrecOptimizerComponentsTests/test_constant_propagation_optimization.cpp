@@ -31,9 +31,9 @@ protected:
     void SetUp() override {
         const std::string testCaseJsonKey = GetParam();
 
-        std::ifstream configFileStream(ConstantPropagationTests::pathToTestCaseFile, std::ios_base::in);
+        std::ifstream configFileStream(pathToTestCaseFile, std::ios_base::in);
         ASSERT_TRUE(configFileStream.good()) << "Could not open test data json file @ "
-                                             << ConstantPropagationTests::pathToTestCaseFile;
+                                             << pathToTestCaseFile;
 
         const nlohmann::json parsedJson = nlohmann::json::parse(configFileStream);
         ASSERT_TRUE(parsedJson.contains(testCaseJsonKey)) << "Required entry for given test case with key '" << testCaseJsonKey << "' was not found";
@@ -51,6 +51,8 @@ protected:
         } else {
             expectedOptimizedCircuit = circuitToOptimize;
         }
+
+
     }
 };
 
@@ -61,7 +63,7 @@ INSTANTIATE_TEST_SUITE_P(SyReCOptimizations, ConstantPropagationTests,
                              std::replace( s.begin(), s.end(), '-', '_');
                              return s; });
 
-TEST_P(ConstantPropagationTests, GenericConstantPropagationOptimization) {
+TEST_P(ConstantPropagationTests, ConstantPropagationOptimizationIntegrationTest) {
     std::string errorsFromParsedCircuit;
     ASSERT_NO_THROW(errorsFromParsedCircuit = parserPublicInterface.readFromString(circuitToOptimize, config));
     ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors";
