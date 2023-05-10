@@ -152,7 +152,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                     const auto& notConstantOperandAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(isLhsConstant ? *rhsOperandAsExpression : *lhsOperandAsExpression);
 
                     sharedData->parserConfig->performConstantPropagation            = false;
-                    const auto  constantOperandReevaluatedWithoutConstantPropagation = *tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->rhsOperand);
+                    const auto constantOperandReevaluatedWithoutConstantPropagation = *tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(isLhsConstant ? context->lhsOperand : context->rhsOperand);
                     sharedData->parserConfig->performConstantPropagation            = true;
 
                     std::shared_ptr<syrec::VariableExpression> constantOperandReevaluatedAsVariableAccess = nullptr;

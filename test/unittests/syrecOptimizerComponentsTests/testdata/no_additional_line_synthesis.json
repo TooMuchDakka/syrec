@@ -1,0 +1,54 @@
+{
+  "expressionsWithOperationsWithNoAssignmentEquivalentTwoOrMoreSubsequentLevelsAreNotOptimized": {
+    "circuit": ""
+  },
+  "expressionWithSubAssignAndSubtractionOperationOnOperationNodesWithoutOnlyLeafNodesIsOptimized": {
+    "circuit": ""
+  },
+  "expressionWithSubAssignAndXorOperationOnOperationNodesWithoutOnlyLeafNodesIsNotOptimized": {
+    "circuit": ""
+  },
+  "expressionWithXorAssignAndSubtractionOperationOnOperationNodesWithoutOnlyLeafNodesIsNotOptimized": {
+    "circuit": ""
+  },
+  "expressionWithXorAssignAndXorOperationOnOperationNodesWithoutOnlyLeafNodesIsOptimized": {
+    "circuit": ""
+  },
+  "expressionWithAddAssignAndSubtractionOperationOnOperationNodeWithoutOnlyLeafNodesIsOptimized": {
+
+  },
+  "expressionWithAddAssignAndXorOperationOnOperationNodeWithoutOnlyLeafNodesIsOptimized": {
+
+  },
+
+  "expressionWithOnlyAddSubAndXorWithLhsOfParentBeingSignalAndRhsBeingBinaryExpressionWillBeSwitched": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16)) x0 += (x1 + (5 - x2))",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16)) x0 += (5 - x2); x0 += x1"
+  },
+  "expressionWithOnlyAddSubAndXorWithRhsOfParentBeingSignalAndLhsBeingBinaryExpressionWillNotBeSwitched": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16)) x0 += ((5 - x2) + x1)",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16)) x0 += (5 - x2); x0 += x1"
+  },
+  "expressionWithOnlyAddSubAndXorWithIncrementAssignOperation": {
+    "other": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16)) x0 += (((t + (x - y)) ^ ((y - (z ^ u)) - t)) - (s ^ (y + (x - z))))",
+    "test": "t = 5, s = 2, x1 = x, x2 = y, x3 = z, x4 = u",
+
+
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16)) x0 += (((5 + (x1 - x2)) ^ ((x2 - (x3 ^ x4)) - 5)) - (2 ^ (x2 + (x1 - x3))))",
+    "expectedCircuit": "t = 5, s = 2, x1 = x, x2 = y, x3 = z, x4 = u"
+  },
+  "expressionWithOnlyAddSubAndXorOperationNodesWithOnlyOneLeafCorrectlyHandled": {
+    "circuit": "module (out o(4), in x(4), in y(4), in t(4), in u(4), in z(4)) o += ((y - ((t / (u + z)) + z)) + (x + ((y - z) / t)))",
+    "expectedCircuit": "module (out o(4), in x(4), in y(4), in t(4), in u(4), in z(4))"
+  },
+  "expressionWithOnlyAddSubAndXorOperationNodesWithTwoLeafsCorrectlyHandled": {
+
+  },
+  "expressionWithOnlyAddSubAndXorWithXorAssignOperation": {
+    "circuit": "",
+    "expectedCircuit": ""
+  },
+  "simpleTest": {
+    "circuit": "module main(in x0(16), in x1(16), in x2(16), in x3(16), in x4(16), out x5(16)) x5 -= (((x0 * x1) + x1) + ((x2 * x1) + (x1 / (x2 - x3))))"
+  }
+}

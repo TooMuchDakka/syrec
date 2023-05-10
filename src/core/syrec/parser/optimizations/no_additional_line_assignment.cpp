@@ -29,9 +29,9 @@ std::optional<syrec_operation::operation> LineAwareOptimization::TreeTraversalNo
         : std::nullopt;
 }
 
-std::optional<std::shared_ptr<syrec::BinaryExpression>> LineAwareOptimization::TreeTraversalNode::fetchReferenceBinaryExpr() const {
+std::optional<LineAwareOptimization::TreeTraversalNode::ReferenceExpr> LineAwareOptimization::TreeTraversalNode::fetchReferenceExpr() const {
     return (isInternalNode && std::holds_alternative<InternalNodeData>(nodeData))
-        ? std::make_optional(std::get<std::shared_ptr<syrec::BinaryExpression>>(std::get<InternalNodeData>(nodeData)))
+        ? std::make_optional(std::get<LineAwareOptimization::TreeTraversalNode::ReferenceExpr>(std::get<InternalNodeData>(nodeData)))
         : std::nullopt;
 }
 
@@ -165,13 +165,17 @@ std::optional<syrec::AssignStatement::vec> LineAwareOptimization::optimize(const
     }
     
     const auto postOrderRepresentation = createPostOrderRepresentation(assignmentStatement->rhs);
-    if (canOptimizeAssignStatement(*usedAssignmentOperation, postOrderRepresentation)) {
+    if (!postOrderRepresentation.has_value()) {
+        return std::nullopt;
+    }
+
+    if (canOptimizeAssignStatement(*usedAssignmentOperation, *postOrderRepresentation)) {
         // TODO: Add 'simple' base optimization algorithm ???
-        if (postOrderRepresentation.areOperandsOnlyAdditionSubtractionOrXor()) {
-            return optimizeComplexAssignStatement(*usedAssignmentOperation, assignmentStatement->lhs, postOrderRepresentation);
+        if (postOrderRepresentation->areOperandsOnlyAdditionSubtractionOrXor()) {
+            return optimizeComplexAssignStatement(*usedAssignmentOperation, assignmentStatement->lhs, *postOrderRepresentation);
             //return optimizeAssignStatementWithOnlyAdditionSubtractionOrXorOperands(*usedAssignmentOperation, assignmentStatement->lhs, postOrderRepresentation);
         }
-        return optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(assignmentStatement, postOrderRepresentation);
+        return optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(assignmentStatement, *postOrderRepresentation);
     }
     return std::make_optional(std::vector<syrec::AssignStatement::ptr>({assignmentStatement}));
 }
@@ -188,14 +192,18 @@ std::optional<syrec_operation::operation> LineAwareOptimization::tryMapAssignmen
     return std::nullopt;
 }
 
-LineAwareOptimization::PostOrderTreeTraversal LineAwareOptimization::createPostOrderRepresentation(const syrec::BinaryExpression::ptr& topLevelBinaryExpr) {
+std::optional<LineAwareOptimization::PostOrderTreeTraversal> LineAwareOptimization::createPostOrderRepresentation(const syrec::BinaryExpression::ptr& topLevelBinaryExpr) {
     std::vector<TreeTraversalNode> postOrderNodeTraversalStorage;
-    traverseExpressionOperand(topLevelBinaryExpr, postOrderNodeTraversalStorage);
+    bool                           wasTraversalOk = true;
+    traverseExpressionOperand(topLevelBinaryExpr, postOrderNodeTraversalStorage, wasTraversalOk);
+    if (!wasTraversalOk) {
+        return std::nullopt;
+    }
     return PostOrderTreeTraversal(postOrderNodeTraversalStorage);
 }
 
 // TODO:
-void LineAwareOptimization::traverseExpressionOperand(const syrec::expression::ptr& expr, std::vector<TreeTraversalNode>& postOrderTraversalContainer) {
+void LineAwareOptimization::traverseExpressionOperand(const syrec::expression::ptr& expr, std::vector<TreeTraversalNode>& postOrderTraversalContainer, bool& canContinueTraversal) {
     if (isExpressionOperandLeafNode(expr)) {
         if (const auto& exprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableAccess != nullptr) {
             postOrderTraversalContainer.emplace_back(TreeTraversalNode::CreateLeafNode(exprAsVariableAccess));
@@ -204,27 +212,50 @@ void LineAwareOptimization::traverseExpressionOperand(const syrec::expression::p
         }
     }
     else {
-        const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
-        auto        operationOfOperationNode = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+        TreeTraversalNode::ReferenceExpr referenceExprVariant;
+        syrec::expression::ptr lhsExprOfCurrentExpr;
+        syrec::expression::ptr rhsExprOfCurrentExpr;
+        syrec_operation::operation operationOfOperationNode;
+        if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
+            referenceExprVariant     = exprAsBinaryExpr;
+            lhsExprOfCurrentExpr = exprAsBinaryExpr->lhs;
+            rhsExprOfCurrentExpr = exprAsBinaryExpr->rhs;
+            operationOfOperationNode = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+        }
+        else {
+            const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr);
+            referenceExprVariant        = exprAsShiftExpr;
+            lhsExprOfCurrentExpr        = exprAsShiftExpr->lhs;
+            rhsExprOfCurrentExpr        = std::make_shared<syrec::NumericExpression>(exprAsShiftExpr->rhs, exprAsShiftExpr->bitwidth());
+            operationOfOperationNode    = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(exprAsShiftExpr->op);
+        }
+
         /*
          * Since this optimization often starts at the deepest operation node while processing the expression tree in post order,
          * we flip the operands of binary expressions of the form constant op BinaryExpr where op is commutative
          */
-        const auto& lhsAsConstantExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(exprAsBinaryExpr->lhs);
-        const auto& rhsAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprAsBinaryExpr->rhs);
-        if (lhsAsConstantExpr != nullptr && rhsAsBinaryExpr != nullptr && (syrec_operation::isCommutative(operationOfOperationNode) || syrec_operation::invert(operationOfOperationNode).has_value())) {
+        const auto& lhsAsConstantExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(lhsExprOfCurrentExpr);
+        const auto isRhsExprEitherBinaryOrShiftExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(rhsExprOfCurrentExpr) != nullptr
+            || std::dynamic_pointer_cast<syrec::ShiftExpression>(rhsExprOfCurrentExpr) != nullptr;
+        canContinueTraversal                         = !(lhsAsConstantExpr != nullptr && isRhsExprEitherBinaryOrShiftExpr);
+        
+        if (!canContinueTraversal) {
+            return;
+        }
+
+        if (lhsAsConstantExpr != nullptr && isRhsExprEitherBinaryOrShiftExpr && (syrec_operation::isCommutative(operationOfOperationNode) || syrec_operation::invert(operationOfOperationNode).has_value())) {
             if (!syrec_operation::isCommutative(operationOfOperationNode)) {
                 operationOfOperationNode = *syrec_operation::invert(operationOfOperationNode);
             }
-            traverseExpressionOperand(exprAsBinaryExpr->rhs, postOrderTraversalContainer);
-            traverseExpressionOperand(exprAsBinaryExpr->lhs, postOrderTraversalContainer);
+            traverseExpressionOperand(rhsExprOfCurrentExpr, postOrderTraversalContainer, canContinueTraversal);
+            traverseExpressionOperand(lhsExprOfCurrentExpr, postOrderTraversalContainer, canContinueTraversal);
         }
         else {
-            traverseExpressionOperand(exprAsBinaryExpr->lhs, postOrderTraversalContainer);
-            traverseExpressionOperand(exprAsBinaryExpr->rhs, postOrderTraversalContainer);            
+            traverseExpressionOperand(lhsExprOfCurrentExpr, postOrderTraversalContainer, canContinueTraversal);
+            traverseExpressionOperand(rhsExprOfCurrentExpr, postOrderTraversalContainer, canContinueTraversal);            
         }
 
-        postOrderTraversalContainer.emplace_back(TreeTraversalNode::CreateInternalNode(std::make_tuple(exprAsBinaryExpr, operationOfOperationNode)));   
+        postOrderTraversalContainer.emplace_back(TreeTraversalNode::CreateInternalNode(TreeTraversalNode::InternalNodeData(referenceExprVariant, operationOfOperationNode)));   
     }
 }
 
@@ -520,13 +551,18 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithRh
                 assignmentOperationToUse                                 = useInvertedAssignmentOperation ? *syrec_operation::invert(operationOfParentNode) : operationOfParentNode;
             }
 
-            const auto& referenceBinaryExpr = *operationNode.fetchReferenceBinaryExpr();
-            const auto& lhsExpr             = referenceBinaryExpr->lhs;
-            const auto& rhsExpr             = referenceBinaryExpr->rhs;
-
-            // TODO: We since an operation node does not store its complete trailing expression, we need to either build it manually or retrieve it from the original assignment statement
-            /*const auto& lhsExpr = *childNodes.first.fetchReferenceBinaryExpr();
-            const auto& rhsExpr = *childNodes.second.fetchReferenceBinaryExpr();*/
+            const auto& referenceExpr = *operationNode.fetchReferenceExpr();
+            syrec::expression::ptr lhsExpr;
+            syrec::expression::ptr rhsExpr;
+            if (std::holds_alternative<std::shared_ptr<syrec::BinaryExpression>>(referenceExpr)) {
+                const auto& referenceExprAsBinaryOne = std::get<std::shared_ptr<syrec::BinaryExpression>>(referenceExpr);
+                lhsExpr                              = referenceExprAsBinaryOne->lhs;
+                rhsExpr                              = referenceExprAsBinaryOne->rhs;
+            } else {
+                const auto& referenceExprAsShiftExpr = std::get<std::shared_ptr<syrec::ShiftExpression>>(referenceExpr);
+                lhsExpr                              = referenceExprAsShiftExpr->lhs;
+                rhsExpr                              = std::make_shared<syrec::NumericExpression>(referenceExprAsShiftExpr->rhs, referenceExprAsShiftExpr->bitwidth());
+            }
 
             assignmentOperationToUse            = operationOfCurrentOperationNode;
             const auto assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(

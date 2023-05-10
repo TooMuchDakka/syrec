@@ -17,7 +17,8 @@ namespace optimizations {
 		struct TreeTraversalNode {
             const bool isInternalNode;
 			using LeafData = std::variant<std::shared_ptr<syrec::VariableExpression>, std::shared_ptr<syrec::NumericExpression>>;
-            using InternalNodeData = std::tuple<std::shared_ptr<syrec::BinaryExpression>, syrec_operation::operation>;
+            using ReferenceExpr = std::variant<std::shared_ptr<syrec::BinaryExpression>, std::shared_ptr<syrec::ShiftExpression>>;
+            using InternalNodeData = std::tuple<ReferenceExpr, syrec_operation::operation>;
             static TreeTraversalNode CreateInternalNode(const InternalNodeData& internalNodeData) {
                 return TreeTraversalNode(true, internalNodeData);
             }
@@ -27,7 +28,7 @@ namespace optimizations {
             }
 
             [[nodiscard]] std::optional<syrec::expression::ptr>      fetchStoredExpr() const;
-            [[nodiscard]] std::optional<std::shared_ptr<syrec::BinaryExpression>> fetchReferenceBinaryExpr() const;
+            [[nodiscard]] std::optional<ReferenceExpr> fetchReferenceExpr() const;
             [[nodiscard]] std::optional<syrec_operation::operation>  fetchStoredOperation() const;
 		private:
             const std::variant<LeafData, InternalNodeData> nodeData;
@@ -71,8 +72,8 @@ namespace optimizations {
         };
 
         [[nodiscard]] static std::optional<syrec_operation::operation> tryMapAssignmentOperand(unsigned int assignmentOperand);
-        [[nodiscard]] static PostOrderTreeTraversal                    createPostOrderRepresentation(const syrec::BinaryExpression::ptr& topLevelBinaryExpr);
-        static void                                                    traverseExpressionOperand(const syrec::expression::ptr& expr, std::vector<TreeTraversalNode>& postOrderTraversalContainer);
+        [[nodiscard]] static std::optional<PostOrderTreeTraversal>     createPostOrderRepresentation(const syrec::BinaryExpression::ptr& topLevelBinaryExpr);
+        static void                                                    traverseExpressionOperand(const syrec::expression::ptr& expr, std::vector<TreeTraversalNode>& postOrderTraversalContainer, bool& canContinueTraversal);
         [[nodiscard]] static bool                                      isExpressionOperandLeafNode(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                                      isOperationAdditionSubtractionOrXor(syrec_operation::operation operation);
         [[nodiscard]] static bool                                      isOperationAssociative(syrec_operation::operation operation);
