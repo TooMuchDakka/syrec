@@ -4,7 +4,7 @@
 
 #include "core/syrec/expression.hpp"
 
-namespace optimization {
+namespace optimizations {
     syrec::expression::ptr simplifyBinaryExpression(const syrec::expression::ptr& expr);
 }
 

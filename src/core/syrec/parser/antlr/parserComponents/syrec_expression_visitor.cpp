@@ -165,7 +165,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                     }
                 } else {
                     if (sharedData->parserConfig->reassociateExpressionsEnabled) {
-                        createdBinaryExpr = optimization::simplifyBinaryExpression(createdBinaryExpr);
+                        createdBinaryExpr = optimizations::simplifyBinaryExpression(createdBinaryExpr);
                     }    
                 }
 
@@ -249,7 +249,10 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     */
 
     // TODO: Handling of shift expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
-    const auto createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *ParserUtilities::mapOperationToInternalFlag(*definedShiftOperation), *shiftAmount);
+    syrec::expression::ptr createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *ParserUtilities::mapOperationToInternalFlag(*definedShiftOperation), *shiftAmount);
+    if (sharedData->parserConfig->reassociateExpressionsEnabled) {
+        createdShiftExpression = optimizations::simplifyBinaryExpression(createdShiftExpression);
+    }
     return std::make_optional(ExpressionEvaluationResult::createFromExpression(createdShiftExpression, numValuesPerDimensionOfExpressiontoShift));
 }
 

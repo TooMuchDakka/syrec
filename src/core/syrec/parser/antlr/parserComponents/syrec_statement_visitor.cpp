@@ -148,6 +148,13 @@ x0 -= (2 - (x2 + (x3 - ((x4 - x5) + (x6 - (x8 + x7))))))
              *
              */
 
+            /*
+             * For this optimization we should disable the constant propagation in case that it evaluates to a constant that cannot be dropped for the given binary expr.
+             * Otherwise, perform the no additional line synthesis optimization and only then apply the reorder expression and constant propagation on the generated assign statements
+             * This also means that we also no the check after the simplification if an assignment statement can be dropped (i.e. a += 0, etc.) [which means we would also need to delete
+             * the inverted assignment statement if it exists]
+             *
+             */
             syrec::AssignStatement::vec createdAssignmentStmts{assignStmt};
             const std::optional<syrec::AssignStatement::vec> optimizedAssignmentStmt = sharedData->parserConfig->noAdditionalLineOptimizationEnabled
                 ? optimizations::LineAwareOptimization::optimize(assignStmt)
@@ -157,6 +164,7 @@ x0 -= (2 - (x2 + (x3 - ((x4 - x5) + (x6 - (x8 + x7))))))
                 createdAssignmentStmts = *optimizedAssignmentStmt;
             }
 
+            // TODO: If the rhs of the assignment operation does not change the value of the lhs (i.e. a += 0) we can drop the statement all together
             for (const auto& assignmentStmt: createdAssignmentStmts) {
                 addStatementToOpenContainer(assignmentStmt);
 

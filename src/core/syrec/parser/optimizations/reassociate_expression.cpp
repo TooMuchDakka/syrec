@@ -1,10 +1,11 @@
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
+#include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
 
 #include <tuple>
 
-using namespace optimization;
+using namespace optimizations;
 
 inline std::optional<std::shared_ptr<syrec::BinaryExpression>> tryConvertExpressionToBinaryOne(const syrec::expression::ptr& expr) {
     if (const auto& exprAsBinaryExpression = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpression != nullptr) {
@@ -91,15 +92,35 @@ std::optional<std::tuple<unsigned int, syrec::expression::ptr>> trySplitExpressi
  *          which in turn is a contradiction (for reversivel circuits)
  * TODO: There is room for further optimizations where one would 'accumulate' signals (i.e. a + (2 + a) => (2 * a) + 2)
  */
-syrec::expression::ptr optimization::simplifyBinaryExpression(const syrec::expression::ptr& expr) {
+syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expression::ptr& expr) {
+    const auto exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr);
     const auto binaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
-    if (binaryExpr == nullptr) {
+    if (binaryExpr == nullptr && exprAsShiftExpr == nullptr) {
         return expr;
     }
 
-    const auto lOperandConstValue = tryGetConstantValueOfExpression(binaryExpr->lhs);
-    const auto rOperandConstValue = tryGetConstantValueOfExpression(binaryExpr->rhs);
+    std::optional<unsigned int> lOperandConstValue;
+    std::optional<unsigned int> rOperandConstValue;
+    std::optional<syrec_operation::operation> mappedFlagToEnum;
 
+    if (binaryExpr != nullptr) {
+        lOperandConstValue = tryGetConstantValueOfExpression(binaryExpr->lhs);
+        rOperandConstValue = tryGetConstantValueOfExpression(binaryExpr->rhs);
+        mappedFlagToEnum   = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(binaryExpr->op);
+        if (!mappedFlagToEnum.has_value()) {
+            return expr;
+        }
+    }
+    else {
+        lOperandConstValue = tryGetConstantValueOfExpression(exprAsShiftExpr->lhs);
+        const auto& rhsOperandOfShiftExpr = std::make_shared<syrec::NumericExpression>(exprAsShiftExpr->rhs, exprAsShiftExpr->bitwidth());
+        rOperandConstValue = tryGetConstantValueOfExpression(rhsOperandOfShiftExpr);
+        mappedFlagToEnum   = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(exprAsShiftExpr->op);
+        if (!mappedFlagToEnum.has_value()) {
+            return expr;
+        }
+    }
+    
     std::optional<unsigned int> constOperandOfParentExpr;
     if (lOperandConstValue.has_value()) {
         constOperandOfParentExpr = lOperandConstValue;
@@ -107,60 +128,26 @@ syrec::expression::ptr optimization::simplifyBinaryExpression(const syrec::expre
         constOperandOfParentExpr = rOperandConstValue;
     }
 
-    const auto mappedFlagToEnum = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(binaryExpr->op);
-    if (!mappedFlagToEnum.has_value()) {
-        return binaryExpr;
-    }
-
     const auto binaryOperationOfExpr = mappedFlagToEnum.value();
-    if (lOperandConstValue.has_value() && rOperandConstValue.has_value()) {
-        if (const auto resultOfExprWithConstOperands = syrec_operation::apply(binaryOperationOfExpr, *lOperandConstValue, *rOperandConstValue);
-            resultOfExprWithConstOperands.has_value()) {
-            return createExpressionForNumber(*resultOfExprWithConstOperands);
+    if (lOperandConstValue.has_value() || rOperandConstValue.has_value()) {
+        const auto& simplificationResult = trySimplify(expr);
+        if (simplificationResult.couldSimplify) {
+            return simplifyBinaryExpression(simplificationResult.simplifiedExpression);
         }
-        return expr;
-    }
-
-    // TODO: These simplification rules should be extracted into an utility function
-    // TODO: Can we apply boolean operation simplifications on arbitrary signals (i.e. x OR 1 = 1) ?
-    switch (binaryOperationOfExpr) {
-        case syrec_operation::operation::addition: {
-            if (constOperandOfParentExpr.has_value() && *constOperandOfParentExpr == 0) {
-                return simplifyBinaryExpression(lOperandConstValue.has_value() ? binaryExpr->rhs : binaryExpr->lhs);
+        /*
+         * If we could not simplify the given shift expression we can only try and simplify the lhs operand of the shift operations
+         * because the rhs can only be a number (with the curretn version of the specification [12.02.2023])
+         */
+        if (exprAsShiftExpr != nullptr) {
+            const auto& lhsOperandSimplified = simplifyBinaryExpression(exprAsShiftExpr->lhs);
+            if (lhsOperandSimplified != exprAsShiftExpr->lhs) {
+                return std::make_shared<syrec::ShiftExpression>(
+                        lhsOperandSimplified,
+                        exprAsShiftExpr->op,
+                        exprAsShiftExpr->rhs);
             }
-            break;
+            return exprAsShiftExpr;
         }
-        case syrec_operation::operation::subtraction: {
-            if (rOperandConstValue.has_value()) {
-                return simplifyBinaryExpression(createBinaryExpression(createExpressionForNumber(-*rOperandConstValue), syrec::BinaryExpression::Add, binaryExpr->lhs));
-            }
-            // Since we cannot simply negate any expression, we will leave this case unoptimized for now
-            /*if (lOperandConstValue.has_value()) {
-                return simplifyBinaryExpression(std::make_shared<syrec::BinaryExpression>(createExpressionForNumber(-lOperandConstValue.value()), syrec::BinaryExpression::Add, binaryExpr->rhs));
-            }*/
-            return simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(binaryExpr);    
-        }
-        case syrec_operation::operation::division: {
-            if (lOperandConstValue.has_value() && *lOperandConstValue == 0) {
-                return createExpressionForNumber(0);
-            }
-            break;
-        }
-        case syrec_operation::operation::multiplication: {
-            if (constOperandOfParentExpr.has_value()) {
-                // x * 0 = 0 or 0 * x = 0
-                if (*constOperandOfParentExpr == 0) {
-                    return createExpressionForNumber(0);
-                }
-                // x * 1 = x or 1 * x = x
-                if (*constOperandOfParentExpr == 1) {
-                    return simplifyBinaryExpression(lOperandConstValue.has_value() ? binaryExpr->rhs : binaryExpr->lhs);
-                }
-            }
-            break;
-        }
-        default:
-            break;
     }
 
     if ((binaryOperationOfExpr != syrec_operation::operation::multiplication && binaryOperationOfExpr != syrec_operation::operation::addition) 

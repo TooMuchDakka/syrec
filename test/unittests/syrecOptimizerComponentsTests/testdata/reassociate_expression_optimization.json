@@ -85,5 +85,28 @@
   "testMultipleReorderingsOfCommutativeOperationsWithOneOperandBeingAConstantAndTheOtherBeingAnExpressionWithOneOperandConstant": {
     "circuit": "module main(in a(16), in b(16), out c(16)) c += (2 + (a + (2 + (a + (2 + (2 * (2 + a))))))); c += (2 * (a * (2 * (a * (2 * (a * (2 * a)))))))",
     "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += (((10 + a) + a) + (2 * a)); c += ((((16 * a) * a) * a) * a)"
+  },
+  "identityOperandOfOperationUsedAsRhsOperandSimplifiesToLhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (b + 0); a += (b - 0); a += (b * 1); a += (b >> 0); a += (b << 0); a += (b ^ 0); a += (b / 1); a += (b % 1)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b; a += b; a += b; a += b; a += b; a += b; a += b; a += b"
+  },
+  "identityOperandOfOperationUsedAsLhsOperandSimplfiesToRhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (0 + b); a += (1 * b); a += (0 ^ b); a += (0 >> 10); a += (0 << 10)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b; a += b; a += b; a += 0; a += 0"
+  },
+  "zeroDividedByAnythingSimplfiesToZero": {
+    "circuit": "module main(out a(16), in b(16)) a += (0 / b)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += 0"
+  },
+  "logicalAndBitwiseAndOperationWithOneOperandBeingZeroSimplifiesToZero": {
+    "circuit": "module main(out a(16), in b(16)) a += (b && 0); a += (0 && b); a += (0 & b); a += (b & 0)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += 0; a += 0; a += 0; a += 0"
+  },
+  "multiplicationWithZeroSimplifiesBothConstantsAndExpressionsToZero": {
+    "circuit": "module main(out a(16), in b(16), in c(16)) a += (0 * (b + c)); a += ((b + c) * 0)",
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) a += 0; a += 0"
+  },
+  "FURTHER": {
+    "circuit": "Further tests that check transformation if one operand is identity of used operation"
   }
 }

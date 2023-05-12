@@ -64,6 +64,7 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.cpp
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/bit_helpers.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/binary_expression_simplifier.cpp
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
@@ -99,6 +100,7 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/bit_helpers.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/binary_expression_simplifier.hpp
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp

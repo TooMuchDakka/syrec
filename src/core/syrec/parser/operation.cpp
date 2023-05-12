@@ -2,6 +2,42 @@
 
 using namespace syrec_operation;
 
+bool syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(operation operation, unsigned operand) noexcept {
+    if (isCommutative(operation)) {
+        return isOperandUseAsRhsInOperationIdentityElement(operation, operand);
+    }
+
+    switch (operation) {
+        case operation::addition:
+        case operation::shift_left:
+        case operation::shift_right:
+        case operation::bitwise_xor:
+            return operand == 0;
+        case operation::multiplication:
+            return operand == 1;
+    }
+    return false;
+}
+
+bool syrec_operation::isOperandUseAsRhsInOperationIdentityElement(const operation operation, const unsigned int operand) noexcept {
+    switch (operation) {
+        case operation::addition:
+        case operation::add_assign:
+        case operation::subtraction:
+        case operation::minus_assign:
+        case operation::shift_left:
+        case operation::shift_right:
+        case operation::xor_assign:
+        case operation::bitwise_xor:
+            return operand == 0;
+        case operation::division:
+        case operation::multiplication:
+        case operation::modulo:
+            return operand == 1;
+    }
+    return false;
+}
+
 std::optional<unsigned int> syrec_operation::apply(const operation operation, const unsigned int leftOperand, const unsigned int rightOperand) noexcept
 {
     unsigned int result;
