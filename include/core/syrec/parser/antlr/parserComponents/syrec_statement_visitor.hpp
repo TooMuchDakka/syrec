@@ -43,6 +43,9 @@ namespace parser {
         [[nodiscard]] std::optional<ExpressionEvaluationResult::ptr> getUnoptimizedExpression(SyReCParser::ExpressionContext* context);
         [[nodiscard]] static bool                                    areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr);
         void                                                         decrementReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression);
+        [[nodiscard]] SymbolTableBackupHelper::ptr                   createCopiesOfCurrentValuesOfChangedSignalsAndResetToOriginal(const SymbolTableBackupHelper::ptr& backupOfOriginalValues) const;
+        void                                                         mergeChangesFromBranchesAndUpdateSymbolTable(const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInTrueBranch, const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInFalseBranch, bool canAnyBranchBeOmitted, bool canTrueBranchBeOmitted) const;
+        void                                                         createAndStoreBackupForAssignedToSignal(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
 
     private:
         std::any visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext* context) override {

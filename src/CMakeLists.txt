@@ -35,6 +35,7 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/signal_access_restriction.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/signal_evaluation_result.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/symbol_table.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/symbol_table_backup_helper.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/value_broadcaster.cpp
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/SyReCBaseVisitor.h
@@ -81,6 +82,7 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_access_restriction.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_evaluation_result.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table_backup_helper.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/value_broadcaster.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor_shared_data.hpp

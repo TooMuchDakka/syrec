@@ -52,13 +52,16 @@ namespace valueLookup {
                 const BaseValueLookup<Vt>&                                                     other
         );
 
-        [[nodiscard]] optimizations::SignalDimensionInformation getSignalInformation() const;
+        [[nodiscard]] optimizations::SignalDimensionInformation    getSignalInformation() const;
+        [[nodiscard]] virtual std::shared_ptr<BaseValueLookup<Vt>> clone() = 0;
+        void                                                       copyRestrictionsAndMergeValuesFromAlternatives(const BaseValueLookup::ptr& alternativeOne, const BaseValueLookup::ptr& alternativeTwo);
+        void                                                       copyRestrictionsAndInvalidateChangedValuesFrom(const BaseValueLookup::ptr& other);
 
     protected:
         const optimizations::SignalDimensionInformation                             signalInformation;
         const LayerData<optimizations::DimensionPropagationBlocker::ptr>::ptr       dimensionAccessRestrictions;
         const std::shared_ptr<LayerData<std::map<unsigned int, std::optional<Vt>>>> valueLookup;
-
+        
         [[nodiscard]] std::optional<LayerData<optimizations::DimensionPropagationBlocker::ptr>::ptr>       initializeDimensionAccessRestrictionLayer(const unsigned int dimension);
         [[nodiscard]] std::optional<std::shared_ptr<LayerData<std::map<unsigned int, std::optional<Vt>>>>> initializeValueLookupLayer(const unsigned int dimension, const std::optional<Vt>& defaultValue);
 
@@ -69,13 +72,12 @@ namespace valueLookup {
          * To have both static and dynamic polymorphism we need to use type erase to keep the dynamic part here
          * https://www.artima.com/articles/on-the-tension-between-object-oriented-and-generic-programming-in-c
          */
-
+        
         [[nodiscard]] virtual bool     canStoreValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const                                                      = 0;
         [[nodiscard]] virtual std::any extractPartsOfValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const                                                = 0;
         [[nodiscard]] virtual std::any transformExistingValueByMergingWithNewOne(const std::any& currentValue, const std::any& newValue, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partsToUpdate) const = 0;
         [[nodiscard]] virtual std::any wrapValueOnOverflow(const std::any& value, unsigned int numBitsOfStorage) const                                                                                                        = 0;
-
-    private:
+        
         template<typename Fn>
         void applyToBitsOfLastLayer(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange, Fn&& applyLambda);
 

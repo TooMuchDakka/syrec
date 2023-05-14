@@ -12,6 +12,7 @@ namespace valueLookup {
 
         ~SignalValueLookup() override = default;
 
+        [[nodiscard]] SignalValueLookup::ptr clone() override;
     protected:
         [[nodiscard]] bool     canStoreValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const override;
         [[nodiscard]] std::any extractPartsOfValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const override;

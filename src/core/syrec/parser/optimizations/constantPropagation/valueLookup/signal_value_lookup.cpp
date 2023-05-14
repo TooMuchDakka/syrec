@@ -3,6 +3,28 @@
 
 using namespace valueLookup;
 
+std::shared_ptr<BaseValueLookup<unsigned>> SignalValueLookup::clone() {
+    const auto& signalInformation = getSignalInformation();
+    auto        copy              = std::make_shared<SignalValueLookup>(signalInformation.bitWidth, signalInformation.valuesPerDimension, 0);
+    auto        dimensionAccess   = std::vector<std::optional<unsigned int>>(signalInformation.valuesPerDimension.size(), std::nullopt);
+
+    copy->applyToBitsOfLastLayer(
+    {},
+    std::nullopt,
+    [&dimensionAccess, &copy, this](const std::vector<unsigned int>& relativeDimensionAccess, unsigned int relativeBitIdx) {
+        copyRelativeDimensionAccess(0, dimensionAccess, relativeDimensionAccess);
+        const auto& accessedBitRange(std::pair(relativeBitIdx, relativeBitIdx));
+        const auto& valueForBit  = tryFetchValueFor(dimensionAccess, accessedBitRange);
+
+        if (valueForBit.has_value()) {
+            copy->updateStoredValueFor(dimensionAccess, accessedBitRange, *valueForBit);
+        } else {
+            copy->invalidateStoredValueForBitrange(dimensionAccess, accessedBitRange);
+        }
+    });
+    return copy;
+}
+
 bool SignalValueLookup::canStoreValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const {
     return BitHelpers::isValueStorableInBitRange(std::any_cast<unsigned int>(value), availableStorageSpace);
 }

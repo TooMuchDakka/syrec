@@ -6,6 +6,7 @@
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/signal_access_restriction.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
+#include "core/syrec/parser/symbol_table_backup_helper.hpp"
 
 #include <optional>
 
@@ -24,6 +25,7 @@ namespace parser {
         std::set<std::string>                                    evaluableLoopVariables;
         std::optional<std::string>                               lastDeclaredLoopVariable;
         bool                                                     currentlyInOmittedRegion;
+        std::stack<SymbolTableBackupHelper::ptr>                 localSignalValuesBackup;
 
         explicit SharedVisitorData(const ParserConfig& parserConfig) :
             parserConfig(std::make_unique<ParserConfig>(parserConfig)),
@@ -56,6 +58,20 @@ namespace parser {
             return std::nullopt;
         }
 
+        [[nodiscard]] std::optional<SymbolTableBackupHelper::ptr> getCurrentLocalSignalValueBackupScope() const {
+            if (localSignalValuesBackup.empty()) {
+                return std::nullopt;
+            }
+            return std::make_optional(localSignalValuesBackup.top());    
+        }
+
+        void createNewLocalSignalValueBackupScope() {
+            localSignalValuesBackup.push(std::make_shared<SymbolTableBackupHelper>());
+        }
+
+        void popCurrentLocalSignalValueBackupScope() {
+            localSignalValuesBackup.pop();
+        }
     protected:
         std::unique_ptr<AssignmentSignalAccessRestriction> signalAccessRestriction;
     };

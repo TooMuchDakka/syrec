@@ -21,13 +21,13 @@ namespace parser {
 
         ~SymbolTable() = default;
 
-        bool                                                                                contains(const std::string_view& literalIdent) const;
-        bool                                                                                contains(const syrec::Module::ptr& module) const;
+        [[nodiscard]] bool                                                                  contains(const std::string_view& literalIdent) const;
+        [[nodiscard]] bool                                                                  contains(const syrec::Module::ptr& module) const;
         [[nodiscard]] std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> getVariable(const std::string_view& literalIdent) const;
-        [[nodiscard]] std::optional<syrec::Module::vec>                              getMatchingModulesForName(const std::string_view& moduleName) const;
-        bool                                                                         addEntry(const syrec::Variable::ptr& variable);
-        bool                                                                         addEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
-        bool                                                                         addEntry(const syrec::Module::ptr& module);                     
+        [[nodiscard]] std::optional<syrec::Module::vec>                                     getMatchingModulesForName(const std::string_view& moduleName) const;
+        bool                                                                                addEntry(const syrec::Variable::ptr& variable);
+        bool                                                                                addEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
+        bool                                                                                addEntry(const syrec::Module::ptr& module);
 
         // BEGIN 
         // TODO: UNUSED_REFERENCE - Marked as used
@@ -39,14 +39,16 @@ namespace parser {
 
         // TODO: CONSTANT_PROPAGATION
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
-        void                                  invalidateStoredValuesFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
+        void                                      invalidateStoredValuesFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void                                      updateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignalParts, unsigned int newValue) const;
 
         void updateViaSignalAssignment(const syrec::VariableAccess::ptr& assignmentLhsOperand, const syrec::VariableAccess::ptr& assignmentRhsOperand) const;
         void swap(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const;
 
-        [[nodiscard]] std::set<std::string> getUnusedLiterals() const;
-        [[nodiscard]] std::vector<bool>     determineIfModuleWasUsed(const syrec::Module::vec& modules) const;
+        [[nodiscard]] std::set<std::string>                              getUnusedLiterals() const;
+        [[nodiscard]] std::vector<bool>                                  determineIfModuleWasUsed(const syrec::Module::vec& modules) const;
+        [[nodiscard]] std::optional<valueLookup::SignalValueLookup::ptr> createBackupOfValueOfSignal(const std::string_view& literalIdent) const;
+        void                                                             restoreValuesFromBackup(const std::string_view& literalIdent, const valueLookup::SignalValueLookup::ptr& newValues) const;
         // END
 
         static void openScope(SymbolTable::ptr& currentScope);

@@ -221,6 +221,34 @@ std::vector<bool> SymbolTable::determineIfModuleWasUsed(const syrec::Module::vec
     return usageStatusPerModule;
 }
 
+std::optional<valueLookup::SignalValueLookup::ptr> SymbolTable::createBackupOfValueOfSignal(const std::string_view& literalIdent) const {
+    if (const auto& symbolTableEntryForLiteral = getEntryForVariable(literalIdent); symbolTableEntryForLiteral != nullptr) {
+        if (symbolTableEntryForLiteral->optionalValueLookup.has_value()) {
+            return std::make_optional((*symbolTableEntryForLiteral->optionalValueLookup)->clone());
+        }
+    }
+    return std::nullopt;
+}
+
+void SymbolTable::restoreValuesFromBackup(const std::string_view& literalIdent, const valueLookup::SignalValueLookup::ptr& newValues) const {
+    if (const auto& symbolTableEntryForLiteral = getEntryForVariable(literalIdent); symbolTableEntryForLiteral != nullptr) {
+        if (symbolTableEntryForLiteral->optionalValueLookup.has_value()) {
+            auto& currentValueOfLiteral = *symbolTableEntryForLiteral->optionalValueLookup;
+
+            const auto& accessedDimensions = std::vector<std::optional<unsigned int>>(currentValueOfLiteral->getSignalInformation().valuesPerDimension.size(), std::nullopt);
+            
+            currentValueOfLiteral->copyRestrictionsAndUnrestrictedValuesFrom(
+                accessedDimensions,
+                std::nullopt,
+                accessedDimensions,
+                std::nullopt,
+                *newValues
+            );
+        }
+    }
+}
+
+
 SymbolTable::ModuleSymbolTableEntry* SymbolTable::getEntryForModulesWithMatchingName(const std::string_view& moduleIdent) const {
     const auto& symbolTableEntryForModule = modules.find(moduleIdent);
     

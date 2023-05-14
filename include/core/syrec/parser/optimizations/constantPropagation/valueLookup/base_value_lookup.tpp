@@ -601,6 +601,57 @@ void BaseValueLookup<Vt>::copyRelativeDimensionAccess(const unsigned int offsetT
     }
 }
 
+/*
+ * TODO: CONSTANT_PROPAGATION: Handling of errors (i.e. alternatives do not access same signals)
+ */
+template<typename Vt>
+void BaseValueLookup<Vt>::copyRestrictionsAndMergeValuesFromAlternatives(const BaseValueLookup<Vt>::ptr& alternativeOne, const BaseValueLookup<Vt>::ptr& alternativeTwo) {
+    std::vector<std::optional<unsigned int>> dimensionAccess = std::vector<std::optional<unsigned int>>(signalInformation.valuesPerDimension.size(), std::nullopt);
+    applyToBitsOfLastLayer(
+        {},
+        std::nullopt,
+        [&dimensionAccess, &alternativeOne, &alternativeTwo, this](const std::vector<unsigned int>& relativeDimensionAccess, unsigned int relativeBitIdx) {
+            copyRelativeDimensionAccess(0, dimensionAccess, relativeDimensionAccess);
+            const auto& accessedBitRange(std::pair(relativeBitIdx, relativeBitIdx));
+            const auto& valueForBitInFirstAlternative = alternativeOne->tryFetchValueFor(dimensionAccess, accessedBitRange);
+            const auto& valueForBitInSecondAlternative = alternativeTwo->tryFetchValueFor(dimensionAccess, accessedBitRange);
+
+            if ((!valueForBitInFirstAlternative.has_value() || !valueForBitInSecondAlternative.has_value())
+                || *valueForBitInFirstAlternative != *valueForBitInSecondAlternative) {
+                invalidateStoredValueForBitrange(dimensionAccess, accessedBitRange);                
+            }
+            else {
+                updateStoredValueFor(dimensionAccess, accessedBitRange, *valueForBitInFirstAlternative);
+            }
+        }
+    );
+}
+
+template<typename Vt>
+void BaseValueLookup<Vt>::copyRestrictionsAndInvalidateChangedValuesFrom(const BaseValueLookup::ptr& other) {
+    std::vector<std::optional<unsigned int>> dimensionAccess = std::vector<std::optional<unsigned int>>(signalInformation.valuesPerDimension.size(), std::nullopt);
+    applyToBitsOfLastLayer(
+        {},
+        std::nullopt,
+        [&dimensionAccess, &other, this](const std::vector<unsigned int>& relativeDimensionAccess, unsigned int relativeBitIdx) {
+            copyRelativeDimensionAccess(0, dimensionAccess, relativeDimensionAccess);
+            const auto& accessedBitRange(std::pair(relativeBitIdx, relativeBitIdx));
+            const auto& currentValueOfBit = tryFetchValueFor(dimensionAccess, accessedBitRange);
+            const auto& valueOfBitInOtherValueLookup = other->tryFetchValueFor(dimensionAccess, accessedBitRange);
+
+            if (valueOfBitInOtherValueLookup.has_value()) {
+                if (currentValueOfBit.has_value() && *valueOfBitInOtherValueLookup != *currentValueOfBit) {
+                    invalidateStoredValueForBitrange(dimensionAccess, accessedBitRange);                
+                }
+            }
+            else {
+                invalidateStoredValueForBitrange(dimensionAccess, accessedBitRange);                
+            }
+        }
+    );
+}
+
+
 template<typename Vt>
 void BaseValueLookup<Vt>::copyRestrictionsAndUnrestrictedValuesFrom(
   const std::vector<std::optional<unsigned int>>&                                accessedDimensionsOfLhsAssignmentOperand,
