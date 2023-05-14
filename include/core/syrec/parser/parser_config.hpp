@@ -9,7 +9,7 @@ namespace parser {
         bool         supportBroadcastingExpressionOperands;
         bool         supportBroadcastingAssignmentOperands;
         bool         reassociateExpressionsEnabled;
-        bool         isRemovalOfUnusedVariablesAndModulesEnabled;
+        bool         deadCodeEliminationEnabled;
         bool         performConstantPropagation;
         bool         noAdditionalLineOptimizationEnabled;
         std::string  expectedMainModuleName;
@@ -27,7 +27,7 @@ namespace parser {
                 supportBroadcastingExpressionOperands(supportBroadcastingExpressionOperands),
                 supportBroadcastingAssignmentOperands(supportBroadcastingAssignmentOperands),
                 reassociateExpressionsEnabled(reassociateExpressionEnabled),
-                isRemovalOfUnusedVariablesAndModulesEnabled(isRemovalOfUnusedVariablesAndModulesEnabled),
+                deadCodeEliminationEnabled(isRemovalOfUnusedVariablesAndModulesEnabled),
                 performConstantPropagation(performConstantPropagation),
                 noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
                 expectedMainModuleName(std::move(expectedMainModuleName))
@@ -39,7 +39,7 @@ namespace parser {
             supportBroadcastingExpressionOperands = copy.supportBroadcastingExpressionOperands;
             supportBroadcastingAssignmentOperands = copy.supportBroadcastingAssignmentOperands;
             reassociateExpressionsEnabled         = copy.reassociateExpressionsEnabled;
-            isRemovalOfUnusedVariablesAndModulesEnabled = copy.isRemovalOfUnusedVariablesAndModulesEnabled;
+            deadCodeEliminationEnabled = copy.deadCodeEliminationEnabled;
             performConstantPropagation                  = copy.performConstantPropagation;
             noAdditionalLineOptimizationEnabled         = copy.noAdditionalLineOptimizationEnabled;
             expectedMainModuleName                      = copy.expectedMainModuleName;

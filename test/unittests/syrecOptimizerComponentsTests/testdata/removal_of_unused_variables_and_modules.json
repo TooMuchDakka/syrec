@@ -1,23 +1,23 @@
 {
   "testRemovalOfUnusedInParameter": {
-    "circuit": "module main(in a(16), out b(16)) b += 0",
-    "expectedCircuit": "module main(out b(16)) b += 0"
+    "circuit": "module main(in a(16), out b(16)) b += 2",
+    "expectedCircuit": "module main(out b(16)) b += 2"
   },
   "testRemovalOfUnusedOutParameter": {
-    "circuit": "module main(out a(16), out b(16)) b += 0",
-    "expectedCircuit": "module main(out b(16)) b += 0"
+    "circuit": "module main(out a(16), out b(16)) b += 2",
+    "expectedCircuit": "module main(out b(16)) b += 2"
   },
   "testRemovalOfUnusedInoutParameter": {
-    "circuit": "module main(inout a(16), out b(16)) b += 0",
-    "expectedCircuit": "module main(out b(16)) b += 0"
+    "circuit": "module main(inout a(16), out b(16)) b += 2",
+    "expectedCircuit": "module main(out b(16)) b += 2"
   },
   "testRemovalOfUnusedWireLocal": {
-    "circuit": "module main(out b(16)) wire a(16) b += 0",
-    "expectedCircuit": "module main(out b(16)) b += 0"
+    "circuit": "module main(out b(16)) wire a(16) b += 2",
+    "expectedCircuit": "module main(out b(16)) b += 2"
   },
   "testRemovalOfUnusedStateLocal": {
-    "circuit": "module main(out b(16)) state a(16) b += 0",
-    "expectedCircuit": "module main(out b(16)) b += 0"
+    "circuit": "module main(out b(16)) state a(16) b += 2",
+    "expectedCircuit": "module main(out b(16)) b += 2"
   },
   "testRemovalOfUnusedModule": {
     "circuit": "module double(in a(16), out b(16)) b += (a << 1) module main(out b(16)) b += 1",
@@ -34,5 +34,21 @@
   "testAttemptedRemovalOfTopLevelModuleWillNotBeDoneWhenDeclaringMultipleModules": {
     "circuit": "module main(out b(16)) b += 1 module test(in a(16)) skip",
     "expectedCircuit": "module main(out b(16)) b += 1"
+  },
+  "testElseBranchRemovedIfGuardConditionEvaluatesToValueLargerThanZero": {
+    "circuit": "module main(out b(16), in a(16), in c(16)) if (#b = #a) then b += 10; b += c else b += a; b += 2 fi (#b = #a)",
+    "expectedCircuit": "module main(out b(16), in c(16)) b += 10; b += c"
+  },
+  "testVariablesOnlyUsedInFalseBranchOfIfStatementWillBeRemovedIfFalseBranchIsDeleted": {
+    "circuit": "module main(out b(16), in a(16), out c(16), out d(16)) if (#b != #a) then c += a; skip else d += a; skip fi (#b != #a)",
+    "expectedCircuit": "module main(in a(16), out d(16)) d += a; skip"
+  },
+  "testIfBranchRemovedIfGuardConditionEvaluatesToValueSmallerOrEqualToZero": {
+    "circuit": "module main(out b(16), in a(16), in c(16)) if (#b != #a) then b += 10; b += c else b += a; b += 2 fi (#b != #a)",
+    "expectedCircuit": "module main(out b(16), in a(16)) b += a; b += 2"
+  },
+  "testVariablesOnlyUsedInTrueBranchOfIfStatementWillBeRemovedIfTrueBranchIsDeleted": {
+    "circuit": "module main(out b(16), in a(16), out c(16), out d(16)) if (#b = #a) then c += a; skip else d += a; skip fi (#b = #a)",
+    "expectedCircuit": "module main(in a(16), out c(16)) c += a; skip"
   }
 }

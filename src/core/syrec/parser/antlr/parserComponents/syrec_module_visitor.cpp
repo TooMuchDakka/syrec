@@ -42,7 +42,7 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
     
     const auto& nameOfTopLevelModule = determineExpectedNameOfTopLevelModule();
     // TODO: UNUSED_REFERENCE - Marked as used
-    if (sharedData->parserConfig->isRemovalOfUnusedVariablesAndModulesEnabled) {
+    if (sharedData->parserConfig->deadCodeEliminationEnabled) {
         removeUnusedModules(nameOfTopLevelModule);
         removeModulesWithoutParameters(nameOfTopLevelModule);
     }
@@ -81,7 +81,7 @@ std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
     isDeclaredModuleValid &= validUserDefinedModuleStatements.has_value() && !validUserDefinedModuleStatements->empty();
 
     // TODO: UNUSED_REFERENCE - Marked as used
-    if (isDeclaredModuleValid && sharedData->parserConfig->isRemovalOfUnusedVariablesAndModulesEnabled) {
+    if (isDeclaredModuleValid && sharedData->parserConfig->deadCodeEliminationEnabled) {
         removeUnusedVariablesAndParametersFromModule(module);
     }
 

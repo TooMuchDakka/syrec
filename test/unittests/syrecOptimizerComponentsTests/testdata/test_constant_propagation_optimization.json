@@ -1,480 +1,472 @@
 {
   "updateOfBitsOfOutParameter": {
-    "circuit": "module main(in a(4), out b[2](4), inout c(4)) b[0].0 += 1; b[0].1 += 1; b[0].2 += 1; b[0].3 += 1; b[1].0 += b[0].0; b[1].1 += b[0].1; b[1].2 += b[0].2; b[1].2 += b[0].2; b[1].3 += b[0].3; c.0 += (b[0].0 + a.0); c.1 += (b[0].1 + a.0); c.2 += (b[0].2 + a.0); c.3 += (b[0].3 + a.0); c.0 += (b[1].0 + a.0); c.1 += (b[1].1 + a.0); c.2 += (b[1].2 + a.0); c.3 += (b[1].3 + a.0)",
-    "expectedCircuit": "module main(in a(4), out b[2](4), inout c(4)) b[0].0 += 1; b[0].1 += 1; b[0].2 += 1; b[0].3 += 1; b[1].0 += 1; b[1].1 += 1; b[1].2 += 1; b[1].2 += 1; b[1].3 += 1; c.0 += (1 + a.0); c.1 += (1 + a.0); c.2 += (1 + a.0); c.3 += (1 + a.0); c.0 += (1 + a.0); c.1 += (1 + a.0); c.2 += (1 + a.0); c.3 += (1 + a.0)"
+    "circuit": "module main(in a(4), out b[2](4), inout c(4)) b[0].0 += 1; b[0].1 += 1; b[0].2 += 1; b[0].3 += 1; b[1].0 += 0; b[1].1 += 0; b[1].2 += 0; b[1].3 += 0; b[1].0 += b[0].0; b[1].1 += b[0].1; b[1].2 += b[0].2; b[1].3 += b[0].3; b[0].1 += a.0; b[0].2 += a.1; c.0 += (b[0].0 + a.0); c.1 += (b[0].1 + a.0); c.2 += (b[0].2 + a.0); c.3 += (b[0].3 + a.0); c.0 += (b[1].0 + a.0); c.1 += (b[1].1 + a.0); c.2 += (b[1].2 + a.0); c.3 += (b[1].3 + a.0)",
+    "expectedCircuit": "module main(in a(4), out b[2](4), inout c(4)) b[0].0 += 1; b[0].1 += 1; b[0].2 += 1; b[0].3 += 1; b[1].0 += 0; b[1].1 += 0; b[1].2 += 0; b[1].3 += 0; b[1].0 += 1; b[1].1 += 1; b[1].2 += 1; b[1].3 += 1; b[0].1 += a.0; b[0].2 += a.1; c.0 += (1 + a.0); c.1 += (b[0].1 + a.0); c.2 += (b[0].2 + a.0); c.3 += (1 + a.0); c.0 += (1 + a.0); c.1 += (1 + a.0); c.2 += (1 + a.0); c.3 += (1 + a.0)"
   },
-  "updateOfBitsOfWireLocal": {
+  "updateOfBitRangesOfOutParameter": {
+    "circuit": "module main(in a(4), out b[2](4), inout c(21)) b[0].0:0 += 1; b[0].1:3 += 4; b[1].0:3 += 6; b[1].0 += a.3; b[1].3 += a.0; c.0:1 += b[0].0:1; c.2:3 += b[0].1:2; c.4:5 += b[0].2:3; c.6:7 += b[1].0:1; c.8:9 += b[1].1:2; c.9:10 += b[1].2:3; c.11:15 += b[0]; c.16:20 += b[1]",
+    "expectedCircuit": "module main(in a(4), out b[2](4), inout c(21)) b[0].0:0 += 1; b[0].1:3 += 4; b[1].0:3 += 6; b[1].0 += a.3; b[1].3 += a.0; c.0:1 += 1; c.2:3 += 0; c.4:5 += 2; c.6:7 += b[1].0:1; c.8:9 += 3; c.9:10 += b[1].2:3; c.11:15 += 9; c.16:20 += b[1]"
+  },
+  "updateOfValueOfDimensionOfOutParameter": {
+    "circuit": "module main(in a(4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; c[0] += b[0]; c[1] += b[1]; b[0] += a; b[1] += a; c[0] += b[0]; c[1] += b[1]",
+    "expectedCircuit": "module main(in a(4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; c[0] += 9; c[1] += 6; b[0] += a; b[1] += a; c[0] += b[0]; c[1] += b[1]"
+  },
+
+  "updateBitsOf1DSignalWithOmittedDimensionAccessIsOk": {
+    "circuit": "module alu( out x0(2), out x1(2), out x2(2), out x3(2),out x4(2), out x5(2), out x6(2), out x7(2), out x8(2), out x9(2), out x10(2), out x11(2), out x12(2), out x13(2), out x14(2), out x15(2), out x16(2)) x0 ^= ( 1 + 1 ); x1 ^= ( 1 - 1 ); x2 ^= ( 1 * 1 ); x3 ^= ( 1 / 1 ); x4 ^= ( 1 % 1 ); x5 ^= ( 1 && 0 ); x6 ^= ( 1 || 1 ); x7 ^= ( 1 & 1 ); x8 ^= ( 2 | 1 ); x9 ^= ( 1 > 2 ); x10 ^= ( 1 < 2 ); x11 ^= ( 1 >= 1 ); x12 ^= ( 2 <= 1 ); x13 ^= ( 1 = 1 ); x14 ^= ( 2 != 1 ); x15 ^= (2 >> 1); x16 ^= (1 << 1)",
+    "expectedCircuit": ""
+  },
+  "updateBitRangesOf1DSignalWithOmittedDimensionAccessIsOk": {
+    "circuit": "module sk(out a(2),out b(2),out c(2),out d(2),out e(2),out f(1),inout x1(2), inout x2(2)) a ^= ((x1 + 2)+(2 + 2)); b ^= ((x1 + 2)-(x2 + 2)); c ^= ((x1 + 2)*(x2 + 2)); d ^= ((x1 + 2)/(x2 + 2)); e ^= ((x1 + 2)%(x2 + 2)); f ^= ((x1 + 2)&&(x2 + 2))",
+    "expectedCircuit": ""
+  },
+  "updateComplete1DSignalWithOmittedDimensionAccessIsOk": {
     "circuit": "",
-    "expectedCircuit": "bla"
-  },
-  "updateBitRangeOfOutParameter": {
-    "circuit": "module main(in a(4), out b[2](4), inout c(4)) b[0].0:0 += 1; c.0 += b[0].0; c.0 += b[0].0:0; b[0].0:1 += 2; c.0:1 += b[0].0:1; b[0].0:2 += 5; c += b[0].0:2; b[0].1 += 1; c += b[0].0:2; b[0].2:3 += 2; b[0].1:2 += 1",
     "expectedCircuit": ""
   },
-  "updateValueOfDimensionOfOutParameter": {
-    "circuit": "module main(in a(4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; c[1] += b[1]; c[0] += b[0]; c[1] += b[1]; c[1] += b[0]",
-    "expectedCircuit": "module main(in a(4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; c[1] += 0; c[0] += 9; c[1] += 6; c[1] += 9"
-  },
-  "updateBitOfValueOfDimensionOfOutParameter": {
-    "circuit": "module main(out b[2](2), inout c[2](2)) b[0].0 += 1; b[0].1 += 0; c[0].0 += b[0].0; c[0].1 += b[0].1; c[1].0 += b[1].0; c[1].1 += b[1].1",
-    "expectedCircuit": "module main(out b[2](2), inout c[2](2)) b[0].0 += 1; b[0].1 += 0; c[0].0 += 1; c[0].1 += 0; c[1].0 += 0; c[1].1 += 0"
-  },
-  "updateBitRangeOfValueOfDimensionOfOutParameter": {
-    "circuit": "module main(out b[2](4), inout c[2](4)) b[0].1:2 += 3; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3",
-    "expectedCircuit": "module main(out b[2](4), inout c[2](4)) b[0].1:2 += 3; c[0].0 += b[0].0; c[0].1 += 1; c[0].2 += 1; c[0].3 += 0; c[1].0 += 0; c[1].1 += 0; c[1].2 += 0; c[1].3 += 0"
-  },
-  "updateBitOf1DSignalAndOmittingDimensionAccessStillUpdatesValue": {
-    "circuit": "module main(out b(4), inout c(4)) b.1 += 1; b.3 += 1; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3",
-    "expectedCircuit": "module main(out b(4), inout c(4)) b.1 += 1; b.3 += 1; c.0 += 0; c.1 += 1; c.2 += 0; c.3 += 1"
-  },
-  "updateBitRangeOf1DSignalAndOmittingDimensionAccessStillUpdatesValue": {
-    "circuit": "module main(out b(4), inout c(4)) b.1:2 += 3; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3",
-    "expectedCircuit": "module main(out b(4), inout c(4)) b.1:2 += 3; c.0 += 0; c.1 += 1; c.2 += 1; c.3 += 0"
-  },
-  "updatingFullSignalOnlyWorksFor1DSignals": {
-    "circuit": "module main(out b(4), inout c(4)) b += 9; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c += b",
-    "expectedCircuit": "module main(out b(4), inout c(4)) b += 9; c.0 += 1; c.1 += 0; c.2 += 0; c.3 += 1; c += 9"
-  },
-  "overwritePreviouslyWrittenBitsByWritingNewValueToBitRange": {
-    "circuit": "module main(in a(4), out b[2](4), inout c[2](4)) b[0].0 += 1; b[0].2 += 1; c[0] += b[0]; b[1].1 += 1; b[1].3 += 1; c[1] += b[1]; b[0] += 17; c[0] += 11; c[1] += c[0]; c[0] += b[0]",
-    "expectedCircuit": "module main(in a(4), out b[2](4), inout c[2](4))"
-  },
-  "assigningUnknownValueToBitDestroysValue": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b.0 += a.0; b.3 += a.3; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b.0 += a.0; b.3 += a.3; c.0 += b.0; c.1 += 0; c.2 += 0; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += 0; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningUnknownValueToBitrangeDestroysValueForOverlappingBitsAndBitRangesAndDisablesValueForValueOfDimension": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b.1:2 += a.1:2; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b.1:2 += a.1:2; c.0 += 0; c.1 += b.1; c.2 += b.2; c.3 += 0; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningUnknownValueToValueOfDimensionDestroysAllValueForValueOfDimension": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += a[0]; b.3 += a.3; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b.0 += a.0; b.3 += a.3; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningValueToUnknownBitOfSignalDestroysAllsValuesForSignal": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningValueToUnknownBitOfValueOfSignalDestroysAllsValuesForValueOfDimensionForSignal": {
-    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; for $i = 0 to 1 step 1 do b[0].$i += 0 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; for $i = 0 to 1 step 1 do b[0].$i += 0 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += 0; c[1].1 += 0; c[1].2 += 0; c[1].3 += 0; c[1].0:1 += 0; c[1].0:2 += 0; c[1].0:3 += 0; c[1].1:2 += 0; c[1].1:3 += 0; c[1].2:3 += 0; c[0] += b[0]; c[1] += 0; c += b"
-  },
-  "assigningUnknownValueToUnknownBitOfSignalDestroysAllValuesForValueOfDimension": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i += a.0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i += a.0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningUnknownValueToBitRangeWithUnknownStartOfValueOfSignalDestroyAllValuesForValueOfDimension": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i:0 += a.$i:0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.$i:0 += a.$i:0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningUnknownValueToBitRangeWithUnknownEndOfValueOfSignalDestroyAllValuesForValueOfDimension": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.0:$i += a.0:$i rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b[0] += 9; for $i = 0 to 1 step 1 do b.0:$i += a.0:$i rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningUnknownValueToUnknownValueOfDimensionDestroysAllValuesForAllValuesOfDimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; for $i = 0 to 1 step 1 do b[$i] += a rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; for $i = 0 to 1 step 1 do b[$i] += a rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b"
-  },
-  "assigningValueToBitOfUnknownValueOfDimensionDestroysBitValueForAllValuesDimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].0 += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].0 += 1 rof; c[0].0 += b[0].0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 1; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += 0; c[0].1:3 += 4; c[0].2:3 += 2; c[1].0 += 0; c[1].1 += 1; c[1].2 += 1; c[1].3 += 0; c[1].0:1 += 2; c[1].0:2 += b[1].6; c[1].0:3 += 6; c[1].1:2 += 3; c[1].1:3 += 3; c[1].2:3 += 1; c[0] += b[0]; c[1] += 6; c += b"
-  },
-  "assigningValueToBitRangeOfUnknownValueOfDimensionDestroysValueForBitRangeForAllValuesDimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].1:2 += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].1:2 += 1 rof; c[0].0 += 0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += 0; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += 0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += 0; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b"
-  },
-  "assigningValueToBitRangeWithUnknownStartOfUnknownValueOfDimensionDestroysAllValuesForAllValuesOfDimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].$i:2 += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].$i:2 += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b"
-  },
-  "assigningValueToBitRangeWithUnknownEndOfUnknownValueOfDimensionDestroysAllValuesForAllValuesOfDimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].0:$i += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), inout c[2](4)) b[0] += 9; b[1] += 6; for $i = 0 to 1 step 1 do b[$i].0:$i += 1 rof; c[0].0 += b[0].0; c[0].1 += b[0].1; c[0].2 += b[0].2; c[0].3 += b[0].3; c[0].0:1 += b[0].0:1; c[0].0:2 += b[0].0:2; c[0].0:3 += b[0].0:3; c[0].1:2 += b[0].1:2; c[0].1:3 += b[0].1:3; c[0].2:3 += b[0].2:3; c[1].0 += b[1].0; c[1].1 += b[1].1; c[1].2 += b[1].2; c[1].3 += b[1].3; c[1].0:1 += b[1].0:1; c[1].0:2 += b[1].0:2; c[1].0:3 += b[1].0:3; c[1].1:2 += b[1].1:2; c[1].1:3 += b[1].1:3; c[1].2:3 += b[1].2:3; c[0] += b[0]; c[1] += b[1]; c += b"
-  },
 
-  "assigningUnknownValueToWholeSignalDestroysAllValuesFor1DSignal": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b += a; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:1; c.0:3 += b.0:3; c.1:2 += b.1:2; c.1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b += a; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:1; c.0:3 += b.0:3; c.1:2 += b.1:2; c.1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningValueToUnknownGlobalBitDestroysAllValuesFor1DSignal": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningValueToGlobalBitRangeWithUnknownEndOfWholeSignalDestroysAllValuesFor1DSignal": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.2:$i += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i.2 += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-  "assigningValueToGlobalBitRangeWithUnknownStartOfWholeSignalDestroysAllValuesFor1DSignal": {
-    "circuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i.2 += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b",
-    "expectedCircuit": "module main(in a(4), out b(4), inout c(4)) b += 9; for $i = 0 to 1 step 1 do b.$i.2 += 0 rof; c.0 += b.0; c.1 += b.1; c.2 += b.2; c.3 += b.3; c.0:1 += b.0:1; c.0:2 += b.0:2; c.0:3 += b.0:3; c.1:2 += b.1:2; c:1:3 += b.1:3; c.2:3 += b.2:3; c[0] += b[0]; c += b"
-  },
-
-
-  "assigningMaximumValueStorableInBitPlusOneWrapsAroundCorrectly": {
-    "circuit": "module main(out b(4), out c[2](4)) b.0 += 2; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3 c[1] += b",
-    "expectedCircuit": "module main(out b(4), out c[2](4)) b.0 += 2; c[0].0 += 1; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1] += 1"
-  },
-  "assigningTooLargeValueToBitOverflowsCorrectly": {
-    "circuit": "module main(out b(4), out c[2](4)) b.0 += 4; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3 c[1] += b",
-    "expectedCircuit": "module main(out b(4), out c[2](4)) b.0 += 4; c[0].0 += 0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1] += 0"
-  },
-  "assigningMaximumValueStorableInBitRangePlusOneWrapsAroundCorrectly": {
-    "circuit": "module main(out b(4), out c[3](4)) b.1:2 += 4; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
-    "expectedCircuit": "module main(out b(4), out c[3](4)) b.1:2 += 4; c[0].0 += 0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1].0:1 += 0; c[1].0:2 += 0; c[1].0:3 += 0; c[1].1:2 += 0; c[1].1:3 += 0; c[1].2:3 += 0; c[2] += 0"
-  },
-  "assigningTooLargeValueToBitRangeOverflowsCorrectly": {
-    "circuit": "module main(out b(4), out c[3](4)) b.1:2 += 7; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
-    "expectedCircuit": "module main(out b(4), out c[3](4)) b.1:2 += 7; c[0].0 += 0; c[0].1 += 1; c[0].2 += 1; c[0].3 += 0; c[1].0:1 += 2; c[1].0:2 += 6; c[1].0:3 += 6; c[1].1:2 += 3; c[1].1:3 += 3; c[1].2:3 += 1; c[2] += 6"
-  },
-  "assigningMaximumValueStorableInValueOfDimensionPlusOneWrapsAroundCorrectly": {
-    "circuit": "module main(out b(4), out c[3](4)) b[0] += 16; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
-    "expectedCircuit": "module main(out b(4), out c[3](4)) b.1:2 += 16; c[0].0 += 0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1].0:1 += 0; c[1].0:2 += 0; c[1].0:3 += 0; c[1].1:2 += 0; c[1].1:3 += 0; c[1].2:3 += 0; c[2] += 0"
-  },
-  "assigningTooLargeValueToValueOfDimensionOverflowsCorrectly": {
-    "circuit": "module main(out b(4), out c[2](4)) b[0] += 16; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
-    "expectedCircuit": "module main(out b(4), out c[2](4)) b[0] += 16; c[0].0 += 0; c[0].1 += 0; c[0].2 += 0; c[0].3 += 0; c[1].0:1 += 0; c[1].0:2 += 0; c[1].0:3 += 0; c[1].1:2 += 0; c[1].1:3 += 0; c[1].2:3 += 0; c[2] += 0"
-  },
-  "assingingTooLargeValueToWholeSignalFor1DSignalOverflowsCorrectly": {
-    "circuit": "module main(out b(4), out c[2](4)) b[0] += 18; c[0].0 += b.0; c[0].1 += b.1; c[0].2 += b.2; c[0].3 += b.3; c[1].0:1 += b.0:1; c[1].0:2 += b.0:2; c[1].0:3 += b.0:3; c[1].1:2 += b.1:2; c[1].1:3 += b.1:3; c[1].2:3 += b.2:3; c[2] += b",
-    "expectedCircuit": "module main(out b(4), out c[2](4)) b[0] += 18; c[0].0 += 0; c[0].1 += 1; c[0].2 += 0; c[0].3 += 0; c[1].0:1 += 2; c[1].0:2 += 2; c[1].0:3 += 2; c[1].1:2 += 1; c[1].1:3 += 1; c[1].2:3 += 0; c[2] += 2"
-  },
-
-
-  "assigningValueToNotFullySpecifiedValueOfDimensionDestroysValuesInSubsequentDimensions": {
-    "circuit": "TEST both assigning unknown value (i.e. another readonly signal) and a concrete value, either a constant or an optimized signal access for all subsequent tests"
-  },
-  "assigningValueToBitOfNotFullySpecifiedOnAccessOnValueOfDimensionDestroysValuesInSubsequentDimensions": {
-
-  },
-  "assigningValueToUnknownBitOfNotFullySpecifiedOnAccessOnValueOfDimensionDestroysValuesInSubsequentDimensions": {
-
-  },
-  "assigningValueToBitRangeOfNotFullySpecifiedAcessOnValueOfDimensionDestroysValuesInSubsequentDimensions": {
-
-  },
-  "assigningValueToUnknownBitRangeOfNotFullySpecifiedAcessOnValueOfDimensionDestroysValuesInSubsequentDimensions": {
-
-  },
-
-  "assigningValueToNotFullySpecifiedUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
-
-  },
-  "assigningValueToBitOfNotFullySpecifiedAccessOnUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
-
-  },
-  "assigningValueToUnknownBitOfNotFullySpecifiedAccessOnUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
-
-  },
-  "assigningValueToBitRangeOfNotFullySpecifiedAcessOnUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
-
-  },
-  "assigningValueToUnknownBitRangeOfNotFullySpecifiedAcessOnUnknownValueOfDimensionDestroysValuesInSubsequentDimensions": {
-
-  },
-
-  "liftRestrictionFromCompletelyBlockedSignalByUnblockingWholeSignal": {
-    "circuit": "module main(in a[2](16), out b[2](16), out c[2](16), out d[2](16)) b += a; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](16), out b[2](16), out c[2](16), out d[2](16)) b += a; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromCompletelyBlockedSignalByUnblockingGlobalBit": {
-    "circuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b += a; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; d[0].0 += b[0].0; d[0].1 += b[0].1; d[1].0 += b[1].0; d[1].1 += b[1].1",
-    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b += a; d[0] += b[0]; d[1] += b[1]; b.0 += 0; d[0].0 += 0; d[0].1 += b[0].1; d[1].0 += 0; d[1].1 += b[1].1"
-  },
-  "liftRestrictionFromCompletelyBlockedSignalByUnblockingGlobalBitRange": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b += a; d[0] += b[0]; d[1] += b[1]; b.1:2 += c.1:2; d[0].0 += b[0].0; d[0].1 += b[0].1; d[1].0 += b[1].0; d[1].1 += b[1].1; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b += a; d[0] += b[0]; d[1] += b[1]; b.0 += 0; d[0].0 += b[0].0; d[0].1 += 0; d[1].0 += b[1].0; d[1].1 += b[1].1; d[0] += b[0]; d[1] += b[1]"
-  },
-  "liftRestrictionFromCompletelyBlockedSignalByUnblockingValueOfLastDimension": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b += a; d[0] += b[0]; d[1] += b[1]; b[1] += c[0]; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b += a; d[0] += b[0]; d[1] += b[1]; b[1] += c[0]; d[0] += 0; d[1] += b[1]"
-  },
-  "liftRestrictionFromCompletelyBlockedSignalByUnblockingValueOfIntermediateDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b += a; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0][1] += c[0][0]; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b += a; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0][1] += c[0][0]; d[0][0] += b[0][0]; d[0][1] += 0"
-  },
-  "liftRestrictionFromCompletelyBlockedSignalByUnblockingWholeDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b += a; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0][1] += c[0][0]; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b += a; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0] += 0; d[0][1] += 0"
-  },
-  "liftRestrictionFromCompletelyBlockedSignalByUnblockingBitOfMultipleDimensions": {
-    "circuit": "This should not work but instead destroy both signal values"
-  },
-  "liftRestrictionFromCompletelyBlockedSignalByUnblockingBitRangeOfMultipleDimensions": {
-    "circuit": "This should not work but instead destroy both signal values"
-  },
-  "liftRestrictionFromCompletelyBlockedSignalByUnblockingValueOfDimensionForMultipleDimensions": {
-    "circuit": "This should not work but instead destroy both signal values"
-  },
-
-  "liftRestrictionFromGloballyBlockedBitByUnblockingWholeSignal": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromGloballyBlockedBitByUnblockingAnyOtherBitGloballyLeavesRestrictionUnchanged": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b.1 += c.1; b.2 += c.2; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b.1 += c.1; b.2 += c.2; d[0] += b[0]; d[1] += b[1]"
-  },
-  "liftRestrictionFromGloballyBlockedBitByUnblockingSameBitGlobally": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromGloballyBlockedBitByUnblockingBitInSubdimensionOnlyLiftsRestrictionForSubdimension": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b[0].0 += c[0].0; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0 += a.0; d[0] += b[0]; d[1] += b[1]; b[0].0 += c[0].0; d[0] += b[0]; d[1] += b[1]"
-  },
-
-  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingWholeSignal": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b.0:2 += a.0:2; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b += a; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingNonOverlappingBitRangeGloballyLeavesRestrictionUnchanged": {
-    "circuit": "module main(in a[2](5), out b[2](5), out c[2](5), out d[2](5)) b.1:2 += a.0:1; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; b.3:5 += c.0:2 d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](5), out b[2](5), out c[2](5), out d[2](5)) b.1:2 += a.0:1; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; b.3:5 += c.0:2 d[0] += b[0]; d[1] += b[1]"
-  },
-  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingMultipleOverlappingGlobalBitRanges": {
-    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; b.2:3 += c.0:1 d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b.0:1 += 0; b.2:3 += 0; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingValueOfSubdimensionLeavesRestrictionForOtherValuesOfDimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b[0] += c[0]; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b[0] += 0; d[0] += 0; d[1] += b[1]"
-  },
-  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingOneBitOfValueOfSubdimensionLeavesRestrictionForRemainingBitRangeAndLiftsOnlyForUnblockedBitForValueOfDimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b[0].0 += c[0].0; d[0] += b[0]; d[1] += b[1]; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.0:3 += a.0:3; d[0] += b[0]; d[1] += b[1]; b[0].0 += 0; d[0] += b[0]; d[1] += b[1]; d[0].0 += 0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3"
-  },
-  "liftRestrictionFromGloballyBlockedBitRangeByUnblockingOverlappingBitRangeOfValueOfSubdimensionLeavesNonOverlappedBitsGloballyRestrictedAndLiftsItForOverlappingOnesInSubdimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.1:3 += a.1:3; d[0] += b[0]; d[1] += b[1]; b[0].0:2 += c[0].0:2; d[0] += b[0]; d[1] += b[1]; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b.1:3 += a.1:3; d[0] += b[0]; d[1] += b[1]; b[0].0:2 += 0; d[0] += b[0]; d[1] += b[1]; d[0].0 += 0; d[0].1 += 0; d[0].2 += 0; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3"
-  },
-
-  "liftRestrictionFromBlockedValueOfDimenisonByUnblockingWholeSignal": {
-    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitOfValueOfSameDimension": {
-    "circuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1 += c[0].0; d[0].0 += b[0].0; d[0].1 += b[0].1; d[1].0 += b[1].0; d[1].1 += b[1].1",
-    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1 += 0; d[0].0 += b[0].0; d[0].1 += 0; d[1].0 += 0; d[1].1 += 0"
-  },
-  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitRangeOfValueOfSameDimension": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1:2 += c[0].0:1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
-    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1 += 0; d[0].0 += b[0].0; d[0].1 += 0; d[0].2 += 0; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
-  },
-  "liftRestrictionFromBlockedValueOfDimensionByUnblockingWholeDimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitGlobally": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b.1 += c.0; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
-    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b.1 += c.0; d[0].0 += b[0].0; d[0].1 += 0; d[0].2 +=b[0].2; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
-  },
-  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitRangeGlobally": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1:2 += c[0].0:1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
-    "expectedCircuit": "module main(in a[2](2), out b[2](2), out c[2](2), out d[2](2)) b[0] += a[0]; d[0] += b[0]; d[1] += b[1]; b[0].1 += 0; d[0].0 += b[0].0; d[0].1 += 0; d[0].2 += 0; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
-  },
-  "liftRestrictionFromBlockedValueOfDimensionByUnblockingValueOfParentDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0].0 += 0; d[0][0].1 += 0; d[0][0].2 += 0; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
-  },
-  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitOfValueOfParentDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0 += c[0].0; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0 += c[0].0; d[0][0].0 += 0; d[0][0].1 += b[0][0].1; d[0][0].2 += d[0][0].2; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
-  },
-  "liftRestrictionFromBlockedValueOfDimensionByUnblockingBitRangeOfValueOfParentDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1:2 += c[0].1:2; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1] += a[0][1]; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0].0 += b[0][0].0; d[0][0].1 += 0; d[0][0].2 += 0; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
-  },
-
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingWholeSignal": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingGlobalBit": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingGlobalBitRange": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingWholeDimension": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitOfWholeBlockedDimension": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitRangeOfWholeBlockedDimension": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingValueOfBlockedDimension": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitOfValueOfBlockedDimension": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitRangeOfValueOfBlockedDimension": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingWholeParentDimension": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitOfWholeParentDimension": {
-
-  },
-  "liftRestrictionFromBlockedWholeDimensionByUnblockingBitRangeOfWholeParentDimension": {
-
-  },
-
-  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingWholeSignal": {
-
-  },
-  "liftRestrictionFromBLockedBitOfWholeDimensionByUnblockingBitGlobally": {
-
-  },
-  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitForValueOfDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockignBitRangeOfValueOfDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitForWholeDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitRangeForWholeDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitOfParentDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitOfWholeDimensionByUnblockingBitRangeOfParentDimension": {
-
-  },
-
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingWholeSignal": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitGlobally": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingOverlappingBitRangeGlobally": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingValueOfDimensionLiftsRestrictionForValueOfDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingWholeDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingParentDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitOfValueOfDimensionLiftsRestrictionForValueOfDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitOfWholeDimensionLiftsRestrictionForBitForWholeDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitInParentDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitRangeOfValueOfDimensionLiftsRestrictionForValueOfDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitRangeOfWholeDimensionLiftsRestrictionForBitForWholeDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfWholeDimensionByUnblockingBitRangeInParentDimension": {
-
-  },
-
-
-
-  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingWholeSignal": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += 0; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromBLockedBitOfValueOfDimensionByUnblockingBitGlobally": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b.0 += c.0; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += 0; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitForValueOfDimension": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b[0].0 += c[0].0; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += 0; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockignBitRangeOfValueOfDimension": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b[0].0:1 += c[0].0:1; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].0 += a[0].0; d[0] += b[0]; d[1] += b[1]; b += 0; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitForWholeDimension": {
-    "circuit": "TODO",
+  "updatePreviouslyWrittenBitValue": {
+    "circuit": "",
     "expectedCircuit": ""
   },
-  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitRangeForWholeDimension": {
-    "circuit": "TODO",
+  "updatePreviouslyWrittenBitRangeValue": {
+    "circuit": "",
     "expectedCircuit": ""
   },
-  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitOfParentDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][0].0 += a[0][0].0; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0 += c[0].0; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][0].0 += a[0][0].0; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0 += 0; d[0][0] += 0; d[0][1] += 0"
-  },
-  "liftRestrictionFromBlockedBitOfValueOfDimensionByUnblockingBitRangeOfParentDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][0].1 += a[0][0].1; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0:1 += c[0].0:1; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][0].0 += a[0][0].0; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].0:1 += 0; d[0][0] += 0; d[0][1] += 0"
+  "updatePreviouslyWrittenValueOfDimension": {
+    "circuit": "",
+    "expectedCircuit": ""
   },
 
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingWholeSignal": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
+  "updateGlobalBitValue": {
+    "circuit": "module main(out a[2](3), out b[2](3), out c[2](3)) b[0] += 5; b[1] += 2; a.0 += b.0; a.0 += b.1; a.0 += b.2; c[0].0 += a[0].0; c[0].1 += a[0].1; c[0].2 += a[0].2; c[1].0 += a[1].0; c[1].1 += a[1].1; c[1].2 += a[1].2",
+    "expectedCircuit": "module main(out a[2](3), out b[2](3), out c[2](3)) b[0] += 5; b[1] += 2; a.0 += b.0; a.0 += a.1; a.0 += b.2; c[0].0 += 1; c[0].1 += 0; c[0].2 += 1; c[1].0 += 0; c[1].1 += 1; c[1].2 += 0"
   },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitGlobally": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; d[0].0 += 0; d[0].1 += 0; d[0].2 += 0; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
+  "updateGlobalBitRangeValue": {
+    "circuit": "module main(out b[2](4), out c[2](4)) b[0].0:1 += 3; b[0].2:3 += 3; b[1].0 += 0; b[1].1:2 += 3; b[1].3 += 0; c.0:1 += b.2:3; c.2:3 += b.0:1; c.4 += b.4; c[0].0:1 += b[0].2:3; c[0].2:3 += b[0].0:1; c[1].0:4 += b[1].0:4",
+    "expectedCircuit": "module main(out b[2](4), out c[2](4)) b[0].0:1 += 3; b[0].2:3 += 3; b[1].0 += 0; b[1].1:2 += 3; b[1].3 += 0; c.0:1 += b.2:3; c.2:3 += b.0:1; c.4 += b.4; c[0].0:1 += 3; c[0].2:3 += 3; c[1].0:4 += 6"
   },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingOverlappingBitRangeGlobally": {
-    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3",
-    "expectedCircuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b.0:1 += c.0:1; d[0].0 += 0; d[0].1 += 0; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0; d[1].3 += 0"
-  },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingValueOfDimensionLiftsRestrictionForValueOfDimension": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b[0] += c[0]; d[0] += b[0]; d[1] += b[1]",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b += c; d[0] += 0; d[1] += 0"
-  },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingWholeDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingParentDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0] += b[0][0]; d[0][1] += b[0][1]",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0] += c[0]; d[0][0] += 0; d[0][1] += 0"
-  },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitOfValueOfDimensionLiftsRestrictionForValueOfDimension": {
-    "circuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b[0].1 += c[0].1; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b[0].1 += c[0].1 += c; d[0].0 += 0; d[0].1 += 0; d[0].2 += b[0].2; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0"
-  },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitOfWholeDimensionLiftsRestrictionForBitForWholeDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitInParentDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1 += c[0].1; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1 += c[0].1; d[0][0].0 += 0; d[0][0].1 += 0; d[0][0].2 += b[0][0].2; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
-  },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitRangeOfValueOfDimensionLiftsRestrictionForValueOfDimension": {
-    "circuit": "module main(in a[2](4), out b[2](4), out c[2](4), out d[2](4)) b[0].1:3 += a[0].1:3; d[0] += b[0]; d[1] += b[1]; b[0].1:2 += c[0].1:2; d[0].0 += b[0].0; d[0].1 += b[0].1; d[0].2 += b[0].2; d[0].3 += b[0].3; d[1].0 += b[1].0; d[1].1 += b[1].1; d[1].2 += b[1].2; d[1].3 += b[1].3",
-    "expectedCircuit": "module main(in a[2](3), out b[2](3), out c[2](3), out d[2](3)) b[0].1:2 += a[0].1:2; d[0] += b[0]; d[1] += b[1]; b[0].1 += c[0].1 += c; d[0].0 += 0; d[0].1 += 0; d[0].2 += 0; d[0].3 += b[0].3; d[1].0 += 0; d[1].1 += 0; d[1].2 += 0; d[1].3 += 0"
-  },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitRangeOfWholeDimensionLiftsRestrictionForBitForWholeDimension": {
-
-  },
-  "liftRestrictionFromBlockedBitRangeOfValueOfDimensionByUnblockingBitRangeInParentDimension": {
-    "circuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].0:3 += a[0][1].0:3; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1:2 += c[0].1:2; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2",
-    "expectedCircuit": "module main(in a[1][2](3), out b[1][2](3), out c[1][2](3), out d[1][2](3)) b[0][1].1:2 += a[0][1].1:2; d[0][0] += b[0][0]; d[0][1] += b[0][1]; b[0].1 += c[0].1; d[0][0].0 += b[0][0].0; d[0][0].1 += 0; d[0][0].2 += 0; d[0][1].0 += 0; d[0][1].1 += 0; d[0][1].2 += 0"
+  "updateValueOfDimension": {
+    "circuit": "module main(out b[2](4), out c[2](4)) b[0] += 6; b[1] += 9; c[0] += b[0]; c[1] += b[1]",
+    "expectedCircuit": "module main(out b[2](4), out c[2](4)) b[0] += 6; b[1] += 9; c[0] += 6; c[1] += 9"
   },
 
-  "swap statement tests TODO": {
+  "assigningValueToBitOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][3](4), out c[2][3](4), out d[2][3](4)) c[0][0] += 9; c[0][1] += 6; c[0][2] += 9; c[1][0] += 6; c[1][1] += 9; c[1][2] += 6; b[0].0 += c[0].0; b[1].3 += c[1].3; b.1:2 += c.1:2; d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][1] += b[0][1]; d[0][2] += b[0][2]; d[1][0] += b[1][0]; d[1][1] += b[1][1]; d[1][2] += b[1][2]",
+    "expectedCircuit": "module main(out b[2][3](4), out c[2][3](4), out d[2][3](4)) c[0][0] += 9; c[0][1] += 6; c[0][2] += 9; c[1][0] += 6; c[1][1] += 9; c[1][2] += 6; b[0].0 += c[0].0; b[1].3 += c[1].3; b.1:2 += c.1:2; d[0][0].0 += 1; d[0][0].1 += 0; d[0][0].2 += 0; d[0][0].3 += 0; d[0][1] += 6; d[0][2] += 1; d[1][0] += 8; d[1][1] += 6; d[1][2] += 8"
+  },
+  "assigningValueToBitRangeOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][3](4), out c[2][3](4), out d[2][3](4)) c[0][0] += 9; c[0][1] += 6; c[0][2] += 9; c[1][0] += 6; c[1][1] += 9; c[1][2] += 6; b[1].0:2 += c[1].0:2; b[0].0:2 += c[0].0:2; b[1].3:4 += c[1].3:4; b[0].3:4 += c[0].3:4; d[0][0] += b[0][0]; d[0][1] += b[0][1]; d[0][2] += b[0][2]; d[1][0] += b[1][0]; d[1][1] += b[1][1]; d[1][2] += b[1][2]",
+    "expectedCircuit": "module main(out b[2][3](4), out c[2][3](4), out d[2][3](4)) c[0][0] += 9; c[0][1] += 6; c[0][2] += 9; c[1][0] += 6; c[1][1] += 9; c[1][2] += 6; b[1].0:2 += c[1].0:2; b[0].0:2 += c[0].0:2; b[1].3:4 += c[1].3:4; b[0].3:4 += c[0].3:4; d[0][0] += 9; d[0][1] += 6; d[0][2] += 9; d[1][0] += 6; d[1][1] += 9; d[1][2] += 6"
+  },
+
+  "invalidateByAssignmentOfUnknownValueToGlobalBit": {
+    "circuit": "module main(out b[2][3](4), out c[2][3](4), in a[2][3](4)) b[0][0] += 6; b[0][1] += 9; b[0][2] += 6; b[1][0] += 9; b[1][1] += 6; b[1][2] += 9; b.0 += a.0; b[0].3 += a[1].2; b[1].3 += a[2].0; c[0][0] += b[0][0]; c[0][1] += b[0][1]; c[0][2] += b[0][2]; c[1][0].0:1 += b[0][0].0:1; c[1][0].2:3 += b[1][0]; c[1][1].0:4 += b[1][1]; c[1][2].0 += b[1][2].0; c[1][2].1 += b[1][2].1; c[1][2].2 += b[1][2].2; c[1][2].3 += b[1][2].3",
+    "expectedCircuit": "module main(out b[2][3](4), out c[2][3](4), in a[2][3](4)) b[0][0] += 6; b[0][1] += 9; b[0][2] += 6; b[1][0] += 9; b[1][1] += 6; b[1][2] += 9; b.0 += a.0; b[0].3 += a[1].2; b[1].3 += a[2].0; c[0][0] += b[0][0]; c[0][1] += b[0][1]; c[0][2] += b[0][2]; c[1][0].0:1 += b[0][0].0:1; c[1][0].2:3 += b[1][0]; c[1][1].0:4 += b[1][1]; c[1][2].0 += b[1][2].0; c[1][2].1 += 0; c[1][2].2 += 0; c[1][2].3 += b[1][2].3"
+  },
+  "invalidateByAssignmentOfUnknownValueToGlobalBitRange": {
+    "circuit": "module main(out b[2][3](4), out c[2][3](4), in a[2][3](4)) b[0][0] += 6; b[0][1] += 9; b[0][2] += 6; b[1][0] += 9; b[1][1] += 6; b[1][2] += 9; b.1:2 += a.0:1; b[0].0 += a[1].2; b[1].0 += a[2].0; c[0][0] += b[0][0]; c[0][1] += b[0][1]; c[0][2] += b[0][2]; c[1][0].0:1 += b[0][0].0:1; c[1][0].2:3 += b[1][0]; c[1][1].0:4 += b[1][1]; c[1][2].0 += b[1][2].0; c[1][2].1 += b[1][2].1; c[1][2].2 += b[1][2].2; c[1][2].3 += b[1][2].3",
+    "expectedCircuit": "module main(out b[2][3](4), out c[2][3](4), in a[2][3](4)) b[0][0] += 6; b[0][1] += 9; b[0][2] += 6; b[1][0] += 9; b[1][1] += 6; b[1][2] += 9; b.1:2 += a.0:1; b[0].0 += a[1].2; b[1].0 += a[2].0; c[0][0] += b[0][0]; c[0][1] += b[0][1]; c[0][2] += b[0][2]; c[1][0].0:1 += b[0][0].0:1; c[1][0].2:3 += b[1][0]; c[1][1].0:4 += b[1][1]; c[1][2].0 += b[1][2].0; c[1][2].1 += 0; c[1][2].2 += 0; c[1][2].3 += b[1][2].3"
+  },
+  "invalidateByAssignmentOfValueToUnknownGlobalBit": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 3 step 1 do c.$i += b.0 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]"
+  },
+  "invalidateByAssignmentOfValueToUnknownGlobalBitRangeDueToUnknownEndOfBitRange": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 3 step 1 do c.0:$i += b.0:2 rof d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]"
+  },
+  "invalidateByAssignmentOfValueToUnknownGlobalBitRangeDueToUnknownStartOfBitRange": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 3 step 1 do c.$i:3 += b.0:2 rof d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]"
+  },
+  "invalidateByAssignmentOfUnknownValueToBitOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), in a(1)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; b[0][0].0 += a; b[0][1].0 += a; b[1][0].0 += a; b[1][1].0 += a; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), in a(1)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 3 step 1 do b[0][0].$i += 1; b[0][1].$i += 1; b[1][0].$i += 1; b[1][1].$1 += 1 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfUnknownValueToBitRangeOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), in a(2)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; b[0][0].1:2 += a; b[0][1].1:2 += a; b[1][0].1:2 += a; b[1][1].1:2 += a; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitRangeDueToUnknownStartOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a(2)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 3 step 1 do b[0][0].$i:3 += a; b[0][1].$i:3 += a; b[1][0].$i:3 += a; b[1][1].$i:3 += a rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitRangeDueToUnknownEndOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a(2)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 3 step 1 do b[0][0].0:$i += a; b[0][1].0:$i += a; b[1][0].0:$i += a; b[1][1].0:$i += a rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfUnknownValueToValueOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a(4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; b[0][0] += a; b[0][1] += a; b[1][0] += a; b[1][1] += a; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownValueOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a(4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[0][$i] += 2; b[0][$i] += 2; b[1][$i] += 2; b[1][$i] += 2 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownValueOfIntermediateDimensionOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a(4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[$i][0] += 2 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitOfUnknownValueOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), in a(1)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[0][$i].$i += a rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitRangeDueToUnknownStartOfUnknownValueOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a(4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[$i][0].$i:3 += 2 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitRangeDueToUnknownEndOfUnknownValueOfFullDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a(4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[$i][0].0:$i += 2 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+
+  "invalidateByAssignmentOfUnknownValueToBitOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), in a[1][2](4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; b[0].0 += a.0; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a[1][2](4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[0].$i += a.0 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfUnknownValueToBitRangeOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), in a[1][2](2)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[0].1:3 += a rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitRangeDueToUnknownStartOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a[1][2](4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[0].$i:2 += a.0:2 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitRangeDueToUnknownEndOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a[1][2](4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[0].0:$i += a.0:2 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfUnknownValueToValueOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), in a[1][2](4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; b[0] += a rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownValueOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a[1][2](4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[$i] += a rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitOfUnknownValueOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a[1][2](4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[$i].$i += a.0 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitRangeDueToUnknownStartOfUnknownValueOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a[1][2](4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[$i].$i:2 += a.0:2 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "invalidateByAssignmentOfValueToUnknownBitRangeDueToUnknownEndOfUnknownValueOfPartialDimensionAccess": {
+    "circuit": "module main(out b[2][2](4), out c[2][2](4), out d[2][2](24), out a[1][2](4)) b[0][0] += 6; b[0][1] += 9; b[1][0] += 9; b[1][1] += 6; for $i = 0 to 1 step 1 do b[0].0:$i += a.0:2 rof; d[0][0].0 += c[0][0].0; d[0][0].1 += c[0][0].1; d[0][0].2 += c[0][0].2; d[0][0].3 += c[0][0].3; d[0][0].4:5 += c[0][0].0:1; d[0][0].6:7 += c[0][0].1:2; d[0][0].8:9 += c[0][0].2:3; d[0][0].10:12 += c[0][0].0:2; d[0][0].13:15 += c[0][0].1:3; d[0][0].16:19 += c[0][0].0:3; d[0][0].20:23 += c[0][0]; d[0][1].0 += c[0][1].0; d[0][1].1 += c[0][1].1; d[0][1].2 += c[0][1].2; d[0][1].3 += c[0][1].3; d[0][1].4:5 += c[0][1].0:1; d[0][1].6:7 += c[0][1].1:2; d[0][1].8:9 += c[0][1].2:3; d[0][1].10:12 += c[0][1].0:2; d[0][1].13:15 += c[0][1].1:3; d[0][1].16:19 += c[0][1].0:3; d[0][1].20:23 += c[0][1]; d[1][0].0 += c[1][0].0; d[1][0].1 += c[1][0].1; d[1][0].2 += c[1][0].2; d[1][0].3 += c[1][0].3; d[1][0].4:5 += c[1][0].0:1; d[1][0].6:7 += c[1][0].1:2; d[1][0].8:9 += c[1][0].2:3; d[1][0].10:12 += c[1][0].0:2; d[1][0].13:15 += c[1][0].1:3; d[1][0].16:19 += c[1][0].0:3; d[1][0].20:23 += c[1][0]; d[1][1].0 += c[1][1].0; d[1][1].1 += c[1][1].1; d[1][1].2 += c[1][1].2; d[1][1].3 += c[1][1].3; d[1][1].4:5 += c[1][1].0:1; d[1][1].6:7 += c[1][1].1:2; d[1][1].8:9 += c[1][1].2:3; d[1][1].10:12 += c[1][1].0:2; d[1][1].13:15 += c[1][1].1:3; d[1][1].16:19 += c[1][1].0:3; d[1][1].20:23 += c[1][1]",
+    "expectedCircuit": "TODO"
+  },
+
+  "swapCompleteSignals": {
+
+  },
+  "swapOfGlobalBits": {
+
+  },
+  "swapGlobalBitOfLhsWithBitOfRhsPartialDimensionAccess": {
+
+  },
+  "swapBitOfLhsBeingPartialDimensionAccessWithGlobalBitOfRhs": {
+
+  },
+  "swapOfGlobalBitRange": {
+
+  },
+  "swapOfValueOfDimensionWithBothSidesBeingFullySpecified": {
+
+  },
+  "swapOfValueOfDimensionWithLhsBeingPartialAndRhsBeingFullySpecified": {
+
+  },
+  "swapOfValueOfDimensionWithLhsBeingFullyAndRhsBeingPartiallySpecified": {
 
   },
 
-  "updateOfBitsOfInoutParameter": {
-    "circuit": "a",
-    "expectedCircuit": "b"
+  "swapOfUnknownGlobalBitOfLhsInvalidatesValuesInRhs": {
+
   },
-  "simplePropagationExample": {
-    "circuit": "module main(in a(16), out b(16), out c(16)) c += (2 + 10); c -= (b + 1); b.0:2 += c.0:2; c.0:2 += 3; b += 10",
-    "expectedCircuit": "module main(in a(16), out b(16), out c(16)) c += 12"
+  "swapOfGlobalBitRangeWithUnknownStartOfLhsInvlidatesWholeSignal": {
+
+  },
+  "swapOfGlobalBitRangeWithUnknownEndOfLhsInvlidatesWholeSignal": {
+
+  },
+
+  "swapOfUnknownValueOfDimensionInvalidatesAllValuesForDimension": {
+
+  },
+  "swapOfUnknownValueOfDimensionOfPartialDimensionAccessInvlaidatesAllValuesForSameAndSubsequentDimensions": {
+
+  },
+  "swapOfBitOfUnknownValueOfDimensionInvalidatesBitInAllValuesOfDimension": {
+
+  },
+  "swapOfBitRangeOfUnknownValueOfDimensionInvalidatesBitRangeInAllValuesOfDimension": {
+
+  },
+  "swapUnknownBitOfUnknownValueOfDimensionInvalidatesAllBitsInAllValuesOfDimension": {
+
+  },
+  "swapOfBitRangeWithUnknownEndOfUnknownValueOfDimensionInvalidatesAllBitsInAllValuesOfDimension": {
+
+  },
+  "swapOfBitRangeWithUnknownStartOfUnknownValueOfDimensionInvalidatesAllBitsInAllValuesOfDimension": {
+
+  },
+  "swapOfUnnknownBitRangeOfUnknownValueOfDimensionInvalidatesAllBitsInAllValuesOfDimension": {
+
+  },
+
+  "GlobalBitOfOutParameteUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2][2](1), out result[2][2](1)) result += (2 * a) module main(out b[2][2](4), out res[2][2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.2, res); uncall double(b.2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfPartialDimensionAccessOfOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2](1), out result[2](1)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].2, res); uncall double(b[0].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfFullDimensionAccessOfOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a(1), out result(1)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].2, res); uncall double(b[0][1].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "GlobalBitRangeOfOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2][2](3), out result[2][2](3)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.1:3, res); uncall double(b.1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfPartialDimensionAccessOfOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2](3), out result[2](3)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].1:3, res); uncall double(b[0].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfFullDimensionAccessOfOutParameterUSedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a(3), out result(3)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].1:3, res); uncall double(b[0][1].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfFullDimensionAccessOfOutParameterUsedAsValueForInParameterWillNotGetInvalidated": {
+    "circuit": "module double(in a(4), out result(4)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1], res); uncall double(b[0][1], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfPartialDimensionAccessOfOutParameterUsedAsValueForInParameterWillNotGetInvalidated": {
+    "circuit": "module double(in a[2](4), out result[2](4)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0], res); uncall double(b[0], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "FullSignalOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2][2](4), out result[2][2](4)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b, res); uncall double(b, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+
+
+  "GlobalBitOfInOutParameteUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2][2](1), out result[2][2](1)) result += (2 * a) module main(inout b[2][2](4), out res[2][2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.2, res); uncall double(b.2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfPartialDimensionAccessOfInOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2](1), out result[2](1)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].2, res); uncall double(b[0].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfFullDimensionAccessOfInOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a(1), out result(1)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].2, res); uncall double(b[0][1].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "GlobalBitRangeOfInOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2][2](3), out result[2][2](3)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.1:3, res); uncall double(b.1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfPartialDimensionAccessOfInOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2](3), out result[2](3)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].1:3, res); uncall double(b[0].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfFullDimensionAccessOfInOutParameterUSedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a(3), out result(3)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].1:3, res); uncall double(b[0][1].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfFullDimensionAccessOfInOutParameterUsedAsValueForInParameterWillNotGetInvalidated": {
+    "circuit": "module double(in a(4), out result(4)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1], res); uncall double(b[0][1], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfPartialDimensionAccessOfInOutParameterUsedAsValueForInParameterWillNotGetInvalidated": {
+    "circuit": "module double(in a[2](4), out result[2](4)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0], res); uncall double(b[0], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "FullSignalInOutParameterUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2][2](4), out result[2][2](4)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b, res); uncall double(b, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+
+
+
+  "GlobalBitOfWireLocalUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2][2](1), out result[2][2](1)) result += (2 * a) module main(out res[2][2](1), out d[2][2](24)) wire b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.2, res); uncall double(b.2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfPartialDimensionAccessOfWireLocalUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2](1), out result[2](1)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].2, res); uncall double(b[0].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfFullDimensionAccessOfWireLocalUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a(1), out result(1)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].2, res); uncall double(b[0][1].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "GlobalBitRangeOfWireLocalUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2][2](3), out result[2][2](3)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.1:3, res); uncall double(b.1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfPartialDimensionAccessOfWireLocalUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2](3), out result[2](3)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].1:3, res); uncall double(b[0].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfFullDimensionAccessOfWireLocalUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a(3), out result(3)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].1:3, res); uncall double(b[0][1].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfFullDimensionAccessOfWireLocalUsedAsValueForInParameterWillNotGetInvalidated": {
+    "circuit": "module double(in a(4), out result(4)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1], res); uncall double(b[0][1], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfPartialDimensionAccessOfWireLocalUsedAsValueForInParameterWillNotGetInvalidated": {
+    "circuit": "module double(in a[2](4), out result[2](4)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0], res); uncall double(b[0], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "FullSignalWireLocalUsedAsValueForInParameterInCallWillNotGetInvalidated": {
+    "circuit": "module double(in a[2][2](4), out result[2][2](4)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b, res); uncall double(b, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+
+
+  "GlobalBitOfOutParameteUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2][2](1), out result[2][2](1)) result += (2 * a) module main(out b[2][2](4), out res[2][2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.2, res); uncall double(b.2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfPartialDimensionAccessOfOutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2](1), out result[2](1)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].2, res); uncall double(b[0].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfFullDimensionAccessOfOutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a(1), out result(1)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].2, res); uncall double(b[0][1].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "GlobalBitRangeOfOutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2][2](3), out result[2][2](3)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.1:3, res); uncall double(b.1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfPartialDimensionAccessOfOutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2](3), out result[2](3)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].1:3, res); uncall double(b[0].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfFullDimensionAccessOfOutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a(3), out result(3)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].1:3, res); uncall double(b[0][1].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfFullDimensionAccessOfOutParameterUsedAsValueForOutParameterWillGetInvalidated": {
+    "circuit": "module double(out a(4), out result(4)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1], res); uncall double(b[0][1], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfPartialDimensionAccessOfOutParameterUsedAsValueForOutParameterWillGetInvalidated": {
+    "circuit": "module double(out a[2](4), out result[2](4)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0], res); uncall double(b[0], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "FullSignalOutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2][2](4), out result[2][2](4)) result += (2 * a) module main(out b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b, res); uncall double(b, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+
+
+  "GlobalBitOfInoutParameteUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2][2](1), out result[2][2](1)) result += (2 * a) module main(inout b[2][2](4), out res[2][2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.2, res); uncall double(b.2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfPartialDimensionAccessOfInoutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2](1), out result[2](1)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].2, res); uncall double(b[0].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfFullDimensionAccessOfInoutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a(1), out result(1)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].2, res); uncall double(b[0][1].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "GlobalBitRangeOfInOutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2][2](3), out result[2][2](3)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.1:3, res); uncall double(b.1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfPartialDimensionAccessOfInOutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2](3), out result[2](3)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].1:3, res); uncall double(b[0].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfFullDimensionAccessOfInOutParameterUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a(3), out result(3)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].1:3, res); uncall double(b[0][1].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfFullDimensionAccessOfInOutParameterUsedAsValueForOutParameterWillGetInvalidated": {
+    "circuit": "module double(out a(4), out result(4)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1], res); uncall double(b[0][1], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfPartialDimensionAccessInOfOutParameterUsedAsValueForOutParameterWillGetInvalidated": {
+    "circuit": "module double(out a[2](4), out result[2](4)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0], res); uncall double(b[0], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "FullSignalOutParameterUsedAsValueForInOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2][2](4), out result[2][2](4)) result += (2 * a) module main(inout b[2][2](4), out res[2](1), out d[2][2](24)) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b, res); uncall double(b, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+
+
+  "GlobalBitOfWireLocalUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2][2](1), out result[2][2](1)) result += (2 * a) module main(out res[2][2](1), out d[2][2](24)) wire out b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.2, res); uncall double(b.2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfPartialDimensionAccessOfWireLocalUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2](1), out result[2](1)) result += (2 * a) module main( out res[2](1), out d[2][2](24)) wire out b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].2, res); uncall double(b[0].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitOfFullDimensionAccessOfWireLocalUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a(1), out result(1)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire out b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].2, res); uncall double(b[0][1].2, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "GlobalBitRangeOfWireLocalUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2][2](3), out result[2][2](3)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire out b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b.1:3, res); uncall double(b.1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfPartialDimensionAccessOfWireLocalUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2](3), out result[2](3)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire out b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0].1:3, res); uncall double(b[0].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "BitRangeOfFullDimensionAccessOfWireLocalUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a(3), out result(3)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire out b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1].1:3, res); uncall double(b[0][1].1:3, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfFullDimensionAccessOfWireLocalUsedAsValueForOutParameterWillGetInvalidated": {
+    "circuit": "module double(out a(4), out result(4)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire out b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0][1], res); uncall double(b[0][1], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "ValueOfPartialDimensionAccessOfWireLocalUsedAsValueForOutParameterWillGetInvalidated": {
+    "circuit": "module double(out a[2](4), out result[2](4)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire out b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b[0], res); uncall double(b[0], res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+  "FullSignalWireLocalUsedAsValueForOutParameterInCallWillGetInvalidated": {
+    "circuit": "module double(out a[2][2](4), out result[2][2](4)) result += (2 * a) module main(out res[2](1), out d[2][2](24)) wire out b[2][2](4) b[0][0] += 9; b[0][1] += 6; b[1][0] += 6; b[1][1] += 9; call double(b, res); uncall double(b, res); d[0][0].0 += b[0][0].0; d[0][0].1 += b[0][0].1; d[0][0].2 += b[0][0].2; d[0][0].3 += b[0][0].3; d[0][0].4:5 += b[0][0].0:1; d[0][0].6:7 += b[0][0].1:2; d[0][0].8:9 += b[0][0].2:3; d[0][0].10:12 += b[0][0].0:2; d[0][0].13:15 += b[0][0].1:3; d[0][0].16:19 += b[0][0].0:3; d[0][0].20:23 += b[0][0]; d[0][1].0 += b[0][1].0; d[0][1].1 += b[0][1].1; d[0][1].2 += b[0][1].2; d[0][1].3 += b[0][1].3; d[0][1].4:5 += b[0][1].0:1; d[0][1].6:7 += b[0][1].1:2; d[0][1].8:9 += b[0][1].2:3; d[0][1].10:12 += b[0][1].0:2; d[0][1].13:15 += b[0][1].1:3; d[0][1].16:19 += b[0][1].0:3; d[0][1].20:23 += b[0][1]; d[1][0].0 += b[1][0].0; d[1][0].1 += b[1][0].1; d[1][0].2 += b[1][0].2; d[1][0].3 += b[1][0].3; d[1][0].4:5 += b[1][0].0:1; d[1][0].6:7 += b[1][0].1:2; d[1][0].8:9 += b[1][0].2:3; d[1][0].10:12 += b[1][0].0:2; d[1][0].13:15 += b[1][0].1:3; d[1][0].16:19 += b[1][0].0:3; d[1][0].20:23 += b[1][0]; d[1][1].0 += b[1][1].0; d[1][1].1 += b[1][1].1; d[1][1].2 += b[1][1].2; d[1][1].3 += b[1][1].3; d[1][1].4:5 += b[1][1].0:1; d[1][1].6:7 += b[1][1].1:2; d[1][1].8:9 += b[1][1].2:3; d[1][1].10:12 += b[1][1].0:2; d[1][1].13:15 += b[1][1].1:3; d[1][1].16:19 += b[1][1].0:3; d[1][1].20:23 += b[1][1]",
+    "expectedCircuit": "TODO"
+  },
+
+
+  "OutOrInoutParameterUsedAsOutParameterGetsInvalidated": {
+
+  },
+  "OutOrInoutParameterUsedAsInoutParameterGetsInvalidated": {
+
+  },
+  "WireParameterUsedAsOutParameterGetsInvalidated": {
+
+  },
+  "WireParameterUsedAsInoutParameterGetsInvalidated": {
+
+  },
+
+  "Swap with invalid combinations, left is unknown, right is unknown, both are unknown, etc.": null,
+  "swapOfUnknownGlobalBitInvalidatesBoth": {
+
   }
 }

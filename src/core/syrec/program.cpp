@@ -54,7 +54,7 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
                                     false,
                                     false,
                                     config.reassociateExpressionEnabled,
-                                    config.removalOfUnusedVariablesAndModulesEnabled,
+                                    config.deadCodeEliminationEnabled,
                                     config.performConstantPropagation,
                                     config.noAdditionalLineOptimizationEnabled,
                                     config.expectedMainModuleName));

@@ -27,6 +27,10 @@
   "xorAssign_lhsMultipleDimensionsNestedBitRange": {
     "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7].0:15 ^= a[1][3][4].0:15"
   },
+  "xorAssign_rhsBeingZeroAllowsDeletionOfAssignmentStmt": {
+    "circuit": "module main(in a(16), int c(16), out b(16)) b ^= (#a > #c); b ^= (2 - 2); b ^= 0; b ^= 1",
+    "expectedCircuit": "module main(in a(16), int c(16), out b(16)) b ^= 1"
+  },
 
   "addAssign_lhsNoExplicitDimension": {
     "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c += a"
@@ -55,6 +59,10 @@
   "addAssign_lhsMultipleDimensionsNestedBitRange": {
     "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7].0:15 += a[1][3][4].0:15"
   },
+  "addAssign_rhsBeingZeroAllowsDeletionOfAssignmentStmt": {
+    "circuit": "module main(in a(16), int c(16), out b(16)) b += (#a > #c); b += (2 - 2); b += 0; b += 1",
+    "expectedCircuit": "module main(in a(16), int c(16), out b(16)) b += 1"
+  },
 
   "subAssign_lhsNoExplicitDimension": {
     "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c -= a"
@@ -82,5 +90,9 @@
   },
   "subAssign_lhsMultipleDimensionsNestedBitRange": {
     "circuit": "module main(in a[2][4][8](16), in b[4][16][32](32), out c[2][4][8](64)) c[1][2][7].0:15 -= a[1][3][4].0:15"
+  },
+  "subAssign_rhsBeingZeroAllowsDeletionOfAssignmentStmt": {
+    "circuit": "module main(in a(16), int c(16), out b(16)) b -= (#a > #c); b -= (2 - 2); b -= 0; b -= 1",
+    "expectedCircuit": "module main(in a(16), int c(16), out b(16)) b -= 1"
   }
 }

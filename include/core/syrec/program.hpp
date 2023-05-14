@@ -18,14 +18,14 @@ namespace syrec {
             std::string expectedMainModuleName = "main"):
             defaultBitwidth(bitwidth),
             reassociateExpressionEnabled(reassociateExpressionEnabled),
-            removalOfUnusedVariablesAndModulesEnabled(removalOfUnusedVariablesAndModulesEnabled),
+            deadCodeEliminationEnabled(removalOfUnusedVariablesAndModulesEnabled),
             performConstantPropagation(performConstantPropagation),
             noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
             expectedMainModuleName(expectedMainModuleName)
         {};
         unsigned    defaultBitwidth;
         bool        reassociateExpressionEnabled;
-        bool        removalOfUnusedVariablesAndModulesEnabled;
+        bool        deadCodeEliminationEnabled;
         bool        performConstantPropagation;
         bool        noAdditionalLineOptimizationEnabled;
         std::string expectedMainModuleName;

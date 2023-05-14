@@ -11,7 +11,9 @@
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/value_broadcaster.hpp"
 
+#include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 #include "core/syrec/parser/optimizations/no_additional_line_assignment.hpp"
+#include "core/syrec/parser/optimizations/reassociate_expression.hpp"
 
 #include <fmt/format.h>
 
@@ -119,34 +121,21 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                     *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
                     exprContainingNewValue);
 
-            /*
-             *
-             *I. 	((((a + b) + 2) * (3 - c) + 2)
-II.	(2 + ((3 - c) * (2 + (a + b))))
+            if (!sharedData->parserConfig->noAdditionalLineOptimizationEnabled) {
+                if (const auto& rhsAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(exprContainingNewValue); rhsAsNumericExpr != nullptr) {
+                    const std::optional<unsigned int> optionalConstantValueOfRhs = rhsAsNumericExpr->value->isConstant() ? std::make_optional(rhsAsNumericExpr->value->evaluate(sharedData->loopVariableMappingLookup)) : std::nullopt;
 
+                    if (optionalConstantValueOfRhs.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*definedAssignmentOperation, *optionalConstantValueOfRhs) 
+                        && sharedData->parserConfig->deadCodeEliminationEnabled) {
+                        return 0;
+                    }
+                }
+                addStatementToOpenContainer(assignStmt);
 
-Bsp:
-I. 	x0 ^= ((x1 + x2) - x3)
-II.	x0 -= (((x1 - x2) - x3) + (x1 - x4))
-III.	x0 ^= ((x1 + x2) / (x3 - x4))
-IV.	x5 ^= (((x0 * x1) * x1) + ((x2 * x1) + x3))
-
-
-x0 -= ((x1 + x2) - (x2 << 2))
-
-x0 -= (x1 + x2)
-x0 += (x2 << 2)
-
-x0 -= ((x1 + 2) << (2 - (x2 + 2)))
-
-x0 -= (x1 + 2)
-
-
-
-x0 -= (2 - (x2 + (x3 - ((x4 - x5) + (x6 - (x8 + x7))))))
-             *
-             *
-             */
+                // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
+                tryUpdateOrInvalidateStoredValueFor(assignedToSignalParts, exprContainingNewValue);
+                return 0;
+            }
 
             /*
              * For this optimization we should disable the constant propagation in case that it evaluates to a constant that cannot be dropped for the given binary expr.
@@ -155,21 +144,76 @@ x0 -= (2 - (x2 + (x3 - ((x4 - x5) + (x6 - (x8 + x7))))))
              * the inverted assignment statement if it exists]
              *
              */
-            syrec::AssignStatement::vec createdAssignmentStmts{assignStmt};
-            const std::optional<syrec::AssignStatement::vec> optimizedAssignmentStmt = sharedData->parserConfig->noAdditionalLineOptimizationEnabled
-                ? optimizations::LineAwareOptimization::optimize(assignStmt)
-                : std::nullopt;
+            const auto& optimizationResultOfAssignmentStmt = optimizations::LineAwareOptimization::optimize(assignStmt);
+            const auto& createdAssignmentStmts = optimizationResultOfAssignmentStmt.statements;
 
-            if (optimizedAssignmentStmt.has_value()) {
-                createdAssignmentStmts = *optimizedAssignmentStmt;
-            }
+            std::vector omitStatusPerAssignStatement(createdAssignmentStmts.size(), false);
+            std::size_t statementIdx = 0;
 
             // TODO: If the rhs of the assignment operation does not change the value of the lhs (i.e. a += 0) we can drop the statement all together
+            // TODO: If we start dropping statements, we should also check if the checks for empty statement blocks in IF, FOR statements and MODULE definitions are correct
             for (const auto& assignmentStmt: createdAssignmentStmts) {
-                addStatementToOpenContainer(assignmentStmt);
+                const auto& typecastedAssignmentStmt = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
+                if (typecastedAssignmentStmt == nullptr || omitStatusPerAssignStatement[statementIdx]) {
+                    statementIdx++;
+                    continue;
+                }
+
+                // TODO: Loop variables should probably also not be automatically substituted with their respective value ?
+                if (sharedData->parserConfig->performConstantPropagation) {
+                /*
+                 * TODO: This should only be relevant for expressions containing operations different than (^,+,-)
+                 * This would also mean that we would perform constant propagation only in case the above condition does not hold (i.e. only in expressions containing (^,+,-)
+                 */ 
+
+                }
+
+                bool                   couldSimplifyRhsExpr  = false;
+                syrec::expression::ptr assignmentStmtRhsExpr = typecastedAssignmentStmt->rhs;
+                if (!sharedData->parserConfig->reassociateExpressionsEnabled) {
+                    const auto& simplifiedRhsExpr = optimizations::simplifyBinaryExpression(assignmentStmtRhsExpr);
+                    couldSimplifyRhsExpr = assignmentStmtRhsExpr != simplifiedRhsExpr;
+                    if (couldSimplifyRhsExpr) {
+                        assignmentStmtRhsExpr = simplifiedRhsExpr;
+                    }
+                } else {
+                    const auto& simplificationResultOfRhsExpr = optimizations::trySimplify(assignmentStmtRhsExpr);
+                    if (simplificationResultOfRhsExpr.couldSimplify) {
+                        assignmentStmtRhsExpr = simplificationResultOfRhsExpr.simplifiedExpression;
+                        couldSimplifyRhsExpr  = true;
+                    }
+                }
+
+                if (const auto& assignmentStmtRhsAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(assignmentStmtRhsExpr); assignmentStmtRhsAsNumericExpr != nullptr) {
+                    const std::optional<unsigned int> optionalConstantValueOfRhs = assignmentStmtRhsAsNumericExpr->value->isConstant()
+                        ? std::make_optional(assignmentStmtRhsAsNumericExpr->value->evaluate(sharedData->loopVariableMappingLookup))
+                        : std::nullopt;
+                    
+                    if (optionalConstantValueOfRhs.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*definedAssignmentOperation, *optionalConstantValueOfRhs)
+                        && sharedData->parserConfig->deadCodeEliminationEnabled) {
+                        /*
+                         * If the current assignment statement leaves the lhs unchanged we can both skip the current assignment statement as well the associated revert statement (only if the latter actually exists)
+                         */
+                        if (optimizationResultOfAssignmentStmt.revertStatementLookup.count(statementIdx) != 0) {
+                            omitStatusPerAssignStatement[optimizationResultOfAssignmentStmt.revertStatementLookup.at(statementIdx)] = true;
+                            statementIdx++;
+                            continue;
+                        } 
+                    }
+                }
+
+                auto finalAssignmentStmt = typecastedAssignmentStmt;
+                if (couldSimplifyRhsExpr) {
+                    finalAssignmentStmt = std::make_shared<syrec::AssignStatement>(
+                            typecastedAssignmentStmt->lhs,
+                            typecastedAssignmentStmt->op,
+                            assignmentStmtRhsExpr);
+                }
+                addStatementToOpenContainer(finalAssignmentStmt);
 
                 // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
-                tryUpdateOrInvalidateStoredValueFor(assignedToSignalParts, exprContainingNewValue);
+                tryUpdateOrInvalidateStoredValueFor(finalAssignmentStmt->lhs, finalAssignmentStmt->rhs);
+                statementIdx++;
             }
         }
         else {
@@ -437,8 +481,30 @@ std::any SyReCStatementVisitor::visitForStatement(SyReCParser::ForStatementConte
 
 std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext* context) {
     const auto guardExpression        = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->guardCondition);
-    const auto trueBranchStmts        = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->trueBranchStmts);
-    const auto falseBranchStmts       = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->falseBranchStmts);
+
+    std::optional<unsigned int> constantValueOfGuardExpr;
+    if (guardExpression.has_value()) {
+        if ((*guardExpression)->isConstantValue()) {
+            constantValueOfGuardExpr = (*guardExpression)->getAsConstant();
+        } else {
+            const auto& guardConditionAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(*(*guardExpression)->getAsExpression());
+            if (guardConditionAsNumericExpr != nullptr && guardConditionAsNumericExpr->value->isConstant()) {
+                constantValueOfGuardExpr = (*guardConditionAsNumericExpr).value->evaluate(sharedData->loopVariableMappingLookup);
+            }
+        }   
+    }
+    const bool canTrueBranchBeOmitted  = constantValueOfGuardExpr.has_value() && constantValueOfGuardExpr <= 0;
+    const bool canFalseBranchBeOmitted = constantValueOfGuardExpr.has_value() && constantValueOfGuardExpr > 0;
+
+    const bool backupOfStatusOfInCurrentlyInOmittedRegion = sharedData->currentlyInOmittedRegion;
+    sharedData->currentlyInOmittedRegion = canTrueBranchBeOmitted;
+    auto trueBranchStmts        = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->trueBranchStmts);
+    sharedData->currentlyInOmittedRegion = backupOfStatusOfInCurrentlyInOmittedRegion;
+
+    sharedData->currentlyInOmittedRegion = canFalseBranchBeOmitted;
+    auto falseBranchStmts       = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->falseBranchStmts);
+    sharedData->currentlyInOmittedRegion = backupOfStatusOfInCurrentlyInOmittedRegion;
+
     const auto closingGuardExpression = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->matchingGuardExpression);
 
     // TODO: Replace pointer comparison with actual equality check of expressions
@@ -446,9 +512,35 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
         return 0;
     }
 
+    const auto& evaluationResultOfUnoptimizedGuardExpression = getUnoptimizedExpression(context->guardCondition);
+    const auto& evaluationResultOfUnoptimizedMatchingGuardExpression = getUnoptimizedExpression(context->matchingGuardExpression);
+    const auto& unoptimizedGuardExpr   = *evaluationResultOfUnoptimizedGuardExpression;
+    const auto& unoptimizedClosingExpr = *evaluationResultOfUnoptimizedMatchingGuardExpression;
+    
+    // TODO: Is we are performing constant propagation this check does not work because the value of the variables used in the guard condition could change in the if-statement
+    // TODO: If dead code elimination is enabled and we can drop either of the branches we should also update the reference count for the used variables in both the guard as well as the closing expression
     // TODO: Error position
-    if (!areExpressionsEqual(*guardExpression, *closingGuardExpression)) {
+    if (!areExpressionsEqual(unoptimizedGuardExpr, unoptimizedClosingExpr)) {
         createError(mapAntlrTokenPosition(context->getStart()), IfAndFiConditionMissmatch);
+        return 0;
+    }
+
+    const bool canAnyBranchBeOmitted = canTrueBranchBeOmitted || canFalseBranchBeOmitted;
+    if (sharedData->parserConfig->deadCodeEliminationEnabled && canAnyBranchBeOmitted) {
+        if (canTrueBranchBeOmitted) {
+            for (const auto& falseBranchStmt : *falseBranchStmts) {
+                addStatementToOpenContainer(falseBranchStmt);
+            }
+        }
+        else {
+            for (const auto& trueBranchStmt: *trueBranchStmts) {
+                addStatementToOpenContainer(trueBranchStmt);
+            }
+        }
+        if (!unoptimizedGuardExpr->isConstantValue()) {
+            decrementReferenceCountForUsedVariablesInExpression(*unoptimizedGuardExpr->getAsExpression());
+            decrementReferenceCountForUsedVariablesInExpression(*unoptimizedClosingExpr->getAsExpression());   
+        }
         return 0;
     }
 
@@ -653,6 +745,18 @@ bool SyReCStatementVisitor::doArgumentsBetweenCallAndUncallMatch(const TokenPosi
     return argumentsMatched;
 }
 
+[[nodiscard]] std::optional<ExpressionEvaluationResult::ptr> SyReCStatementVisitor::getUnoptimizedExpression(SyReCParser::ExpressionContext* context) {
+    const auto backupOfConstantPropagationStatus = sharedData->parserConfig->performConstantPropagation;
+    const auto backupOfReassociateConstantPropagationStatus = sharedData->parserConfig->reassociateExpressionsEnabled;
+
+    sharedData->parserConfig->performConstantPropagation = false;
+    sharedData->parserConfig->reassociateExpressionsEnabled = false;
+    const auto& unoptimizedExpression                       = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context);
+    sharedData->parserConfig->performConstantPropagation    = backupOfConstantPropagationStatus;
+    sharedData->parserConfig->reassociateExpressionsEnabled = backupOfReassociateConstantPropagationStatus;
+    return unoptimizedExpression;
+}
+
 bool SyReCStatementVisitor::areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr) {
     const bool isFirstExprConstant = firstExpr->isConstantValue();
     const bool isOtherExprConstant = otherExpr->isConstantValue();
@@ -671,8 +775,13 @@ bool SyReCStatementVisitor::areExpressionsEqual(const ExpressionEvaluationResult
 // TODO: CONSTANT_PROPAGATION: Handling of out of range indizes for dimension or bit range
 // TODO: CONSTANT_PROPAGATION: In case the rhs expr was a constant, should we trim its value in case it cannot be stored in the lhs ?
 void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const {
+    // TODO: CONSTANT_PROPAGATION: Find a better way to not work with incorrect signal state in omitted if-condition branch
+    if (sharedData->currentlyInOmittedRegion) {
+        return;
+    }
+
     const auto& constantValueOfExprContainingNewValue = std::dynamic_pointer_cast<syrec::NumericExpression>(exprContainingNewValue);
-    const auto& variableToCopyValuesAndRestrictionsFrom           = std::dynamic_pointer_cast<syrec::VariableExpression>(exprContainingNewValue);
+    const auto& variableToCopyValuesAndRestrictionsFrom = std::dynamic_pointer_cast<syrec::VariableExpression>(exprContainingNewValue);
 
     /*
      * We should invalidate the assigned to signal parts if we cannot determine:
@@ -754,3 +863,24 @@ bool SyReCStatementVisitor::areAccessedValuesForDimensionAndBitsConstant(const s
     return !invalidateAccessedBitRange && !accessedAnyNonConstantValueOfDimension;
 }
 
+void SyReCStatementVisitor::decrementReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression) {
+    if (const auto& expressionAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(expression); expressionAsVariableAccess != nullptr) {
+        const auto& accessedVariable = expressionAsVariableAccess->var;
+        sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(accessedVariable->var->name);
+    }
+    if (const auto& expressionAsBinaryExpression = std::dynamic_pointer_cast<syrec::BinaryExpression>(expression); expressionAsBinaryExpression != nullptr) {
+        decrementReferenceCountForUsedVariablesInExpression(expressionAsBinaryExpression->lhs);
+        decrementReferenceCountForUsedVariablesInExpression(expressionAsBinaryExpression->rhs);
+    }
+    if (const auto& expressionAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expression); expressionAsShiftExpr != nullptr) {
+        decrementReferenceCountForUsedVariablesInExpression(expressionAsShiftExpr->lhs);
+        if (expressionAsShiftExpr->rhs->isLoopVariable()) {
+            sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(expressionAsShiftExpr->rhs->variableName());
+        }
+    }
+    if (const auto& expressionAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expression); expressionAsNumericExpr != nullptr) {
+        if (expressionAsNumericExpr->value->isLoopVariable()) {
+            sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(expressionAsNumericExpr->value->variableName());
+        }
+    }
+}

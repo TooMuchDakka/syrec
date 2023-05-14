@@ -157,27 +157,28 @@ std::vector<std::size_t> LineAwareOptimization::PostOrderTreeTraversal::getEithe
 }
 
 
-std::optional<syrec::AssignStatement::vec> LineAwareOptimization::optimize(const std::shared_ptr<syrec::AssignStatement>& assignmentStatement) {
+LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimize(const std::shared_ptr<syrec::AssignStatement>& assignmentStatement) {
     const auto& usedAssignmentOperation = tryMapAssignmentOperand(assignmentStatement->op);
     const auto& rhsAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentStatement->rhs);
     if (!usedAssignmentOperation.has_value() || rhsAsBinaryExpr == nullptr) {
-        return std::nullopt;   
+        return LineAwareOptimizationResult(assignmentStatement);
     }
     
     const auto postOrderRepresentation = createPostOrderRepresentation(assignmentStatement->rhs);
     if (!postOrderRepresentation.has_value()) {
-        return std::nullopt;
+        return LineAwareOptimizationResult(assignmentStatement);
     }
 
     if (canOptimizeAssignStatement(*usedAssignmentOperation, *postOrderRepresentation)) {
         // TODO: Add 'simple' base optimization algorithm ???
         if (postOrderRepresentation->areOperandsOnlyAdditionSubtractionOrXor()) {
-            return optimizeComplexAssignStatement(*usedAssignmentOperation, assignmentStatement->lhs, *postOrderRepresentation);
+            const auto& optimizedAssignmentStatements = optimizeComplexAssignStatement(*usedAssignmentOperation, assignmentStatement->lhs, *postOrderRepresentation);
+            return LineAwareOptimizationResult(optimizedAssignmentStatements);
             //return optimizeAssignStatementWithOnlyAdditionSubtractionOrXorOperands(*usedAssignmentOperation, assignmentStatement->lhs, postOrderRepresentation);
         }
         return optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(assignmentStatement, *postOrderRepresentation);
     }
-    return std::make_optional(std::vector<syrec::AssignStatement::ptr>({assignmentStatement}));
+    return LineAwareOptimizationResult(assignmentStatement);
 }
 
 std::optional<syrec_operation::operation> LineAwareOptimization::tryMapAssignmentOperand(unsigned assignmentOperand) {
@@ -491,7 +492,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeComplexAssignStatemen
     return generatedAssignmentStatement;
 }
 
-syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(const std::shared_ptr<syrec::AssignStatement>& assignStmt, const PostOrderTreeTraversal& postOrderTraversalContainer) {
+LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(const std::shared_ptr<syrec::AssignStatement>& assignStmt, const PostOrderTreeTraversal& postOrderTraversalContainer) {
     const auto                        assignmentOperand = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(assignStmt->op);
     const syrec::VariableAccess::ptr& assignStmtLhs     = assignStmt->lhs;
 
@@ -514,6 +515,8 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithRh
     std::set<std::size_t>       visitedOperationNodes;
     syrec::AssignStatement::vec generatedAssignmentStatement;
     syrec::AssignStatement::vec assignmentStatementsToRevert;
+    std::map<std::size_t, std::size_t> lookupOfRevertStatementIfAssignmentNeedsToBeReverted;
+
     for (std::size_t i = 0; i < operationNodesInPostOrder.size(); ++i) {
         bool        doesAssignmentStatementNeedToBeReset = false;
         const auto& operationNodeTraversalIdx            = operationNodesInPostOrder.at(i);
@@ -649,7 +652,15 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithRh
                         *parser::ParserUtilities::mapOperationToInternalFlag(invertedAssignmentOperation),
                         assignmentStmtToCheck->rhs);
                 assignmentStatementsToRevert.emplace_back(invertedAssignmentStmt);
+                // Added index for revert statement is only relative and needs to be corrected after all assignment statements were added
+                lookupOfRevertStatementIfAssignmentNeedsToBeReverted.insert({i, i});
             }
+        }
+    }
+
+    if (!lookupOfRevertStatementIfAssignmentNeedsToBeReverted.empty()) {
+        for (auto& lookupEntryKvPair : lookupOfRevertStatementIfAssignmentNeedsToBeReverted) {
+            lookupEntryKvPair.second += generatedAssignmentStatement.size();
         }
     }
 
@@ -657,7 +668,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithRh
         generatedAssignmentStatement.emplace_back(invertedAssignmentStmt);
     }
 
-    return generatedAssignmentStatement;
+    return LineAwareOptimizationResult(generatedAssignmentStatement, lookupOfRevertStatementIfAssignmentNeedsToBeReverted);
 }
 
 

@@ -23,12 +23,15 @@ namespace parser {
         std::optional<unsigned int>                              optionalExpectedExpressionSignalWidth;
         std::set<std::string>                                    evaluableLoopVariables;
         std::optional<std::string>                               lastDeclaredLoopVariable;
+        bool                                                     currentlyInOmittedRegion;
 
         explicit SharedVisitorData(const ParserConfig& parserConfig) :
             parserConfig(std::make_unique<ParserConfig>(parserConfig)),
             currentSymbolTableScope(std::make_shared<SymbolTable>()),
             currentModuleCallNestingLevel(0),
-            shouldSkipSignalAccessRestrictionCheck(true)
+            shouldSkipSignalAccessRestrictionCheck(true),
+            currentlyParsingAssignmentStmtRhs(false),
+            currentlyInOmittedRegion(false)
         {}
 
         void resetSignalAccessRestriction() {

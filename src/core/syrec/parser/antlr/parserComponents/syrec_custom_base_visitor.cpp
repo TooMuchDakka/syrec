@@ -161,8 +161,10 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
             container->setVar(std::get<syrec::Variable::ptr>(*signalSymTabEntry));
             accessedSignal.emplace(container);
 
-            // TODO: UNUSED_REFERENCE - Marked as used
-            sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);
+            if (!sharedData->currentlyInOmittedRegion) {
+                // TODO: UNUSED_REFERENCE - Marked as used
+                sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);   
+            }
         }
     }
 
@@ -275,9 +277,6 @@ std::any SyReCCustomBaseVisitor::visitNumberFromSignalwidth(SyReCParser::NumberF
     const auto&                       symTableEntryForSignal = sharedData->currentSymbolTableScope->getVariable(signalIdent);
     if (symTableEntryForSignal.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symTableEntryForSignal)) {
         signalWidthOfSignal.emplace(std::make_shared<syrec::Number>(std::get<syrec::Variable::ptr>(*symTableEntryForSignal)->bitwidth));
-
-        // TODO: UNUSED_REFERENCE - Marked as used
-        sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);
     } else {
         // TODO: GEN_ERROR, this should not happen
         // TODO: Error position

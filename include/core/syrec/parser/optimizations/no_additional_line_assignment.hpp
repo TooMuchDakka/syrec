@@ -11,7 +11,22 @@
 namespace optimizations {
 	class LineAwareOptimization {
 	public:
-        [[nodiscard]] static std::optional<syrec::AssignStatement::vec> optimize(const std::shared_ptr<syrec::AssignStatement>& assignmentStatement);
+        struct LineAwareOptimizationResult {
+            const syrec::AssignStatement::vec        statements;
+            const std::map<std::size_t, std::size_t> revertStatementLookup;
+
+
+            LineAwareOptimizationResult(const syrec::AssignStatement::ptr& referenceStmt):
+                statements({referenceStmt}) {}
+
+            LineAwareOptimizationResult(syrec::AssignStatement::vec statements):
+                statements(std::move(statements)) {}
+
+            LineAwareOptimizationResult(syrec::AssignStatement::vec statements, std::map<std::size_t, std::size_t> revertStatementLookup):
+                statements(std::move(statements)), revertStatementLookup(std::move(revertStatementLookup)) {}
+        };
+
+        [[nodiscard]] static LineAwareOptimizationResult optimize(const std::shared_ptr<syrec::AssignStatement>& assignmentStatement);
 
 	protected:
 		struct TreeTraversalNode {
@@ -81,7 +96,7 @@ namespace optimizations {
 		[[nodiscard]] static bool                        canOptimizeAssignStatement(syrec_operation::operation assignmentOperand, const PostOrderTreeTraversal& postOrderTraversalContainer);
         [[nodiscard]] static syrec::AssignStatement::vec optimizeAssignStatementWithOnlyAdditionSubtractionOrXorOperands(syrec_operation::operation assignmentOperand, const syrec::VariableAccess::ptr& assignStmtLhs, const PostOrderTreeTraversal& postOrderTraversalContainer);
         [[nodiscard]] static syrec::AssignStatement::vec optimizeComplexAssignStatement(syrec_operation::operation assignmentOperand, const syrec::VariableAccess::ptr& assignStmtLhs, const PostOrderTreeTraversal& postOrderTraversalContainer);
-        [[nodiscard]] static syrec::AssignStatement::vec optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(const std::shared_ptr<syrec::AssignStatement>& assignStmt, const PostOrderTreeTraversal& postOrderTraversalContainer);
+        [[nodiscard]] static LineAwareOptimization::LineAwareOptimizationResult optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(const std::shared_ptr<syrec::AssignStatement>& assignStmt, const PostOrderTreeTraversal& postOrderTraversalContainer);
         [[nodiscard]] static bool                        doAssignmentAndRhsExpressionOperationMatch(syrec_operation::operation assignmentOperation, syrec_operation::operation rhsOperation);
         
         /**
