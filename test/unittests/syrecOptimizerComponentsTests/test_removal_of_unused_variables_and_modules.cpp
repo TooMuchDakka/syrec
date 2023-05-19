@@ -26,7 +26,7 @@ protected:
     std::string expectedOptimizedCircuit;
 
     explicit RemovalOfUnusedVariablesAndModulesTest():
-        astDumper(syrecAstDumpUtils::SyrecASTDumper(true)), config(16, true, true) {}
+        astDumper(syrecAstDumpUtils::SyrecASTDumper(true)), config(16, true, true, true) {}
 
     void SetUp() override {
         const std::string testCaseJsonKey = GetParam();
@@ -34,6 +34,11 @@ protected:
         std::ifstream configFileStream(RemovalOfUnusedVariablesAndModulesTest::pathToTestCaseFile, std::ios_base::in);
         ASSERT_TRUE(configFileStream.good()) << "Could not open test data json file @ "
                                              << RemovalOfUnusedVariablesAndModulesTest::pathToTestCaseFile;
+
+
+
+
+
 
         const nlohmann::json parsedJson = nlohmann::json::parse(configFileStream);
         ASSERT_TRUE(parsedJson.contains(testCaseJsonKey)) << "Required entry for given test case with key '" << testCaseJsonKey << "' was not found";

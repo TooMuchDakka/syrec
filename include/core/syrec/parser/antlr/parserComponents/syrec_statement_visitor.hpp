@@ -46,6 +46,8 @@ namespace parser {
         [[nodiscard]] SymbolTableBackupHelper::ptr                   createCopiesOfCurrentValuesOfChangedSignalsAndResetToOriginal(const SymbolTableBackupHelper::ptr& backupOfOriginalValues) const;
         void                                                         mergeChangesFromBranchesAndUpdateSymbolTable(const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInTrueBranch, const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInFalseBranch, bool canAnyBranchBeOmitted, bool canTrueBranchBeOmitted) const;
         void                                                         createAndStoreBackupForAssignedToSignal(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
+        // TODO: Fix nicer solution than to return an expression::ptr
+        [[nodiscard]] syrec::expression::ptr                         tryDetermineNewSignalValueFromAssignment(const syrec::VariableAccess::ptr& assignedToSignal, syrec_operation::operation assignmentOp, const syrec::expression::ptr& assignmentStmtRhsExpr) const;
 
     private:
         std::any visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext* context) override {
@@ -68,6 +70,7 @@ namespace parser {
             return expressionVisitor->visitShiftExpression(context);
         }
 
+        // TODO: Maybe find a better solution than to pass an expression::ptr for the new value
         void tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const;
         void invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(const syrec::Module::ptr& calledModule, const std::vector<std::string>& calleeArguments) const;
         void invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts) const;

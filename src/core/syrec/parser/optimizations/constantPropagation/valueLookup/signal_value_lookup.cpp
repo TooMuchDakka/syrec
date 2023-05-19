@@ -8,20 +8,28 @@ std::shared_ptr<BaseValueLookup<unsigned>> SignalValueLookup::clone() {
     auto        copy              = std::make_shared<SignalValueLookup>(signalInformation.bitWidth, signalInformation.valuesPerDimension, 0);
     auto        dimensionAccess   = std::vector<std::optional<unsigned int>>(signalInformation.valuesPerDimension.size(), std::nullopt);
 
-    copy->applyToBitsOfLastLayer(
-    {},
-    std::nullopt,
-    [&dimensionAccess, &copy, this](const std::vector<unsigned int>& relativeDimensionAccess, unsigned int relativeBitIdx) {
-        copyRelativeDimensionAccess(0, dimensionAccess, relativeDimensionAccess);
-        const auto& accessedBitRange(std::pair(relativeBitIdx, relativeBitIdx));
-        const auto& valueForBit  = tryFetchValueFor(dimensionAccess, accessedBitRange);
+    //copy->applyToBitsOfLastLayer(
+    //{},
+    //std::nullopt,
+    //[&dimensionAccess, &copy, this](const std::vector<unsigned int>& relativeDimensionAccess, unsigned int relativeBitIdx) {
+    //    copyRelativeDimensionAccess(0, dimensionAccess, relativeDimensionAccess);
+    //    const auto& accessedBitRange(std::pair(relativeBitIdx, relativeBitIdx));
+    //    const auto& valueForBit  = tryFetchValueFor(dimensionAccess, accessedBitRange);
 
-        if (valueForBit.has_value()) {
-            copy->updateStoredValueFor(dimensionAccess, accessedBitRange, *valueForBit);
-        } else {
-            copy->invalidateStoredValueForBitrange(dimensionAccess, accessedBitRange);
-        }
-    });
+    //    if (valueForBit.has_value()) {
+    //        copy->updateStoredValueFor(dimensionAccess, accessedBitRange, *valueForBit);
+    //    } else {
+    //        copy->invalidateStoredValueForBitrange(dimensionAccess, accessedBitRange);
+    //    }
+    //});
+
+    copy->copyRestrictionsAndUnrestrictedValuesFrom(
+            {},
+            std::nullopt,
+            {},
+            std::nullopt,
+            *this);
+
     return copy;
 }
 

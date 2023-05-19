@@ -607,7 +607,7 @@ INSTANTIATE_TEST_SUITE_P(
             [](const SignalValueLookup::ptr& signalValueLookupWithoutRestriction) {
                 signalValueLookupWithoutRestriction->invalidateStoredValueFor({SignalValueLookupTest::lockedValueOfFirstDimension, SignalValueLookupTest::lockedValueOfFirstDimension});
                 signalValueLookupWithoutRestriction->liftRestrictionsOfDimensions({ SignalValueLookupTest::lockedValueOfFirstDimension, SignalValueLookupTest::lockedValueOfSecondDimension}, std::nullopt);
-                signalValueLookupWithoutRestriction->liftRestrictionsOfDimensions({SignalValueLookupTest::lockedValueOfFirstDimension + 1, SignalValueLookupTest::lockedValueOfSecondDimension}, std::nullopt);
+                signalValueLookupWithoutRestriction->liftRestrictionsOfDimensions({SignalValueLookupTest::lockedValueOfFirstDimension - 1, SignalValueLookupTest::lockedValueOfSecondDimension}, std::nullopt);
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess&) {
                 if (accessedDimensions.empty()) {
@@ -649,8 +649,8 @@ INSTANTIATE_TEST_SUITE_P(
                 signalValueLookupWithoutRestriction->invalidateStoredValueFor({SignalValueLookupTest::lockedValueOfFirstDimension, SignalValueLookupTest::lockedValueOfFirstDimension});
                 signalValueLookupWithoutRestriction->liftRestrictionsOfDimensions({SignalValueLookupTest::lockedValueOfFirstDimension, SignalValueLookupTest::lockedValueOfSecondDimension, std::nullopt}, std::nullopt);
                 signalValueLookupWithoutRestriction->liftRestrictionsOfDimensions({SignalValueLookupTest::lockedValueOfFirstDimension, SignalValueLookupTest::lockedValueOfSecondDimension}, std::nullopt);
-                signalValueLookupWithoutRestriction->liftRestrictionsOfDimensions({SignalValueLookupTest::lockedValueOfFirstDimension + 1}, std::nullopt);
-                signalValueLookupWithoutRestriction->liftRestrictionsOfDimensions({SignalValueLookupTest::lockedValueOfFirstDimension + 1, SignalValueLookupTest::lockedValueOfSecondDimension, std::nullopt}, std::nullopt);
+                signalValueLookupWithoutRestriction->liftRestrictionsOfDimensions({SignalValueLookupTest::lockedValueOfFirstDimension - 1}, std::nullopt);
+                signalValueLookupWithoutRestriction->liftRestrictionsOfDimensions({SignalValueLookupTest::lockedValueOfFirstDimension - 1, SignalValueLookupTest::lockedValueOfSecondDimension, std::nullopt}, std::nullopt);
             },
             [](const UserDefinedDimensionAccess& accessedDimensions, const OptionalBitRangeAccess&) {
                 if (accessedDimensions.empty()) {

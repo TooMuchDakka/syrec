@@ -125,7 +125,7 @@ void SymbolTable::incrementLiteralReferenceCount(const std::string_view& literal
 
 void SymbolTable::decrementLiteralReferenceCount(const std::string_view& literalIdent) const {
     if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
-        foundSymbolTableEntryForLiteral->referenceCount = std::min(static_cast<std::size_t>(0), foundSymbolTableEntryForLiteral->referenceCount - 1);
+        foundSymbolTableEntryForLiteral->referenceCount = std::max(static_cast<std::size_t>(0), foundSymbolTableEntryForLiteral->referenceCount - 1);
     }
 }
 
@@ -233,14 +233,11 @@ std::optional<valueLookup::SignalValueLookup::ptr> SymbolTable::createBackupOfVa
 void SymbolTable::restoreValuesFromBackup(const std::string_view& literalIdent, const valueLookup::SignalValueLookup::ptr& newValues) const {
     if (const auto& symbolTableEntryForLiteral = getEntryForVariable(literalIdent); symbolTableEntryForLiteral != nullptr) {
         if (symbolTableEntryForLiteral->optionalValueLookup.has_value()) {
-            auto& currentValueOfLiteral = *symbolTableEntryForLiteral->optionalValueLookup;
-
-            const auto& accessedDimensions = std::vector<std::optional<unsigned int>>(currentValueOfLiteral->getSignalInformation().valuesPerDimension.size(), std::nullopt);
-            
+            const auto& currentValueOfLiteral = *symbolTableEntryForLiteral->optionalValueLookup;
             currentValueOfLiteral->copyRestrictionsAndUnrestrictedValuesFrom(
-                accessedDimensions,
+                {},
                 std::nullopt,
-                accessedDimensions,
+                {},
                 std::nullopt,
                 *newValues
             );
@@ -426,7 +423,7 @@ void SymbolTable::swap(const syrec::VariableAccess::ptr& swapLhsOperand, const s
     }
 
     const auto& signalValueLookupOfLhsVariable = *symbolTableEntryForLhsVariable->optionalValueLookup;
-    const auto& signalValueLookupOfRhsVariable = *symbolTableEntryForLhsVariable->optionalValueLookup;
+    const auto& signalValueLookupOfRhsVariable = *symbolTableEntryForRhsVariable->optionalValueLookup;
 
     signalValueLookupOfLhsVariable->swapValuesAndRestrictionsBetween(
             tryTransformAccessedDimensions(swapLhsOperand, false), tryTransformAccessedBitRange(swapLhsOperand),

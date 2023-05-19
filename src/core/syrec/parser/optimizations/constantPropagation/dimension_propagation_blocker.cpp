@@ -133,6 +133,7 @@ void DimensionPropagationBlocker::liftRestrictionForBitRange(const std::optional
         }
     }
     else {
+        isDimensionCompletelyBlocked = false;
         /*
          * Since the unblocked bit range leaves some of the signal still blocked, we need to either create the remaining restriction on a dimension or per value of dimension wide level
          */
@@ -142,13 +143,15 @@ void DimensionPropagationBlocker::liftRestrictionForBitRange(const std::optional
                 (*dimensionBitRangeAccessRestriction)->liftRestrictionFor(blockedBitRange);
             }
         } else {
-            BitRangeAccessRestriction remainingRestriction = BitRangeAccessRestriction(signalInformation.bitWidth);
-            remainingRestriction.liftRestrictionFor(blockedBitRange);
+            BitRangeAccessRestriction remainingRestrictionForUnblockedValueOfDimension = BitRangeAccessRestriction(signalInformation.bitWidth);
+            remainingRestrictionForUnblockedValueOfDimension.liftRestrictionFor(blockedBitRange);
 
             for (unsigned int valueOfDimension = 0; valueOfDimension < numValuesForDimension; ++valueOfDimension) {
-                if (valueOfDimension != *blockedValueOfDimension) {
-                    perValueOfDimensionBitRangeAccessRestrictionLookup.insert(std::make_pair(valueOfDimension, std::make_shared<BitRangeAccessRestriction>(remainingRestriction)));   
-                }
+                const auto restrictionForValueOfDimension = valueOfDimension == *blockedValueOfDimension
+                    ? remainingRestrictionForUnblockedValueOfDimension
+                    : BitRangeAccessRestriction(signalInformation.bitWidth);
+
+                perValueOfDimensionBitRangeAccessRestrictionLookup.insert(std::make_pair(valueOfDimension, std::make_shared<BitRangeAccessRestriction>(restrictionForValueOfDimension)));
             }
         }
     }

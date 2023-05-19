@@ -53,6 +53,7 @@ namespace valueLookup {
         );
 
         [[nodiscard]] optimizations::SignalDimensionInformation    getSignalInformation() const;
+        [[nodiscard]] std::vector<std::optional<unsigned int>>     copyDimensionAccessAndPadNotAccessedDimensionWithAccessToAllValuesOfDimension(const std::vector<std::optional<unsigned int>>& actualDimensionAccess) const;
         [[nodiscard]] virtual std::shared_ptr<BaseValueLookup<Vt>> clone() = 0;
         void                                                       copyRestrictionsAndMergeValuesFromAlternatives(const BaseValueLookup::ptr& alternativeOne, const BaseValueLookup::ptr& alternativeTwo);
         void                                                       copyRestrictionsAndInvalidateChangedValuesFrom(const BaseValueLookup::ptr& other);
@@ -67,7 +68,6 @@ namespace valueLookup {
 
         [[nodiscard]] std::optional<std::vector<unsigned int>> transformAccessOnDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions) const;
         [[nodiscard]] bool                                     isValueLookupBlockedFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const;
-
         /*
          * To have both static and dynamic polymorphism we need to use type erase to keep the dynamic part here
          * https://www.artima.com/articles/on-the-tension-between-object-oriented-and-generic-programming-in-c
@@ -76,18 +76,20 @@ namespace valueLookup {
         [[nodiscard]] virtual bool     canStoreValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const                                                      = 0;
         [[nodiscard]] virtual std::any extractPartsOfValue(const std::any& value, const optimizations::BitRangeAccessRestriction::BitRangeAccess& availableStorageSpace) const                                                = 0;
         [[nodiscard]] virtual std::any transformExistingValueByMergingWithNewOne(const std::any& currentValue, const std::any& newValue, const optimizations::BitRangeAccessRestriction::BitRangeAccess& partsToUpdate) const = 0;
-        [[nodiscard]] virtual std::any wrapValueOnOverflow(const std::any& value, unsigned int numBitsOfStorage) const                                                                                                        = 0;
-        
+        [[nodiscard]] virtual std::any wrapValueOnOverflow(const std::any& value, unsigned int numBitsOfStorage) const                                                                                                        = 0;                                                                                             
+
         template<typename Fn>
         void applyToBitsOfLastLayer(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange, Fn&& applyLambda);
 
         template<typename Fn>
-        void applyToLastLayerBitsWithRelativeDimensionAccessInformation(unsigned int currentDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, unsigned int numAccessedBits, std::vector<unsigned int>& relativeDimensionAccess, Fn&& applyLambda);
+        void applyToLastLayerBitsWithRelativeDimensionAccessInformation(std::size_t currentDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, std::size_t numAccessedBits, std::vector<unsigned int>& relativeDimensionAccess, Fn&& applyLambda);
 
         template<typename Fn>
-        void applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(unsigned int dimensionToStartFrom, unsigned int currentDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, unsigned int numAccessedBits, std::vector<unsigned int>& relativeDimensionAccess, Fn&& applyLambda);
+        void applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(std::size_t dimensionToStartFrom, std::size_t currentDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, std::size_t numAccessedBits, std::vector<unsigned int>& relativeDimensionAccess, Fn&& applyLambda);
 
-        static void copyRelativeDimensionAccess(const unsigned int offsetToRelativeDimensionInOriginalDimensionAccess, std::vector<std::optional<unsigned int>>& dimensionAccessContainer, const std::vector<unsigned int>& relativeDimensionAccess);
+        static void                                     mergeActualWithRelativeDimensionAccess(std::vector<std::optional<unsigned int>>& dimensionAccessContainer, std::size_t offsetToRelativeDimensionInOriginalDimensionAccess, const std::vector<unsigned int>& relativeDimensionAccess);
+        static std::vector<std::optional<unsigned int>> transformRelativeToActualDimensionAccess(const std::vector<unsigned int>& relativeDimensionAccess);
+        
         /*
         void liftRestrictionIfBitIsNotRestrictedAndHasValue(
                 const std::vector<unsigned int>&                                relativeDimensionAccess,

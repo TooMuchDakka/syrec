@@ -121,30 +121,23 @@ private:
 
     template<typename Fn>
     void applyRecursivelyOnLayerStartingFrom(const unsigned int startDimension, const std::optional<unsigned int>& valueOfStartDimension, const unsigned int currDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, Fn&& applyLambda) {
-        if (startDimension > accessedDimensions.size()) {
+        if (startDimension >= accessedDimensions.size()) {
             return;
         }
 
-        if (currDimension != startDimension) {
-            const auto& accessedValueOfCurrentDimension = accessedDimensions.at(currDimension);
+        const auto& accessedValueOfCurrentDimension = accessedDimensions.at(currDimension);
+        if (currDimension >= startDimension) {
+            applyLambda(layerData, accessedValueOfCurrentDimension);
+        }
+
+        if (currDimension < accessedDimensions.size() - 1) {
             if (accessedValueOfCurrentDimension.has_value()) {
-                if (currDimension < startDimension) {
-                    nextLayerLinks.at(*accessedValueOfCurrentDimension)->applyRecursivelyOnLayerStartingFrom(startDimension, valueOfStartDimension, currDimension + 1, accessedDimensions, applyLambda);
-                } else {
-                    applyLambda(layerData, accessedDimensions.at(currDimension));
-                }
+                nextLayerLinks.at(*accessedValueOfCurrentDimension)->applyRecursivelyOnLayerStartingFrom(startDimension, valueOfStartDimension, currDimension + 1, accessedDimensions, applyLambda);
             } else {
                 for (auto& nextLayerLink: nextLayerLinks) {
-                    if (currDimension < startDimension) {
-                        nextLayerLink->applyRecursivelyOnLayerStartingFrom(startDimension, valueOfStartDimension, currDimension + 1, accessedDimensions, applyLambda);
-                    } else {
-                        applyLambda(layerData, accessedDimensions.at(currDimension));
-                    }
+                    nextLayerLink->applyRecursivelyOnLayerStartingFrom(startDimension, valueOfStartDimension, currDimension + 1, accessedDimensions, applyLambda);
                 }
             }
-        }
-        else {
-            applyLambda(layerData, accessedDimensions.at(currDimension));
         }
     }
 };

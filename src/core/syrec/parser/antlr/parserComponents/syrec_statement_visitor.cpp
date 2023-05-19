@@ -115,7 +115,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
 
             const auto& containerOfExpressionContainingNewValue = (*assignmentOpRhsOperand)->getAsExpression();
             const auto& exprContainingNewValue = *containerOfExpressionContainingNewValue;
-
+            
             const auto assignStmt = std::make_shared<syrec::AssignStatement>(
                     assignedToSignalParts,
                     *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
@@ -133,7 +133,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                 addStatementToOpenContainer(assignStmt);
                 
                 // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
-                tryUpdateOrInvalidateStoredValueFor(assignedToSignalParts, exprContainingNewValue);
+                tryUpdateOrInvalidateStoredValueFor(assignedToSignalParts, tryDetermineNewSignalValueFromAssignment(assignedToSignalParts, *definedAssignmentOperation, exprContainingNewValue));
 
                 if (sharedData->optionalExpectedExpressionSignalWidth.has_value()) {
                     sharedData->optionalExpectedExpressionSignalWidth.reset();
@@ -219,8 +219,9 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                 }
                 addStatementToOpenContainer(finalAssignmentStmt);
 
+                const auto usedAssignmentOperationOfFinalAssignmentStmt = *ParserUtilities::mapInternalBinaryOperationFlagToEnum(typecastedAssignmentStmt->op);
                 // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
-                tryUpdateOrInvalidateStoredValueFor(finalAssignmentStmt->lhs, finalAssignmentStmt->rhs);
+                tryUpdateOrInvalidateStoredValueFor(finalAssignmentStmt->lhs, tryDetermineNewSignalValueFromAssignment(typecastedAssignmentStmt->lhs, usedAssignmentOperationOfFinalAssignmentStmt, finalAssignmentStmt->rhs));
                 statementIdx++;
             }
         }
@@ -530,6 +531,9 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
         return 0;
     }
 
+    /*
+     * Do not increment reference count when evaluating unoptimized guard and closing guard expression
+     */
     const auto& evaluationResultOfUnoptimizedGuardExpression = getUnoptimizedExpression(context->guardCondition);
     const auto& evaluationResultOfUnoptimizedMatchingGuardExpression = getUnoptimizedExpression(context->matchingGuardExpression);
     const auto& unoptimizedGuardExpr   = *evaluationResultOfUnoptimizedGuardExpression;
@@ -555,8 +559,10 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
             }
         }
         if (!unoptimizedGuardExpr->isConstantValue()) {
+            /*
+             * We only need to decrement the reference count of the variables used either in the guard or closing guard expression since we are assuming they are the same
+             */
             decrementReferenceCountForUsedVariablesInExpression(*unoptimizedGuardExpr->getAsExpression());
-            decrementReferenceCountForUsedVariablesInExpression(*unoptimizedClosingExpr->getAsExpression());   
         }
         return 0;
     }
@@ -777,12 +783,15 @@ bool SyReCStatementVisitor::doArgumentsBetweenCallAndUncallMatch(const TokenPosi
 [[nodiscard]] std::optional<ExpressionEvaluationResult::ptr> SyReCStatementVisitor::getUnoptimizedExpression(SyReCParser::ExpressionContext* context) {
     const auto backupOfConstantPropagationStatus = sharedData->parserConfig->performConstantPropagation;
     const auto backupOfReassociateConstantPropagationStatus = sharedData->parserConfig->reassociateExpressionsEnabled;
+    const auto backupOfCurrentlyInOmittedRegion             = sharedData->currentlyInOmittedRegion;
 
     sharedData->parserConfig->performConstantPropagation = false;
     sharedData->parserConfig->reassociateExpressionsEnabled = false;
+    sharedData->currentlyInOmittedRegion                    = true;
     const auto& unoptimizedExpression                       = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context);
     sharedData->parserConfig->performConstantPropagation    = backupOfConstantPropagationStatus;
     sharedData->parserConfig->reassociateExpressionsEnabled = backupOfReassociateConstantPropagationStatus;
+    sharedData->currentlyInOmittedRegion                    = backupOfCurrentlyInOmittedRegion;
     return unoptimizedExpression;
 }
 
@@ -805,9 +814,9 @@ bool SyReCStatementVisitor::areExpressionsEqual(const ExpressionEvaluationResult
 // TODO: CONSTANT_PROPAGATION: In case the rhs expr was a constant, should we trim its value in case it cannot be stored in the lhs ?
 void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const {
     // TODO: CONSTANT_PROPAGATION: Find a better way to not work with incorrect signal state in omitted if-condition branch
-    if (sharedData->currentlyInOmittedRegion) {
+    /*if (sharedData->currentlyInOmittedRegion) {
         return;
-    }
+    }*/
 
     const auto& constantValueOfExprContainingNewValue = std::dynamic_pointer_cast<syrec::NumericExpression>(exprContainingNewValue);
     const auto& variableToCopyValuesAndRestrictionsFrom = std::dynamic_pointer_cast<syrec::VariableExpression>(exprContainingNewValue);
@@ -901,17 +910,17 @@ void SyReCStatementVisitor::decrementReferenceCountForUsedVariablesInExpression(
         const auto& accessedVariable = expressionAsVariableAccess->var;
         sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(accessedVariable->var->name);
     }
-    if (const auto& expressionAsBinaryExpression = std::dynamic_pointer_cast<syrec::BinaryExpression>(expression); expressionAsBinaryExpression != nullptr) {
+    else if (const auto& expressionAsBinaryExpression = std::dynamic_pointer_cast<syrec::BinaryExpression>(expression); expressionAsBinaryExpression != nullptr) {
         decrementReferenceCountForUsedVariablesInExpression(expressionAsBinaryExpression->lhs);
         decrementReferenceCountForUsedVariablesInExpression(expressionAsBinaryExpression->rhs);
     }
-    if (const auto& expressionAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expression); expressionAsShiftExpr != nullptr) {
+    else if (const auto& expressionAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expression); expressionAsShiftExpr != nullptr) {
         decrementReferenceCountForUsedVariablesInExpression(expressionAsShiftExpr->lhs);
         if (expressionAsShiftExpr->rhs->isLoopVariable()) {
             sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(expressionAsShiftExpr->rhs->variableName());
         }
     }
-    if (const auto& expressionAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expression); expressionAsNumericExpr != nullptr) {
+    else if (const auto& expressionAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expression); expressionAsNumericExpr != nullptr) {
         if (expressionAsNumericExpr->value->isLoopVariable()) {
             sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(expressionAsNumericExpr->value->variableName());
         }
@@ -949,25 +958,23 @@ void SyReCStatementVisitor::mergeChangesFromBranchesAndUpdateSymbolTable(const S
             std::inserter(unionOfChangedSignalsOfBothBranches, unionOfChangedSignalsOfBothBranches.begin()));
 
     std::set<std::string> changedSignalsInBothBranches;
-
     std::set_intersection(
     changedSignalsInTrueBranch.cbegin(), changedSignalsInTrueBranch.cend(),
     changedSignalsInFalseBranch.cbegin(), changedSignalsInFalseBranch.cend(),
-    std::inserter(changedSignalsInBothBranches, changedSignalsInBothBranches.begin()));
+    std::inserter(changedSignalsInBothBranches, changedSignalsInBothBranches.begin()));   
 
     for (const auto& changedSignal: unionOfChangedSignalsOfBothBranches) {
         const valueLookup::SignalValueLookup::ptr originalValueOfSignal = *sharedData->currentSymbolTableScope->createBackupOfValueOfSignal(changedSignal);
-        if (changedSignalsInBothBranches.count(changedSignal) != 0) {
+        if (changedSignalsInBothBranches.count(changedSignal) != 0 && !canAnyBranchBeOmitted) {
             const auto& backupOfValueInTrueBranch = *valuesOfChangedSignalsInTrueBranch->getBackedupEntryFor(changedSignal);
             const auto& backupOfValueInFalseBranch = *valuesOfChangedSignalsInFalseBranch->getBackedupEntryFor(changedSignal);
             originalValueOfSignal->copyRestrictionsAndMergeValuesFromAlternatives(backupOfValueInTrueBranch, backupOfValueInFalseBranch);
         } else {
-            const auto& accessedDimensions = std::vector<std::optional<unsigned int>>(originalValueOfSignal->getSignalInformation().valuesPerDimension.size(), std::nullopt);
-            const bool  wasSignalOnlyChangedInTrueBranch = changedSignalsInTrueBranch.count(changedSignal) != 0;
-            const bool  wasSignalOnlyChangedInFalseBranch = changedSignalsInFalseBranch.count(changedSignal) != 0;
+            const bool  wasSignalOnlyChangedInTrueBranch  = ((canAnyBranchBeOmitted && !canTrueBranchBeOmitted) ? true : changedSignalsInFalseBranch.count(changedSignal) == 0)
+                && changedSignalsInTrueBranch.count(changedSignal) != 0;
 
-            const bool canUpdateBeIgnored = (wasSignalOnlyChangedInTrueBranch && canAnyBranchBeOmitted && canTrueBranchBeOmitted)
-                || (wasSignalOnlyChangedInFalseBranch && canAnyBranchBeOmitted && !canTrueBranchBeOmitted);
+            const bool canUpdateBeIgnored = (wasSignalOnlyChangedInTrueBranch && canAnyBranchBeOmitted && canTrueBranchBeOmitted) ||
+                                            (!wasSignalOnlyChangedInTrueBranch && canAnyBranchBeOmitted && !canTrueBranchBeOmitted);
 
             if (canUpdateBeIgnored) {
                 continue;
@@ -980,11 +987,11 @@ void SyReCStatementVisitor::mergeChangesFromBranchesAndUpdateSymbolTable(const S
                 }
                 else {
                     originalValueOfSignal->copyRestrictionsAndUnrestrictedValuesFrom(
-                            accessedDimensions,
+                           {},
                             std::nullopt,
-                            accessedDimensions,
+                           {},
                             std::nullopt,
-                            *backupOfValueInTrueBranch);    
+                            *backupOfValueInTrueBranch); 
                 }
             } else {
                 const auto& backupOfValueInFalseBranch = *valuesOfChangedSignalsInFalseBranch->getBackedupEntryFor(changedSignal);
@@ -992,9 +999,9 @@ void SyReCStatementVisitor::mergeChangesFromBranchesAndUpdateSymbolTable(const S
                     originalValueOfSignal->copyRestrictionsAndInvalidateChangedValuesFrom(backupOfValueInFalseBranch);
                 } else {
                     originalValueOfSignal->copyRestrictionsAndUnrestrictedValuesFrom(
-                            accessedDimensions,
+                            {},
                             std::nullopt,
-                            accessedDimensions,
+                            {},
                             std::nullopt,
                             *backupOfValueInFalseBranch);
                 }
@@ -1005,10 +1012,25 @@ void SyReCStatementVisitor::mergeChangesFromBranchesAndUpdateSymbolTable(const S
 }
 
 void SyReCStatementVisitor::createAndStoreBackupForAssignedToSignal(const syrec::VariableAccess::ptr& assignedToSignalParts) const {
-    if (const auto& ifConditionBranchAssignedSignalsBackupHelper = sharedData->getCurrentLocalSignalValueBackupScope(); ifConditionBranchAssignedSignalsBackupHelper.has_value()) {
-        const auto& assignedToSignal = assignedToSignalParts->var->name;
+    const auto& assignedToSignal = assignedToSignalParts->var->name;
+    if (const auto& ifConditionBranchAssignedSignalsBackupHelper = sharedData->getCurrentLocalSignalValueBackupScope(); ifConditionBranchAssignedSignalsBackupHelper.has_value() && !(*ifConditionBranchAssignedSignalsBackupHelper)->hasEntryFor(assignedToSignal)) {
         if (const auto& copyOfCurrentValueOfAssignedToSignal = sharedData->currentSymbolTableScope->createBackupOfValueOfSignal(assignedToSignal); copyOfCurrentValueOfAssignedToSignal.has_value()) {
             ifConditionBranchAssignedSignalsBackupHelper.value()->storeBackupOf(assignedToSignal, *copyOfCurrentValueOfAssignedToSignal);
         }
     }
 }
+
+syrec::expression::ptr SyReCStatementVisitor::tryDetermineNewSignalValueFromAssignment(const syrec::VariableAccess::ptr& assignedToSignal, syrec_operation::operation assignmentOp, const syrec::expression::ptr& assignmentStmtRhsExpr) const {
+    const auto& assignmentRhsExprAsConstant = std::dynamic_pointer_cast<syrec::NumericExpression>(assignmentStmtRhsExpr);
+    const auto& currentValueOfAssignedToSignal = sharedData->currentSymbolTableScope->tryFetchValueForLiteral(assignedToSignal);
+
+    if (assignmentRhsExprAsConstant == nullptr || !assignmentRhsExprAsConstant->value->isConstant() || !currentValueOfAssignedToSignal.has_value()) {
+        return assignmentStmtRhsExpr;
+    }
+
+    const auto& assignmentRhsExprEvaluated = assignmentRhsExprAsConstant->value->evaluate({});
+    return std::make_shared<syrec::NumericExpression>(
+            std::make_shared<syrec::Number>(*syrec_operation::apply(assignmentOp, *currentValueOfAssignedToSignal, assignmentRhsExprEvaluated)),
+            assignmentStmtRhsExpr->bitwidth());
+}
+

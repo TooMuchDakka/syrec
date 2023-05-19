@@ -18,6 +18,7 @@ namespace parser {
         [[nodiscard]] const std::map<std::string, valueLookup::SignalValueLookup::ptr>& getBackedUpEntries() const;
         [[nodiscard]] std::optional<valueLookup::SignalValueLookup::ptr>                getBackedupEntryFor(const std::string& signalIdent) const;
         [[nodiscard]] std::set<std::string>                                             getIdentsOfChangedSignals() const;
+        [[nodiscard]] bool                                                              hasEntryFor(const std::string& signalIdent) const;
 
 	private:
         std::map<std::string, valueLookup::SignalValueLookup::ptr> backedUpSymbolTableEntries;

@@ -3,7 +3,7 @@
 using namespace parser;
 
 void SymbolTableBackupHelper::storeBackupOf(const std::string& signalIdent, const valueLookup::SignalValueLookup::ptr& currentValueOfSignal) {
-    if (backedUpSymbolTableEntries.count(signalIdent) != 0) {
+    if (!hasEntryFor(signalIdent) != 0) {
         backedUpSymbolTableEntries[signalIdent] = currentValueOfSignal;
     } else {
         backedUpSymbolTableEntries.insert(std::pair(signalIdent, currentValueOfSignal));
@@ -15,7 +15,7 @@ const std::map<std::string, valueLookup::SignalValueLookup::ptr>& SymbolTableBac
 }
 
 std::optional<valueLookup::SignalValueLookup::ptr> SymbolTableBackupHelper::getBackedupEntryFor(const std::string& signalIdent) const {
-    if (backedUpSymbolTableEntries.count(signalIdent) == 0) {
+    if (!hasEntryFor(signalIdent)) {
         return std::nullopt;
     }
     return std::make_optional(backedUpSymbolTableEntries.at(signalIdent));
@@ -29,4 +29,6 @@ std::set<std::string> SymbolTableBackupHelper::getIdentsOfChangedSignals() const
     return idents;
 }
 
-
+bool SymbolTableBackupHelper::hasEntryFor(const std::string& signalIdent) const {
+    return backedUpSymbolTableEntries.count(signalIdent) != 0;
+}
