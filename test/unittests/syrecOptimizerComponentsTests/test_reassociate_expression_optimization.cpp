@@ -1,4 +1,4 @@
-#include "syrec_ast_dump_utils.hpp"
+#include "core/syrec/parser/utils/syrec_ast_dump_utils.hpp"
 #include "test_case_creation_utils.hpp"
 
 #include "gtest/gtest.h"

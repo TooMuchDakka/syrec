@@ -58,3 +58,4 @@ var/
 .installed.cfg
 *.egg
 .pytest_cache/
+/test/unittests/syrecOptimizerComponentsTests/testdata/other.json

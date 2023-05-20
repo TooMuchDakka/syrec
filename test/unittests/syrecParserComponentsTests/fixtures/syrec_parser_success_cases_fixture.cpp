@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <fstream>
 
-#include "syrec_ast_dump_utils.hpp"
+#include "core/syrec/parser/utils/syrec_ast_dump_utils.hpp"
 #include "core/syrec/program.hpp"
 
 using json = nlohmann::json;
