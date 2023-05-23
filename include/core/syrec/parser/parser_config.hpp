@@ -12,6 +12,7 @@ namespace parser {
         bool         deadCodeEliminationEnabled;
         bool         performConstantPropagation;
         bool         noAdditionalLineOptimizationEnabled;
+        bool         operationStrengthReductionEnabled;
         std::string  expectedMainModuleName;
 
         explicit ParserConfig(
@@ -22,6 +23,7 @@ namespace parser {
                 const bool         isRemovalOfUnusedVariablesAndModulesEnabled = false,
                 const bool         performConstantPropagation                  = false,
                 const bool         noAdditionalLineOptimizationEnabled         = false,
+                const bool         operationStrengthReductionEnabled            = false,
                 std::string  expectedMainModuleName                      = "main"):
                 cDefaultSignalWidth(defaultSignalWidth),
                 supportBroadcastingExpressionOperands(supportBroadcastingExpressionOperands),
@@ -30,19 +32,21 @@ namespace parser {
                 deadCodeEliminationEnabled(isRemovalOfUnusedVariablesAndModulesEnabled),
                 performConstantPropagation(performConstantPropagation),
                 noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
+                operationStrengthReductionEnabled(operationStrengthReductionEnabled),
                 expectedMainModuleName(std::move(expectedMainModuleName))
                 {}
 
         
         ParserConfig& operator=(const ParserConfig& copy) {
             cDefaultSignalWidth = copy.cDefaultSignalWidth;
-            supportBroadcastingExpressionOperands = copy.supportBroadcastingExpressionOperands;
-            supportBroadcastingAssignmentOperands = copy.supportBroadcastingAssignmentOperands;
-            reassociateExpressionsEnabled         = copy.reassociateExpressionsEnabled;
-            deadCodeEliminationEnabled = copy.deadCodeEliminationEnabled;
-            performConstantPropagation                  = copy.performConstantPropagation;
-            noAdditionalLineOptimizationEnabled         = copy.noAdditionalLineOptimizationEnabled;
-            expectedMainModuleName                      = copy.expectedMainModuleName;
+            supportBroadcastingExpressionOperands        = copy.supportBroadcastingExpressionOperands;
+            supportBroadcastingAssignmentOperands        = copy.supportBroadcastingAssignmentOperands;
+            reassociateExpressionsEnabled                = copy.reassociateExpressionsEnabled;
+            deadCodeEliminationEnabled                   = copy.deadCodeEliminationEnabled;
+            performConstantPropagation                   = copy.performConstantPropagation;
+            noAdditionalLineOptimizationEnabled          = copy.noAdditionalLineOptimizationEnabled;
+            operationStrengthReductionEnabled            = copy.operationStrengthReductionEnabled;
+            expectedMainModuleName                       = copy.expectedMainModuleName;
             return *this;
         }
     };

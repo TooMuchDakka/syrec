@@ -179,13 +179,13 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                 bool                   couldSimplifyRhsExpr  = false;
                 syrec::expression::ptr assignmentStmtRhsExpr = typecastedAssignmentStmt->rhs;
                 if (!sharedData->parserConfig->reassociateExpressionsEnabled) {
-                    const auto& simplifiedRhsExpr = optimizations::simplifyBinaryExpression(assignmentStmtRhsExpr);
+                    const auto& simplifiedRhsExpr = optimizations::simplifyBinaryExpression(assignmentStmtRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled);
                     couldSimplifyRhsExpr = assignmentStmtRhsExpr != simplifiedRhsExpr;
                     if (couldSimplifyRhsExpr) {
                         assignmentStmtRhsExpr = simplifiedRhsExpr;
                     }
                 } else {
-                    const auto& simplificationResultOfRhsExpr = optimizations::trySimplify(assignmentStmtRhsExpr);
+                    const auto& simplificationResultOfRhsExpr = optimizations::trySimplify(assignmentStmtRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled);
                     if (simplificationResultOfRhsExpr.couldSimplify) {
                         assignmentStmtRhsExpr = simplificationResultOfRhsExpr.simplifiedExpression;
                         couldSimplifyRhsExpr  = true;

@@ -12,6 +12,6 @@ namespace optimizations {
             couldSimplify(couldSimplify), simplifiedExpression(std::move(simplifiedExpression)) {}
     };
 
-    [[nodiscard]] BinaryExpressionSimplificationResult trySimplify(const syrec::expression::ptr& binaryExpr);
+    [[nodiscard]] BinaryExpressionSimplificationResult trySimplify(const syrec::expression::ptr& binaryExpr, bool shouldPerformOperationStrengthReduction);
 };
 #endif

@@ -12,15 +12,17 @@ namespace syrec {
         explicit ReadProgramSettings(
             unsigned bitwidth = 32U,
             bool reassociateExpressionEnabled = false,
-            bool removalOfUnusedVariablesAndModulesEnabled = false,
+            bool deadCodeEliminationEnabled = false,
             bool performConstantPropagation = false,
             bool noAdditionalLineOptimizationEnabled = false,
+            bool operationStrengthReductionEnabled = false,
             std::string expectedMainModuleName = "main"):
             defaultBitwidth(bitwidth),
             reassociateExpressionEnabled(reassociateExpressionEnabled),
-            deadCodeEliminationEnabled(removalOfUnusedVariablesAndModulesEnabled),
+            deadCodeEliminationEnabled(deadCodeEliminationEnabled),
             performConstantPropagation(performConstantPropagation),
             noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
+            operationStrengthReductionEnabled(operationStrengthReductionEnabled),
             expectedMainModuleName(expectedMainModuleName)
         {};
         unsigned    defaultBitwidth;
@@ -28,6 +30,7 @@ namespace syrec {
         bool        deadCodeEliminationEnabled;
         bool        performConstantPropagation;
         bool        noAdditionalLineOptimizationEnabled;
+        bool        operationStrengthReductionEnabled;
         std::string expectedMainModuleName;
     };
 

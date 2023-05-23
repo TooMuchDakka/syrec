@@ -1,10 +1,12 @@
 #include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 #include "core/syrec/parser/operation.hpp"
+#include "core/syrec/parser/optimizations/operation_strength_reduction.hpp"
+
 #include <core/syrec/parser/parser_utilities.hpp>
 
 using namespace optimizations;
 
-static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExpr(const std::variant<std::shared_ptr<syrec::ShiftExpression>, std::shared_ptr<syrec::BinaryExpression>>& exprToOptimize, bool onlyTopLevelExpr) {
+static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExpr(const std::variant<std::shared_ptr<syrec::ShiftExpression>, std::shared_ptr<syrec::BinaryExpression>>& exprToOptimize, bool onlyTopLevelExpr, bool shouldPerformOperationStrengthReduction) {
     const auto&            isExprBinaryOne = std::holds_alternative<std::shared_ptr<syrec::BinaryExpression>>(exprToOptimize);
 
     syrec::expression::ptr referenceExpression;
@@ -25,7 +27,7 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
         usedOperation              = exprAsShiftOne->op;
     }
 
-    const auto mappedFlagToEnum = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(usedOperation);
+    auto mappedFlagToEnum = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(usedOperation);
     if (!mappedFlagToEnum.has_value()) {
         return BinaryExpressionSimplificationResult(false, referenceExpression);
     }
@@ -58,14 +60,14 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
             if (onlyTopLevelExpr) {
                 return BinaryExpressionSimplificationResult(true, exprRhsOperand);
             }
-            const auto& simplificationResultOfRhs = trySimplify(exprRhsOperand);
+            const auto& simplificationResultOfRhs = trySimplify(exprRhsOperand, shouldPerformOperationStrengthReduction);
             return BinaryExpressionSimplificationResult(true, simplificationResultOfRhs.simplifiedExpression);   
         }
         if (!isLeftOperandConstant && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedFlagToEnum, *rExprAsConstantValue)) {
             if (onlyTopLevelExpr) {
                 return BinaryExpressionSimplificationResult(true, exprLhsOperand);
             }
-            const auto& simplificationResultOfLhs = trySimplify(exprLhsOperand);
+            const auto& simplificationResultOfLhs = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction);
             return BinaryExpressionSimplificationResult(true, simplificationResultOfLhs.simplifiedExpression);   
         }
 
@@ -87,7 +89,7 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
             case syrec_operation::operation::shift_left:
             case syrec_operation::operation::shift_right:
                 if (!isLeftOperandConstant && *rExprAsConstantValue == 0) {
-                    const auto& simplificationResultOfNonConstantOperand = trySimplify(exprLhsOperand);
+                    const auto& simplificationResultOfNonConstantOperand = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction);
                     return BinaryExpressionSimplificationResult(true, simplificationResultOfNonConstantOperand.simplifiedExpression);
                 }
                 if (isLeftOperandConstant && *lExprAsConstantValue == 0) {
@@ -103,14 +105,25 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
             const auto simplificationResult = std::make_shared<syrec::NumericExpression>(containerForResult, referenceExpression->bitwidth());
             return BinaryExpressionSimplificationResult(true, simplificationResult);
         }
+
+        // TODO: Do we need to refetch the rhs expression ? We would expect that it is updated automatically since we are only holding references to it ?
+        /*
+         * Since operation strength can change the operation of a binary expression, we need to update the used operation of the binary expression
+         */
+        if (tryPerformOperationStrengthReduction(referenceExpression)) {
+            mappedFlagToEnum = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(usedOperation);
+            if (!mappedFlagToEnum.has_value()) {
+                return BinaryExpressionSimplificationResult(false, referenceExpression);
+            }
+        }
     }
 
     if (onlyTopLevelExpr) {
         return BinaryExpressionSimplificationResult(false, referenceExpression);
     }
 
-    const auto& simplificationResultOfLhs = trySimplify(exprLhsOperand);
-    const auto& simplificationResultOfRhs = trySimplify(exprRhsOperand);
+    const auto& simplificationResultOfLhs = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction);
+    const auto& simplificationResultOfRhs = trySimplify(exprRhsOperand, shouldPerformOperationStrengthReduction);
 
     if (simplificationResultOfLhs.couldSimplify || simplificationResultOfRhs.couldSimplify) {
         const auto& newBinaryExpr = std::make_shared<syrec::BinaryExpression>(
@@ -118,22 +131,22 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
                 *parser::ParserUtilities::mapOperationToInternalFlag(*mappedFlagToEnum),
                 simplificationResultOfRhs.simplifiedExpression);
 
-        const auto& simplificationResultOfNewTopLevelBinaryExpr = trySimplifyOptionallyOnlyTopLevelExpr(newBinaryExpr, true);
+        const auto& simplificationResultOfNewTopLevelBinaryExpr = trySimplifyOptionallyOnlyTopLevelExpr(newBinaryExpr, true, shouldPerformOperationStrengthReduction);
         return BinaryExpressionSimplificationResult(true, simplificationResultOfNewTopLevelBinaryExpr.simplifiedExpression);
     }
     return BinaryExpressionSimplificationResult(false, referenceExpression);
 
 }
 
-BinaryExpressionSimplificationResult optimizations::trySimplify(const syrec::expression::ptr& expr) {
+BinaryExpressionSimplificationResult optimizations::trySimplify(const syrec::expression::ptr& expr, bool shouldPerformOperationStrengthReduction) {
     const std::shared_ptr<syrec::BinaryExpression> exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     const std::shared_ptr<syrec::ShiftExpression> exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr);
     
     if (exprAsBinaryExpr != nullptr) {
-        return trySimplifyOptionallyOnlyTopLevelExpr(exprAsBinaryExpr, false);
+        return trySimplifyOptionallyOnlyTopLevelExpr(exprAsBinaryExpr, false, shouldPerformOperationStrengthReduction);
     }
     if (exprAsShiftExpr != nullptr) {
-        return trySimplifyOptionallyOnlyTopLevelExpr(exprAsShiftExpr, false);
+        return trySimplifyOptionallyOnlyTopLevelExpr(exprAsShiftExpr, false, shouldPerformOperationStrengthReduction);
     }
     return BinaryExpressionSimplificationResult(false, expr);
 }

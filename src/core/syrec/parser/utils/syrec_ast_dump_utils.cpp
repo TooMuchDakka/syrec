@@ -15,7 +15,7 @@ std::string SyrecASTDumper::stringifyModules(const syrec::Module::vec& modules) 
     return resultBuffer.str();
 }
 
-std::string SyrecASTDumper::stringifyModule(const syrec::Module::ptr& moduleToStringify) {
+std::string SyrecASTDumper::stringifyModule(const syrec::Module::ptr& moduleToStringify)  {
     const std::string stringifiedParameters = stringifyAndJoinMany(moduleToStringify->parameters, this->dumpConfig.parameterDelimiter.c_str(), stringifyVariable);
     const std::string stringifiedLocals = stringifyModuleLocals(moduleToStringify->variables);
     const std::string stringifiedStmts      = stringifyStatements(moduleToStringify->statements);
@@ -25,7 +25,7 @@ std::string SyrecASTDumper::stringifyModule(const syrec::Module::ptr& moduleToSt
         + stringifiedStmts;
 }
 
-std::string SyrecASTDumper::stringifyModuleLocals(const syrec::Variable::vec& moduleLocals) {
+std::string SyrecASTDumper::stringifyModuleLocals(const syrec::Variable::vec& moduleLocals)  {
     if (moduleLocals.empty())
         return "";
 
@@ -59,7 +59,7 @@ inline std::string SyrecASTDumper::stringifyStatements(const syrec::Statement::v
     return resultBuffer.str();
 }
 
-std::string SyrecASTDumper::stringifyStatement(const syrec::Statement::ptr& statement) {
+std::string SyrecASTDumper::stringifyStatement(const syrec::Statement::ptr& statement)  {
     if (auto const* swapStmt = dynamic_cast<syrec::SwapStatement*>(statement.get())) {
         return stringifySwapStatement(*swapStmt);
     }
@@ -107,11 +107,11 @@ std::string SyrecASTDumper::stringifyAssignStatement(const syrec::AssignStatemen
     return stringifyVariableAccess(assignStmt.lhs) + " " + assignOpStringified + " " + stringifyExpression(assignStmt.rhs);
 }
 
-inline std::string SyrecASTDumper::stringifyCallStatement(const syrec::CallStatement& callStmt) const {
+inline std::string SyrecASTDumper::stringifyCallStatement(const syrec::CallStatement& callStmt)  {
     return "call " + callStmt.target->name + "(" + stringifyAndJoinMany<std::string>(callStmt.parameters, this->dumpConfig.parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
 }
 
-inline std::string SyrecASTDumper::stringifyUncallStatement(const syrec::UncallStatement& uncallStmt) const {
+inline std::string SyrecASTDumper::stringifyUncallStatement(const syrec::UncallStatement& uncallStmt)  {
     return "uncall " + uncallStmt.target->name + "(" + stringifyAndJoinMany<std::string>(uncallStmt.parameters, this->dumpConfig.parameterDelimiter.c_str(), [](const std::string& parameter) { return parameter; }) + ")";
 }
 

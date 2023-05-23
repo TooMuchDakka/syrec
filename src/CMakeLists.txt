@@ -56,6 +56,7 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.cpp
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/no_additional_line_assignment.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operation_strength_reduction.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/reassociate_expression.cpp
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/bit_range_access_restriction.cpp
@@ -92,6 +93,7 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_parser_interface.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/no_additional_line_assignment.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operation_strength_reduction.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/reassociate_expression.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/bit_range_access_restriction.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/dimension_propagation_blocker.hpp

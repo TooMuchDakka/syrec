@@ -68,8 +68,8 @@ namespace syrecAstDumpUtils {
         [[nodiscard]] std::string stringifyStatement(const syrec::Statement::ptr& statement);
         [[nodiscard]] static std::string stringifySwapStatement(const syrec::SwapStatement& swapStmt);
         [[nodiscard]] static std::string stringifyAssignStatement(const syrec::AssignStatement& assignStmt);
-        [[nodiscard]] std::string stringifyCallStatement(const syrec::CallStatement& callStmt) const;
-        [[nodiscard]] std::string stringifyUncallStatement(const syrec::UncallStatement& uncallStmt) const;
+        [[nodiscard]] std::string stringifyCallStatement(const syrec::CallStatement& callStmt);
+        [[nodiscard]] std::string stringifyUncallStatement(const syrec::UncallStatement& uncallStmt);
         [[nodiscard]] static std::string stringifyUnaryStatement(const syrec::UnaryStatement& unaryStmt);
         [[nodiscard]] static std::string stringifySkipStatement();
         [[nodiscard]] std::string stringifyForStatement(const syrec::ForStatement& forStmt);
