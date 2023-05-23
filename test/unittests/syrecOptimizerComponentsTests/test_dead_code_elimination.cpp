@@ -9,9 +9,9 @@
 
 using namespace syrec;
 
-class RemovalOfUnusedVariablesAndModulesTest: public testing::TestWithParam<std::string> {
+class DeadCodeEliminationTest: public testing::TestWithParam<std::string> {
 public:
-    inline static const std::string pathToTestCaseFile = "./unittests/syrecOptimizerComponentsTests/testdata/removal_of_unused_variables_and_modules.json";
+    inline static const std::string pathToTestCaseFile = "./unittests/syrecOptimizerComponentsTests/testdata/dead_code_elimination.json";
 
 private:
     const std::string cJsonKeyCircuit               = "circuit";
@@ -25,20 +25,15 @@ protected:
     std::string circuitToOptimize;
     std::string expectedOptimizedCircuit;
 
-    explicit RemovalOfUnusedVariablesAndModulesTest():
+    explicit DeadCodeEliminationTest():
         astDumper(syrecAstDumpUtils::SyrecASTDumper(true)), config(16, true, true, true) {}
 
     void SetUp() override {
         const std::string testCaseJsonKey = GetParam();
 
-        std::ifstream configFileStream(RemovalOfUnusedVariablesAndModulesTest::pathToTestCaseFile, std::ios_base::in);
+        std::ifstream configFileStream(DeadCodeEliminationTest::pathToTestCaseFile, std::ios_base::in);
         ASSERT_TRUE(configFileStream.good()) << "Could not open test data json file @ "
-                                             << RemovalOfUnusedVariablesAndModulesTest::pathToTestCaseFile;
-
-
-
-
-
+                                             << DeadCodeEliminationTest::pathToTestCaseFile;
 
         const nlohmann::json parsedJson = nlohmann::json::parse(configFileStream);
         ASSERT_TRUE(parsedJson.contains(testCaseJsonKey)) << "Required entry for given test case with key '" << testCaseJsonKey << "' was not found";
@@ -59,14 +54,14 @@ protected:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(SyReCOptimizations, RemovalOfUnusedVariablesAndModulesTest,
-                         testing::ValuesIn(syrecTestUtils::loadTestCasesNamesFromFile(RemovalOfUnusedVariablesAndModulesTest::pathToTestCaseFile, {})),
-                         [](const testing::TestParamInfo<RemovalOfUnusedVariablesAndModulesTest::ParamType>& info) {
+INSTANTIATE_TEST_SUITE_P(SyReCOptimizations, DeadCodeEliminationTest,
+                         testing::ValuesIn(syrecTestUtils::loadTestCasesNamesFromFile(DeadCodeEliminationTest::pathToTestCaseFile, {})),
+                         [](const testing::TestParamInfo<DeadCodeEliminationTest::ParamType>& info) {
                              auto s = info.param;
                              std::replace( s.begin(), s.end(), '-', '_');
                              return s; });
 
-TEST_P(RemovalOfUnusedVariablesAndModulesTest, GenericRemovalOfUnusedVariableAndModulesTest) {
+TEST_P(DeadCodeEliminationTest, GenericRemovalOfUnusedVariableAndModulesTest) {
     std::string errorsFromParsedCircuit;
     ASSERT_NO_THROW(errorsFromParsedCircuit = parserPublicInterface.readFromString(circuitToOptimize, config));
     ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors";

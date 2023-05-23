@@ -36,10 +36,12 @@ namespace parser {
         std::any visitStatementList(SyReCParser::StatementListContext* context) override;
 
         void removeUnusedVariablesAndParametersFromModule(const syrec::Module::ptr& module) const;
-        void removeUnusedModules(const std::string_view& expectedIdentOfTopLevelModuleToNotRemove);
-        void removeModulesWithoutParameters(const std::string_view& expectedIdentOfTopLevelModuleToNotRemove);
+        void removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(syrec::Module::vec& unoptimizedModules, syrec::Module::vec& optimizedModules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const;
+        void removeModulesWithoutParameters(syrec::Module::vec& modules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const;
 
         [[nodiscard]] std::string determineExpectedNameOfTopLevelModule() const;
+        [[nodiscard]] syrec::Module::ptr createCopyOfModule(const syrec::Module::ptr& moduleToCreateCopyFrom) const;
+        [[nodiscard]] std::vector<bool> determineUnusedParametersBetweenModuleVersions(const syrec::Module::ptr& unoptimizedModule, const syrec::Module::ptr& optimizedModule) const;
 
         static std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
         static std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);

@@ -21,37 +21,58 @@ syrec::Module::vec       SyReCModuleVisitor::getFoundModules() const {
     return foundModules;
 }
 
+// TODO: DEAD_CODE_ELIMINATION: Modules with only in parameters can also be removed
 std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) {
-    const auto                                dimensions = std::vector<unsigned int>({2, 4, 3});
-    const valueLookup::SignalValueLookup::ptr x = std::make_shared<valueLookup::SignalValueLookup>(valueLookup::SignalValueLookup(10, dimensions, 10)); 
-    x->invalidateStoredValueFor({1, std::nullopt});
-    const auto y = x->tryFetchValueFor({0, 3, 1}, std::nullopt);
-
     SymbolTable::openScope(sharedData->currentSymbolTableScope);
-    for (const auto& module: context->module()) {
+
+    syrec::Module::vec unoptimizedModules;
+    for (std::size_t i = 0; i < context->module().size(); ++i) {
+        const auto module = context->module().at(i);
+        /*
+         * We have moved the opening and closing of a new symbol table scope from the module visitor here, into the parent,
+         * to not lose information about the declared symbols of the module that is required for some optimizations
+         */
+        SymbolTable::openScope(sharedData->currentSymbolTableScope);
         const auto moduleParseResult = tryVisitAndConvertProductionReturnValue<syrec::Module::ptr>(module);
+        bool       alreadyClosedOpenedSymbolTableScope = false;
+
         if (moduleParseResult.has_value()) {
             if (sharedData->currentSymbolTableScope->contains(*moduleParseResult)) {
                 createError(mapAntlrTokenPosition(module->IDENT()->getSymbol()), fmt::format(DuplicateModuleIdentDeclaration, (*moduleParseResult)->name));
             } else {
-                sharedData->currentSymbolTableScope->addEntry(*moduleParseResult);
-                foundModules.emplace_back(moduleParseResult.value());
+                const auto& unoptimizedModuleVersion       = *moduleParseResult;
+                auto        optimizedModuleVersion         = unoptimizedModuleVersion;
+                auto        unusedStatusPerModuleParameter = std::vector(unoptimizedModuleVersion->parameters.size(), false);
+                if (sharedData->parserConfig->deadCodeEliminationEnabled) {
+                    optimizedModuleVersion = createCopyOfModule(unoptimizedModuleVersion);
+                    // TODO: UNUSED_REFERENCE - Marked as used
+                    removeUnusedVariablesAndParametersFromModule(optimizedModuleVersion);
+                    unusedStatusPerModuleParameter = determineUnusedParametersBetweenModuleVersions(unoptimizedModuleVersion, optimizedModuleVersion);
+                }
+                alreadyClosedOpenedSymbolTableScope = true;
+                SymbolTable::closeScope(sharedData->currentSymbolTableScope);
+                sharedData->currentSymbolTableScope->addEntry(unoptimizedModuleVersion, unusedStatusPerModuleParameter);
+                unoptimizedModules.emplace_back(unoptimizedModuleVersion);
+                foundModules.emplace_back(optimizedModuleVersion);   
             }
+        }
+
+        if (!alreadyClosedOpenedSymbolTableScope) {
+            SymbolTable::closeScope(sharedData->currentSymbolTableScope);
         }
     }
     
     const auto& nameOfTopLevelModule = determineExpectedNameOfTopLevelModule();
     // TODO: UNUSED_REFERENCE - Marked as used
     if (sharedData->parserConfig->deadCodeEliminationEnabled) {
-        removeUnusedModules(nameOfTopLevelModule);
-        removeModulesWithoutParameters(nameOfTopLevelModule);
+        removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(unoptimizedModules, foundModules, nameOfTopLevelModule);
+        removeModulesWithoutParameters(foundModules, nameOfTopLevelModule);
     }
 
     return 0;
 }
 
 std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
-    SymbolTable::openScope(sharedData->currentSymbolTableScope);
     sharedData->currentModuleCallNestingLevel++;
 
     // TODO: Wrap into optional, since token could be null if no alternative rule is found and the moduleProduction is choosen instead (as the first alternative from the list of possible ones if nothing else matches)
@@ -78,19 +99,15 @@ std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
     }
 
     const auto validUserDefinedModuleStatements = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
-    isDeclaredModuleValid &= validUserDefinedModuleStatements.has_value() && !validUserDefinedModuleStatements->empty();
-
-    // TODO: UNUSED_REFERENCE - Marked as used
-    if (isDeclaredModuleValid && sharedData->parserConfig->deadCodeEliminationEnabled) {
-        removeUnusedVariablesAndParametersFromModule(module);
-    }
-
-    SymbolTable::closeScope(sharedData->currentSymbolTableScope);
+    //isDeclaredModuleValid &= validUserDefinedModuleStatements.has_value() && !validUserDefinedModuleStatements->empty();
+    
     sharedData->currentModuleCallNestingLevel--;
 
     if (isDeclaredModuleValid) {
         lastDeclaredModuleIdent = moduleIdent;
-        module->statements = *validUserDefinedModuleStatements;
+        if (validUserDefinedModuleStatements.has_value()) {
+            module->statements = *validUserDefinedModuleStatements;   
+        }
         return std::make_optional(module);
     }
     return std::nullopt;
@@ -219,31 +236,31 @@ void SyReCModuleVisitor::removeUnusedVariablesAndParametersFromModule(const syre
 }
 
 // TODO: UNUSED_REFERENCE - Marked as used
-void SyReCModuleVisitor::removeUnusedModules(const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) {
-    const auto& wasUsedStatusPerFoundModule = sharedData->currentSymbolTableScope->determineIfModuleWasUsed(foundModules);
+void SyReCModuleVisitor::removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(syrec::Module::vec& unoptimizedModules, syrec::Module::vec& optimizedModules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const {
+    const auto& wasUsedStatusPerFoundModule = sharedData->currentSymbolTableScope->determineIfModuleWasUsed(unoptimizedModules);
     std::size_t moduleIdx                   = 0;
 
-    for (auto foundModule = foundModules.begin(); foundModule != foundModules.end(); moduleIdx++) {
+    for (auto foundModule = optimizedModules.begin(); foundModule != optimizedModules.end(); moduleIdx++) {
         if (foundModule->get()->name == expectedIdentOfTopLevelModuleToNotRemove 
             || wasUsedStatusPerFoundModule.at(moduleIdx)) {
             ++foundModule;
         }
         else {
-            foundModule = foundModules.erase(foundModule);   
+            foundModule = optimizedModules.erase(foundModule);   
         }
     }
 }
 
 // TODO: UNUSED_REFERENCE - Marked as used
-void SyReCModuleVisitor::removeModulesWithoutParameters(const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) {
-    foundModules.erase(
+void SyReCModuleVisitor::removeModulesWithoutParameters(syrec::Module::vec& modules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const {
+    modules.erase(
     std::remove_if(
-            foundModules.begin(),
-            foundModules.end(),
+            modules.begin(),
+            modules.end(),
             [&expectedIdentOfTopLevelModuleToNotRemove](const syrec::Module::ptr& module) {
                 return module->name != expectedIdentOfTopLevelModuleToNotRemove && module->parameters.empty();
             }),
-    foundModules.end());
+    modules.end());
 }
 
 std::string SyReCModuleVisitor::determineExpectedNameOfTopLevelModule() const {
@@ -255,6 +272,40 @@ std::string SyReCModuleVisitor::determineExpectedNameOfTopLevelModule() const {
                 return module->name == defaultExpectedTopLevelModuleName;
             });
     return doesModuleWithExpectedDefaultTopLevelNameExist && !lastDeclaredModuleIdent.empty() ? defaultExpectedTopLevelModuleName : lastDeclaredModuleIdent;
+}
+
+syrec::Module::ptr SyReCModuleVisitor::createCopyOfModule(const syrec::Module::ptr& moduleToCreateCopyFrom) const {
+    const syrec::Module::ptr createCopyOfModule = std::make_shared<syrec::Module>(moduleToCreateCopyFrom->name);
+    for (const auto& parameterToCopy : moduleToCreateCopyFrom->parameters) {
+        createCopyOfModule->addParameter(parameterToCopy);
+    }
+
+    for (const auto& localToCopy : moduleToCreateCopyFrom->variables) {
+        createCopyOfModule->addVariable(localToCopy);
+    }
+
+    for (const auto& statement : moduleToCreateCopyFrom->statements) {
+        createCopyOfModule->addStatement(statement);
+    }
+    return createCopyOfModule;
+}
+
+std::vector<bool> SyReCModuleVisitor::determineUnusedParametersBetweenModuleVersions(const syrec::Module::ptr& unoptimizedModule, const syrec::Module::ptr& optimizedModule) const {
+    std::set<std::string> setOfParameterNamesOfOptimizedModule;
+    std::transform(
+    optimizedModule->parameters.cbegin(),
+    optimizedModule->parameters.cend(),
+    std::inserter(setOfParameterNamesOfOptimizedModule, setOfParameterNamesOfOptimizedModule.begin()),
+    [](const syrec::Variable::ptr& variable) {
+        return variable->name;
+    });
+
+    std::vector<bool> isUnusedStatusPerParameterOfUnoptimizedModule(unoptimizedModule->parameters.size(), false);
+    for (std::size_t i = 0; i < unoptimizedModule->parameters.size(); ++i) {
+        const auto& parameterName                        = unoptimizedModule->parameters.at(i)->name;
+        isUnusedStatusPerParameterOfUnoptimizedModule[i] = setOfParameterNamesOfOptimizedModule.count(parameterName) == 0;
+    }
+    return isUnusedStatusPerParameterOfUnoptimizedModule;
 }
 
 

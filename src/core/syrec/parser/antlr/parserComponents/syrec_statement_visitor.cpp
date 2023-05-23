@@ -259,6 +259,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
     return 0;
 }
 
+// TODO: DEAD_CODE_ELIMINATION: Module calls with only in parameters can also be removed
 std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementContext* context) {
     bool                      isValidCallOperationDefined = context->OP_CALL() != nullptr || context->OP_UNCALL() != nullptr;
     const std::optional<bool> isCallOperation             = isValidCallOperationDefined ? std::make_optional(context->OP_CALL() != nullptr) : std::nullopt;
@@ -297,6 +298,8 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
             const auto symTabEntryForCalleeArgument = *sharedData->currentSymbolTableScope->getVariable(userDefinedCallArgument->getText());
             if (std::holds_alternative<syrec::Variable::ptr>(symTabEntryForCalleeArgument)) {
                 (*potentialModulesToCall)->refineGuessWithNextParameter(std::get<syrec::Variable::ptr>(symTabEntryForCalleeArgument));
+                // We also need to increment the reference count of the callee arguments if we know that the literal references a valid entry in the symbol table
+                sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(calleeArguments.back());
                 continue;
             }
         }
@@ -365,12 +368,26 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
     }
 
     const auto moduleMatchingCalleeArguments = (*potentialModulesToCall)->getMatchesForGuess().front();
+    std::set<std::size_t> positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters;
+    if (sharedData->parserConfig->deadCodeEliminationEnabled) {
+        positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters = *sharedData->currentSymbolTableScope->getPositionOfUnusedParametersForModule(moduleMatchingCalleeArguments);
+    }
+
+    trimAndDecrementReferenceCountOfUnusedCalleeParameters(calleeArguments, positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters);
+    syrec::Statement::ptr createdCallOrUncallStmt;
     if (*isCallOperation) {
         // TODO: CONSTANT_PROPAGATION
-        invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(moduleMatchingCalleeArguments, calleeArguments);
-        addStatementToOpenContainer(std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments));
+        invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(moduleMatchingCalleeArguments, calleeArguments, positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters);
+        createdCallOrUncallStmt = std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments);
     } else {
-        addStatementToOpenContainer(std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments));
+        createdCallOrUncallStmt = std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments);
+    }
+
+    if (!calleeArguments.empty()) {
+        addStatementToOpenContainer(createdCallOrUncallStmt);
+    }
+    else {
+        sharedData->currentSymbolTableScope->decrementReferenceCountOfModulesMatchingSignature(moduleMatchingCalleeArguments);
     }
 
     return 0;
@@ -488,6 +505,7 @@ std::any SyReCStatementVisitor::visitForStatement(SyReCParser::ForStatementConte
     return 0;
 }
 
+// TODO: DEAD_CODE_ELIMINATION: If both branches turn out to be empty due to optimizations we would also have to update the reference counts of the optimized away variables
 std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext* context) {
     const auto guardExpression        = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->guardCondition);
 
@@ -502,9 +520,9 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
             }
         }   
     }
-    const bool canTrueBranchBeOmitted  = constantValueOfGuardExpr.has_value() && constantValueOfGuardExpr <= 0;
-    const bool canFalseBranchBeOmitted = constantValueOfGuardExpr.has_value() && constantValueOfGuardExpr > 0;
-    const bool canAnyBranchBeOmitted                      = canTrueBranchBeOmitted || canFalseBranchBeOmitted;
+    bool canTrueBranchBeOmitted  = constantValueOfGuardExpr.has_value() && constantValueOfGuardExpr <= 0;
+    bool canFalseBranchBeOmitted = constantValueOfGuardExpr.has_value() && constantValueOfGuardExpr > 0;
+    const bool canAnyBranchBeOmitted   = canTrueBranchBeOmitted || canFalseBranchBeOmitted;
 
     const bool backupOfStatusOfInCurrentlyInOmittedRegion = sharedData->currentlyInOmittedRegion;
     sharedData->currentlyInOmittedRegion = canTrueBranchBeOmitted;
@@ -527,7 +545,7 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
     const auto closingGuardExpression = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->matchingGuardExpression);
 
     // TODO: Replace pointer comparison with actual equality check of expressions
-    if (!guardExpression.has_value() || (!trueBranchStmts.has_value() || (*trueBranchStmts).empty()) || (!falseBranchStmts.has_value() || (*falseBranchStmts).empty()) || !closingGuardExpression.has_value()) {
+    if (!guardExpression.has_value() || !closingGuardExpression.has_value()) {
         return 0;
     }
 
@@ -547,17 +565,26 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
         return 0;
     }
 
-    if (sharedData->parserConfig->deadCodeEliminationEnabled && canAnyBranchBeOmitted) {
-        if (canTrueBranchBeOmitted) {
-            for (const auto& falseBranchStmt : *falseBranchStmts) {
-                addStatementToOpenContainer(falseBranchStmt);
+    const bool isTrueBranchEmpty = !trueBranchStmts.has_value() || trueBranchStmts->empty();
+    const bool isFalseBranchEmpty = !falseBranchStmts.has_value() || falseBranchStmts->empty();
+    const bool canWholeIfBeOmitted = (isTrueBranchEmpty && isFalseBranchEmpty) || (canAnyBranchBeOmitted && canTrueBranchBeOmitted && isFalseBranchEmpty) || (canAnyBranchBeOmitted && canFalseBranchBeOmitted && isTrueBranchEmpty);
+    
+    if (sharedData->parserConfig->deadCodeEliminationEnabled && (canWholeIfBeOmitted || canAnyBranchBeOmitted)) {
+        /*
+         * Only add the statements of the branch not omitted (when only considering the guard expression) if its contains at least one statement
+         */
+        if (!canWholeIfBeOmitted) {
+            if (canTrueBranchBeOmitted) {
+                for (const auto& falseBranchStmt: *falseBranchStmts) {
+                    addStatementToOpenContainer(falseBranchStmt);
+                }
+            } else {
+                for (const auto& trueBranchStmt: *trueBranchStmts) {
+                    addStatementToOpenContainer(trueBranchStmt);
+                }
             }
         }
-        else {
-            for (const auto& trueBranchStmt: *trueBranchStmts) {
-                addStatementToOpenContainer(trueBranchStmt);
-            }
-        }
+
         if (!unoptimizedGuardExpr->isConstantValue()) {
             /*
              * We only need to decrement the reference count of the variables used either in the guard or closing guard expression since we are assuming they are the same
@@ -565,6 +592,15 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
             decrementReferenceCountForUsedVariablesInExpression(*unoptimizedGuardExpr->getAsExpression());
         }
         return 0;
+    }
+
+    if (isTrueBranchEmpty) {
+        trueBranchStmts = syrec::Statement::vec();
+        insertSkipStatementIfStatementListIsEmpty(*trueBranchStmts);
+    }
+    if (isFalseBranchEmpty) {
+        falseBranchStmts = syrec::Statement::vec();
+        insertSkipStatementIfStatementListIsEmpty(*falseBranchStmts);
     }
 
     const auto ifStatement      = std::make_shared<syrec::IfStatement>();
@@ -868,9 +904,14 @@ void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::Var
 }
 
 // TODO: CONSTANT_PROPAGATION: We are assuming that no loop variables or constant can be passed as parameter and that all passed callee arguments were declared
-void SyReCStatementVisitor::invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(const syrec::Module::ptr& calledModule, const std::vector<std::string>& calleeArguments) const {
+void SyReCStatementVisitor::invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(const syrec::Module::ptr& calledModule, const std::vector<std::string>& calleeArguments, const std::set<std::size_t>& positionsOfParametersLeftUntouched) const {
     std::size_t parameterIdx = 0;
     for (const auto& formalCalleeArgument: calledModule->parameters) {
+        if (positionsOfParametersLeftUntouched.count(parameterIdx) != 0) {
+            parameterIdx++;
+            continue;
+        }
+
         if (formalCalleeArgument->type == syrec::Variable::Types::Inout || formalCalleeArgument->type == syrec::Variable::Types::Out) {
             const auto& symbolTableEntryForParameter = *sharedData->currentSymbolTableScope->getVariable(calleeArguments.at(parameterIdx));
 
@@ -887,6 +928,16 @@ void SyReCStatementVisitor::invalidateValuesForVariablesUsedAsParametersChangeab
 void SyReCStatementVisitor::invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts) const {
     createAndStoreBackupForAssignedToSignal(assignedToVariableParts);
     sharedData->currentSymbolTableScope->invalidateStoredValuesFor(assignedToVariableParts);
+}
+
+
+void SyReCStatementVisitor::trimAndDecrementReferenceCountOfUnusedCalleeParameters(std::vector<std::string>& calleeArguments, const std::set<std::size_t>& positionsOfUnusedParameters) const {
+    std::size_t numRemovedParameters = 0;
+    for (const auto unusedParameterPosition: positionsOfUnusedParameters) {
+        const auto positionOfCalleeArgument = unusedParameterPosition - numRemovedParameters++;
+        sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(calleeArguments.at(positionOfCalleeArgument));
+        calleeArguments.erase(std::next(calleeArguments.begin(), positionOfCalleeArgument));
+    }
 }
 
 bool SyReCStatementVisitor::areAccessedValuesForDimensionAndBitsConstant(const syrec::VariableAccess::ptr& accessedSignalParts) const {
@@ -926,7 +977,6 @@ void SyReCStatementVisitor::decrementReferenceCountForUsedVariablesInExpression(
         }
     }
 }
-
 
 /*
  * TODO: We need a more elaborate scheme to update the orignal value after both branches have been parsed
@@ -1033,4 +1083,3 @@ syrec::expression::ptr SyReCStatementVisitor::tryDetermineNewSignalValueFromAssi
             std::make_shared<syrec::Number>(*syrec_operation::apply(assignmentOp, *currentValueOfAssignedToSignal, assignmentRhsExprEvaluated)),
             assignmentStmtRhsExpr->bitwidth());
 }
-

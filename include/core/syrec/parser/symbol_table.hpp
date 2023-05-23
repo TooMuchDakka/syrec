@@ -25,9 +25,10 @@ namespace parser {
         [[nodiscard]] bool                                                                  contains(const syrec::Module::ptr& module) const;
         [[nodiscard]] std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> getVariable(const std::string_view& literalIdent) const;
         [[nodiscard]] std::optional<syrec::Module::vec>                                     getMatchingModulesForName(const std::string_view& moduleName) const;
+        [[nodiscard]] std::optional<std::set<std::size_t>>                                  getPositionOfUnusedParametersForModule(const syrec::Module::ptr& module) const;
         bool                                                                                addEntry(const syrec::Variable::ptr& variable);
         bool                                                                                addEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
-        bool                                                                                addEntry(const syrec::Module::ptr& module);
+        bool                                                                                addEntry(const syrec::Module::ptr& module, const std::vector<bool>& isUnusedStatusPerModuleParameter);
 
         // BEGIN 
         // TODO: UNUSED_REFERENCE - Marked as used
@@ -60,7 +61,7 @@ namespace parser {
             std::variant<syrec::Variable::ptr, syrec::Number::ptr> variableInformation;
             std::optional<valueLookup::SignalValueLookup::ptr>     optionalValueLookup;
             std::size_t                                            referenceCount;
-
+            
             VariableSymbolTableEntry(const syrec::Variable::ptr& variable): referenceCount(0) {
                 variableInformation = std::variant<syrec::Variable::ptr, syrec::Number::ptr>(variable);
                 
@@ -98,9 +99,15 @@ namespace parser {
         struct ModuleSymbolTableEntry {
             syrec::Module::vec matchingModules;
             std::vector<std::size_t> referenceCountsPerModule;
+            std::vector<std::vector<bool>> optimizedAwayStatusPerParameterOfModulePerModule;
 
-            ModuleSymbolTableEntry(const syrec::Module::ptr& module):
-                matchingModules({module}), referenceCountsPerModule({0}){}
+            ModuleSymbolTableEntry(): matchingModules({}), referenceCountsPerModule({}), optimizedAwayStatusPerParameterOfModulePerModule({}) {}
+
+            void addModule(const syrec::Module::ptr& module, const std::vector<bool>& isUnusedStatusPerModuleParameter) {
+                matchingModules.emplace_back(module);
+                referenceCountsPerModule.emplace_back(0);
+                optimizedAwayStatusPerParameterOfModulePerModule.emplace_back(isUnusedStatusPerModuleParameter);
+            }
         };
 
         std::map<std::string, std::shared_ptr<VariableSymbolTableEntry>, std::less<void>> locals;

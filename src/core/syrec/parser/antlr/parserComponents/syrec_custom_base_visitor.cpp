@@ -442,6 +442,11 @@ std::optional<unsigned> SyReCCustomBaseVisitor::applyBinaryOperation(syrec_opera
     return syrec_operation::apply(operation, leftOperand, rightOperand);
 }
 
+void SyReCCustomBaseVisitor::insertSkipStatementIfStatementListIsEmpty(syrec::Statement::vec& statementList) const {
+    if (statementList.empty()) {
+        statementList.emplace_back(std::make_shared<syrec::SkipStatement>());
+    }
+}
 
 std::optional<SignalAccessRestriction::SignalAccess> SyReCCustomBaseVisitor::tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const TokenPosition& optionalEvaluationErrorPosition) {
     if (!canEvaluateNumber(accessedBits.first) || !canEvaluateNumber(accessedBits.second)) {

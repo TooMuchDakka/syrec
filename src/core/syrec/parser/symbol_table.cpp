@@ -69,20 +69,48 @@ bool SymbolTable::addEntry(const syrec::Number::ptr& number, const unsigned int 
     return true;
 }
 
-bool SymbolTable::addEntry(const syrec::Module::ptr& module) {
+bool SymbolTable::addEntry(const syrec::Module::ptr& module, const std::vector<bool>& isUnusedStatusPerModuleParameter) {
     if (nullptr == module) {
         return false;
     }
 
-    if (!contains(module)) {
-        modules.insert(std::pair(module->name, std::make_shared<ModuleSymbolTableEntry>(ModuleSymbolTableEntry(module))));
-    } else {
-        ModuleSymbolTableEntry& modulesWithMatchingName = *getEntryForModulesWithMatchingName(module->name);
-        modulesWithMatchingName.matchingModules.emplace_back(module);
-        modulesWithMatchingName.referenceCountsPerModule.emplace_back(0);
+    auto symbolTableEntryForModuleName = getEntryForModulesWithMatchingName(module->name);
+    if (symbolTableEntryForModuleName == nullptr) {
+        const auto& newSymbolTableEntryForModuleName = std::make_shared<ModuleSymbolTableEntry>(ModuleSymbolTableEntry());
+        modules.insert(std::pair(module->name, newSymbolTableEntryForModuleName));
+        symbolTableEntryForModuleName = newSymbolTableEntryForModuleName.get();
     }
+    symbolTableEntryForModuleName->addModule(module, isUnusedStatusPerModuleParameter);
     return true;
 }
+
+std::optional<std::set<std::size_t>> SymbolTable::getPositionOfUnusedParametersForModule(const syrec::Module::ptr& module) const {
+    const auto& symbolTableEntryForModuleName = getEntryForModulesWithMatchingName(module->name);
+    if (symbolTableEntryForModuleName == nullptr) {
+        return std::nullopt;
+    }
+    
+    const auto& foundPositionOfModuleMatchingSignature =
+            std::find_if(symbolTableEntryForModuleName->matchingModules.cbegin(),
+                         symbolTableEntryForModuleName->matchingModules.cend(),
+                         [&module](const syrec::Module::ptr& moduleStoredInSymbolTable) {
+                             return doModuleSignaturesMatch(module, moduleStoredInSymbolTable);
+                         });
+    if (foundPositionOfModuleMatchingSignature == symbolTableEntryForModuleName->matchingModules.cend()) {
+        return std::nullopt;
+    }
+
+    const std::size_t positionOfMatch = std::distance(symbolTableEntryForModuleName->matchingModules.cbegin(), foundPositionOfModuleMatchingSignature);
+    const auto&              isUnusedStatusPerParameter = symbolTableEntryForModuleName->optimizedAwayStatusPerParameterOfModulePerModule.at(positionOfMatch);
+    std::set<std::size_t> positionOfUnusedParameters;
+    for (std::size_t i = 0; i < isUnusedStatusPerParameter.size(); ++i) {
+        if (isUnusedStatusPerParameter.at(i)) {
+            positionOfUnusedParameters.emplace(i);
+        }
+    }
+    return std::make_optional(positionOfUnusedParameters);
+}
+
 
 void SymbolTable::openScope(SymbolTable::ptr& currentScope) {
     // TODO: Implement me
@@ -125,7 +153,7 @@ void SymbolTable::incrementLiteralReferenceCount(const std::string_view& literal
 
 void SymbolTable::decrementLiteralReferenceCount(const std::string_view& literalIdent) const {
     if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
-        foundSymbolTableEntryForLiteral->referenceCount = std::max(static_cast<std::size_t>(0), foundSymbolTableEntryForLiteral->referenceCount - 1);
+        foundSymbolTableEntryForLiteral->referenceCount = foundSymbolTableEntryForLiteral->referenceCount == 0 ? 0 : foundSymbolTableEntryForLiteral->referenceCount - 1;
     }
 }
 
@@ -296,7 +324,7 @@ void SymbolTable::incrementOrDecrementReferenceCountOfModulesMatchingSignature(c
                     currentReferenceCountOfModule++;
                 }
             } else {
-                currentReferenceCountOfModule = std::min(static_cast<std::size_t>(0), referenceCountPerModule.at(moduleIdx) - 1);   
+                currentReferenceCountOfModule = referenceCountPerModule.at(moduleIdx) == 0 ? 0 : referenceCountPerModule.at(moduleIdx) - 1;   
             }
         }
     }
@@ -387,6 +415,8 @@ void SymbolTable::updateStoredValueFor(const syrec::VariableAccess::ptr& assigne
     const auto& transformedBitRangeAccess        = tryTransformAccessedBitRange(assignedToSignalParts);
     const auto& signalValueLookup                = *symbolTableEntryForVariable->optionalValueLookup;
 
+    // TODO: SIGNAL_VALUE_LOOKUP: Lifting existing restrictions could also be done in the update call and "should" not be the task of the user ?
+    signalValueLookup->liftRestrictionsOfDimensions(transformedDimensionAccess, transformedBitRangeAccess);
     signalValueLookup->updateStoredValueFor(transformedDimensionAccess, transformedBitRangeAccess, newValue);
 }
 
@@ -431,4 +461,3 @@ void SymbolTable::swap(const syrec::VariableAccess::ptr& swapLhsOperand, const s
         *signalValueLookupOfRhsVariable
     );
 }
-
