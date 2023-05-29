@@ -161,7 +161,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
             container->setVar(std::get<syrec::Variable::ptr>(*signalSymTabEntry));
             accessedSignal.emplace(container);
 
-            if (!sharedData->currentlyInOmittedRegion) {
+            if (!sharedData->modificationsOfReferenceCountsDisabled) {
                 // TODO: UNUSED_REFERENCE - Marked as used
                 sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);   
             }
@@ -383,7 +383,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::Number
 
 inline bool SyReCCustomBaseVisitor::canEvaluateNumber(const syrec::Number::ptr& number) const {
     if (number->isLoopVariable()) {
-        return sharedData->evaluableLoopVariables.find(number->variableName()) != sharedData->evaluableLoopVariables.end();
+        return sharedData->parserConfig->performConstantPropagation && sharedData->evaluableLoopVariables.find(number->variableName()) != sharedData->evaluableLoopVariables.end();
     }
     return number->isCompileTimeConstantExpression() ? canEvaluateCompileTimeExpression(number->getExpression()) : true;
 }
@@ -396,7 +396,8 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateNumber(const syrec::N
     if (numberContainer->isLoopVariable()) {
         const std::string& loopVariableIdent = numberContainer->variableName();
         if (sharedData->evaluableLoopVariables.find(loopVariableIdent) == sharedData->evaluableLoopVariables.end() ||
-            sharedData->loopVariableMappingLookup.find(loopVariableIdent) == sharedData->loopVariableMappingLookup.end()) {
+            sharedData->loopVariableMappingLookup.find(loopVariableIdent) == sharedData->loopVariableMappingLookup.end()
+            || !sharedData->parserConfig->performConstantPropagation) {
             return std::nullopt;
         }
     } else if (numberContainer->isCompileTimeConstantExpression()) {
@@ -494,6 +495,11 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(c
     if (auto const* numericExpression = dynamic_cast<syrec::NumericExpression*>(expression.get())) {
         if (canEvaluateNumber(numericExpression->value)) {
             return tryEvaluateNumber(numericExpression->value, evaluationErrorPosition);
+        }
+
+        // TODO: LOOP_UNROLLING: What should the default bitwidth of the expression for a loop variable be if we cannot determine the maximum value of the later ?
+        if (numericExpression->value->isLoopVariable()) {
+            return std::make_optional(UINT_MAX);
         }
         return std::nullopt;
     }

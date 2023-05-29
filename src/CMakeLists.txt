@@ -54,7 +54,8 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_expression_visitor.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_module_visitor.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.cpp
-
+      
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/loop_optimizer.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/no_additional_line_assignment.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operation_strength_reduction.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/reassociate_expression.cpp
@@ -92,6 +93,7 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_module_visitor.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_parser_interface.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/loop_optimizer.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/no_additional_line_assignment.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operation_strength_reduction.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/reassociate_expression.hpp

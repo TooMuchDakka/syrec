@@ -24,8 +24,18 @@ namespace parser {
         std::optional<unsigned int>                              optionalExpectedExpressionSignalWidth;
         std::set<std::string>                                    evaluableLoopVariables;
         std::optional<std::string>                               lastDeclaredLoopVariable;
-        bool                                                     currentlyInOmittedRegion;
+        bool                                                     modificationsOfReferenceCountsDisabled;
+        bool                                                     performingReadOnlyParsingOfLoopBody;
+        bool                                                     forceSkipReadOnlyParsingOfLoopBody;
         std::stack<SymbolTableBackupHelper::ptr>                 localSignalValuesBackup;
+
+        struct LoopVariableUnrollModification {
+            std::string loopVariableIdent;
+            std::size_t additionalOffset;
+        };
+
+        std::map<std::string, LoopVariableUnrollModification> loopVariableModificationsDueToUnroll;
+        std::size_t                                            loopNestingLevel;
 
         explicit SharedVisitorData(const ParserConfig& parserConfig) :
             parserConfig(std::make_unique<ParserConfig>(parserConfig)),
@@ -33,7 +43,9 @@ namespace parser {
             currentModuleCallNestingLevel(0),
             shouldSkipSignalAccessRestrictionCheck(true),
             currentlyParsingAssignmentStmtRhs(false),
-            currentlyInOmittedRegion(false)
+            modificationsOfReferenceCountsDisabled(false),
+            loopVariableModificationsDueToUnroll({}),
+            loopNestingLevel(0)
         {}
 
         void resetSignalAccessRestriction() {

@@ -420,6 +420,18 @@ void SymbolTable::updateStoredValueFor(const syrec::VariableAccess::ptr& assigne
     signalValueLookup->updateStoredValueFor(transformedDimensionAccess, transformedBitRangeAccess, newValue);
 }
 
+void SymbolTable::updateStoredValueForLoopVariable(const std::string_view& loopVariableIdent, unsigned newValue) const {
+    const auto& symbolTableEntryForVariable = getEntryForVariable(loopVariableIdent);
+    if (symbolTableEntryForVariable == nullptr || !std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation) || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {
+        return;
+    }
+
+    const auto& signalValueLookup = *symbolTableEntryForVariable->optionalValueLookup;
+    const auto& requiredDimensionAccessToUpdateValue = std::vector({std::make_optional<unsigned int>(0u)});
+    signalValueLookup->updateStoredValueFor(requiredDimensionAccessToUpdateValue, std::nullopt, newValue);
+}
+
+
 void SymbolTable::updateViaSignalAssignment(const syrec::VariableAccess::ptr& assignmentLhsOperand, const syrec::VariableAccess::ptr& assignmentRhsOperand) const {
     const auto& symbolTableEntryForLhsVariable = getEntryForVariable(assignmentLhsOperand->var->name);
     const auto& symbolTableEntryForRhsVariable = getEntryForVariable(assignmentRhsOperand->var->name);

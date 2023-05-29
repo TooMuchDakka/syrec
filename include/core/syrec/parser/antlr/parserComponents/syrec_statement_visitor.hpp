@@ -7,6 +7,7 @@
 #include "core/syrec/parser/module_call_stack.hpp"
 #include "core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor.hpp"
 #include "core/syrec/parser/antlr/parserComponents/syrec_expression_visitor.hpp"
+#include "core/syrec/parser/optimizations/loop_optimizer.hpp"
 
 namespace parser {
     class SyReCStatementVisitor: public SyReCCustomBaseVisitor {
@@ -77,6 +78,35 @@ namespace parser {
         void trimAndDecrementReferenceCountOfUnusedCalleeParameters(std::vector<std::string>& calleeArguments, const std::set<std::size_t>& positionsOfUnusedParameters) const;
         [[nodiscard]] bool areAccessedValuesForDimensionAndBitsConstant(const syrec::VariableAccess::ptr& accessedSignalParts) const;
 
+        
+        struct CustomLoopContextInformation {
+            SyReCParser::ForStatementContext*         parentLoopContext;
+            std::vector<CustomLoopContextInformation> nestedLoopContexts;
+        };
+        [[nodiscard]] static CustomLoopContextInformation buildCustomLoopContextInformation(SyReCParser::ForStatementContext* loopStatement);
+
+        struct UnrolledLoopVariableValue {
+            const std::size_t activateAtLineRelativeToParent;
+            const std::string loopVariableIdent;
+            const std::size_t value;
+        };
+
+        struct ModifiedLoopHeaderInformation {
+            const std::size_t                activateAtLineRelativeToParent;
+            const std::optional<std::size_t> newLoopStartValue;
+            const std::optional<std::size_t> newLoopStepsize;
+        };
+
+         void buildParseRuleInformationFromUnrolledLoops(
+                std::vector<antlr4::ParserRuleContext*>&               buildParseRuleInformation,
+                std::size_t&                                          stmtOffsetFromParentLoop,
+                SyReCParser::ForStatementContext*                     loopToUnroll,
+                const CustomLoopContextInformation&                   customLoopContextInformation,
+                std::vector<UnrolledLoopVariableValue>&               unrolledLoopVariableValues,
+                std::vector<ModifiedLoopHeaderInformation>& modifiedLoopHeaderInformation,
+                const optimizations::LoopUnroller::UnrollInformation& unrollInformation);
+
+        [[nodiscard]] static std::optional<std::string> tryGetLoopVariableIdent(SyReCParser::ForStatementContext* loopContext);
     };
 } // namespace parser
 #endif

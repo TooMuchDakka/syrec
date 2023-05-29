@@ -3,6 +3,7 @@
 #include "core/syrec/expression.hpp"
 #include "core/syrec/grammar.hpp"
 #include "core/syrec/module.hpp"
+#include "parser/optimizations/loop_optimizer.hpp"
 
 #include <vector>
 
@@ -16,6 +17,7 @@ namespace syrec {
             bool performConstantPropagation = false,
             bool noAdditionalLineOptimizationEnabled = false,
             bool operationStrengthReductionEnabled = false,
+            std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig = std::nullopt,
             std::string expectedMainModuleName = "main"):
             defaultBitwidth(bitwidth),
             reassociateExpressionEnabled(reassociateExpressionEnabled),
@@ -23,15 +25,17 @@ namespace syrec {
             performConstantPropagation(performConstantPropagation),
             noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
             operationStrengthReductionEnabled(operationStrengthReductionEnabled),
+            optionalLoopUnrollConfig(optionalLoopUnrollConfig),
             expectedMainModuleName(expectedMainModuleName)
         {};
-        unsigned    defaultBitwidth;
-        bool        reassociateExpressionEnabled;
-        bool        deadCodeEliminationEnabled;
-        bool        performConstantPropagation;
-        bool        noAdditionalLineOptimizationEnabled;
-        bool        operationStrengthReductionEnabled;
-        std::string expectedMainModuleName;
+        unsigned                                             defaultBitwidth;
+        bool                                                 reassociateExpressionEnabled;
+        bool                                                 deadCodeEliminationEnabled;
+        bool                                                 performConstantPropagation;
+        bool                                                 noAdditionalLineOptimizationEnabled;
+        bool                                                 operationStrengthReductionEnabled;
+        std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig;
+        std::string                                          expectedMainModuleName;
     };
 
     class program {
