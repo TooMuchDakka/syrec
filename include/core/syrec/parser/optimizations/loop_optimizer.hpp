@@ -65,6 +65,10 @@ namespace optimizations {
                 : data(std::move(data)) {}
         };
 
+        // TODO: LOOP_UNROLLING: Instead of copying all entries of the existing loop variable lookup we could also simply store a reference to it 
+        explicit LoopUnroller(syrec::Number::loop_variable_mapping existingLoopVariableValueLookup):
+            loopVariableValueLookup(std::move(existingLoopVariableValueLookup)) {}
+
         UnrollInformation tryUnrollLoop(const LoopOptimizationConfig& loopUnrollConfig, const std::shared_ptr<syrec::ForStatement>& loopStatement);
 
     private:

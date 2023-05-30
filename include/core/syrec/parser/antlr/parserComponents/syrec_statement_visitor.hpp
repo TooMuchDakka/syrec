@@ -25,6 +25,15 @@ namespace parser {
         std::unique_ptr<SyReCExpressionVisitor> expressionVisitor;
         std::stack<syrec::Statement::vec>       statementListContainerStack;
         std::unique_ptr<ModuleCallStack>        moduleCallStack;
+
+         struct ModifiedLoopHeaderInformation {
+            const std::size_t                activateAtLineRelativeToParent;
+            const std::optional<std::string> loopVariableIdent;
+            const std::size_t                newLoopStartValue;
+            const std::size_t                loopEndValue;
+            const std::size_t                newLoopStepsize;
+        };
+         std::optional<ModifiedLoopHeaderInformation> preDeterminedLoopHeaderInformation;
         
         std::any visitCallStatement(SyReCParser::CallStatementContext* context) override;
         std::any visitForStatement(SyReCParser::ForStatementContext* context) override;
@@ -78,7 +87,22 @@ namespace parser {
         void trimAndDecrementReferenceCountOfUnusedCalleeParameters(std::vector<std::string>& calleeArguments, const std::set<std::size_t>& positionsOfUnusedParameters) const;
         [[nodiscard]] bool areAccessedValuesForDimensionAndBitsConstant(const syrec::VariableAccess::ptr& accessedSignalParts) const;
 
-        
+        struct ParsedLoopHeaderInformation {
+            const std::optional<std::string>                        loopVariableIdent;
+            const std::pair<syrec::Number::ptr, syrec::Number::ptr> range;
+            const syrec::Number::ptr                                stepSize;
+        };
+        [[nodiscard]] std::optional<ParsedLoopHeaderInformation> determineLoopHeader(SyReCParser::ForStatementContext* context, bool& openedNewSymbolTableScopeForLoopVariable);
+        [[nodiscard]] std::optional<ParsedLoopHeaderInformation> determineLoopHeaderFromPredefinedOne(bool& openedNewSymbolTableScopeForLoopVariable);
+
+        struct LoopIterationRange {
+            const std::size_t startValue;
+            const std::size_t endValue;
+            const std::size_t stepSize;
+        };
+        [[nodiscard]] std::optional<LoopIterationRange> tryDetermineCompileTimeLoopIterationRange(const ParsedLoopHeaderInformation& loopHeader);
+        [[nodiscard]] bool                                       doesLoopOnlyPerformOneIteration(const ParsedLoopHeaderInformation& loopHeader);
+
         struct CustomLoopContextInformation {
             SyReCParser::ForStatementContext*         parentLoopContext;
             std::vector<CustomLoopContextInformation> nestedLoopContexts;
@@ -89,12 +113,6 @@ namespace parser {
             const std::size_t activateAtLineRelativeToParent;
             const std::string loopVariableIdent;
             const std::size_t value;
-        };
-
-        struct ModifiedLoopHeaderInformation {
-            const std::size_t                activateAtLineRelativeToParent;
-            const std::optional<std::size_t> newLoopStartValue;
-            const std::optional<std::size_t> newLoopStepsize;
         };
 
          void buildParseRuleInformationFromUnrolledLoops(
