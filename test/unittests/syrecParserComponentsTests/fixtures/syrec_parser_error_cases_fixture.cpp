@@ -198,6 +198,8 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserErrorCases,
                              std::make_pair("production_forStatement", "missingRofEndDelimiter"),
                              std::make_pair("production_forStatement", "duplicateLoopVariableNameInNestedLoop"),
                              std::make_pair("production_forStatement", "invalidSelfReferenceToLoopVariableInStartValueDefinition"),
+                             std::make_pair("production_forStatement", "stepSizeOfZeroCreatesError"),
+                             std::make_pair("production_forStatement", "stepSizeOfZeroCreatesErrorIfStartValueIsOmittedAndOnlyEndValueIsCompileTimeConstantGreaterThanZero"),
 
                              /* IfStatement production */
                              std::make_pair("production_ifStatement", "invalidIfIdent"),

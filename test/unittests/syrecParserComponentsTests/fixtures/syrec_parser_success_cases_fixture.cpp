@@ -245,6 +245,10 @@ INSTANTIATE_TEST_SUITE_P(SyrecParserSuccessCases,
                         std::make_pair("production_forStatement", "usageOfLoopVariableInAnyExpressionExceptInitialValueOk"),
                         std::make_pair("production_forStatement", "selfReferenceOfLoopVariableOkInEndValueDefinition"),
                         std::make_pair("production_forStatement", "selfReferenceOfLoopVariableOkInStepsizeDefinition"),
+                        std::make_pair("production_forStatement", "stepSizeZeroDoesNotCreateErrorIfStartAndEndValueAreCompileTimeConstantAndAreEqualToEachOther"),
+                        std::make_pair("production_forStatement", "stepSizeZeroDoesNotCreateErrorIfStartIsCompileTimeConstantAndEndValueIsExpressionThatDoesNotEvaluateToConstant"),
+                        std::make_pair("production_forStatement", "stepSizeZeroDoesNotCreateErrorIfStartIsExpressionThatDoesNotEvaluateToConstantAndEndIsCompileTimeConstant"),
+                        std::make_pair("production_forStatement", "stepSizeZeroDoesNotCreateErrorIfStartAndAndAreExpressionsThatDoNotEvaluateToConstant"),
 
                         /* Expression production */
                         std::make_pair("production_expression", "isConstant"),

@@ -1179,6 +1179,11 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
         stepSize.emplace(std::make_shared<syrec::Number>(1));
     }
 
+    /*
+     * If the either the start and end or the end value are defined as expressions, we have to be more permissible regarding errors specific to the step size being zero (if it was specified or evaluated to zero)
+     * since the effect of the different optimizations would be to cumbersome to check, i.e. simply checking if the start and end value expression are syntactically equivalent
+     * is not correct in all cases when the reassociate expression or constant propagation optimization is enabled since subexpression could be dropped by these optimizations.
+     */
     if (loopHeaderValid && (wasStartValueExplicitlyDefined ? canEvaluateNumber(*rangeStartValue) : true) && canEvaluateNumber(*rangeEndValue) && (wasStepSizeExplicitlyDefined ? canEvaluateNumber(*stepSize) : true)) {
         const std::optional<unsigned int> stepSizeEvaluated = tryEvaluateNumber(*stepSize, determineContextStartTokenPositionOrUseDefaultOne(context->loopStepsizeDefinition()));
         if (stepSizeEvaluated.has_value()) {
@@ -1206,14 +1211,19 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
                 } else if (!negativeStepSizeDefined && *iterationRangeStartValueEvaluated > *iterationRangeEndValueEvaluated) {
                     createError(mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart), fmt::format(InvalidLoopVariableValueRangeWithPositiveStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
                     loopHeaderValid = false;
-                } else if (stepSizeEvaluated != 0) {
+                } else if (*stepSizeEvaluated != 0) {
                     numIterations = (negativeStepSizeDefined ? (*iterationRangeStartValueEvaluated - *iterationRangeEndValueEvaluated) : (*iterationRangeEndValueEvaluated - *iterationRangeStartValueEvaluated)) + 1;
                     numIterations /= *stepSizeEvaluated;
+                }
+                else if (*stepSizeEvaluated == 0) {
+                    if (*iterationRangeStartValueEvaluated != *iterationRangeEndValueEvaluated) {
+                        createError(mapAntlrTokenPosition(context->loopStepsizeDefinition()->number()->start), fmt::format(InvalidLoopIterationRangeStepSizeCannotBeZeroWhenStartAndEndValueDiffer, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated));
+                        loopHeaderValid = false;
+                    }
                 }
             }
         }
     }
-
     if (!loopHeaderValid) {
         return std::nullopt;
     }
@@ -1264,13 +1274,31 @@ std::optional<SyReCStatementVisitor::LoopIterationRange> SyReCStatementVisitor::
     return std::make_optional(LoopIterationRange({*iterationRangeStartEvaluated, *iterationRangeEndEvaluated, *stepSizeEvaluated}));
 }
 
-
 // TODO: Evaluation of number without creation of error ?
 bool SyReCStatementVisitor::doesLoopOnlyPerformOneIteration(const ParsedLoopHeaderInformation& loopHeader) {
     if (const auto& compileTimeIterationRangeValues = tryDetermineCompileTimeLoopIterationRange(loopHeader); compileTimeIterationRangeValues.has_value()) {
-        return compileTimeIterationRangeValues->startValue + compileTimeIterationRangeValues->stepSize >= compileTimeIterationRangeValues->endValue;
+        return determineNumberOfLoopIterations(*compileTimeIterationRangeValues) == 1;
     }
     return false;
+}
+
+std::size_t SyReCStatementVisitor::determineNumberOfLoopIterations(const LoopIterationRange& loopIterationRange) const {
+    if (loopIterationRange.stepSize == 0) {
+        return 0;
+    }
+
+    std::size_t iterationRangeBetweenStartAndEnd;
+    if (loopIterationRange.endValue >= loopIterationRange.startValue) {
+        iterationRangeBetweenStartAndEnd = loopIterationRange.endValue - loopIterationRange.startValue;
+    }
+    else {
+        iterationRangeBetweenStartAndEnd = loopIterationRange.startValue - loopIterationRange.endValue;
+    }
+    if (iterationRangeBetweenStartAndEnd == 0) {
+        return 1;
+    }
+
+    return static_cast<std::size_t>(std::ceil(iterationRangeBetweenStartAndEnd / loopIterationRange.stepSize));
 }
 
 
@@ -1358,12 +1386,20 @@ void SyReCStatementVisitor::visitForStatementWithOptimizationsEnabled(SyReCParse
     const auto& loopVariableIdent                                = parsedLoopHeader.has_value() ? parsedLoopHeader->loopVariableIdent : std::nullopt;
     const bool  loopHeaderValid                                  = parsedLoopHeader.has_value();
 
-    const bool doesLoopOnlyPerformOneIterationInTotal = parsedLoopHeader.has_value() && doesLoopOnlyPerformOneIteration(*parsedLoopHeader);
-    const auto& valueOfLoopVariableInCurrentIteration = tryEvaluateNumber(parsedLoopHeader->range.first, determineContextStartTokenPositionOrUseDefaultOne(nullptr));
-    if (sharedData->parserConfig->deadCodeEliminationEnabled && doesLoopOnlyPerformOneIterationInTotal && loopVariableIdent.has_value() && valueOfLoopVariableInCurrentIteration.has_value()) {
-        if (sharedData->parserConfig->optionalLoopUnrollConfig.has_value() ? sharedData->parserConfig->optionalLoopUnrollConfig->maxAllowedNestingLevelOfInnerLoops > sharedData->loopNestingLevel : true) {
-            addOrUpdateLoopVariableEntryAndOptionallyMakeItsValueAvailableForEvaluations(*loopVariableIdent, valueOfLoopVariableInCurrentIteration, needToCloseOpenedSymbolTableScopeForLoopVariable);
-        }
+    const bool doesLoopOnlyPerformOneIterationInTotal = loopHeaderValid && doesLoopOnlyPerformOneIteration(*parsedLoopHeader);
+    const auto& valueOfLoopVariableInCurrentIteration = loopHeaderValid ? tryEvaluateNumber(parsedLoopHeader->range.first, determineContextStartTokenPositionOrUseDefaultOne(nullptr)) : std::nullopt;
+
+    if (loopHeaderValid) {
+        if (const auto& determinedIterationRange = tryDetermineCompileTimeLoopIterationRange(*parsedLoopHeader); determinedIterationRange.has_value()) {
+            const auto numberOfIterationsOfLoop = determineNumberOfLoopIterations(*determinedIterationRange);
+            if (numberOfIterationsOfLoop == 1 
+                && sharedData->parserConfig->deadCodeEliminationEnabled 
+                && (sharedData->parserConfig->optionalLoopUnrollConfig.has_value() ? sharedData->parserConfig->optionalLoopUnrollConfig->maxAllowedNestingLevelOfInnerLoops > sharedData->loopNestingLevel : true) 
+                && loopVariableIdent.has_value()
+                && valueOfLoopVariableInCurrentIteration.has_value()) {
+                addOrUpdateLoopVariableEntryAndOptionallyMakeItsValueAvailableForEvaluations(*loopVariableIdent, valueOfLoopVariableInCurrentIteration, needToCloseOpenedSymbolTableScopeForLoopVariable);
+            }
+        }    
     }
 
     std::optional<syrec::Statement::vec> loopBody;
@@ -1560,4 +1596,3 @@ void SyReCStatementVisitor::removeLoopVariableAndMakeItsValueUnavailableForEvalu
         sharedData->loopVariableMappingLookup.erase(loopVariableIdent);
     }
 }
-

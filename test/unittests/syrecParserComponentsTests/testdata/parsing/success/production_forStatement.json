@@ -61,5 +61,20 @@
   },
   "selfReferenceOfLoopVariableOkInStepsizeDefinition": {
     "circuit": "module main() for $a = 0 to 2 step (2 + ($a + 2)) do skip rof"
+  },
+  "stepSizeZeroDoesNotCreateErrorIfStartAndEndValueAreCompileTimeConstantAndAreEqualToEachOther": {
+    "circuit": "module main() for $a = 2 to 2 step 0 do skip rof"
+  },
+  "stepSizeZeroDoesNotCreateErrorIfStartIsCompileTimeConstantAndEndValueIsExpressionThatDoesNotEvaluateToConstant": {
+    "circuit": "module main(in b(4)) for $j = 0 to 5 step 1 do for $a = 2 to ($j + (#b + 2)) step 0 do skip rof rof",
+    "expectedCircuit": "module main(in b(4)) for $j = 0 to 5 step 1 do for $a = 2 to ($j + 6) step 0 do skip rof rof"
+  },
+  "stepSizeZeroDoesNotCreateErrorIfStartIsExpressionThatDoesNotEvaluateToConstantAndEndIsCompileTimeConstant": {
+    "circuit": "module main(in b(4)) for $j = 0 to 5 step 1 do for $a = ($j + (#b + 2)) to 2 step 0 do skip rof rof",
+    "expectedCircuit": "module main(in b(4)) for $j = 0 to 5 step 1 do for $a = ($j + 6) to 2 step 0 do skip rof rof"
+  },
+  "stepSizeZeroDoesNotCreateErrorIfStartAndAndAreExpressionsThatDoNotEvaluateToConstant": {
+    "circuit": "module main(in b(4)) for $j = 0 to 5 step 1 do for $a = (#b + $j) to ($j + (#b + 2)) step 0 do skip rof rof",
+    "expectedCircuit": "module main(in b(4)) for $j = 0 to 5 step 1 do for $a = (4 + $j) to ($j + 6) step 0 do skip rof rof"
   }
 }

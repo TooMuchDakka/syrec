@@ -31,6 +31,7 @@ namespace parser {
 
     extern const std::string InvalidLoopVariableValueRangeWithPositiveStepsize;
     extern const std::string InvalidLoopVariableValueRangeWithNegativeStepsize;
+    extern const std::string InvalidLoopIterationRangeStepSizeCannotBeZeroWhenStartAndEndValueDiffer;
     extern const std::string CannotReferenceLoopVariableInInitalValueDefinition;
 
     extern const std::string InvalidSwapSignalWidthMissmatch;

@@ -27,6 +27,7 @@ namespace parser {
 
     extern const std::string InvalidLoopVariableValueRangeWithPositiveStepsize = "invalid loop variable value range, start value cannot be larger than the end (start: {0:d}, end: {1:d}, stepsize: {2:d})";
     extern const std::string InvalidLoopVariableValueRangeWithNegativeStepsize = "invalid loop variable value range, end value cannot be larger than the start (start: {0:d}, end: {1:d}, stepsize: {2:d})";
+    extern const std::string InvalidLoopIterationRangeStepSizeCannotBeZeroWhenStartAndEndValueDiffer = "A step size of 0 can only be used if the defined start and end value of the loop iteration range are equal but where actually (start: {0:d}, end: {1:d})";
     extern const std::string CannotReferenceLoopVariableInInitalValueDefinition = "cannot reference loop variable '{0:s}' inside of the expression defining the initial value of the latter";
 
     extern const std::string InvalidSwapSignalWidthMissmatch       = "invalid swap signal width missmatch, first operand had a signal width of {0:d} while the other had a signal width of {1:d}";
