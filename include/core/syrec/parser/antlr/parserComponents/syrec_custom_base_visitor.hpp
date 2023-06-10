@@ -59,6 +59,8 @@ namespace parser {
         void                                                    insertSkipStatementIfStatementListIsEmpty(syrec::Statement::vec& statementList) const;
 
         std::optional<SignalAccessRestriction::SignalAccess> tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const TokenPosition& optionalEvaluationErrorPosition);
+        void incrementReferenceCountOfSignal(const std::string_view& signalIdent) const;
+        void                                                 decrementReferenceCountOfSignal(const std::string_view& signalIdent) const;
 
         std::any visitSignal(SyReCParser::SignalContext* context) override;
         std::any visitNumberFromConstant(SyReCParser::NumberFromConstantContext* context) override;

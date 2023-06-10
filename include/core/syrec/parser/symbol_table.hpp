@@ -29,6 +29,7 @@ namespace parser {
         bool                                                                                addEntry(const syrec::Variable::ptr& variable);
         bool                                                                                addEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
         bool                                                                                addEntry(const syrec::Module::ptr& module, const std::vector<bool>& isUnusedStatusPerModuleParameter);
+        void                                                                                removeVariable(const std::string& literalIdent);
 
         // BEGIN 
         // TODO: UNUSED_REFERENCE - Marked as used
@@ -41,6 +42,7 @@ namespace parser {
         // TODO: CONSTANT_PROPAGATION
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void                                      invalidateStoredValuesFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
+        void                                      invalidateStoredValueForLoopVariable(const std::string_view& loopVariableIdent) const;
         void                                      updateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignalParts, unsigned int newValue) const;
         void                                      updateStoredValueForLoopVariable(const std::string_view& loopVariableIdent, unsigned int newValue) const;
 

@@ -84,6 +84,19 @@ bool SymbolTable::addEntry(const syrec::Module::ptr& module, const std::vector<b
     return true;
 }
 
+void SymbolTable::removeVariable(const std::string& literalIdent) {
+    if (!contains(literalIdent)) {
+        return;
+    }
+
+    if (locals.count(literalIdent) == 0 && outer != nullptr) {
+        outer->removeVariable(literalIdent);
+    } else if (locals.count(literalIdent) != 0) {
+        locals.erase(literalIdent);
+    }
+}
+
+
 std::optional<std::set<std::size_t>> SymbolTable::getPositionOfUnusedParametersForModule(const syrec::Module::ptr& module) const {
     const auto& symbolTableEntryForModuleName = getEntryForModulesWithMatchingName(module->name);
     if (symbolTableEntryForModuleName == nullptr) {
@@ -204,6 +217,16 @@ void SymbolTable::invalidateStoredValuesFor(const syrec::VariableAccess::ptr& as
             signalValueLookup->invalidateStoredValueForBitrange(transformedDimensionAccess, *transformedBitRange);   
         }
     }
+}
+
+void SymbolTable::invalidateStoredValueForLoopVariable(const std::string_view& loopVariableIdent) const {
+    const auto& symbolTableEntryForVariable = getEntryForVariable(loopVariableIdent);
+    if (symbolTableEntryForVariable == nullptr || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {
+        return;
+    }
+
+    const auto& signalValueLookup = *symbolTableEntryForVariable->optionalValueLookup;
+    signalValueLookup->invalidateAllStoredValuesForSignal();
 }
 
 

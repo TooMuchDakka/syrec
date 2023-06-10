@@ -5,6 +5,7 @@
 #include "gtest/gtest.h"
 #include <algorithm>
 #include <fstream>
+#include <optional>
 #include <nlohmann/json.hpp>
 
 using namespace syrec;
@@ -26,7 +27,14 @@ protected:
     std::string expectedOptimizedCircuit;
 
     explicit DeadCodeEliminationTest():
-        astDumper(syrecAstDumpUtils::SyrecASTDumper(true)), config(16, true, true, true) {}
+
+
+
+        /*astDumper(syrecAstDumpUtils::SyrecASTDumper(true)),
+        config(16, true, true, true, false, false, 
+            std::make_optional(optimizations::LoopOptimizationConfig(2, 2, UINT_MAX, true, false))) {}*/
+        astDumper(syrecAstDumpUtils::SyrecASTDumper(true)),
+        config(16, true, true, true, false, false) {}
 
     void SetUp() override {
         const std::string testCaseJsonKey = GetParam();

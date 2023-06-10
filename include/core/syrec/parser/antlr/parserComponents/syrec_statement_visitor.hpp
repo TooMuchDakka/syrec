@@ -59,6 +59,10 @@ namespace parser {
         // TODO: Fix nicer solution than to return an expression::ptr
         [[nodiscard]] syrec::expression::ptr                         tryDetermineNewSignalValueFromAssignment(const syrec::VariableAccess::ptr& assignedToSignal, syrec_operation::operation assignmentOp, const syrec::expression::ptr& assignmentStmtRhsExpr) const;
 
+        [[nodiscard]] std::optional<syrec::ForStatement::ptr> visitForStatementInReadonlyMode(SyReCParser::ForStatementContext* context);
+        void                                                  visitForStatementWithOptimizationsEnabled(SyReCParser::ForStatementContext* context);
+        void                                                  unrollAndProcessLoopBody(SyReCParser::ForStatementContext* context, const std::shared_ptr<syrec::ForStatement>& loopStatement, const optimizations::LoopOptimizationConfig& loopUnrollConfigToUse);
+
     private:
         std::any visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext* context) override {
             return expressionVisitor->visitExpressionFromNumber(context);
@@ -125,6 +129,10 @@ namespace parser {
                 const optimizations::LoopUnroller::UnrollInformation& unrollInformation);
 
         [[nodiscard]] static std::optional<std::string> tryGetLoopVariableIdent(SyReCParser::ForStatementContext* loopContext);
+        [[nodiscard]] std::optional<syrec::Statement::vec> determineLoopBodyWithSideEffectsDisabled(SyReCParser::StatementListContext* loopBodyStmtsContext);
+        [[nodiscard]] bool                                 isValuePropagationBlockedDueToLoopDataFlowAnalysis(const syrec::VariableAccess::ptr& accessedPartsOfSignalToBeUpdated) const;
+        void                                               addOrUpdateLoopVariableEntryAndOptionallyMakeItsValueAvailableForEvaluations(const std::string& loopVariableIdent, const std::optional<unsigned int>& valueOfLoopVariable, bool& wasNewSymbolTableScopeOpened) const;
+        void                                               removeLoopVariableAndMakeItsValueUnavailableForEvaluations(const std::string& loopVariableIdent, bool wasNewSymbolTableScopeOpenedForLoopVariable) const;
     };
 } // namespace parser
 #endif
