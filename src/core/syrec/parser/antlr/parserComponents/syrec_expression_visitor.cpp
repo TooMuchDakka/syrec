@@ -9,6 +9,7 @@
 #include "core/syrec/parser/value_broadcaster.hpp"
 
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
+#include "core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp"
 
 using namespace parser;
 
@@ -135,6 +136,12 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                 //const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
 
                 syrec::BinaryExpression::ptr createdBinaryExpr = std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression);
+                if (const auto typecastedBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(createdBinaryExpr); typecastedBinaryExpr != nullptr && sharedData->optionalMultiplicationSimplifier.has_value()) {
+                    const auto exprWithPotentiallySimplifiedMultiplications = sharedData->optionalMultiplicationSimplifier.value()->trySimplify(typecastedBinaryExpr);
+                    if (exprWithPotentiallySimplifiedMultiplications.has_value()) {
+                        createdBinaryExpr = *exprWithPotentiallySimplifiedMultiplications;
+                    }
+                }
 
                 /*
                  * Since the synthesis without additional lines optimization could optimize a binary expression of the form e_left op e_right to e_left op = e_right
@@ -165,7 +172,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                     }
                 } else {
                     if (sharedData->parserConfig->reassociateExpressionsEnabled) {
-                        createdBinaryExpr = optimizations::simplifyBinaryExpression(createdBinaryExpr, sharedData->parserConfig->operationStrengthReductionEnabled);
+                        createdBinaryExpr = optimizations::simplifyBinaryExpression(createdBinaryExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier);
                     }    
                 }
 
@@ -251,7 +258,7 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     // TODO: Handling of shift expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
     syrec::expression::ptr createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *ParserUtilities::mapOperationToInternalFlag(*definedShiftOperation), *shiftAmount);
     if (sharedData->parserConfig->reassociateExpressionsEnabled) {
-        createdShiftExpression = optimizations::simplifyBinaryExpression(createdShiftExpression, sharedData->parserConfig->operationStrengthReductionEnabled);
+        createdShiftExpression = optimizations::simplifyBinaryExpression(createdShiftExpression, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier);
     }
     return std::make_optional(ExpressionEvaluationResult::createFromExpression(createdShiftExpression, numValuesPerDimensionOfExpressiontoShift));
 }

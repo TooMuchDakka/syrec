@@ -4,6 +4,7 @@
 #include "core/syrec/grammar.hpp"
 #include "core/syrec/module.hpp"
 #include "parser/optimizations/loop_optimizer.hpp"
+#include "parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp"
 
 #include <vector>
 
@@ -17,6 +18,7 @@ namespace syrec {
             bool performConstantPropagation = false,
             bool noAdditionalLineOptimizationEnabled = false,
             bool operationStrengthReductionEnabled = false,
+            optimizations::MultiplicationSimplificationMethod multiplicationSimplificationMethod = optimizations::MultiplicationSimplificationMethod::None,
             std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig = std::nullopt,
             std::string expectedMainModuleName = "main"):
             defaultBitwidth(bitwidth),
@@ -25,17 +27,36 @@ namespace syrec {
             performConstantPropagation(performConstantPropagation),
             noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
             operationStrengthReductionEnabled(operationStrengthReductionEnabled),
+            multiplicationSimplificationMethod(multiplicationSimplificationMethod),
             optionalLoopUnrollConfig(optionalLoopUnrollConfig),
-            expectedMainModuleName(expectedMainModuleName)
-        {};
+            expectedMainModuleName(std::move(expectedMainModuleName))
+        {}
+
         unsigned                                             defaultBitwidth;
         bool                                                 reassociateExpressionEnabled;
         bool                                                 deadCodeEliminationEnabled;
         bool                                                 performConstantPropagation;
         bool                                                 noAdditionalLineOptimizationEnabled;
         bool                                                 operationStrengthReductionEnabled;
+        optimizations::MultiplicationSimplificationMethod    multiplicationSimplificationMethod;
         std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig;
         std::string                                          expectedMainModuleName;
+
+        ReadProgramSettings& operator=(ReadProgramSettings other) noexcept {
+            using std::swap;
+            swap(defaultBitwidth, other.defaultBitwidth);
+            swap(reassociateExpressionEnabled, other.reassociateExpressionEnabled);
+            swap(deadCodeEliminationEnabled, other.deadCodeEliminationEnabled);
+            swap(performConstantPropagation, other.performConstantPropagation);
+            swap(noAdditionalLineOptimizationEnabled, other.noAdditionalLineOptimizationEnabled);
+            swap(operationStrengthReductionEnabled, other.operationStrengthReductionEnabled);
+            swap(multiplicationSimplificationMethod, other.multiplicationSimplificationMethod);
+            if (other.optionalLoopUnrollConfig.has_value()) {
+                optionalLoopUnrollConfig.emplace(*other.optionalLoopUnrollConfig);
+            }
+            swap(expectedMainModuleName, other.expectedMainModuleName);
+            return *this;
+        }
     };
 
     class program {

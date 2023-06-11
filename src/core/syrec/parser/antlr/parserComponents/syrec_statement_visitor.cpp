@@ -187,7 +187,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                 bool                   couldSimplifyRhsExpr  = false;
                 syrec::expression::ptr assignmentStmtRhsExpr = typecastedAssignmentStmt->rhs;
                 if (!sharedData->parserConfig->reassociateExpressionsEnabled) {
-                    const auto& simplifiedRhsExpr = optimizations::simplifyBinaryExpression(assignmentStmtRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled);
+                    const auto& simplifiedRhsExpr = optimizations::simplifyBinaryExpression(assignmentStmtRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier);
                     couldSimplifyRhsExpr = assignmentStmtRhsExpr != simplifiedRhsExpr;
                     if (couldSimplifyRhsExpr) {
                         assignmentStmtRhsExpr = simplifiedRhsExpr;
@@ -197,6 +197,16 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                     if (simplificationResultOfRhsExpr.couldSimplify) {
                         assignmentStmtRhsExpr = simplificationResultOfRhsExpr.simplifiedExpression;
                         couldSimplifyRhsExpr  = true;
+                    }
+
+                    /*
+                     * Since the reassociate expression optimization also incorporates the simplification of multiplication operations, we only need the perform the latter when the former optimization is not enabled
+                     */
+                    if (const auto& rhsOperandAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentStmtRhsExpr); rhsOperandAsBinaryExpr != nullptr && sharedData->optionalMultiplicationSimplifier.has_value()) {
+                        if (const auto optionalSimplificationResultOfMultiplicationsOfRhsOperand = sharedData->optionalMultiplicationSimplifier.value()->trySimplify(rhsOperandAsBinaryExpr); optionalSimplificationResultOfMultiplicationsOfRhsOperand.has_value()) {
+                            assignmentStmtRhsExpr = *optionalSimplificationResultOfMultiplicationsOfRhsOperand;
+                            couldSimplifyRhsExpr  = true;
+                        }
                     }
                 }
 

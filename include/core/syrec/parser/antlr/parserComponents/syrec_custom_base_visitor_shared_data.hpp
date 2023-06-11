@@ -6,6 +6,7 @@
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/symbol_table_backup_helper.hpp"
+#include "core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
 
 #include <optional>
@@ -28,6 +29,7 @@ namespace parser {
         std::stack<SymbolTableBackupHelper::ptr>                                       localSignalValuesBackup;
         std::stack<std::shared_ptr<optimizations::LoopBodyValuePropagationBlocker>>    loopBodyValuePropagationBlockers;
         bool                                                                           performPotentialValueLookupForCurrentlyAccessedSignal;
+        const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>> optionalMultiplicationSimplifier;
 
         struct LoopVariableUnrollModification {
             std::string loopVariableIdent;
@@ -46,6 +48,7 @@ namespace parser {
             modificationsOfReferenceCountsDisabled(false),
             performingReadOnlyParsingOfLoopBody(false),
             performPotentialValueLookupForCurrentlyAccessedSignal(true),
+            optionalMultiplicationSimplifier(createMultiplicationSimplifier(parserConfig.multiplicationSimplificationMethod)),
             loopVariableModificationsDueToUnroll({}),
             loopNestingLevel(0)
         {}
@@ -88,6 +91,17 @@ namespace parser {
         }
     protected:
         std::unique_ptr<AssignmentSignalAccessRestriction> signalAccessRestriction;
+
+        std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>> createMultiplicationSimplifier(optimizations::MultiplicationSimplificationMethod multiplicationSimplificationMethod) {
+            switch (multiplicationSimplificationMethod) {
+                case optimizations::MultiplicationSimplificationMethod::BinarySimplification: 
+                {
+                    return std::make_optional(std::make_unique<optimizations::BinaryMultiplicationSimplifier>());
+                }
+                default:
+                    return std::nullopt;
+            }
+        }
     };
 }; // namespace parser
 

@@ -2,6 +2,7 @@
 #define PARSER_CONFIG_H
 
 #include "optimizations/loop_optimizer.hpp"
+#include "optimizations/operationSimplification/base_multiplication_simplifier.hpp"
 
 #include <string>
 
@@ -15,6 +16,7 @@ namespace parser {
         bool                                                 performConstantPropagation;
         bool                                                 noAdditionalLineOptimizationEnabled;
         bool                                                 operationStrengthReductionEnabled;
+        optimizations::MultiplicationSimplificationMethod    multiplicationSimplificationMethod;
         std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig;
         std::string  expectedMainModuleName;
 
@@ -27,6 +29,7 @@ namespace parser {
                 const bool         performConstantPropagation                  = false,
                 const bool         noAdditionalLineOptimizationEnabled         = false,
                 const bool         operationStrengthReductionEnabled           = false,
+                const optimizations::MultiplicationSimplificationMethod multiplicationSimplificationMethod = optimizations::MultiplicationSimplificationMethod::None,
                 const std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig = std::nullopt,
                 std::string  expectedMainModuleName                      = "main"):
                 cDefaultSignalWidth(defaultSignalWidth),
@@ -37,6 +40,7 @@ namespace parser {
                 performConstantPropagation(performConstantPropagation),
                 noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
                 operationStrengthReductionEnabled(operationStrengthReductionEnabled),
+                multiplicationSimplificationMethod(multiplicationSimplificationMethod),
                 optionalLoopUnrollConfig(optionalLoopUnrollConfig),
                 expectedMainModuleName(std::move(expectedMainModuleName))
                 {}
@@ -51,6 +55,7 @@ namespace parser {
             performConstantPropagation                   = copy.performConstantPropagation;
             noAdditionalLineOptimizationEnabled          = copy.noAdditionalLineOptimizationEnabled;
             operationStrengthReductionEnabled            = copy.operationStrengthReductionEnabled;
+            multiplicationSimplificationMethod           = copy.multiplicationSimplificationMethod;
             if (copy.optionalLoopUnrollConfig.has_value()) {
                 optionalLoopUnrollConfig.emplace(*copy.optionalLoopUnrollConfig);
             }

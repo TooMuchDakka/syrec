@@ -67,6 +67,9 @@ add_library(
       #${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.cpp
 
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.cpp
+
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/bit_helpers.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/binary_expression_simplifier.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/loop_body_value_propagation_blocker.cpp
@@ -108,6 +111,9 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/layer_data.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp
+
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/bit_helpers.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/binary_expression_simplifier.hpp

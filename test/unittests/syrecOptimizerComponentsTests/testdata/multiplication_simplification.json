@@ -1,0 +1,5 @@
+{
+  "simplifyTest": {
+    "circuit": "module main(out b(4), in a(4)) b += (113 * (a + 2))"
+  }
+}
