@@ -6,6 +6,8 @@
 #include "core/syrec/parser/utils/syrec_ast_dump_utils.hpp"
 
 #include "gtest/gtest.h"
+#include <cstdlib>
+#include <cerrno>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -15,7 +17,7 @@ protected:
     const unsigned int defaultSignalBitwidth         = 16;
     const std::string cJsonKeyCircuit               = "circuit";
     const std::string cJsonKeyExpectedCircuitOutput = "expectedCircuit";
-    const std::string cJsonKeyEnabledOptimizations  = "enabledOptimizations";
+    const std::string cJsonKeyEnabledOptimizations  = "optimizations";
 
     const std::string cJsonKeySupportingBroadcastingExpressionOperands = "exprOperandsBroadcastingON";
     const std::string cJsonKeySupportingBroadCastingAssignmentOperands = "assignmentOperandsBroadcastingON";
@@ -76,8 +78,12 @@ protected:
             }
             userDefinedOptions = loadDefinedOptimizationOptions(testcaseJsonData.at(cJsonKeyEnabledOptimizations));
         }
-        const auto& loadedUserOptimizationOptions = createParserConfigFromOptions(userDefinedOptions);
-        config                                    = mergeDefaultAndUserDefinedParserConfigOptions(getDefaultParserConfig(), loadedUserOptimizationOptions, userDefinedOptions);
+        std::optional<syrec::ReadProgramSettings> loadedUserOptimizationOptions;
+        ASSERT_NO_FATAL_FAILURE(createParserConfigFromOptions(userDefinedOptions, loadedUserOptimizationOptions)) << "Expected to be able to parse user supplied optimization options";
+        if (!loadedUserOptimizationOptions.has_value()) {
+            FAIL();
+        }
+        config                                    = mergeDefaultAndUserDefinedParserConfigOptions(getDefaultParserConfig(), *loadedUserOptimizationOptions, userDefinedOptions);
     }
 
     [[nodiscard]] virtual std::string                getTestCaseJsonKey()  = 0;
@@ -98,10 +104,10 @@ protected:
         LoopUnrollMaxNestingLevel,
         LoopUnrollMaxUnrollCountPerLoop,
         LoopUnrollMaxAllowedTotalSize,
-        LoopUnrollForceUnrollFlag,
+        LoopForceUnrollFlag,
         LoopUnrollAllowRemainderFlag
     };
-    [[nodiscard]] std::map<OptimizerOption, std::string> loadDefinedOptimizationOptions(const nlohmann::json& testCaseDataJsonObject) {
+    [[nodiscard]] std::map<OptimizerOption, std::string> loadDefinedOptimizationOptions(const nlohmann::json& testCaseDataJsonObject) const {
         std::map<OptimizerOption, std::string> userDefinedOptions;
         for (const auto& [key, value]: testCaseDataJsonObject.items()) {
             const auto& mappedToOptimizerOption = tryMapOptimizationJsonKeyToOptimizerOption(key);
@@ -113,7 +119,10 @@ protected:
         return userDefinedOptions;
     }
 
-    [[nodiscard]] syrec::ReadProgramSettings             createParserConfigFromOptions(const std::map<OptimizerOption, std::string>& loadedOptimizationOptions) {
+    /*
+     * Return type is null because otherwise GTEST assertions cannot be used, see: https://google.github.io/googletest/advanced.html#assertion-placement
+     */
+    void createParserConfigFromOptions(const std::map<OptimizerOption, std::string>& loadedOptimizationOptions, std::optional<syrec::ReadProgramSettings>& parsedProgramSettings) const {
         syrec::ReadProgramSettings generatedConfig;
 
         std::size_t                     maxUnrollCountPerLoop = 0;
@@ -143,42 +152,78 @@ protected:
                 case ReassociateExpressionFlag:
                     generatedConfig.reassociateExpressionEnabled = true;
                     break;
-                case MultiplicationSimplificationMethod:
-                    generatedConfig.multiplicationSimplificationMethod = tryMapToMultiplicationSimplificationMethod(value).value_or(optimizations::MultiplicationSimplificationMethod::None);
+                case MultiplicationSimplificationMethod: {
+                    const auto mappedToSimplificationMethod = tryMapToMultiplicationSimplificationMethod(value);
+                    ASSERT_TRUE(mappedToSimplificationMethod.has_value()) << "Failed to map " << value << " to a valid multiplication simplification method";
+                    generatedConfig.multiplicationSimplificationMethod = *mappedToSimplificationMethod;
                     break;
-                case LoopUnrollMaxNestingLevel:
+                }
+                case LoopUnrollMaxNestingLevel: {
+                    const auto parsedMaxNestingLevelValue = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedMaxNestingLevelValue.has_value()) << "Failed to map given maximum allowed nesting level of loops to a number: " << value;
                     wereLoopUnrollConfigOptionsDefined = true;
-                    maxAllowedNestingLevelOfInnerLoops = 0;
+                    maxAllowedNestingLevelOfInnerLoops = *parsedMaxNestingLevelValue;
                     break;
-                case LoopUnrollMaxUnrollCountPerLoop:
+                }
+                case LoopUnrollMaxUnrollCountPerLoop: {
+                    const auto parsedMaxUnrollCountPerLoopValue = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedMaxUnrollCountPerLoopValue.has_value()) << "Failed to map given maximum allowed unroll level of loops to a number: " << value;
                     wereLoopUnrollConfigOptionsDefined = true;
-                    maxUnrollCountPerLoop = 0;
+                    maxUnrollCountPerLoop              = *parsedMaxUnrollCountPerLoopValue;
                     break;
-                case LoopUnrollMaxAllowedTotalSize:
+                }
+                case LoopUnrollMaxAllowedTotalSize: {
+                    const auto parsedMaxAllowedTotalLoopSize = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedMaxAllowedTotalLoopSize.has_value()) << "Failed to map given maximum allowed total loop size to a number: " << value;
                     wereLoopUnrollConfigOptionsDefined = true;
-                    maxAllowedTotalLoopSize = 0;
+                    maxAllowedTotalLoopSize            = *parsedMaxAllowedTotalLoopSize;
                     break;
-                case LoopUnrollForceUnrollFlag:
+                }
+                case LoopForceUnrollFlag: {
                     wereLoopUnrollConfigOptionsDefined = true;
-                    forceUnrollAll = true;
-                    break;
-                case LoopUnrollAllowRemainderFlag:
+                    forceUnrollAll                     = true;
+                    break;   
+                }
+                case LoopUnrollAllowRemainderFlag: {
                     wereLoopUnrollConfigOptionsDefined = true;
-                    allowRemainderLoop = true;
+                    allowRemainderLoop                 = true;
                     break;
+                }
             }
         }
 
         if (wereLoopUnrollConfigOptionsDefined) {
             generatedConfig.optionalLoopUnrollConfig.emplace(optimizations::LoopOptimizationConfig(maxUnrollCountPerLoop, maxAllowedNestingLevelOfInnerLoops, maxAllowedTotalLoopSize, allowRemainderLoop, forceUnrollAll));
         }
-        return generatedConfig;
+        parsedProgramSettings.emplace(generatedConfig);
     }
-    [[nodiscard]] syrec::ReadProgramSettings mergeDefaultAndUserDefinedParserConfigOptions(
+
+    [[nodiscard]] static syrec::ReadProgramSettings mergeDefaultAndUserDefinedParserConfigOptions(
         const syrec::ReadProgramSettings& defaultParserConfig, 
         const syrec::ReadProgramSettings& userDefinedOptimizations, 
         const std::map<OptimizerOption, std::string>& loadedOptimizationOptions) {
-        return getDefaultParserConfig();
+
+        syrec::ReadProgramSettings mergedOptions;
+        mergedOptions.deadCodeEliminationEnabled = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::DeadCodeEliminationFlag, loadedOptimizationOptions, defaultParserConfig.deadCodeEliminationEnabled, userDefinedOptimizations.deadCodeEliminationEnabled);
+        mergedOptions.performConstantPropagation = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::PerformConstantPropagationFlag, loadedOptimizationOptions, defaultParserConfig.performConstantPropagation, userDefinedOptimizations.performConstantPropagation);
+        mergedOptions.noAdditionalLineOptimizationEnabled = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisFlag, loadedOptimizationOptions, defaultParserConfig.noAdditionalLineOptimizationEnabled, userDefinedOptimizations.noAdditionalLineOptimizationEnabled);
+        mergedOptions.operationStrengthReductionEnabled   = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::OperationStrengthReductionEnabled, loadedOptimizationOptions, defaultParserConfig.operationStrengthReductionEnabled, userDefinedOptimizations.operationStrengthReductionEnabled);
+        mergedOptions.reassociateExpressionEnabled        = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::ReassociateExpressionFlag, loadedOptimizationOptions, defaultParserConfig.reassociateExpressionEnabled, userDefinedOptimizations.reassociateExpressionEnabled);
+        mergedOptions.multiplicationSimplificationMethod  = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::MultiplicationSimplificationMethod, loadedOptimizationOptions, defaultParserConfig.multiplicationSimplificationMethod, userDefinedOptimizations.multiplicationSimplificationMethod);
+        
+        if (userDefinedOptimizations.optionalLoopUnrollConfig.has_value() && !defaultParserConfig.optionalLoopUnrollConfig.has_value()) {
+            mergedOptions.optionalLoopUnrollConfig.emplace(*userDefinedOptimizations.optionalLoopUnrollConfig);
+        } else if (userDefinedOptimizations.optionalLoopUnrollConfig.has_value() && defaultParserConfig.optionalLoopUnrollConfig.has_value()) {
+            const auto maxAllowedTotalLoopSize = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollMaxAllowedTotalSize, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->maxAllowedTotalLoopSize, userDefinedOptimizations.optionalLoopUnrollConfig->maxAllowedTotalLoopSize);
+            const auto maxAllowedLoopNestingLevel = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollMaxNestingLevel, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->maxAllowedNestingLevelOfInnerLoops, userDefinedOptimizations.optionalLoopUnrollConfig->maxAllowedNestingLevelOfInnerLoops);
+            const auto maxUnrolledLoopIterations  = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollMaxUnrollCountPerLoop, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->maxUnrollCountPerLoop, userDefinedOptimizations.optionalLoopUnrollConfig->maxUnrollCountPerLoop);
+            const auto allowLoopRemainder         = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollAllowRemainderFlag, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->allowRemainderLoop, userDefinedOptimizations.optionalLoopUnrollConfig->allowRemainderLoop);
+            const auto forceUnrollLoops           = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopForceUnrollFlag, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->forceUnrollAll, userDefinedOptimizations.optionalLoopUnrollConfig->forceUnrollAll);
+            mergedOptions.optionalLoopUnrollConfig.emplace(optimizations::LoopOptimizationConfig(maxUnrolledLoopIterations, maxAllowedLoopNestingLevel, maxAllowedTotalLoopSize, allowLoopRemainder, forceUnrollLoops));
+        } else if (!userDefinedOptimizations.optionalLoopUnrollConfig.has_value() && defaultParserConfig.optionalLoopUnrollConfig.has_value()) {
+            mergedOptions.optionalLoopUnrollConfig.emplace(*defaultParserConfig.optionalLoopUnrollConfig);
+        }
+        return mergedOptions;
     }
 
 
@@ -204,7 +249,7 @@ protected:
         if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollMaxNestingLevel) return std::make_optional(OptimizerOption::LoopUnrollMaxNestingLevel);
         if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollMaxUnrollCountPerLoop) return std::make_optional(OptimizerOption::LoopUnrollMaxUnrollCountPerLoop);
         if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollMaxAllowedTotalSize) return std::make_optional(OptimizerOption::LoopUnrollMaxAllowedTotalSize);
-        if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollForceUnrollFlag) return std::make_optional(OptimizerOption::LoopUnrollForceUnrollFlag);
+        if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollForceUnrollFlag) return std::make_optional(OptimizerOption::LoopForceUnrollFlag);
         if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollAllowRemainderFlag) return std::make_optional(OptimizerOption::LoopUnrollAllowRemainderFlag);
         return std::nullopt;
     }
@@ -216,8 +261,30 @@ protected:
         return std::nullopt;
     }
 
-private:
-    // TODO: Create read program settings from config and merge with custom implementation of class
+    [[nodiscard]] std::optional<unsigned int> tryParseStringToNumber(const std::string_view& stringToBeParsed) const {
+        if (!std::all_of(stringToBeParsed.cbegin(), stringToBeParsed.cend(), [](const char character) { return std::isdigit(static_cast<unsigned int>(character)); })) {
+            return std::nullopt;
+        }
+        char* end = nullptr;
+        const auto numberParsedFromString = std::strtoul(stringToBeParsed.data(), &end, 10);
+        if (errno == ERANGE) {
+            errno = 0;
+            return std::nullopt;
+        }
+        if (numberParsedFromString <= std::numeric_limits<unsigned int>::max()) {
+            return std::make_optional(static_cast<unsigned int>(numberParsedFromString));
+        }
+
+        return std::nullopt;
+    }
+
+    template<typename T>
+    [[nodiscard]] static T chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption option, const std::map<OptimizerOption, std::string>& userSuppliedOptions, T& defaultValue, T& userSuppliedValue) {
+        if (userSuppliedOptions.count(option) == 0) {
+            return defaultValue;
+        }
+        return userSuppliedValue;
+    }
 };
 
 #endif
