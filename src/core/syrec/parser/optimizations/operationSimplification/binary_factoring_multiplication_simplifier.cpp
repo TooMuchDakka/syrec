@@ -4,8 +4,49 @@
 using namespace optimizations;
 
 std::optional<syrec::expression::ptr> BinaryFactoringMultiplicationSimplifier::trySimplify(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
-    return trySimplify(binaryExpr, true);
+    const bool isLeftOperandConstant  = isOperandConstant(binaryExpr->lhs);
+    const bool isRightOperandConstant = isOperandConstant(binaryExpr->rhs);
+
+    if (!isOperationOfExpressionMultiplicationAndHasAtleastOneConstantOperand(binaryExpr) || !(isLeftOperandConstant ^ isRightOperandConstant)) {
+        const auto lhsOperandAsBinaryExpr           = std::dynamic_pointer_cast<syrec::BinaryExpression>(binaryExpr->lhs);
+        const auto simplificationResultOfLhsOperand = lhsOperandAsBinaryExpr != nullptr ? trySimplify(lhsOperandAsBinaryExpr) : std::nullopt;
+
+        const auto rhsOperandAsBinaryExpr           = std::dynamic_pointer_cast<syrec::BinaryExpression>(binaryExpr->rhs);
+        const auto simplificationResultOfRhsOperand = rhsOperandAsBinaryExpr != nullptr ? trySimplify(rhsOperandAsBinaryExpr) : std::nullopt;
+
+        if (simplificationResultOfLhsOperand.has_value() || simplificationResultOfRhsOperand.has_value()) {
+            return std::make_optional(std::make_shared<syrec::BinaryExpression>(
+                    simplificationResultOfLhsOperand.value_or(binaryExpr->lhs),
+                    binaryExpr->op,
+                    simplificationResultOfRhsOperand.value_or(binaryExpr->rhs)));
+        }
+        return std::nullopt;
+    }
+
+    const auto constantOperand    = isLeftOperandConstant ? binaryExpr->lhs : binaryExpr->rhs;
+    const auto nonConstantOperand = isLeftOperandConstant ? binaryExpr->rhs : binaryExpr->lhs;
+    const auto valueOfConstant    = *tryDetermineValueOfConstant(constantOperand);
+
+    if (const auto& shiftExpressionIfConstantTermIsPowerOfTwo = replaceMultiplicationWithShiftIfConstantTermIsPowerOfTwo(valueOfConstant, nonConstantOperand); shiftExpressionIfConstantTermIsPowerOfTwo.has_value()) {
+        return shiftExpressionIfConstantTermIsPowerOfTwo;
+    }
+
+    const auto& factorTermsOfConstant = factorizeInteger(valueOfConstant);
+    if (factorTermsOfConstant.empty()) {
+        return std::nullopt;
+    }
+
+    syrec::expression::ptr toBeMultipliedOperand = nonConstantOperand;
+    for (const auto factorTerm: factorTermsOfConstant) {
+        const auto exprForFactorTerm = std::make_shared<syrec::Number>(factorTerm);
+        toBeMultipliedOperand        = std::make_shared<syrec::BinaryExpression>(
+                std::make_shared<syrec::NumericExpression>(exprForFactorTerm, BitHelpers::getRequiredBitsToStoreValue(factorTerm)),
+                syrec::BinaryExpression::Multiply,
+                toBeMultipliedOperand);
+    }
+    return BinaryMultiplicationSimplifier::trySimplify(std::dynamic_pointer_cast<syrec::BinaryExpression>(toBeMultipliedOperand));
 }
+
 
 std::vector<unsigned> BinaryFactoringMultiplicationSimplifier::factorizeInteger(unsigned integer) {
     if (factorizingCache.count(integer) != 0) {
@@ -71,48 +112,4 @@ void BinaryFactoringMultiplicationSimplifier::combineDuplicateFactors(std::vecto
         *std::next(factorToCheck) = static_cast<unsigned int>(std::pow(*factorToCheck, 2));
         factorToCheck = foundFactors.erase(factorToCheck);
     }
-}
-
-std::optional<syrec::expression::ptr> BinaryFactoringMultiplicationSimplifier::trySimplify(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr, bool factorizeConstantOperands) {
-    const bool isLeftOperandConstant  = isOperandConstant(binaryExpr->lhs);
-    const bool isRightOperandConstant = isOperandConstant(binaryExpr->rhs);
-
-    if (!isOperationOfExpressionMultiplicationAndHasAtleastOneConstantOperand(binaryExpr) || !(isLeftOperandConstant ^ isRightOperandConstant)) {
-        const auto lhsOperandAsBinaryExpr           = std::dynamic_pointer_cast<syrec::BinaryExpression>(binaryExpr->lhs);
-        const auto simplificationResultOfLhsOperand = lhsOperandAsBinaryExpr != nullptr ? trySimplify(lhsOperandAsBinaryExpr) : std::nullopt;
-
-        const auto rhsOperandAsBinaryExpr           = std::dynamic_pointer_cast<syrec::BinaryExpression>(binaryExpr->rhs);
-        const auto simplificationResultOfRhsOperand = rhsOperandAsBinaryExpr != nullptr ? trySimplify(rhsOperandAsBinaryExpr) : std::nullopt;
-
-        if (simplificationResultOfLhsOperand.has_value() || simplificationResultOfRhsOperand.has_value()) {
-            return std::make_optional(std::make_shared<syrec::BinaryExpression>(
-                    simplificationResultOfLhsOperand.value_or(binaryExpr->lhs),
-                    binaryExpr->op,
-                    simplificationResultOfRhsOperand.value_or(binaryExpr->rhs)));
-        }
-        return std::nullopt;
-    }
-
-    const auto constantOperand    = isLeftOperandConstant ? binaryExpr->lhs : binaryExpr->rhs;
-    const auto nonConstantOperand = isLeftOperandConstant ? binaryExpr->rhs : binaryExpr->lhs;
-    const auto valueOfConstant    = *tryDetermineValueOfConstant(constantOperand);
-
-    if (const auto& shiftExpressionIfConstantTermIsPowerOfTwo = replaceMultiplicationWithShiftIfConstantTermIsPowerOfTwo(valueOfConstant, nonConstantOperand); shiftExpressionIfConstantTermIsPowerOfTwo.has_value()) {
-        return shiftExpressionIfConstantTermIsPowerOfTwo;
-    }
-
-    const auto& factorTermsOfConstant = factorizeConstantOperands ? factorizeInteger(valueOfConstant) : std::vector(1, valueOfConstant);
-    if (factorTermsOfConstant.empty()) {
-        return std::nullopt;
-    }
-
-    syrec::expression::ptr toBeMultipliedOperand = nonConstantOperand;
-    for (const auto factorTerm: factorTermsOfConstant) {
-        const auto exprForFactorTerm = std::make_shared<syrec::Number>(factorTerm);
-        toBeMultipliedOperand        = std::make_shared<syrec::BinaryExpression>(
-                std::make_shared<syrec::NumericExpression>(exprForFactorTerm, BitHelpers::getRequiredBitsToStoreValue(factorTerm)),
-                syrec::BinaryExpression::Multiply,
-                toBeMultipliedOperand);
-    }
-    return BinaryMultiplicationSimplifier::trySimplify(std::dynamic_pointer_cast<syrec::BinaryExpression>(toBeMultipliedOperand));
 }
