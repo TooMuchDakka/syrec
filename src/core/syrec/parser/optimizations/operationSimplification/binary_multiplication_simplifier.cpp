@@ -25,8 +25,12 @@ std::optional<syrec::expression::ptr> BinaryMultiplicationSimplifier::trySimplif
     }
 
     const bool isLeftOperandConstant = isOperandConstant(binaryExpr->lhs);
-    const auto valueOfConstantOperand = std::dynamic_pointer_cast<syrec::NumericExpression>(isLeftOperandConstant ? binaryExpr->lhs : binaryExpr->rhs)->value->evaluate({});
+    const auto valueOfConstantOperand = *tryDetermineValueOfConstant(isLeftOperandConstant ? binaryExpr->lhs : binaryExpr->rhs);
     auto       nonConstantOperand     = isLeftOperandConstant ? binaryExpr->rhs : binaryExpr->lhs;
+
+    if (const auto& shiftExpressionIfConstantTermIsPowerOfTwo = replaceMultiplicationWithShiftIfConstantTermIsPowerOfTwo(valueOfConstantOperand, nonConstantOperand); shiftExpressionIfConstantTermIsPowerOfTwo.has_value()) {
+        return shiftExpressionIfConstantTermIsPowerOfTwo;
+    }
 
     const auto simplificationSteps = cache.count(valueOfConstantOperand) != 0
     ? cache.at(valueOfConstantOperand)
@@ -83,12 +87,11 @@ std::vector<BinaryMultiplicationSimplifier::ShiftAndAddOrSubOperationStep> Binar
 
     auto oneBitsOfConstantOperand = extractOneBitPositionsOfNumber(static_cast<unsigned int>(constantToSimplify));
     reverseAndUpdateBitPositionsOfNumber(oneBitsOfConstantOperand);
-
-    const auto& lastOneBitToCheck        = std::prev(oneBitsOfConstantOperand.end());
+    
     std::vector<BinaryMultiplicationSimplifier::ShiftAndAddOrSubOperationStep> operationSteps;
-    std::optional<std::size_t>                                                 prevOneBitPosition;
+    std::optional<std::size_t>                                                 prevOneBitPosition = oneBitsOfConstantOperand.front();
 
-    for (auto oneBitPositionIterator = oneBitsOfConstantOperand.begin(); oneBitPositionIterator != lastOneBitToCheck; ++oneBitPositionIterator) {
+    for (auto oneBitPositionIterator = std::next(oneBitsOfConstantOperand.begin()); oneBitPositionIterator != oneBitsOfConstantOperand.end(); ++oneBitPositionIterator) {
         operationSteps.emplace_back(ShiftAndAddOrSubOperationStep(determineShiftAmount(*oneBitPositionIterator, prevOneBitPosition), true));
         prevOneBitPosition = *oneBitPositionIterator;
     }
@@ -105,4 +108,3 @@ syrec::BinaryExpression::ptr BinaryMultiplicationSimplifier::generateExpressionF
     }
     return nonConstantShiftExprOperand;
 }
-

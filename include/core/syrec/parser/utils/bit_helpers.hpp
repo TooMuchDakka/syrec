@@ -9,5 +9,6 @@ namespace BitHelpers {
     [[nodiscard]] unsigned int extractBitsFromValue(const unsigned int value, const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& accessedBitRange);
     [[nodiscard]] unsigned int getMaximumStorableValueInBitRange(const unsigned int numAccessedBits);
     [[nodiscard]] unsigned int mergeValues(const unsigned int currentValue, const unsigned int newValue, const ::optimizations::BitRangeAccessRestriction::BitRangeAccess& partsToUpdate);
+    [[nodiscard]] std::size_t  getRequiredBitsToStoreValue(unsigned int value);
 }
 #endif

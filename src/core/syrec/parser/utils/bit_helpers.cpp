@@ -69,4 +69,13 @@ unsigned int BitHelpers::mergeValues(const unsigned int currentValue, const unsi
     return (currentValue & zeroMask) | (newValue << partsToUpdate.first);
 }
 
+std::size_t BitHelpers::getRequiredBitsToStoreValue(unsigned value) {
+    if (value == 0) {
+        return 1;
+    }
+
+    return static_cast<unsigned int>(std::log2(value) + 1);
+}
+
+
 

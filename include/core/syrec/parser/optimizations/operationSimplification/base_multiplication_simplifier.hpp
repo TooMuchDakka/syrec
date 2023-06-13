@@ -19,6 +19,8 @@ namespace optimizations {
 	protected:
         [[nodiscard]] bool isOperationOfExpressionMultiplicationAndHasAtleastOneConstantOperand(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) const;
         [[nodiscard]] bool isOperandConstant(const syrec::expression::ptr& expressionOperand) const;
+        [[nodiscard]] std::optional<unsigned int> tryDetermineValueOfConstant(const syrec::expression::ptr& operandOfBinaryExpr) const;
+        [[nodiscard]] std::optional<syrec::expression::ptr> replaceMultiplicationWithShiftIfConstantTermIsPowerOfTwo(unsigned int constantTerm, const syrec::expression::ptr& nonConstantTerm) const;
 	};
 }
 

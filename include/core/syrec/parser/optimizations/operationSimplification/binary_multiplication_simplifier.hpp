@@ -9,7 +9,6 @@ namespace optimizations {
     public:
         /*
          *  IGNORE LEFTMOST 1 bit and start at leftmost bit ignoring more significant zero bits (i.e. bits to the right of the leftmost one bit)
-
             0101 1101 = 93 * n
 
             4n = n << 2
@@ -23,7 +22,7 @@ namespace optimizations {
          */
         [[nodiscard]] std::optional<syrec::expression::ptr> trySimplify(const std::shared_ptr<syrec::BinaryExpression>&) override;
 
-    private:
+    protected:
         struct ShiftAndAddOrSubOperationStep {
             const std::size_t shiftAmount;
             const bool        performAddition;

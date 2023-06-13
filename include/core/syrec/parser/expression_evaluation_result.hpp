@@ -2,6 +2,7 @@
 #define EXPRESSION_EVALUATION_RESULT_HPP
 
 #include "core/syrec/expression.hpp"
+#include "core/syrec/parser/utils/bit_helpers.hpp"
 
 #include <variant>
 
@@ -30,13 +31,11 @@ namespace parser {
             return std::shared_ptr<ExpressionEvaluationResult>(new ExpressionEvaluationResult(expression, numValuesPerDimension));
         }
 
-        [[nodiscard]] static unsigned int                           getRequiredBitWidthToStoreSignal(unsigned int constantValue);
-
     private:
         ExpressionEvaluationResult(unsigned int constantValue, const std::optional<unsigned int>& optionalExpectedSignalWidth):
             isConstant(true), optionalExpectedSignalWidthForConstantValue(optionalExpectedSignalWidth) {
             numValuesPerDimension.emplace_back(1);
-            evaluationResult = std::make_pair(constantValue, optionalExpectedSignalWidth.has_value() ? *optionalExpectedSignalWidth : getRequiredBitWidthToStoreSignal(constantValue));
+            evaluationResult = std::make_pair(constantValue, optionalExpectedSignalWidth.has_value() ? *optionalExpectedSignalWidth : BitHelpers::getRequiredBitsToStoreValue(constantValue));
         }
 
         ExpressionEvaluationResult(const syrec::expression::ptr& expression, std::vector<unsigned int>& numValuesPerDimension):

@@ -6,6 +6,7 @@
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/symbol_table_backup_helper.hpp"
+#include "core/syrec/parser/optimizations/operationSimplification/binary_factoring_multiplication_simplifier.hpp"
 #include "core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
 
@@ -92,12 +93,12 @@ namespace parser {
     protected:
         std::unique_ptr<AssignmentSignalAccessRestriction> signalAccessRestriction;
 
-        std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>> createMultiplicationSimplifier(optimizations::MultiplicationSimplificationMethod multiplicationSimplificationMethod) {
+        [[nodiscard]] std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>> createMultiplicationSimplifier(optimizations::MultiplicationSimplificationMethod multiplicationSimplificationMethod) const {
             switch (multiplicationSimplificationMethod) {
                 case optimizations::MultiplicationSimplificationMethod::BinarySimplification: 
-                {
                     return std::make_optional(std::make_unique<optimizations::BinaryMultiplicationSimplifier>());
-                }
+                case optimizations::MultiplicationSimplificationMethod::BinarySimplificationWithFactoring:
+                    return std::make_optional(std::make_unique<optimizations::BinaryFactoringMultiplicationSimplifier>());
                 default:
                     return std::nullopt;
             }

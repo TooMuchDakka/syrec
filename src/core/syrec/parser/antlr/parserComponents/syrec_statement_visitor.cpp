@@ -13,6 +13,7 @@
 #include "core/syrec/parser/optimizations/loop_optimizer.hpp"
 
 #include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
+#include "core/syrec/parser/utils/bit_helpers.hpp"
 #include "core/syrec/parser/optimizations/no_additional_line_assignment.hpp"
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
@@ -1570,7 +1571,7 @@ void SyReCStatementVisitor::addOrUpdateLoopVariableEntryAndOptionallyMakeItsValu
         wasNewSymbolTableScopeOpened = true;
 
         if (valueOfLoopVariable.has_value()) {
-            sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(loopVariableIdent), ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(*valueOfLoopVariable), valueOfLoopVariable);   
+            sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(loopVariableIdent), BitHelpers::getRequiredBitsToStoreValue(*valueOfLoopVariable), valueOfLoopVariable);   
         }
         else {
             sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(loopVariableIdent), UINT_MAX, valueOfLoopVariable);

@@ -1,5 +1,5 @@
 #include "core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp"
-#include <core/syrec/parser/expression_evaluation_result.hpp>
+#include "core/syrec/parser/utils/bit_helpers.hpp"
 
 using namespace optimizations;
 
@@ -8,14 +8,12 @@ std::optional<syrec::expression::ptr> BaseMultiplicationSimplifier::trySimplify(
         return std::nullopt;
     }
 
-    const bool isLeftOperandConstant  = isOperandConstant(binaryExpr->lhs);
-    const bool isRightOperandConstant = isOperandConstant(binaryExpr->rhs);
-    if (isLeftOperandConstant && isRightOperandConstant) {
-        const auto& leftOperandValue       = std::dynamic_pointer_cast<syrec::NumericExpression>(binaryExpr->lhs)->value->evaluate({});
-        const auto& rightOperandValue      = std::dynamic_pointer_cast<syrec::NumericExpression>(binaryExpr->rhs)->value->evaluate({});
-        const auto  finalValueOfExpression = leftOperandValue * rightOperandValue;
+    const auto valueOfLeftOperandIfConstant = tryDetermineValueOfConstant(binaryExpr->lhs);
+    const auto valueOfRightOperandIfConstant = tryDetermineValueOfConstant(binaryExpr->rhs);
 
-        return std::make_optional(std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(finalValueOfExpression), parser::ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(finalValueOfExpression)));
+    if (valueOfLeftOperandIfConstant.has_value() && valueOfRightOperandIfConstant.has_value()) {
+        const auto resultOfProduct = *valueOfLeftOperandIfConstant * *valueOfRightOperandIfConstant;
+        return std::make_optional(std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(resultOfProduct), BitHelpers::getRequiredBitsToStoreValue(resultOfProduct)));
     }
     return std::nullopt;
 }
@@ -31,5 +29,25 @@ bool BaseMultiplicationSimplifier::isOperandConstant(const syrec::expression::pt
     }
     return false;
 }
+
+std::optional<unsigned> BaseMultiplicationSimplifier::tryDetermineValueOfConstant(const syrec::expression::ptr& operandOfBinaryExpr) const {
+    if (const auto operandAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(operandOfBinaryExpr); operandAsNumericExpr != nullptr) {
+        if (operandAsNumericExpr->value->isConstant()) {
+            return std::make_optional(operandAsNumericExpr->value->evaluate({}));
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<syrec::expression::ptr> BaseMultiplicationSimplifier::replaceMultiplicationWithShiftIfConstantTermIsPowerOfTwo(unsigned int constantTerm, const syrec::expression::ptr& nonConstantTerm) const {
+    if (constantTerm % 2 != 0 || constantTerm == 0) {
+        return std::nullopt;
+    }
+
+    const auto shiftAmount = static_cast<unsigned int>(std::log2(constantTerm));
+    return std::make_optional(std::make_shared<syrec::ShiftExpression>(nonConstantTerm, syrec::ShiftExpression::Left, std::make_shared<syrec::Number>(shiftAmount)));
+}
+
+
 
 

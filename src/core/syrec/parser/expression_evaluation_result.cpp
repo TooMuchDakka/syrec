@@ -29,12 +29,3 @@ std::optional<syrec::expression::ptr> ExpressionEvaluationResult::getAsExpressio
     const auto& generatedExpression          = std::make_shared<syrec::NumericExpression>(containerForConstantValue, constantValueAndBitwidthPair.second);
     return std::make_optional(generatedExpression);
 }
-
-// TODO:
-unsigned ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(unsigned int constantValue) {
-    if (constantValue == 0) {
-        return 1;
-    }
-
-    return static_cast<unsigned int>(std::log2(constantValue) + 1);
-}

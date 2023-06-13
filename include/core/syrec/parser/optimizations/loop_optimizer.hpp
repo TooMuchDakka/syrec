@@ -15,6 +15,9 @@ namespace optimizations {
         LoopOptimizationConfig(const std::size_t maxUnrollCountPerLoop, const std::size_t maxAllowedNestingLevelOfInnerLoops, const std::size_t maxAllowedTotalLoopSize, const bool allowRemainderLoop, const bool forceUnrollAll):
             maxUnrollCountPerLoop(maxUnrollCountPerLoop), maxAllowedNestingLevelOfInnerLoops(maxAllowedNestingLevelOfInnerLoops), maxAllowedTotalLoopSize(maxAllowedTotalLoopSize), allowRemainderLoop(allowRemainderLoop), forceUnrollAll(forceUnrollAll)
 	    {}
+
+        LoopOptimizationConfig(const LoopOptimizationConfig& other) noexcept:
+	        maxUnrollCountPerLoop(other.maxUnrollCountPerLoop), maxAllowedNestingLevelOfInnerLoops(other.maxAllowedNestingLevelOfInnerLoops), maxAllowedTotalLoopSize(other.maxAllowedTotalLoopSize), allowRemainderLoop(other.allowRemainderLoop), forceUnrollAll(other.forceUnrollAll) {}
 	};
 
     class LoopUnroller {

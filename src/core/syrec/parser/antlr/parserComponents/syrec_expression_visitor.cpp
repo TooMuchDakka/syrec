@@ -7,6 +7,7 @@
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/value_broadcaster.hpp"
+#include "core/syrec/parser/utils/bit_helpers.hpp"
 
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
 #include "core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp"
@@ -64,7 +65,7 @@ std::any SyReCExpressionVisitor::visitExpressionFromSignal(SyReCParser::Expressi
         unsigned int bitWidthOfSignal = 0;
         if (canEvaluateNumber(constantSignalValue)) {
             const auto constantSignalValueEvaluated = *tryEvaluateNumber(constantSignalValue, determineContextStartTokenPositionOrUseDefaultOne(context->signal()));
-            bitWidthOfSignal                        = ExpressionEvaluationResult::getRequiredBitWidthToStoreSignal(constantSignalValueEvaluated);
+            bitWidthOfSignal                        = static_cast<unsigned int>(BitHelpers::getRequiredBitsToStoreValue(constantSignalValueEvaluated));
             constantSignalValue                     = std::make_shared<syrec::Number>(constantSignalValueEvaluated);
             return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(constantSignalValueEvaluated, std::make_optional(bitWidthOfSignal)));
         }
