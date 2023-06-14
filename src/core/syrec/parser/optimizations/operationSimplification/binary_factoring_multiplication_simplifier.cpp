@@ -3,6 +3,10 @@
 
 using namespace optimizations;
 
+/*
+ * TODO: Currently after factoring the given integer a to i.e. a_0 * a_1, the subsequent trySimplifiy call of the generated expression from the found factors will perform a factorization again (which is currently not desired behaviour)
+ * For example: 9 could be factorized to 3 * 3 => (((x << 1) + 1) << 1 + ((x << 1) + 1)) but the initial factor would already produce the sequence ((x << 3) + 1) thus the proposed fusion approach of the normal and factorizing method should work best
+ */
 std::optional<syrec::expression::ptr> BinaryFactoringMultiplicationSimplifier::trySimplify(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
     const bool isLeftOperandConstant  = isOperandConstant(binaryExpr->lhs);
     const bool isRightOperandConstant = isOperandConstant(binaryExpr->rhs);

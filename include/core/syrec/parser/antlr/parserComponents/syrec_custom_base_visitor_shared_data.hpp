@@ -15,21 +15,21 @@
 namespace parser {
     class SharedVisitorData {
     public:
-        std::vector<std::string>                                                       errors;
-        std::vector<std::string>                                                       warnings;
-        const std::unique_ptr<ParserConfig>                                            parserConfig;
-        std::shared_ptr<SymbolTable>                                                   currentSymbolTableScope;
-        std::size_t                                                                    currentModuleCallNestingLevel;
-        syrec::Number::loop_variable_mapping                                           loopVariableMappingLookup;
-        bool                                                                           shouldSkipSignalAccessRestrictionCheck;
-        bool                                                                           currentlyParsingAssignmentStmtRhs;
-        std::optional<unsigned int>                                                    optionalExpectedExpressionSignalWidth;
-        std::optional<std::string>                                                     lastDeclaredLoopVariable;
-        bool                                                                           modificationsOfReferenceCountsDisabled;
-        bool                                                                           performingReadOnlyParsingOfLoopBody;
-        std::stack<SymbolTableBackupHelper::ptr>                                       localSignalValuesBackup;
-        std::stack<std::shared_ptr<optimizations::LoopBodyValuePropagationBlocker>>    loopBodyValuePropagationBlockers;
-        bool                                                                           performPotentialValueLookupForCurrentlyAccessedSignal;
+        std::vector<std::string>                                                          errors;
+        std::vector<std::string>                                                          warnings;
+        const std::unique_ptr<ParserConfig>                                               parserConfig;
+        std::shared_ptr<SymbolTable>                                                      currentSymbolTableScope;
+        std::size_t                                                                       currentModuleCallNestingLevel;
+        syrec::Number::loop_variable_mapping                                              loopVariableMappingLookup;
+        bool                                                                              shouldSkipSignalAccessRestrictionCheck;
+        bool                                                                              currentlyParsingAssignmentStmtRhs;
+        std::optional<unsigned int>                                                       optionalExpectedExpressionSignalWidth;
+        std::optional<std::string>                                                        lastDeclaredLoopVariable;
+        bool                                                                              modificationsOfReferenceCountsDisabled;
+        bool                                                                              performingReadOnlyParsingOfLoopBody;
+        std::stack<SymbolTableBackupHelper::ptr>                                          localSignalValuesBackup;
+        std::stack<std::shared_ptr<optimizations::LoopBodyValuePropagationBlocker>>       loopBodyValuePropagationBlockers;
+        bool                                                                              performPotentialValueLookupForCurrentlyAccessedSignal;
         const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>> optionalMultiplicationSimplifier;
 
         struct LoopVariableUnrollModification {

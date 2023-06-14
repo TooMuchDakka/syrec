@@ -10,7 +10,6 @@
 #include "core/syrec/parser/utils/bit_helpers.hpp"
 
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
-#include "core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp"
 
 using namespace parser;
 

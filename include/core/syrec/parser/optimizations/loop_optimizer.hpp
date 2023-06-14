@@ -5,6 +5,7 @@
 #include "core/syrec/statement.hpp"
 
 namespace optimizations {
+    // TODO: LOOP_UNROLLING: Should we define default values for the given options and if so can we determine good default values (maybe with heuristics or copied from LLVM ?)
 	struct LoopOptimizationConfig {
         const std::size_t maxUnrollCountPerLoop;
         const std::size_t maxAllowedNestingLevelOfInnerLoops;
@@ -16,8 +17,7 @@ namespace optimizations {
             maxUnrollCountPerLoop(maxUnrollCountPerLoop), maxAllowedNestingLevelOfInnerLoops(maxAllowedNestingLevelOfInnerLoops), maxAllowedTotalLoopSize(maxAllowedTotalLoopSize), allowRemainderLoop(allowRemainderLoop), forceUnrollAll(forceUnrollAll)
 	    {}
 
-        LoopOptimizationConfig(const LoopOptimizationConfig& other) noexcept:
-	        maxUnrollCountPerLoop(other.maxUnrollCountPerLoop), maxAllowedNestingLevelOfInnerLoops(other.maxAllowedNestingLevelOfInnerLoops), maxAllowedTotalLoopSize(other.maxAllowedTotalLoopSize), allowRemainderLoop(other.allowRemainderLoop), forceUnrollAll(other.forceUnrollAll) {}
+        LoopOptimizationConfig(const LoopOptimizationConfig& other) = default;
 	};
 
     class LoopUnroller {

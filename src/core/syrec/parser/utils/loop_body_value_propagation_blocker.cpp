@@ -25,6 +25,10 @@ bool optimizations::LoopBodyValuePropagationBlocker::isAccessBlockedFor(const sy
         .has_value();
 }
 
+bool optimizations::LoopBodyValuePropagationBlocker::areAnyAssignmentsPerformed() const {
+    return !assignedToSignalsInLoopBody.empty();
+}
+
 void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec::Statement::ptr& stmt) {
     if (const auto& stmtAsAssignmentStmt = tryConvertStmtToStmtOfOtherType<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
         handleAssignment(stmtAsAssignmentStmt->lhs);

@@ -1,5 +1,58 @@
 {
-  "simplifyTest": {
-    "circuit": "module main(out b(4), in a(4)) b += (113 * (a + 2))"
+  "constantTermOfMultiplicationSimplifiedInNonNestedExpression": {
+    "circuit": "module main(out b(4), in a(4)) b += (113 * a)",
+    "expectedCircuit": "module main(out b(4), in a(4)) b += ((((((a << 1) + a) << 1) + a) << 4) + a)",
+    "optimizations": {
+      "multiplySimplifyON": "binaryMethod"
+    }
+  },
+  "constantTermOfParentMultiplicationSimplifiedInExpressionWithNestedExpressions": {
+    "circuit": "module main(out b(4), in a(4)) b += (113 * (a + 2))",
+    "expectedCircuit": "module main(out b(4), in a(4)) b += (((((((a + 2) << 1) + (a + 2)) << 1) + (a + 2)) << 4) + (a + 2))",
+    "optimizations": {
+      "multiplySimplifyON": "binaryMethod"
+    }
+  },
+  "constantTermOfNestedMultiplicationSimplfiedInExpressionWithNestedExpressions": {
+    "circuit": "module main(out b(4), in a(4)) b += (a * (a * 113))",
+    "expectedCircuit": "module main(out b(4), in a(4)) b += (a * ((((((a << 1) + a) << 1) + a) << 4) + a))",
+    "optimizations": {
+      "multiplySimplifyON": "binaryMethod"
+    }
+  },
+  "constantTermOfNestedMultiplicationAndParentMultiplicationSimplifiedInExpressionWithNestedExpressions": {
+    "circuit": "module main(out b(4), in a(4)) b += (585 * (a * 9))",
+    "expectedCircuit": "module main(out b(4), in a(4)) b += ((((((((a << 3) + a) << 3) + ((a << 3) + a)) << 3) + ((a << 3) + a)) << 3) + ((a << 3) + a))",
+    "optimizations": {
+      "multiplySimplifyON": "binaryMethod"
+    }
+  },
+  "constantTermOfMultiplicationFactoredAndSimplifiedInNonNestedExpression": {
+    "circuit": "module main(out b(4), in a(4)) b += (585 * a)",
+    "expectedCircuit": "module main(out b(4), in a(4)) b += (((a << 3) + a) << 6) + ((a << 3) + a)",
+    "optimizations": {
+      "multiplySimplifyON": "binaryFactoringMethod"
+    }
+  },
+  "constantTermOfMultiplicationFactoredAndSimplifiedInNestedExpression": {
+    "circuit": "module main(out b(4), in a(4)) b += (585 * (a + 2))",
+    "expectedCircuit": "module main(out b(4), in a(4)) b += ((((a + 2) << 3) + (a + 2)) << 6) + (((a + 2) << 3) + (a + 2))",
+    "optimizations": {
+      "multiplySimplifyON": "binaryFactoringMethod"
+    }
+  },
+  "constantTermOfNestedMultiplicationFactoredAndSimplfiedInExpressionWithNestedExpressions": {
+    "circuit": "module main(out b(4), in a(4)) b += (a * (a * 585))",
+    "expectedCircuit": "module main(out b(4), in a(4)) b += (a * (((a << 3) + a) << 6) + ((a << 3) + a))",
+    "optimizations": {
+      "multiplySimplifyON": "binaryFactoringMethod"
+    }
+  },
+  "constantTermOfNestedMultiplicationAndParentMultiplicationFactoredSimplifiedInExpressionWithNestedExpressions": {
+    "circuit": "module main(out b(4), in a(4)) b += (585 * (a * 113))",
+    "expectedCircuit": "module main(out b(4), in a(4)) b += (((a << 3) + a) << 6) + ((a << 3) + a)",
+    "optimizations": {
+      "multiplySimplifyON": "binaryFactoringMethod"
+    }
   }
 }

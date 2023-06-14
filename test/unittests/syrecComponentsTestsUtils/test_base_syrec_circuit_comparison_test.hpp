@@ -6,6 +6,7 @@
 #include "core/syrec/parser/utils/syrec_ast_dump_utils.hpp"
 
 #include "gtest/gtest.h"
+#include <fstream>
 #include <cstdlib>
 #include <cerrno>
 #include <nlohmann/json.hpp>
@@ -137,21 +138,36 @@ protected:
                 case SupportingBroadCastingExpressionOperandsFlag:
                 case SupportingBroadCastingAssignmentOperands:
                     break;
-                case DeadCodeEliminationFlag:
-                    generatedConfig.deadCodeEliminationEnabled = true;
+                case DeadCodeEliminationFlag: {
+                    const auto parsedDeadCodeEliminationFlagValue = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedDeadCodeEliminationFlagValue.has_value()) << "Failed to map " << value << " to a valid dead code elimination value";
+                    generatedConfig.deadCodeEliminationEnabled = *parsedDeadCodeEliminationFlagValue > 0;
+                    break;   
+                }
+                case PerformConstantPropagationFlag: {
+                    const auto parsedConstantPropagationFlagValue = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedConstantPropagationFlagValue.has_value()) << "Failed to map " << value << " to a valid constant propagation value";
+                    generatedConfig.performConstantPropagation = *parsedConstantPropagationFlagValue > 0;
                     break;
-                case PerformConstantPropagationFlag:
-                    generatedConfig.performConstantPropagation = true;
+                }
+                case NoAdditionalLineSynthesisFlag: {
+                    const auto parsedNoAdditionalLineSynthesisFlagValue = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedNoAdditionalLineSynthesisFlagValue.has_value()) << "Failed to map " << value << " to a valid no additional line synthesis value";
+                    generatedConfig.noAdditionalLineOptimizationEnabled = *parsedNoAdditionalLineSynthesisFlagValue > 0;
                     break;
-                case NoAdditionalLineSynthesisFlag:
-                    generatedConfig.noAdditionalLineOptimizationEnabled = true;
+                }
+                case OperationStrengthReductionEnabled: {
+                    const auto parsedOperationStrengthReductionFlagValue = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedOperationStrengthReductionFlagValue.has_value()) << "Failed to map " << value << " to a valid operation strength reduction value";
+                    generatedConfig.operationStrengthReductionEnabled = *parsedOperationStrengthReductionFlagValue > 0;
                     break;
-                case OperationStrengthReductionEnabled:
-                    generatedConfig.operationStrengthReductionEnabled = true;
+                }
+                case ReassociateExpressionFlag: {
+                    const auto parsedReassociateExpressionFlagValue = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedReassociateExpressionFlagValue.has_value()) << "Failed to map " << value << " to a valid reassociate expression value";
+                    generatedConfig.reassociateExpressionEnabled = *parsedReassociateExpressionFlagValue > 0;
                     break;
-                case ReassociateExpressionFlag:
-                    generatedConfig.reassociateExpressionEnabled = true;
-                    break;
+                }
                 case MultiplicationSimplificationMethod: {
                     const auto mappedToSimplificationMethod = tryMapToMultiplicationSimplificationMethod(value);
                     ASSERT_TRUE(mappedToSimplificationMethod.has_value()) << "Failed to map " << value << " to a valid multiplication simplification method";
@@ -181,12 +197,16 @@ protected:
                 }
                 case LoopForceUnrollFlag: {
                     wereLoopUnrollConfigOptionsDefined = true;
-                    forceUnrollAll                     = true;
+                    const auto parsedForceUnrollFlag   = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedForceUnrollFlag.has_value()) << "Failed to map given force unrolling of loops flag value to a number: " << value;
+                    forceUnrollAll                     = *parsedForceUnrollFlag > 0;
                     break;   
                 }
                 case LoopUnrollAllowRemainderFlag: {
                     wereLoopUnrollConfigOptionsDefined = true;
-                    allowRemainderLoop                 = true;
+                    const auto parsedAllowLoopRemainderFlag   = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedAllowLoopRemainderFlag.has_value()) << "Failed to map given allow remainder of loop after unroll flag value to a number: " << value;
+                    allowRemainderLoop = *parsedAllowLoopRemainderFlag > 0;
                     break;
                 }
             }

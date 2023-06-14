@@ -451,6 +451,12 @@ void SymbolTable::updateStoredValueForLoopVariable(const std::string_view& loopV
 
     const auto& signalValueLookup = *symbolTableEntryForVariable->optionalValueLookup;
     const auto& requiredDimensionAccessToUpdateValue = std::vector({std::make_optional<unsigned int>(0u)});
+
+    /*
+     * We need to lift all restrictions that would prevent an update of the signal value.
+     * Since loop variables are readonly variables for the user, we control its value and thus restrictions can only stem from the initial readonly parsing of the loop
+     */ 
+    signalValueLookup->liftRestrictionsFromWholeSignal();
     signalValueLookup->updateStoredValueFor(requiredDimensionAccessToUpdateValue, std::nullopt, newValue);
 }
 

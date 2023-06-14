@@ -11,6 +11,7 @@ namespace optimizations {
     public:
         explicit           LoopBodyValuePropagationBlocker(const syrec::Statement::vec& stmtBlock, const parser::SymbolTable::ptr& symbolTable, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions);
         [[nodiscard]] bool isAccessBlockedFor(const syrec::VariableAccess::ptr& accessedPartsOfSignal) const;
+        [[nodiscard]] bool areAnyAssignmentsPerformed() const;
 
     private:
         std::map<std::string, valueLookup::SignalValueLookup::ptr> assignedToSignalsInLoopBody;

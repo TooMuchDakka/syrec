@@ -163,11 +163,19 @@
   },
   "testNestedLoopWithOnlyOneIterationAndAnExplicitLoopVariableDefinedIsUnrolledCorrectlyWithParentLoopNotBeingUnrolled": {
     "circuit":          "module test(out a(4), out b(4), out c[2](4)) for 0 to 5 step 1 do for $i = 0 to 10 step 10 do ++= a; if ($i = b) then ++= b else skip fi ($i = b); ++= b rof rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
-    "expectedCircuit":  "module test(out a(4), out b(4), out c[2](4)) for 0 to 5 step 1 do ++= a; if (0 = b) then ++= b else skip fi (0 = b); ++= b rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3"
+    "expectedCircuit":  "module test(out a(4), out b(4), out c[2](4)) for 0 to 5 step 1 do ++= a; if (0 = b) then ++= b else skip fi (0 = b); ++= b rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
+    "optimizations": {
+      "loopUnrollMaxUnrollCnt": "1",
+      "loopUnrollAllowRemainderON": "0"
+    }
   },
   "testNestedLoopWithOnlyOneIterationAndNoLoopVariableDefinedIsUnrolledCorrectlyWithParentLoopNotBeingUnrolled": {
     "circuit":          "module test(out a(4), out b(4), out c[2](4)) for $j = 0 to 5 step 1 do for 0 to 10 step 10 do ++= a; if (a = b) then ++= b else skip fi (a = b); ++= b rof rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
-    "expectedCircuit":  "module test(out a(4), out b(4), out c[2](4)) for $j = 0 to 5 step 1 do ++= a; if (a = b) then ++= b else skip fi (a = b); ++= b rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3"
+    "expectedCircuit":  "module test(out a(4), out b(4), out c[2](4)) for $j = 0 to 5 step 1 do ++= a; if (a = b) then ++= b else skip fi (a = b); ++= b rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
+    "optimizations": {
+      "loopUnrollMaxUnrollCnt": "1",
+      "loopUnrollAllowRemainderON": "0"
+    }
   },
   "testNestedLoopWithOnlyOneIterationWithoutLopVariableCorrectlyUnrolledIfParentIsAlsoUnrolledWithParentDefiningLoopVariable": {
     "circuit":          "module test(out a(4), out b(4), out c[2](4)) for $j = 0 to 5 step 5 do for 0 to 10 step 10 do ++= a; if ($j = b) then ++= b else skip fi ($j = b); ++= b rof rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
@@ -180,5 +188,9 @@
   "testNestedLoopWithOnlyOneIterationAndLoopVariableCorrectlyUnrolledIfParentIsAlsoUnrolledWithBothDefiningALoopVariable": {
     "circuit": "module test(out a(4), out b(4), out c[2](4)) for $i = 0 to 5 step 5 do for $j = 0 to 10 step 10 do ++= a; if ($j = $i) then ++= b else skip fi ($j = $i); ++= b rof rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
     "expectedCircuit": "module test(out a(4), out b(4), out c[2](4)) ++= a; ++= b; ++= b; c[0].0 += 1; c[1].1 += 1"
+  },
+  "testLoopVariableOccurrencesCorrectlyReplacedInAssignmentStatementIfLoopIsUnrolled": {
+    "circuit": "module forloop(in op(1), out c[2](4), inout a[2](4), inout b[2](4)) for $i = 0 to 1 do c[$i] ^= (a[$i] + b[$i]) rof",
+    "expectedCircuit": "module forloop(in op(1), out c[2](4), inout a[2](4), inout b[2](4)) c[0] ^= (a[0] + b[0])"
   }
 }
