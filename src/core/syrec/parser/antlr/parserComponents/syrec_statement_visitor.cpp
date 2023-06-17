@@ -1308,11 +1308,8 @@ std::size_t SyReCStatementVisitor::determineNumberOfLoopIterations(const LoopIte
     else {
         iterationRangeBetweenStartAndEnd = loopIterationRange.startValue - loopIterationRange.endValue;
     }
-    if (iterationRangeBetweenStartAndEnd == 0) {
-        return 1;
-    }
 
-    return static_cast<std::size_t>(std::ceil(iterationRangeBetweenStartAndEnd / loopIterationRange.stepSize));
+    return static_cast<std::size_t>(std::ceil((iterationRangeBetweenStartAndEnd + 1) / loopIterationRange.stepSize));
 }
 
 
@@ -1502,7 +1499,7 @@ void SyReCStatementVisitor::unrollAndProcessLoopBody(SyReCParser::ForStatementCo
      * We cannot perform an unroll of a loop with a defined variable if the constant propagation optimization is turn off because this would not fixup the value of the loop variable in the unrolled statements
      * i.e. for $i = 0 to 4 step 1 do c[$i] += ... rof would be unrolled to c[$i] += ... with the definition of the loop variable $i being removed since the loop was unrolled completely
      */
-    if (!std::holds_alternative<optimizations::LoopUnroller::NotModifiedLoopInformation>(unrolledLoopInformation.data) && sharedData->currentSymbolTableScope->contains(loopStatement->loopVariable)
+    if (!std::holds_alternative<optimizations::LoopUnroller::NotModifiedLoopInformation>(unrolledLoopInformation.data) && !loopStatement->loopVariable.empty()
         && !sharedData->parserConfig->performConstantPropagation) {
         addStatementToOpenContainer(loopStatement);
         return;

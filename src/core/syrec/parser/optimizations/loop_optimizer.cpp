@@ -7,6 +7,7 @@ optimizations::LoopUnroller::UnrollInformation optimizations::LoopUnroller::tryU
 }
 
 optimizations::LoopUnroller::UnrollInformation optimizations::LoopUnroller::tryUnrollLoop(const LoopOptimizationConfig& loopUnrollConfig, const std::size_t loopNestingLevel, const std::shared_ptr<syrec::ForStatement>& loopStatement) {
+    
     if (loopUnrollConfig.forceUnrollAll) {
         if (const auto& fullyUnrolledLoopInformation = canLoopBeFullyUnrolled(loopUnrollConfig, loopNestingLevel, loopStatement); fullyUnrolledLoopInformation.has_value()) {
             return UnrollInformation(*fullyUnrolledLoopInformation);   
@@ -149,9 +150,9 @@ std::optional<std::size_t> optimizations::LoopUnroller::determineNumberOfLoopIte
     const auto& stepSize               = loopStatement->step->evaluate(loopVariableValueLookup);
 
     if (endValue > startValue) {
-        return std::make_optional((endValue - startValue) / stepSize);
+        return std::make_optional(((endValue - startValue) + 1) / stepSize);
     }
-    return std::make_optional((startValue - endValue) / stepSize);
+    return std::make_optional(((startValue - endValue) + 1) / stepSize);
 }
 
 std::optional<std::string> optimizations::LoopUnroller::tryGetLoopVariable(const std::shared_ptr<syrec::ForStatement>& loopStatement) {
