@@ -11,12 +11,12 @@ bool syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(operation ope
         case operation::addition:
         case operation::shift_left:
         case operation::shift_right:
-        case operation::bitwise_xor:
             return operand == 0;
         case operation::multiplication:
             return operand == 1;
+        default:
+            return false;
     }
-    return false;
 }
 
 bool syrec_operation::isOperandUseAsRhsInOperationIdentityElement(const operation operation, const unsigned int operand) noexcept {
@@ -27,15 +27,14 @@ bool syrec_operation::isOperandUseAsRhsInOperationIdentityElement(const operatio
         case operation::minus_assign:
         case operation::shift_left:
         case operation::shift_right:
-        case operation::xor_assign:
-        case operation::bitwise_xor:
             return operand == 0;
         case operation::division:
         case operation::multiplication:
         case operation::modulo:
             return operand == 1;
+        default:
+            return false;
     }
-    return false;
 }
 
 std::optional<unsigned int> syrec_operation::apply(const operation operation, const unsigned int leftOperand, const unsigned int rightOperand) noexcept
@@ -56,14 +55,14 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
         case operation::upper_bits_multiplication:
             result = leftOperand * rightOperand;
             break;
-        case operation::division:
+        case operation::division: {
             if (rightOperand == 0) {
                 isValidBinaryOperation = false;
-            }
-            else {
+            } else {
                 result = leftOperand / rightOperand;
             }
-            break;
+            break;   
+        }
         case operation::bitwise_and:
             result = leftOperand & rightOperand;
             break;
@@ -77,11 +76,9 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
         case operation::modulo:
             result = leftOperand % rightOperand;
             break;
-        // TODO: Implement correctly
         case operation::logical_and:
             result = leftOperand && rightOperand;
             break;
-        // TODO: Implement correctly
         case operation::logical_or:
             result = leftOperand || rightOperand;
             break;
@@ -111,6 +108,7 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
             break;
         default:
             isValidBinaryOperation = false;
+            break;
     }
 
     return isValidBinaryOperation ? std::optional(result) : std::nullopt;
@@ -124,8 +122,8 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
         case operation::bitwise_negation:
             result = ~operand;
             break;
-        // TODO: Implement correctly
         case operation::logical_negation:
+            result = operand == 0 ? 1 : 0;
             break;
         case operation::increment_assign:
             result = operand + 1;
@@ -133,7 +131,6 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
         case operation::decrement_assign:
             result = operand - 1;
             break;
-        // TODO: Implement correctly
         case operation::invert_assign:
             result = ~operand;
             break;

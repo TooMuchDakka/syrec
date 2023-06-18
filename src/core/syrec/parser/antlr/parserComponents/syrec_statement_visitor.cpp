@@ -737,7 +737,12 @@ std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementCon
 
     if (areAccessedValuesForDimensionAndBitsConstant(lhsAccessedSignal) && areAccessedValuesForDimensionAndBitsConstant(rhsAccessedSignal)
         && !isValuePropagationBlockedDueToLoopDataFlowAnalysis(lhsAccessedSignal) && !isValuePropagationBlockedDueToLoopDataFlowAnalysis(rhsAccessedSignal)) {
-        sharedData->currentSymbolTableScope->swap(lhsAccessedSignal, rhsAccessedSignal);
+        /*
+         * We do not perform value updates when constant propagation is disabled, i.e. during the readonly parsing of a loop body
+         */
+        if (!sharedData->parserConfig->performConstantPropagation) {
+            sharedData->currentSymbolTableScope->swap(lhsAccessedSignal, rhsAccessedSignal);   
+        }
     }
     else {
         invalidateStoredValueFor(lhsAccessedSignal);
