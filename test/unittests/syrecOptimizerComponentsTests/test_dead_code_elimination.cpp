@@ -19,7 +19,7 @@ protected:
 
     syrec::ReadProgramSettings getDefaultParserConfig() override {
         const auto loopUnrollConfig = std::make_optional(optimizations::LoopOptimizationConfig(2, 2, UINT_MAX, true, false));
-        return syrec::ReadProgramSettings(defaultSignalBitwidth, true, true, true, false, false, optimizations::MultiplicationSimplificationMethod::None, loopUnrollConfig);
+        return syrec::ReadProgramSettings(defaultSignalBitwidth, true, true, true, false, false, false, optimizations::MultiplicationSimplificationMethod::None, loopUnrollConfig);
     }
 };
 
@@ -33,3 +33,6 @@ INSTANTIATE_TEST_SUITE_P(SyReCOptimizations, DeadCodeEliminationTest,
 TEST_P(DeadCodeEliminationTest, GenericRemovalOfUnusedVariableAndModulesTest) {
     performParsingAndCompareExpectedAndActualCircuit();
 }
+
+
+

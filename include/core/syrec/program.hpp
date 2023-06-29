@@ -12,12 +12,13 @@ namespace syrec {
 
     struct ReadProgramSettings {
         explicit ReadProgramSettings(
-            unsigned bitwidth = 32U,
-            bool reassociateExpressionEnabled = false,
-            bool deadCodeEliminationEnabled = false,
-            bool performConstantPropagation = false,
-            bool noAdditionalLineOptimizationEnabled = false,
-            bool operationStrengthReductionEnabled = false,
+            unsigned                                             bitwidth                            = 32U,
+            bool                                                 reassociateExpressionEnabled        = false,
+            bool                                                 deadCodeEliminationEnabled          = false,
+            bool                                                 performConstantPropagation          = false,
+            bool                                                 noAdditionalLineOptimizationEnabled = false,
+            bool                                                 operationStrengthReductionEnabled   = false,
+            bool                                                 deadStoreEliminationEnabled         = false,
             optimizations::MultiplicationSimplificationMethod multiplicationSimplificationMethod = optimizations::MultiplicationSimplificationMethod::None,
             std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig = std::nullopt,
             std::string expectedMainModuleName = "main"):
@@ -27,6 +28,7 @@ namespace syrec {
             performConstantPropagation(performConstantPropagation),
             noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
             operationStrengthReductionEnabled(operationStrengthReductionEnabled),
+            deadStoreEliminationEnabled(deadStoreEliminationEnabled),
             multiplicationSimplificationMethod(multiplicationSimplificationMethod),
             optionalLoopUnrollConfig(optionalLoopUnrollConfig),
             expectedMainModuleName(std::move(expectedMainModuleName))
@@ -38,6 +40,7 @@ namespace syrec {
         bool                                                 performConstantPropagation;
         bool                                                 noAdditionalLineOptimizationEnabled;
         bool                                                 operationStrengthReductionEnabled;
+        bool                                                 deadStoreEliminationEnabled;
         optimizations::MultiplicationSimplificationMethod    multiplicationSimplificationMethod;
         std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig;
         std::string                                          expectedMainModuleName;
@@ -50,6 +53,7 @@ namespace syrec {
             swap(performConstantPropagation, other.performConstantPropagation);
             swap(noAdditionalLineOptimizationEnabled, other.noAdditionalLineOptimizationEnabled);
             swap(operationStrengthReductionEnabled, other.operationStrengthReductionEnabled);
+            swap(deadStoreEliminationEnabled, other.deadStoreEliminationEnabled);
             swap(multiplicationSimplificationMethod, other.multiplicationSimplificationMethod);
             if (other.optionalLoopUnrollConfig.has_value()) {
                 optionalLoopUnrollConfig.emplace(*other.optionalLoopUnrollConfig);

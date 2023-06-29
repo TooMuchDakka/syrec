@@ -26,6 +26,7 @@ protected:
     const std::string cJsonKeyPerformConstantPropagationFlag           = "constantPropON";
     const std::string cJsonKeyNoAdditionalLineSynthesisFlag            = "noAddLineSynON";
     const std::string cJsonKeyOperationStrengthReductionEnabled        = "opStrengthReductionON";
+    const std::string cJsonKeyDeadStoreEliminationEnabled              = "deadStoreElimON";
     const std::string cJsonKeyReassociateExpressionFlag                = "reassociateExprON";
     const std::string cJsonKeyMultiplicationSimplificationMethod       = "multiplySimplifyON";
     const std::string cJsonKeyLoopUnrollMaxNestingLevel                = "loopUnrollMaxNestingLvl";
@@ -100,6 +101,7 @@ protected:
         PerformConstantPropagationFlag,
         NoAdditionalLineSynthesisFlag,
         OperationStrengthReductionEnabled,
+        DeadStoreEliminationEnabled,
         ReassociateExpressionFlag,
         MultiplicationSimplificationMethod,
         LoopUnrollMaxNestingLevel,
@@ -160,6 +162,12 @@ protected:
                     const auto parsedOperationStrengthReductionFlagValue = tryParseStringToNumber(value);
                     ASSERT_TRUE(parsedOperationStrengthReductionFlagValue.has_value()) << "Failed to map " << value << " to a valid operation strength reduction value";
                     generatedConfig.operationStrengthReductionEnabled = *parsedOperationStrengthReductionFlagValue > 0;
+                    break;
+                }
+                case DeadStoreEliminationEnabled: {
+                    const auto parsedDeadStoreEliminationEnabledFlagValue = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedDeadStoreEliminationEnabledFlagValue.has_value()) << "Failed to map " << value << " to a valid dead store elimination value";
+                    generatedConfig.deadStoreEliminationEnabled = *parsedDeadStoreEliminationEnabledFlagValue > 0;
                     break;
                 }
                 case ReassociateExpressionFlag: {
@@ -228,6 +236,7 @@ protected:
         mergedOptions.performConstantPropagation = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::PerformConstantPropagationFlag, loadedOptimizationOptions, defaultParserConfig.performConstantPropagation, userDefinedOptimizations.performConstantPropagation);
         mergedOptions.noAdditionalLineOptimizationEnabled = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisFlag, loadedOptimizationOptions, defaultParserConfig.noAdditionalLineOptimizationEnabled, userDefinedOptimizations.noAdditionalLineOptimizationEnabled);
         mergedOptions.operationStrengthReductionEnabled   = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::OperationStrengthReductionEnabled, loadedOptimizationOptions, defaultParserConfig.operationStrengthReductionEnabled, userDefinedOptimizations.operationStrengthReductionEnabled);
+        mergedOptions.deadStoreEliminationEnabled         = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::DeadStoreEliminationEnabled, loadedOptimizationOptions, defaultParserConfig.deadStoreEliminationEnabled, userDefinedOptimizations.deadStoreEliminationEnabled);
         mergedOptions.reassociateExpressionEnabled        = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::ReassociateExpressionFlag, loadedOptimizationOptions, defaultParserConfig.reassociateExpressionEnabled, userDefinedOptimizations.reassociateExpressionEnabled);
         mergedOptions.multiplicationSimplificationMethod  = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::MultiplicationSimplificationMethod, loadedOptimizationOptions, defaultParserConfig.multiplicationSimplificationMethod, userDefinedOptimizations.multiplicationSimplificationMethod);
         
@@ -264,6 +273,7 @@ protected:
         if (jsonKeyOfOptimizationOption == cJsonKeyPerformConstantPropagationFlag) return std::make_optional(OptimizerOption::PerformConstantPropagationFlag);
         if (jsonKeyOfOptimizationOption == cJsonKeyNoAdditionalLineSynthesisFlag) return std::make_optional(OptimizerOption::NoAdditionalLineSynthesisFlag);
         if (jsonKeyOfOptimizationOption == cJsonKeyOperationStrengthReductionEnabled) return std::make_optional(OptimizerOption::OperationStrengthReductionEnabled);
+        if (jsonKeyOfOptimizationOption == cJsonKeyDeadStoreEliminationEnabled) return std::make_optional(OptimizerOption::DeadStoreEliminationEnabled);
         if (jsonKeyOfOptimizationOption == cJsonKeyReassociateExpressionFlag) return std::make_optional(OptimizerOption::ReassociateExpressionFlag);
         if (jsonKeyOfOptimizationOption == cJsonKeyMultiplicationSimplificationMethod) return std::make_optional(OptimizerOption::MultiplicationSimplificationMethod);
         if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollMaxNestingLevel) return std::make_optional(OptimizerOption::LoopUnrollMaxNestingLevel);

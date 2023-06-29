@@ -67,22 +67,12 @@ namespace parser {
             
             VariableSymbolTableEntry(const syrec::Variable::ptr& variable): referenceCount(0) {
                 variableInformation = std::variant<syrec::Variable::ptr, syrec::Number::ptr>(variable);
-                
-                switch (variable->type) {
-                    case syrec::Variable::Types::Out:
-                    case syrec::Variable::Types::Wire:
-                    case syrec::Variable::Types::Inout: {
-                        valueLookup::SignalValueLookup::ptr valueLookup = std::make_shared<valueLookup::SignalValueLookup>(valueLookup::SignalValueLookup(variable->bitwidth, variable->dimensions, 0));
-                        if (variable->type == syrec::Variable::Types::Inout) {
-                            valueLookup->invalidateAllStoredValuesForSignal();
-                        }
-                        optionalValueLookup = valueLookup;
-                        break;   
-                    }
-                    default:
-                        break;
-                }
 
+                valueLookup::SignalValueLookup::ptr valueLookup = std::make_shared<valueLookup::SignalValueLookup>(valueLookup::SignalValueLookup(variable->bitwidth, variable->dimensions, 0));
+                if (variable->type == syrec::Variable::Types::In || variable->type == syrec::Variable::Types::Inout) {
+                    valueLookup->invalidateAllStoredValuesForSignal();
+                }
+                optionalValueLookup = valueLookup;
             }
             VariableSymbolTableEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultLoopVariableValue): referenceCount(0) {
                 variableInformation = std::variant<syrec::Variable::ptr, syrec::Number::ptr>(number);
