@@ -57,7 +57,7 @@ std::optional<std::shared_ptr<LayerData<std::map<unsigned, std::optional<Vt>>>>>
 
 template<typename Vt>
 void BaseValueLookup<Vt>::invalidateAllStoredValuesForSignal() const {
-    valueLookup->applyRecursively([](std::map<unsigned int, std::optional<unsigned int>>& layerValueLookup) {
+    valueLookup->applyRecursively([](std::map<unsigned int, std::optional<Vt>>& layerValueLookup) {
         layerValueLookup.clear();
     });
 
@@ -100,7 +100,7 @@ void BaseValueLookup<Vt>::invalidateStoredValueFor(const std::vector<std::option
     valueLookup->applyOnLastAccessedDimension(
             0,
             accessedDimensions,
-            [](std::map<unsigned int, std::optional<unsigned int>>& layerValueLookup, const std::vector<LayerData<std::map<unsigned int, std::optional<unsigned int>>>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
+            [](std::map<unsigned int, std::optional<Vt>>& layerValueLookup, const std::vector<LayerData<std::map<unsigned int, std::optional<Vt>>>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
                 if (valueOfLastAccessedDimension.has_value()) {
                     if (layerValueLookup.count(*valueOfLastAccessedDimension) > 0) {
                         layerValueLookup.erase(*valueOfLastAccessedDimension);

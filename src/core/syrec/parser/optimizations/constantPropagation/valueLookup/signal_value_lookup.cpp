@@ -54,7 +54,7 @@ std::any SignalValueLookup::wrapValueOnOverflow(const std::any& value, const uns
     const auto valueToCheck                        = std::any_cast<unsigned int>(value);
     const auto maximumValueStorableInBitsOfStorage = BitHelpers::getMaximumStorableValueInBitRange(numBitsOfStorage);
     if (valueToCheck <= maximumValueStorableInBitsOfStorage) {
-        return value;
+        return valueToCheck;
     }
 
     /*
