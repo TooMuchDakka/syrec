@@ -67,6 +67,10 @@ add_library(
       #${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.cpp
 
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/deadStoreElimination/dead_store_eliminator.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/deadStoreElimination/dead_store_status_lookup.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/deadStoreElimination/statement_iteration_helper.cpp
+
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operationSimplification/binary_factoring_multiplication_simplifier.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.cpp
@@ -112,6 +116,10 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/layer_data.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp
+
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/deadStoreElimination/dead_store_eliminator.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/deadStoreElimination/dead_store_status_lookup.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/deadStoreElimination/statement_iteration_helper.hpp
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/binary_factoring_multiplication_simplifier.hpp

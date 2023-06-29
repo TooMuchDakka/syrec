@@ -6,6 +6,7 @@
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/symbol_table_backup_helper.hpp"
+#include "core/syrec/parser/optimizations/deadStoreElimination/dead_store_eliminator.hpp"
 #include "core/syrec/parser/optimizations/operationSimplification/binary_factoring_multiplication_simplifier.hpp"
 #include "core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
@@ -31,6 +32,7 @@ namespace parser {
         std::stack<std::shared_ptr<optimizations::LoopBodyValuePropagationBlocker>>       loopBodyValuePropagationBlockers;
         bool                                                                              performPotentialValueLookupForCurrentlyAccessedSignal;
         const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>> optionalMultiplicationSimplifier;
+        const std::optional<std::shared_ptr<deadStoreElimination::DeadStoreEliminator>>   optionalDeadStoreEliminator;
 
         struct LoopVariableUnrollModification {
             std::string loopVariableIdent;
@@ -50,6 +52,7 @@ namespace parser {
             performingReadOnlyParsingOfLoopBody(false),
             performPotentialValueLookupForCurrentlyAccessedSignal(true),
             optionalMultiplicationSimplifier(createMultiplicationSimplifier(parserConfig.multiplicationSimplificationMethod)),
+            optionalDeadStoreEliminator(createDeadStoreEliminator(parserConfig.deadStoreEliminationEnabled)),
             loopVariableModificationsDueToUnroll({}),
             loopNestingLevel(0)
         {}
@@ -102,6 +105,10 @@ namespace parser {
                 default:
                     return std::nullopt;
             }
+        }
+
+        [[nodiscard]] std::optional<std::shared_ptr<deadStoreElimination::DeadStoreEliminator>> createDeadStoreEliminator(bool deadStoreEliminationEnabled) {
+            return deadStoreEliminationEnabled ? std::make_optional(std::make_shared<deadStoreElimination::DeadStoreEliminator>(currentSymbolTableScope)) : std::nullopt;
         }
     };
 }; // namespace parser
