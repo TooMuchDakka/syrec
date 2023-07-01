@@ -10,12 +10,16 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
     std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> nextStatement = statementIterationHelper->getNextNonControlFlowStatement();
     while (nextStatement.has_value()) {
         if (const auto& nextStatementAsAssignmentStatement = std::dynamic_pointer_cast<syrec::AssignStatement>(nextStatement->statement); nextStatementAsAssignmentStatement != nullptr) {
+            markAccessedVariablePartsAsLive(nextStatementAsAssignmentStatement->lhs);
             markAccessedSignalsAsLiveInExpression(nextStatementAsAssignmentStatement->rhs);
-            insertPotentiallyDeadAssignmentStatement(nextStatementAsAssignmentStatement->lhs, nextStatement->relativeIndexInControlFlowGraph);
-            //markAccessedVariablePartsAsLive(nextStatementAsAssignmentStatement->lhs);
+            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsAssignmentStatement)) {
+                insertPotentiallyDeadAssignmentStatement(nextStatementAsAssignmentStatement->lhs, nextStatement->relativeIndexInControlFlowGraph);   
+            }
         } else if (const auto& nextStatementAsUnaryAssignmentStatement = std::dynamic_pointer_cast<syrec::UnaryStatement>(nextStatement->statement); nextStatementAsUnaryAssignmentStatement != nullptr) {
-            //markAccessedVariablePartsAsLive(nextStatementAsUnaryAssignmentStatement->var);
-            insertPotentiallyDeadAssignmentStatement(nextStatementAsUnaryAssignmentStatement->var, nextStatement->relativeIndexInControlFlowGraph);
+            markAccessedVariablePartsAsLive(nextStatementAsUnaryAssignmentStatement->var);
+            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsUnaryAssignmentStatement)) {
+                insertPotentiallyDeadAssignmentStatement(nextStatementAsUnaryAssignmentStatement->var, nextStatement->relativeIndexInControlFlowGraph);   
+            }
         } else if (const auto& nextStatementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(nextStatement->statement); nextStatementAsIfStatement != nullptr) {
             markAccessedSignalsAsLiveInExpression(nextStatementAsIfStatement->condition);
         } else if (const auto& nextStatementAsCallStatement = std::dynamic_pointer_cast<syrec::CallStatement>(nextStatement->statement); nextStatementAsCallStatement != nullptr) {
@@ -33,17 +37,26 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
     return combineAndSortDeadRemainingDeadStores();
 }
 
-bool DeadStoreEliminator::doesAssignmentContainPotentiallyUnsafeOperation(const syrec::Statement::ptr& stmt) {
+// TODO: Implement me
+void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores) {
+    return;
+}
+
+
+bool DeadStoreEliminator::doesAssignmentContainPotentiallyUnsafeOperation(const syrec::Statement::ptr& stmt) const {
     if (const auto& stmtAsUnaryAssignmentStmt = std::dynamic_pointer_cast<syrec::UnaryStatement>(stmt); stmtAsUnaryAssignmentStmt != nullptr) {
-        return wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsUnaryAssignmentStmt->var);
+        return isAssignedToSignalAModifiableParameter(stmtAsUnaryAssignmentStmt->var->var->name)
+            || wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsUnaryAssignmentStmt->var);
     }
     if (const auto& stmtAsAssignmentStmt = std::dynamic_pointer_cast<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
-        return wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsAssignmentStmt->lhs) || doesExpressionContainPotentiallyUnsafeOperation(stmtAsAssignmentStmt->rhs);
+        return isAssignedToSignalAModifiableParameter(stmtAsAssignmentStmt->lhs->var->name)
+            || wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsAssignmentStmt->lhs)
+            || doesExpressionContainPotentiallyUnsafeOperation(stmtAsAssignmentStmt->rhs);
     }
     return false;
 }
 
-bool DeadStoreEliminator::doesExpressionContainPotentiallyUnsafeOperation(const syrec::expression::ptr& expr) {
+bool DeadStoreEliminator::doesExpressionContainPotentiallyUnsafeOperation(const syrec::expression::ptr& expr) const {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         auto doesContainPotentiallyUnsafeOperation = doesExpressionContainPotentiallyUnsafeOperation(exprAsBinaryExpr->lhs) || doesExpressionContainPotentiallyUnsafeOperation(exprAsBinaryExpr->rhs);
         // Should we consider a division with unknown divisor as an unsafe operation ?
@@ -65,7 +78,7 @@ bool DeadStoreEliminator::doesExpressionContainPotentiallyUnsafeOperation(const 
 
 // We are assuming zero based indexing and are also checking further conditions required for a valid bit range access
 // are the latter really necessary ?
-bool DeadStoreEliminator::wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(const syrec::VariableAccess::ptr& signalAccess) {
+bool DeadStoreEliminator::wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(const syrec::VariableAccess::ptr& signalAccess) const {
     const auto fetchedSymbolTableEntry = symbolTable->getVariable(signalAccess->var->name);
     if (!fetchedSymbolTableEntry.has_value()) {
         return false;
@@ -103,6 +116,18 @@ bool DeadStoreEliminator::wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndW
 
     return dimensionAccessOK && bitRangeOK;
 }
+
+// TODO: Handling of state variables
+bool DeadStoreEliminator::isAssignedToSignalAModifiableParameter(const std::string_view& assignedToSignalIdent) const {
+    if (const auto& symbolTableEntryForAssignedToSignal = symbolTable->getVariable(assignedToSignalIdent); symbolTableEntryForAssignedToSignal.has_value()) {
+        if (std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForAssignedToSignal)) {
+            const auto& assignedToVariable = std::get<syrec::Variable::ptr>(*symbolTableEntryForAssignedToSignal);
+            return assignedToVariable->type == syrec::Variable::Types::Inout || assignedToVariable->type == syrec::Variable::Types::Out;
+        }
+    }
+    return false;
+}
+
 
 std::optional<unsigned int> DeadStoreEliminator::tryEvaluateNumber(const syrec::Number::ptr& number) const {
     return number->isConstant() ? std::make_optional(number->evaluate({})) : std::nullopt;
@@ -156,7 +181,7 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
     ).has_value();
 }
 
-[[nodiscard]] std::vector<std::optional<unsigned int>> DeadStoreEliminator::transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::expression::ptr>& dimensionAccess) {
+[[nodiscard]] std::vector<std::optional<unsigned int>> DeadStoreEliminator::transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::expression::ptr>& dimensionAccess) const {
     std::vector<std::optional<unsigned int>> transformedAccessOnDimension;
     std::transform(
             dimensionAccess.cbegin(),
@@ -179,7 +204,7 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
     return transformedAccessOnDimension;
 }
 
-[[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> DeadStoreEliminator::transformUserDefinedBitRangeAccess(unsigned int accessedSignalBitRange, const std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> & bitRangeAccess) {
+[[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> DeadStoreEliminator::transformUserDefinedBitRangeAccess(unsigned int accessedSignalBitRange, const std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> & bitRangeAccess) const {
     if (!bitRangeAccess.has_value()) {
         return std::make_optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>(0, accessedSignalBitRange - 1);
     }
@@ -315,7 +340,7 @@ potentiallyDeadStores.end());
     }
 }
 
-void DeadStoreEliminator::markAccessedSignalPartsAsDead(const syrec::VariableAccess::ptr& signalAccess) {
+void DeadStoreEliminator::markAccessedSignalPartsAsDead(const syrec::VariableAccess::ptr& signalAccess) const {
     if (livenessStatusLookup.count(signalAccess->var->name) == 0) {
         return;
     }

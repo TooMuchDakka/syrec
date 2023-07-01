@@ -43,6 +43,7 @@ namespace deadStoreElimination {
          *
          */
         [[nodiscard]] std::vector<AssignmentStatementIndexInControlFlowGraph> findDeadStores(const syrec::Statement::vec& statementList);
+        void                                                                  removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores);
 
     private:
         std::map<std::string, std::vector<PotentiallyDeadAssignmentStatement>> assignmentStmtIndizesPerSignal;
@@ -67,9 +68,10 @@ namespace deadStoreElimination {
          * II.  SignalAccess with either unknown accessed value of dimension or bit range 
          *
          */
-        [[nodiscard]] bool                        doesAssignmentContainPotentiallyUnsafeOperation(const syrec::Statement::ptr& stmt);
-        [[nodiscard]] bool                        doesExpressionContainPotentiallyUnsafeOperation(const syrec::expression::ptr& expr);
-        [[nodiscard]] bool                        wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(const syrec::VariableAccess::ptr& signalAccess);
+        [[nodiscard]] bool                        doesAssignmentContainPotentiallyUnsafeOperation(const syrec::Statement::ptr& stmt) const;
+        [[nodiscard]] bool                        doesExpressionContainPotentiallyUnsafeOperation(const syrec::expression::ptr& expr) const;
+        [[nodiscard]] bool                        wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(const syrec::VariableAccess::ptr& signalAccess) const;
+        [[nodiscard]] bool                        isAssignedToSignalAModifiableParameter(const std::string_view& assignedToSignalIdent) const;
         [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& number) const;
 
         /*
@@ -79,15 +81,15 @@ namespace deadStoreElimination {
         void               markAccessedVariablePartsAsLive(const syrec::VariableAccess::ptr& signalAccess);
         [[nodiscard]] bool isAccessedVariablePartLive(const syrec::VariableAccess::ptr& signalAccess);
 
-        [[nodiscard]] std::vector<std::optional<unsigned int>>                                transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::expression::ptr>& dimensionAccess);
-        [[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> transformUserDefinedBitRangeAccess(unsigned int accessedSignalBitwidth, const std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>>& bitRangeAccess);
+        [[nodiscard]] std::vector<std::optional<unsigned int>>                                transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::expression::ptr>& dimensionAccess) const;
+        [[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> transformUserDefinedBitRangeAccess(unsigned int accessedSignalBitwidth, const std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>>& bitRangeAccess) const;
         [[nodiscard]] std::vector<AssignmentStatementIndexInControlFlowGraph>                 combineAndSortDeadRemainingDeadStores();
 
         void markAccessedSignalsAsLiveInExpression(const syrec::expression::ptr& expr);
         void markAccessedSignalsAsLiveInCallStatement(const  std::shared_ptr<syrec::CallStatement>& callStmt);
         void insertPotentiallyDeadAssignmentStatement(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::vector<std::size_t>& relativeIndexOfStatementInControlFlowGraph);
         void removeNoLongerDeadStores(const std::string& accessedSignalIdent);
-        void markAccessedSignalPartsAsDead(const syrec::VariableAccess::ptr& signalAccess);
+        void markAccessedSignalPartsAsDead(const syrec::VariableAccess::ptr& signalAccess) const;
         void resetInternalData();
     };
 }
