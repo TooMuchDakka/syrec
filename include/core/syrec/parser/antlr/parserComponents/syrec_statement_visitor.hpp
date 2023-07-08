@@ -105,8 +105,8 @@ namespace parser {
             const std::size_t stepSize;
         };
         [[nodiscard]] std::optional<LoopIterationRange> tryDetermineCompileTimeLoopIterationRange(const ParsedLoopHeaderInformation& loopHeader);
-        [[nodiscard]] bool                                       doesLoopOnlyPerformOneIteration(const ParsedLoopHeaderInformation& loopHeader);
-        [[nodiscard]] std::size_t                       determineNumberOfLoopIterations(const LoopIterationRange& loopIterationRange) const;
+        [[nodiscard]] bool                              doesLoopOnlyPerformOneIteration(const ParsedLoopHeaderInformation& loopHeader);
+        [[nodiscard]] static std::size_t                determineNumberOfLoopIterations(const LoopIterationRange& loopIterationRange);
 
         struct CustomLoopContextInformation {
             SyReCParser::ForStatementContext*         parentLoopContext;

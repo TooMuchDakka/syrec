@@ -17,6 +17,7 @@
 #include "core/syrec/parser/optimizations/no_additional_line_assignment.hpp"
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
+#include "core/syrec/parser/utils/loop_range_utils.hpp"
 
 #include <fmt/format.h>
 
@@ -441,6 +442,8 @@ std::any SyReCStatementVisitor::visitLoopVariableDefinition(SyReCParser::LoopVar
  * TODO: LOOP_UNROLLING: During "read-only" parsing run of loop do not modifiy reference counts
  * TODO: LOOP_UNROLLING: Do not perform unroll if iteration range is not known at compile time
  * TODO: LOOP_UNROLLING: Def-use list for loop unrolling to not insert values for signals that are changed in later iterations
+ *
+ * TODO: DEAD_CODE_ELIMINATION: Support of reference counting for loop variable (and removal/extracting loop invariant code)
  */
 std::any SyReCStatementVisitor::visitForStatement(SyReCParser::ForStatementContext* context) {
     if (sharedData->performingReadOnlyParsingOfLoopBody || !sharedData->parserConfig->deadCodeEliminationEnabled) {
@@ -1301,20 +1304,12 @@ bool SyReCStatementVisitor::doesLoopOnlyPerformOneIteration(const ParsedLoopHead
     return false;
 }
 
-std::size_t SyReCStatementVisitor::determineNumberOfLoopIterations(const LoopIterationRange& loopIterationRange) const {
+std::size_t SyReCStatementVisitor::determineNumberOfLoopIterations(const LoopIterationRange& loopIterationRange) {
     if (loopIterationRange.stepSize == 0) {
         return 0;
     }
 
-    std::size_t iterationRangeBetweenStartAndEnd;
-    if (loopIterationRange.endValue >= loopIterationRange.startValue) {
-        iterationRangeBetweenStartAndEnd = loopIterationRange.endValue - loopIterationRange.startValue;
-    }
-    else {
-        iterationRangeBetweenStartAndEnd = loopIterationRange.startValue - loopIterationRange.endValue;
-    }
-
-    return static_cast<std::size_t>(std::ceil((iterationRangeBetweenStartAndEnd + 1) / loopIterationRange.stepSize));
+    return *utils::determineNumberOfLoopIterations(static_cast<unsigned int>(loopIterationRange.startValue), static_cast<unsigned int>(loopIterationRange.endValue), static_cast<unsigned int>(loopIterationRange.stepSize));
 }
 
 

@@ -18,7 +18,7 @@ std::shared_ptr<valueLookup::BaseValueLookup<bool>> DeadStoreStatusLookup::clone
 }
 
 bool DeadStoreStatusLookup::areAccessedSignalPartsDead(const std::vector<std::optional<unsigned>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) const {
-    return isValueLookupBlockedFor(accessedDimensions, accessedBitRange);
+    return !isValueLookupBlockedFor(accessedDimensions, accessedBitRange);
 }
 
 

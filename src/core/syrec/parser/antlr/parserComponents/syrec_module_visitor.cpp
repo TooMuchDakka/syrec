@@ -53,6 +53,7 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
                 SymbolTable::closeScope(sharedData->currentSymbolTableScope);
                 sharedData->currentSymbolTableScope->addEntry(unoptimizedModuleVersion, unusedStatusPerModuleParameter);
                 unoptimizedModules.emplace_back(unoptimizedModuleVersion);
+                // P1
                 foundModules.emplace_back(optimizedModuleVersion);   
             }
         }
@@ -67,6 +68,7 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
     if (sharedData->parserConfig->deadCodeEliminationEnabled) {
         removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(unoptimizedModules, foundModules, nameOfTopLevelModule);
         removeModulesWithoutParameters(foundModules, nameOfTopLevelModule);
+        // TODO: Remove now empty modules after dead code elimination (either here or at pos P1)?
     }
 
     return 0;
@@ -98,7 +100,7 @@ std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
         }
     }
 
-    const auto validUserDefinedModuleStatements = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
+    auto validUserDefinedModuleStatements = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
     //isDeclaredModuleValid &= validUserDefinedModuleStatements.has_value() && !validUserDefinedModuleStatements->empty();
     
     sharedData->currentModuleCallNestingLevel--;
@@ -106,7 +108,17 @@ std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
     if (isDeclaredModuleValid) {
         lastDeclaredModuleIdent = moduleIdent;
         if (validUserDefinedModuleStatements.has_value()) {
-            module->statements = *validUserDefinedModuleStatements;   
+            if (sharedData->parserConfig->deadStoreEliminationEnabled && sharedData->optionalDeadStoreEliminator.has_value()) {
+                auto        statementsToProcess = *std::move(validUserDefinedModuleStatements);
+                validUserDefinedModuleStatements.reset();
+
+                const auto& foundDeadStores = sharedData->optionalDeadStoreEliminator.value()->findDeadStores(statementsToProcess);
+                sharedData->optionalDeadStoreEliminator.value()->removeDeadStoresFrom(statementsToProcess, foundDeadStores);
+                // TODO: What if there are no remaining statements in the module body after the dead store elimination
+                module->statements = statementsToProcess;
+            } else {
+                module->statements = *validUserDefinedModuleStatements;      
+            }
         }
         return std::make_optional(module);
     }

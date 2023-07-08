@@ -1,4 +1,5 @@
 #include "core/syrec/parser/optimizations/loop_optimizer.hpp"
+#include "core/syrec/parser/utils/loop_range_utils.hpp"
 
 #include <algorithm>
 
@@ -148,11 +149,7 @@ std::optional<std::size_t> optimizations::LoopUnroller::determineNumberOfLoopIte
     const auto& startValue             = loopStatement->range.first->evaluate(loopVariableValueLookup);
     const auto& endValue   = loopStatement->range.second->evaluate(loopVariableValueLookup);
     const auto& stepSize               = loopStatement->step->evaluate(loopVariableValueLookup);
-
-    if (endValue > startValue) {
-        return std::make_optional(((endValue - startValue) + 1) / stepSize);
-    }
-    return std::make_optional(((startValue - endValue) + 1) / stepSize);
+    return utils::determineNumberOfLoopIterations(startValue, endValue, stepSize);
 }
 
 std::optional<std::string> optimizations::LoopUnroller::tryGetLoopVariable(const std::shared_ptr<syrec::ForStatement>& loopStatement) {

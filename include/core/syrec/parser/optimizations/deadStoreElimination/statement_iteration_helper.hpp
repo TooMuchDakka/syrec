@@ -8,34 +8,60 @@
 namespace deadStoreElimination {
     class StatementIterationHelper {
     public:
+        enum BlockType {
+            Module,
+            Loop,
+            IfConditionTrueBranch,
+            IfConditionFalseBranch
+        };
+
+        struct StatementIndexInBlock {
+            BlockType blockType;
+            std::size_t relativeIndexInBlock;
+
+            StatementIndexInBlock(BlockType blockType, std::size_t relativeIndexInBlock):
+                blockType(blockType), relativeIndexInBlock(relativeIndexInBlock) {}
+        };
+
         struct StatementAndRelativeIndexPair {
             const syrec::Statement::ptr    statement;
-            const std::vector<std::size_t> relativeIndexInControlFlowGraph;
+            const std::vector<StatementIndexInBlock> relativeIndexInControlFlowGraph;
 
             StatementAndRelativeIndexPair(syrec::Statement::ptr statement):
-                StatementAndRelativeIndexPair(statement, {}) {}
+                StatementAndRelativeIndexPair(std::move(statement), {}) {}
 
-            StatementAndRelativeIndexPair(syrec::Statement::ptr statement, std::vector<std::size_t> relativeIndexInControlFlowGraph):
+            StatementAndRelativeIndexPair(syrec::Statement::ptr statement, std::vector<StatementIndexInBlock> relativeIndexInControlFlowGraph):
                 statement(std::move(statement)), relativeIndexInControlFlowGraph(std::move(relativeIndexInControlFlowGraph)) {}
         };
 
         StatementIterationHelper(const syrec::Statement::vec& statementsToIterate) {
             statementIndexInCurrentBlock = 0;
-            perControlBlockRelativeStatementCounter.emplace_back(statementIndexInCurrentBlock);
+            perControlBlockRelativeStatementCounter.emplace_back(StatementIndexInBlock(BlockType::Module, statementIndexInCurrentBlock));
             remainingStatementsToParse.push(statementsToIterate);
         }
             
 
         // TODO: Naming, module call representing dead store is technically also a control flow statement
-        [[nodiscard]] std::optional<StatementAndRelativeIndexPair> getNextNonControlFlowStatement();
+        [[nodiscard]] std::optional<StatementAndRelativeIndexPair> getNextStatement();
 
     private:
-        std::vector<std::size_t>          perControlBlockRelativeStatementCounter;
-        std::stack<syrec::Statement::vec> remainingStatementsToParse;
-        std::size_t                       statementIndexInCurrentBlock;
+        struct BlockTypeSwitch {
+            std::size_t activeStartingFromStatementWithIndex;
+            BlockType   switchedToBlockType;
 
-        void                                   createAndPushNewStatementBlock(const syrec::Statement::vec& statements);
-        [[nodiscard]] std::vector<std::size_t> buildRelativeIndexForCurrentStatement() const;
+            BlockTypeSwitch(std::size_t activeStartingFromStatementWithIndex, BlockType switchedToBlockType):
+                activeStartingFromStatementWithIndex(activeStartingFromStatementWithIndex), switchedToBlockType(switchedToBlockType) {}
+        };
+
+        std::vector<StatementIndexInBlock> perControlBlockRelativeStatementCounter;
+        std::stack<syrec::Statement::vec>  remainingStatementsToParse;
+        std::stack<BlockTypeSwitch>        blockTypeSwitches;
+        std::size_t                        statementIndexInCurrentBlock;
+
+        void                                             createAndPushNewStatementBlock(const syrec::Statement::vec& statements, BlockType typeOfNewBlock);
+        void                                             appendStatementsWithBlockTypeSwitch(const syrec::Statement::vec& statements, BlockType typeOfNewBlock, std::size_t offsetForBlockSwitch);
+        void                                             updateStatementIndexInCurrentBlock();
+        [[nodiscard]] std::vector<StatementIndexInBlock> buildRelativeIndexForCurrentStatement() const;
     };
 }
 

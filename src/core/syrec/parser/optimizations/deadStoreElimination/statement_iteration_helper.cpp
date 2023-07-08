@@ -1,10 +1,9 @@
 #include "core/syrec/parser/optimizations/deadStoreElimination/statement_iteration_helper.hpp"
-
 #include <algorithm>
 
 using namespace deadStoreElimination;
 
-std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> StatementIterationHelper::getNextNonControlFlowStatement() {
+std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> StatementIterationHelper::getNextStatement() {
     if (remainingStatementsToParse.empty()) {
         return std::nullopt;
     }
@@ -12,15 +11,14 @@ std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> Statement
     std::optional<syrec::Statement::ptr> nextStatement;
     while (!remainingStatementsToParse.empty() && !nextStatement.has_value()) {
         const auto& statementsToIterate                       = remainingStatementsToParse.top();
-        const auto  numberOfRemainingStatementsInCurrentBlock = statementsToIterate.empty() ? 0 : (statementsToIterate.size() - statementIndexInCurrentBlock);
+        const auto  numberOfRemainingStatementsInCurrentBlock = statementsToIterate.empty() ? 0 : (statementsToIterate.size() - perControlBlockRelativeStatementCounter.back().relativeIndexInBlock);
         if (numberOfRemainingStatementsInCurrentBlock == 0) {
             remainingStatementsToParse.pop();
             perControlBlockRelativeStatementCounter.erase(std::prev(perControlBlockRelativeStatementCounter.end()));
+            updateStatementIndexInCurrentBlock();
         } else {
-            nextStatement.emplace(statementsToIterate.at(statementIndexInCurrentBlock));
-            perControlBlockRelativeStatementCounter.back()++;
+            nextStatement.emplace(statementsToIterate.at(perControlBlockRelativeStatementCounter.back().relativeIndexInBlock));
         }
-        statementIndexInCurrentBlock = !perControlBlockRelativeStatementCounter.empty() ? perControlBlockRelativeStatementCounter.back() : 0;
     }
 
     if (!nextStatement.has_value()) {
@@ -29,48 +27,58 @@ std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> Statement
     const auto& statementToProcess = *nextStatement;
     if (const auto statementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(statementToProcess); statementAsIfStatement != nullptr) {
         const auto statementAndIndexPair = StatementAndRelativeIndexPair(statementAsIfStatement, buildRelativeIndexForCurrentStatement());
-        //const auto currentNestingLevelOfControlFlowGraph = perControlBlockRelativeStatementCounter.size();
-        createAndPushNewStatementBlock(statementAsIfStatement->elseStatements);
-        createAndPushNewStatementBlock(statementAsIfStatement->thenStatements);
-        //perControlBlockRelativeStatementCounter.at(currentNestingLevelOfControlFlowGraph - 1) += 1;
+        createAndPushNewStatementBlock(statementAsIfStatement->thenStatements, BlockType::IfConditionTrueBranch);
+        appendStatementsWithBlockTypeSwitch(statementAsIfStatement->elseStatements, BlockType::IfConditionFalseBranch, statementAsIfStatement->thenStatements.size());
+        /*createAndPushNewStatementBlock(statementAsIfStatement->elseStatements, BlockType::IfConditionFalseBranch);
+        appendStatementsWithBlockTypeSwitch(statementAsIfStatement->thenStatements, BlockType::IfConditionTrueBranch, statementAsIfStatement->elseStatements.size());*/
         return std::make_optional(statementAndIndexPair);
     }
 
     if (const auto statementAsLoopStatement = std::dynamic_pointer_cast<syrec::ForStatement>(statementToProcess); statementAsLoopStatement != nullptr) {
-        //const auto currentNestingLevelOfControlFlowGraph = perControlBlockRelativeStatementCounter.size();
-        createAndPushNewStatementBlock(statementAsLoopStatement->statements);
-        //perControlBlockRelativeStatementCounter.at(currentNestingLevelOfControlFlowGraph - 1) += 1;
-        return getNextNonControlFlowStatement();
+        const auto statementAndIndexPair = StatementAndRelativeIndexPair(statementAsLoopStatement, buildRelativeIndexForCurrentStatement());
+        createAndPushNewStatementBlock(statementAsLoopStatement->statements, BlockType::Loop);
+        return std::make_optional(statementAndIndexPair);
     }
 
     const auto statementAndIndexPair = StatementAndRelativeIndexPair(statementToProcess, buildRelativeIndexForCurrentStatement());
-    //statementIndexInCurrentBlock++;
+    updateStatementIndexInCurrentBlock();
     return std::make_optional(statementAndIndexPair);
 }
 
-[[nodiscard]] std::vector<std::size_t> StatementIterationHelper::buildRelativeIndexForCurrentStatement() const {
-    return perControlBlockRelativeStatementCounter;
-    //std::vector<std::size_t> relativeIndex;
-
-    ///*
-    // * Indizes of previous blocks reference the statement after the new block in the control flow graph
-    // * thus we decrement the stored index to reference the original position
-    // */
-    //std::transform(
-    //        perControlBlockRelativeStatementCounter.cbegin(),
-    //        perControlBlockRelativeStatementCounter.cend(),
-    //        std::back_inserter(relativeIndex),
-    //        [](const std::size_t relativeStatementCounterInBlock) {
-    //            return relativeStatementCounterInBlock - 1;
-    //        });
-    //// But this decrement should not be done for the current block since we are creating its relative index before creating any new block in the control flow graph
-    //relativeIndex.back() = statementIndexInCurrentBlock;
-    //return relativeIndex;
+[[nodiscard]] std::vector<StatementIterationHelper::StatementIndexInBlock> StatementIterationHelper::buildRelativeIndexForCurrentStatement() const {
+    /*if (perControlBlockRelativeStatementCounter.size() == 1) {
+        return perControlBlockRelativeStatementCounter;    
+    }
+    return {std::next(perControlBlockRelativeStatementCounter.begin()), perControlBlockRelativeStatementCounter.end()};*/
+    std::vector<StatementIterationHelper::StatementIndexInBlock> builtIndexForStatement = std::vector(perControlBlockRelativeStatementCounter.begin(), perControlBlockRelativeStatementCounter.end());
+    builtIndexForStatement.back().relativeIndexInBlock                                = statementIndexInCurrentBlock;
+    return builtIndexForStatement;
 }
 
-void StatementIterationHelper::createAndPushNewStatementBlock(const syrec::Statement::vec& statements) {
+void StatementIterationHelper::createAndPushNewStatementBlock(const syrec::Statement::vec& statements, BlockType typeOfNewBlock) {
     remainingStatementsToParse.push(statements);
-    perControlBlockRelativeStatementCounter.back() = statementIndexInCurrentBlock;
+    perControlBlockRelativeStatementCounter.back().relativeIndexInBlock = statementIndexInCurrentBlock;
     statementIndexInCurrentBlock                   = 0;
-    perControlBlockRelativeStatementCounter.emplace_back(statementIndexInCurrentBlock);
+    perControlBlockRelativeStatementCounter.emplace_back(StatementIndexInBlock(typeOfNewBlock, statementIndexInCurrentBlock));
+}
+
+void StatementIterationHelper::appendStatementsWithBlockTypeSwitch(const syrec::Statement::vec& statements, BlockType typeOfNewBlock, std::size_t offsetForBlockSwitch) {
+    auto& currentRemainingStatementsToParse = remainingStatementsToParse.top();
+    currentRemainingStatementsToParse.insert(std::end(currentRemainingStatementsToParse), statements.begin(), statements.end());
+    blockTypeSwitches.push(BlockTypeSwitch(offsetForBlockSwitch, typeOfNewBlock));
+}
+
+void StatementIterationHelper::updateStatementIndexInCurrentBlock() {
+    if (perControlBlockRelativeStatementCounter.empty()) {
+        statementIndexInCurrentBlock = 0;
+        return;
+    }
+    
+    ++perControlBlockRelativeStatementCounter.back().relativeIndexInBlock;
+    ++statementIndexInCurrentBlock;
+    if (!blockTypeSwitches.empty() && statementIndexInCurrentBlock == blockTypeSwitches.top().activeStartingFromStatementWithIndex) {
+        perControlBlockRelativeStatementCounter.back().blockType = blockTypeSwitches.top().switchedToBlockType;
+        statementIndexInCurrentBlock                             = 0;
+        blockTypeSwitches.pop();
+    }
 }

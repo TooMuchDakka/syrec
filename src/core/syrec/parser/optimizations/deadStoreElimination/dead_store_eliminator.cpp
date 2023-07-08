@@ -1,5 +1,6 @@
 #include "core/syrec/parser/optimizations/deadStoreElimination/statement_iteration_helper.hpp"
 #include "core/syrec/parser/optimizations/deadStoreElimination/dead_store_eliminator.hpp"
+#include "core/syrec/parser/utils/loop_range_utils.hpp"
 
 using namespace deadStoreElimination;
 
@@ -7,19 +8,23 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
     resetInternalData();
     const std::unique_ptr<StatementIterationHelper> statementIterationHelper = std::make_unique<StatementIterationHelper>(statementList);
 
-    std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> nextStatement = statementIterationHelper->getNextNonControlFlowStatement();
+    std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> nextStatement = statementIterationHelper->getNextStatement();
     while (nextStatement.has_value()) {
-        if (const auto& nextStatementAsAssignmentStatement = std::dynamic_pointer_cast<syrec::AssignStatement>(nextStatement->statement); nextStatementAsAssignmentStatement != nullptr) {
+        if (const auto& nextStatementAsLoopStatement = std::dynamic_pointer_cast<syrec::ForStatement>(nextStatement->statement); nextStatementAsLoopStatement != nullptr) {
+            addInformationAboutLoopWithMoreThanOneStatement(nextStatementAsLoopStatement, nextStatement->relativeIndexInControlFlowGraph.size());
+        } else if (const auto& nextStatementAsAssignmentStatement = std::dynamic_pointer_cast<syrec::AssignStatement>(nextStatement->statement); nextStatementAsAssignmentStatement != nullptr) {
             markAccessedVariablePartsAsLive(nextStatementAsAssignmentStatement->lhs);
             markAccessedSignalsAsLiveInExpression(nextStatementAsAssignmentStatement->rhs);
-            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsAssignmentStatement)) {
+            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsAssignmentStatement) && !isAssignmentDefinedInLoopPerformingMoreThanOneIteration()) {
                 insertPotentiallyDeadAssignmentStatement(nextStatementAsAssignmentStatement->lhs, nextStatement->relativeIndexInControlFlowGraph);   
             }
+            //insertPotentiallyDeadAssignmentStatement(nextStatementAsAssignmentStatement->lhs, nextStatement->relativeIndexInControlFlowGraph);   
         } else if (const auto& nextStatementAsUnaryAssignmentStatement = std::dynamic_pointer_cast<syrec::UnaryStatement>(nextStatement->statement); nextStatementAsUnaryAssignmentStatement != nullptr) {
             markAccessedVariablePartsAsLive(nextStatementAsUnaryAssignmentStatement->var);
-            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsUnaryAssignmentStatement)) {
+            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsUnaryAssignmentStatement) && !isAssignmentDefinedInLoopPerformingMoreThanOneIteration()) {
                 insertPotentiallyDeadAssignmentStatement(nextStatementAsUnaryAssignmentStatement->var, nextStatement->relativeIndexInControlFlowGraph);   
             }
+            //insertPotentiallyDeadAssignmentStatement(nextStatementAsUnaryAssignmentStatement->var, nextStatement->relativeIndexInControlFlowGraph);   
         } else if (const auto& nextStatementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(nextStatement->statement); nextStatementAsIfStatement != nullptr) {
             markAccessedSignalsAsLiveInExpression(nextStatementAsIfStatement->condition);
         } else if (const auto& nextStatementAsCallStatement = std::dynamic_pointer_cast<syrec::CallStatement>(nextStatement->statement); nextStatementAsCallStatement != nullptr) {
@@ -28,29 +33,135 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
             markAccessedVariablePartsAsLive(nextStatementAsSwapStatement->lhs);
             markAccessedVariablePartsAsLive(nextStatementAsSwapStatement->rhs);
         }
-
+        
+        markStatementAsProcessedInLoopBody(nextStatement->statement, nextStatement->relativeIndexInControlFlowGraph.size());
         nextStatement.reset();
-        if (const auto& nextFetchedStatement = statementIterationHelper->getNextNonControlFlowStatement(); nextFetchedStatement.has_value()) {
+        if (const auto& nextFetchedStatement = statementIterationHelper->getNextStatement(); nextFetchedStatement.has_value()) {
             nextStatement.emplace(*nextFetchedStatement);
         }
     }
     return combineAndSortDeadRemainingDeadStores();
 }
 
+void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores, std::size_t& currDeadStoreIndex, std::size_t nestingLevelOfCurrentBlock) const {
+    auto        stopProcessing         = currDeadStoreIndex >= foundDeadStores.size();
+    std::size_t numRemovedStmtsInBlock = 0;
+    while (!stopProcessing) {
+        const auto& deadStoreIndex          = foundDeadStores.at(currDeadStoreIndex);
+        // Since the first index in the relative index chain is always the position of the statement in the module, we can omit this one nesting level
+        const auto& nestingLevelOfDeadStore = deadStoreIndex.relativeStatementIndexPerControlBlock.size() - 1;
+        const auto& relativeStatementIndexInCurrentBlockOfDeadStore = deadStoreIndex.relativeStatementIndexPerControlBlock.at(nestingLevelOfCurrentBlock).relativeIndexInBlock - numRemovedStmtsInBlock;
+
+        /*if (nestingLevelOfDeadStore < nestingLevelOfCurrentBlock) {
+            stopProcessing = true;
+        } else 
+            */
+
+        const auto& referencedStatement = statementList.at(relativeStatementIndexInCurrentBlockOfDeadStore);
+        if (nestingLevelOfDeadStore > nestingLevelOfCurrentBlock) {
+
+            const auto typeOfNestedBlock = nestingLevelOfCurrentBlock + 1 <= nestingLevelOfDeadStore
+                ? deadStoreIndex.relativeStatementIndexPerControlBlock.at(nestingLevelOfCurrentBlock + 1).blockType
+                : StatementIterationHelper::BlockType::Module;
+            
+            switch (typeOfNestedBlock) {
+                /*
+                 * We could perform a flip of the branches (which would also require a flip of the guard as well as closing guard expression)
+                 * in case the true branch is empty while the false branch is not
+                 */
+                case StatementIterationHelper::IfConditionTrueBranch:
+                    if (auto referenceStatementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(referencedStatement); referenceStatementAsIfStatement != nullptr) {
+                        removeDeadStoresFrom(referenceStatementAsIfStatement->thenStatements, foundDeadStores, currDeadStoreIndex, nestingLevelOfCurrentBlock + 1);
+                        if (referenceStatementAsIfStatement->thenStatements.empty()) {
+                            const auto anyDeadStoresRemaining = currDeadStoreIndex < foundDeadStores.size();
+                            if (!anyDeadStoresRemaining) {
+                                referenceStatementAsIfStatement->thenStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
+                            } else {
+                                const auto& nextDeadStore               = foundDeadStores.at(currDeadStoreIndex);
+                                const auto& nestingLevelOfNextDeadStore = nextDeadStore.relativeStatementIndexPerControlBlock.size();
+                                /*
+                                 * We know that if the next dead store is found at a higher nesting level that there are no remaining dead stores in the else branch
+                                 * and thus if the latter was empty, we are now allowed to remove the whole if statement since the true branch is empty after all dead stores were removed
+                                 */
+                                if (nestingLevelOfNextDeadStore < nestingLevelOfDeadStore && referenceStatementAsIfStatement->elseStatements.empty()) {
+                                    decrementReferenceCountOfUsedSignalsInStatement(referenceStatementAsIfStatement);
+                                    statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
+                                    numRemovedStmtsInBlock++;
+                                    currDeadStoreIndex++;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case StatementIterationHelper::IfConditionFalseBranch: {
+                    if (auto referenceStatementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(referencedStatement); referenceStatementAsIfStatement != nullptr) {
+                        removeDeadStoresFrom(referenceStatementAsIfStatement->elseStatements, foundDeadStores, currDeadStoreIndex, nestingLevelOfCurrentBlock + 1);
+                        if (referenceStatementAsIfStatement->elseStatements.empty()) {
+                            if (referenceStatementAsIfStatement->thenStatements.empty()) {
+                                decrementReferenceCountOfUsedSignalsInStatement(referenceStatementAsIfStatement);
+                                statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
+                                numRemovedStmtsInBlock++;
+                                currDeadStoreIndex++;
+                            }
+                            else {
+                                /*
+                                 * Since empty branches are not allowed by the SyReC grammar, we need to insert a skip statement into the
+                                 * else branch so that the if statement conforms to the grammar
+                                 */ 
+                                referenceStatementAsIfStatement->elseStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
+                            }
+                        } else {
+                            if (referenceStatementAsIfStatement->thenStatements.empty()) {
+                                /*
+                                 * Since empty branches are not allowed by the SyReC grammar, we need to insert a skip statement into the
+                                 * true branch so that the if statement conforms to the grammar
+                                 */ 
+                                referenceStatementAsIfStatement->thenStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
+                            }
+                        }
+                    }
+                    break;
+                }
+                case StatementIterationHelper::Loop: {
+                    if (auto referenceStatementAsLoopStatement = std::dynamic_pointer_cast<syrec::ForStatement>(referencedStatement); referenceStatementAsLoopStatement != nullptr) {
+                        removeDeadStoresFrom(referenceStatementAsLoopStatement->statements, foundDeadStores, currDeadStoreIndex, nestingLevelOfCurrentBlock + 1);
+                        if (referenceStatementAsLoopStatement->statements.empty()) {
+                            decrementReferenceCountOfUsedSignalsInStatement(referenceStatementAsLoopStatement);
+                            statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
+                            numRemovedStmtsInBlock++;
+                            currDeadStoreIndex++;
+                        }
+                    }
+                    break;   
+                }
+                default:
+                    break;
+            }
+        } else {
+            decrementReferenceCountOfUsedSignalsInStatement(referencedStatement);
+            statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
+            numRemovedStmtsInBlock++;
+            currDeadStoreIndex++;
+        }
+        stopProcessing = currDeadStoreIndex >= foundDeadStores.size();
+    }
+}
+
 // TODO: Implement me
-void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores) {
-    return;
+void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores) const {
+    std::size_t deadStoreIndex = 0;
+    removeDeadStoresFrom(statementList, foundDeadStores, deadStoreIndex, 0);
 }
 
 
 bool DeadStoreEliminator::doesAssignmentContainPotentiallyUnsafeOperation(const syrec::Statement::ptr& stmt) const {
     if (const auto& stmtAsUnaryAssignmentStmt = std::dynamic_pointer_cast<syrec::UnaryStatement>(stmt); stmtAsUnaryAssignmentStmt != nullptr) {
-        return isAssignedToSignalAModifiableParameter(stmtAsUnaryAssignmentStmt->var->var->name)
-            || wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsUnaryAssignmentStmt->var);
+        return !wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsUnaryAssignmentStmt->var)
+            || isAssignedToSignalAModifiableParameter(stmtAsUnaryAssignmentStmt->var->var->name);
     }
     if (const auto& stmtAsAssignmentStmt = std::dynamic_pointer_cast<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
-        return isAssignedToSignalAModifiableParameter(stmtAsAssignmentStmt->lhs->var->name)
-            || wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsAssignmentStmt->lhs)
+        return !wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsAssignmentStmt->lhs)
+            || isAssignedToSignalAModifiableParameter(stmtAsAssignmentStmt->lhs->var->name)
             || doesExpressionContainPotentiallyUnsafeOperation(stmtAsAssignmentStmt->rhs);
     }
     return false;
@@ -71,7 +182,7 @@ bool DeadStoreEliminator::doesExpressionContainPotentiallyUnsafeOperation(const 
         return doesExpressionContainPotentiallyUnsafeOperation(exprAsShiftExpr->lhs);
     }
     if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableExpr != nullptr) {
-        return doesExpressionContainPotentiallyUnsafeOperation(expr);
+        return !wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(exprAsVariableExpr->var);
     }
     return false;
 }
@@ -82,7 +193,8 @@ bool DeadStoreEliminator::wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndW
     const auto fetchedSymbolTableEntry = symbolTable->getVariable(signalAccess->var->name);
     if (!fetchedSymbolTableEntry.has_value()) {
         return false;
-    } else if (std::holds_alternative<syrec::Number::ptr>(*fetchedSymbolTableEntry)) {
+    }
+    if (std::holds_alternative<syrec::Number::ptr>(*fetchedSymbolTableEntry)) {
         return true;
     }
 
@@ -134,26 +246,30 @@ std::optional<unsigned int> DeadStoreEliminator::tryEvaluateNumber(const syrec::
 }
 
 void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableAccess::ptr& signalAccess) {
+    const auto& signalTableEntryForAccessedSignal = symbolTable->getVariable(signalAccess->var->name);
+    if (!signalTableEntryForAccessedSignal.has_value() || !std::holds_alternative<syrec::Variable::ptr>(*signalTableEntryForAccessedSignal)) {
+        return;
+    }
+
     if (livenessStatusLookup.count(signalAccess->var->name) == 0) {
-        const auto& signalTableEntryForAccessedSignal = symbolTable->getVariable(signalAccess->var->name);
-        if (!signalTableEntryForAccessedSignal.has_value() || !std::holds_alternative<syrec::Variable::ptr>(*signalTableEntryForAccessedSignal)) {
-            return;
-        }
         const auto& referencedSignalInVariableAccess = std::get<syrec::Variable::ptr>(*signalTableEntryForAccessedSignal);
         auto        livenessStatusLookupEntry        = std::make_shared<DeadStoreStatusLookup>(
                 referencedSignalInVariableAccess->bitwidth,
                 referencedSignalInVariableAccess->dimensions,
                 std::make_optional(false));
-        livenessStatusLookupEntry->invalidateAllStoredValuesForSignal();
         livenessStatusLookup.insert(std::make_pair(signalAccess->var->name, livenessStatusLookupEntry));
     }
 
     auto&       livenessStatusForAccessedVariable = livenessStatusLookup.at(signalAccess->var->name);
-    const auto& backingVariableEntryForAccessedSignal = std::get<syrec::Variable::ptr>(*symbolTable->getVariable(signalAccess->var->name));
-    livenessStatusForAccessedVariable->liftRestrictionsOfDimensions(
-        transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), signalAccess->indexes),
-        transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, signalAccess->range)
-    );
+    const auto& backingVariableEntryForAccessedSignal = std::get<syrec::Variable::ptr>(*signalTableEntryForAccessedSignal);
+    const auto& transformedDimensionAccess = transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), signalAccess->indexes);
+    const auto& transformedBitRangeAccess  = transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, signalAccess->range);
+    if (transformedBitRangeAccess.has_value()) {
+        livenessStatusForAccessedVariable->invalidateStoredValueForBitrange(transformedDimensionAccess, *transformedBitRangeAccess);
+    } else {
+        livenessStatusForAccessedVariable->invalidateStoredValueFor(transformedDimensionAccess);
+    }
+
     removeNoLongerDeadStores(signalAccess->var->name);
     /*
      * After we have updated the liveness status (by removing previously dead assignments made live by the current signal access) for the accessed signal ident,
@@ -162,7 +278,7 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
     markAccessedSignalPartsAsDead(signalAccess);
 }
 
-[[nodiscard]] bool DeadStoreEliminator::isAccessedVariablePartLive(const syrec::VariableAccess::ptr& signalAccess) {
+[[nodiscard]] bool DeadStoreEliminator::isAccessedVariablePartLive(const syrec::VariableAccess::ptr& signalAccess) const {
     if (livenessStatusLookup.count(signalAccess->var->name) == 0 || !symbolTable->contains(signalAccess->var->name)) {
         return false;
     }
@@ -175,10 +291,10 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
     
     const auto& backingVariableEntryForAccessedSignal = std::get<syrec::Variable::ptr>(*symbolTable->getVariable(signalAccess->var->name));
     const auto& livenessStatusOfVariable = livenessStatusLookup.at(signalAccess->var->name);
-    return livenessStatusOfVariable->tryFetchValueFor(
-        transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), signalAccess->indexes), 
-        transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, signalAccess->range)
-    ).has_value();
+    return !livenessStatusOfVariable->tryFetchValueFor(
+        transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), signalAccess->indexes),
+        transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, signalAccess->range))
+    .has_value();
 }
 
 [[nodiscard]] std::vector<std::optional<unsigned int>> DeadStoreEliminator::transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::expression::ptr>& dimensionAccess) const {
@@ -247,26 +363,27 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
     deadStoreStatementIndizesInFlowGraph.begin(),
     deadStoreStatementIndizesInFlowGraph.end(),
     [](const AssignmentStatementIndexInControlFlowGraph& thisElem, const AssignmentStatementIndexInControlFlowGraph& thatElem) {
-        if (thisElem.relativeStatementIndexPerControlBlock.size() != thatElem.relativeStatementIndexPerControlBlock.size()) {
-            return thisElem.relativeStatementIndexPerControlBlock.size() < thatElem.relativeStatementIndexPerControlBlock.size();
-        }
+        const auto& numElementsToCompare = std::min(thisElem.relativeStatementIndexPerControlBlock.size(), thatElem.relativeStatementIndexPerControlBlock.size());
+        const auto& lastElementOfThisElem     = std::next(thisElem.relativeStatementIndexPerControlBlock.cbegin(), numElementsToCompare);
+        const auto& lastElementOfThatElem     = std::next(thatElem.relativeStatementIndexPerControlBlock.cbegin(), numElementsToCompare);
 
-        const auto& firstMissmatchedRelativeIndexForAnyBlock = std::mismatch(
+        const auto& pairOfMissmatchedElements = std::mismatch(
                 thisElem.relativeStatementIndexPerControlBlock.cbegin(),
-                thisElem.relativeStatementIndexPerControlBlock.cend(),
+                lastElementOfThisElem,
                 thatElem.relativeStatementIndexPerControlBlock.cbegin(),
-                thatElem.relativeStatementIndexPerControlBlock.cend()
-        );
+                lastElementOfThatElem,
+                [](const StatementIterationHelper::StatementIndexInBlock& operandOne, const StatementIterationHelper::StatementIndexInBlock& operandTwo) {
+                    return operandOne.relativeIndexInBlock == operandTwo.relativeIndexInBlock;
+                });
 
-        if (firstMissmatchedRelativeIndexForAnyBlock.first == thisElem.relativeStatementIndexPerControlBlock.cend()) {
+        if (pairOfMissmatchedElements.first == lastElementOfThisElem) {
             return true;
         }
-        return *firstMissmatchedRelativeIndexForAnyBlock.first < *firstMissmatchedRelativeIndexForAnyBlock.second;
+        return pairOfMissmatchedElements.first->relativeIndexInBlock > pairOfMissmatchedElements.second->relativeIndexInBlock;
     });
 
     return deadStoreStatementIndizesInFlowGraph;
 }
-
 
 void DeadStoreEliminator::markAccessedSignalsAsLiveInExpression(const syrec::expression::ptr& expr) {
     /* Numeric expression can be ignored since they either only define constants (accessing the bitwidth of a variable does also define a constant and its value is independent from the changes made during the execution of the program and thus does not update the liveness status of the accessed signal) or use loop variables
@@ -294,7 +411,7 @@ void DeadStoreEliminator::markAccessedSignalsAsLiveInCallStatement(const std::sh
     }
 }
 
-void DeadStoreEliminator::insertPotentiallyDeadAssignmentStatement(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::vector<std::size_t>& relativeIndexOfStatementInControlFlowGraph) {
+void DeadStoreEliminator::insertPotentiallyDeadAssignmentStatement(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::vector<StatementIterationHelper::StatementIndexInBlock>& relativeIndexOfStatementInControlFlowGraph) {
     const auto& accessedSignalIdent = assignedToSignalParts->var->name;
     if (assignmentStmtIndizesPerSignal.count(accessedSignalIdent) == 0) {
         assignmentStmtIndizesPerSignal.insert(std::make_pair<std::string_view, std::vector<PotentiallyDeadAssignmentStatement>>(accessedSignalIdent, {}));
@@ -328,7 +445,7 @@ std::remove_if(
 
             // TODO: Could we adapt the typedef for the pointer made in the base value lookup to be automatically cast to derived class (aka a polymorphic typedef)
             // This could then also be used syrec polymorphism (expression, etc).
-            return livenessStatusLookupForAssignedToSignal->areAccessedSignalPartsDead(
+            return !livenessStatusLookupForAssignedToSignal->areAccessedSignalPartsDead(
                     transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), assignedToSignalParts->indexes),
                     transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, assignedToSignalParts->range)
             );
@@ -355,14 +472,119 @@ void DeadStoreEliminator::markAccessedSignalPartsAsDead(const syrec::VariableAcc
     const auto& transformedDimensionAccess        = transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), signalAccess->indexes);
     const auto& transformedBitRangeAccess         = transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, signalAccess->range);
 
-    if (transformedBitRangeAccess.has_value()) {
-        livenessStatusForAccessedVariable->invalidateStoredValueForBitrange(transformedDimensionAccess, *transformedBitRangeAccess);    
-    } else {
-        livenessStatusForAccessedVariable->invalidateStoredValueFor(transformedDimensionAccess);
-    }
+    livenessStatusForAccessedVariable->liftRestrictionsOfDimensions(transformedDimensionAccess, transformedBitRangeAccess);
 }
 
 void DeadStoreEliminator::resetInternalData() {
     livenessStatusLookup.clear();
     assignmentStmtIndizesPerSignal.clear();
+}
+
+void DeadStoreEliminator::decrementReferenceCountOfUsedSignalsInStatement(const syrec::Statement::ptr& statement) const {
+    /*
+     * We do not have to decrement the reference counts of signals used in a loop statement since we are assuming that its body is already empty and
+     * only constants or signal widths, which are already transformed to constants, can be used for which no reference counting is required
+     */
+    if (const auto& statementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(statement); statementAsIfStatement != nullptr) {
+        decrementReferenceCountsOfUsedSignalsInExpression(statementAsIfStatement->condition);
+    } else if (const auto& statementAsAssignmentStatement = std::dynamic_pointer_cast<syrec::AssignStatement>(statement); statementAsAssignmentStatement != nullptr) {
+        decrementReferenceCountForAccessedSignal(statementAsAssignmentStatement->lhs);
+        decrementReferenceCountsOfUsedSignalsInExpression(statementAsAssignmentStatement->rhs);
+    } else if (const auto& statementAsUnaryAssignmentStatement = std::dynamic_pointer_cast<syrec::UnaryStatement>(statement); statementAsUnaryAssignmentStatement != nullptr) {
+        decrementReferenceCountForAccessedSignal(statementAsUnaryAssignmentStatement->var);
+    } else if (const auto& statementAsSwapStatement = std::dynamic_pointer_cast<syrec::SwapStatement>(statement); statementAsSwapStatement != nullptr) {
+        decrementReferenceCountForAccessedSignal(statementAsSwapStatement->lhs);
+        decrementReferenceCountForAccessedSignal(statementAsSwapStatement->rhs);
+    } else if (const auto& statementAsCallStatement = std::dynamic_pointer_cast<syrec::CallStatement>(statement); statementAsCallStatement != nullptr) {
+        for (const auto& calleeArgument : statementAsCallStatement->parameters) {
+            const auto& fetchedOptionalSymbolTableEntry = symbolTable->getVariable(calleeArgument);
+            if (!fetchedOptionalSymbolTableEntry.has_value() || !std::holds_alternative<syrec::Variable::ptr>(*fetchedOptionalSymbolTableEntry)) {
+                continue;
+            }
+
+            const auto& accessedVariable = std::get<syrec::Variable::ptr>(*fetchedOptionalSymbolTableEntry);
+            const auto  signalAccess     = std::make_shared<syrec::VariableAccess>();
+            signalAccess->setVar(accessedVariable);
+            decrementReferenceCountForAccessedSignal(signalAccess);
+        }
+    }
+}
+
+void DeadStoreEliminator::decrementReferenceCountsOfUsedSignalsInExpression(const syrec::expression::ptr& expr) const {
+    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
+        decrementReferenceCountsOfUsedSignalsInExpression(exprAsBinaryExpr->lhs);
+        decrementReferenceCountsOfUsedSignalsInExpression(exprAsBinaryExpr->rhs);
+    } else if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
+        decrementReferenceCountsOfUsedSignalsInExpression(exprAsShiftExpr->lhs);
+        decrementReferenceCountOfNumber(exprAsShiftExpr->rhs);
+    } else if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableExpr != nullptr) {
+        decrementReferenceCountForAccessedSignal(exprAsVariableExpr->var);
+    } else if (const auto& exprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expr); exprAsNumericExpr != nullptr) {
+        decrementReferenceCountOfNumber(exprAsNumericExpr->value);
+    }
+    // TODO: Support for unary expressions and maybe reference counting of loop variables ?
+}
+
+void DeadStoreEliminator::decrementReferenceCountForAccessedSignal(const syrec::VariableAccess::ptr& accessedSignal) const {
+    symbolTable->decrementLiteralReferenceCount(accessedSignal->var->name);
+}
+
+void DeadStoreEliminator::decrementReferenceCountOfNumber(const syrec::Number::ptr& number) const {
+    if (number->isConstant()) {
+        return;
+    }
+
+    if (number->isCompileTimeConstantExpression()) {
+        decrementReferenceCountOfNumber(number->getExpression().lhsOperand);
+        decrementReferenceCountOfNumber(number->getExpression().rhsOperand);
+    }
+    else if (number->isLoopVariable()){
+        symbolTable->decrementLiteralReferenceCount(number->variableName());
+    }
+}
+
+bool DeadStoreEliminator::isAssignmentDefinedInLoopPerformingMoreThanOneIteration() const {
+    return !remainingNonControlFlowStatementsPerLoopBody.empty()
+        && std::any_of(
+        remainingNonControlFlowStatementsPerLoopBody.cbegin(), 
+        remainingNonControlFlowStatementsPerLoopBody.cend(), 
+        [](const LoopStatementInformation& loopInformation) {
+            return loopInformation.performsMoreThanOneIteration;
+        });
+}
+
+void DeadStoreEliminator::markStatementAsProcessedInLoopBody(const syrec::Statement::ptr& stmt, std::size_t nestingLevelOfStmt) {
+    if (std::dynamic_pointer_cast<syrec::ForStatement>(stmt) != nullptr 
+        || remainingNonControlFlowStatementsPerLoopBody.empty() 
+        || nestingLevelOfStmt > remainingNonControlFlowStatementsPerLoopBody.back().nestingLevelOfLoop ) {
+        return;
+    }
+
+    auto& numRemainingStmtInLoopBody = remainingNonControlFlowStatementsPerLoopBody.back().numRemainingNonControlFlowStatementsInLoopBody;
+    if (numRemainingStmtInLoopBody >= 1) {
+        numRemainingStmtInLoopBody--;
+    }
+
+    if (numRemainingStmtInLoopBody == 0) {
+        remainingNonControlFlowStatementsPerLoopBody.erase(std::prev(remainingNonControlFlowStatementsPerLoopBody.end()));
+    }
+}
+
+void DeadStoreEliminator::addInformationAboutLoopWithMoreThanOneStatement(const std::shared_ptr<syrec::ForStatement>& loopStmt, std::size_t nestingLevelOfStmt) {
+    remainingNonControlFlowStatementsPerLoopBody.emplace_back(LoopStatementInformation(nestingLevelOfStmt, loopStmt->statements.size(), doesLoopPerformMoreThanOneIteration(loopStmt)));
+}
+
+bool DeadStoreEliminator::doesLoopPerformMoreThanOneIteration(const std::shared_ptr<syrec::ForStatement>& loopStmt) const {
+    const auto& startValue = tryEvaluateNumber(loopStmt->range.first);
+    const auto& endValue = tryEvaluateNumber(loopStmt->range.second);
+    const auto& stepSize   = tryEvaluateNumber(loopStmt->step);
+
+    if (!startValue.has_value() || !endValue.has_value() || !stepSize.has_value()) {
+        return false;
+    }
+    
+    if (const auto numIterations = utils::determineNumberOfLoopIterations(*startValue, *endValue, *stepSize); numIterations.has_value()) {
+        return *numIterations > 1;
+    }
+    return true;
 }

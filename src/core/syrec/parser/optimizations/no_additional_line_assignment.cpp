@@ -548,6 +548,9 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
             if (i == 0) {
                 assignmentOperationToUse = assignmentOperand;
             } else {
+                /*
+                 * This call crashes if parent node is traversed (see test other)
+                 */
                 const auto& traversalIndexOfParentOfCurrentOperationNode = *postOrderTraversalContainer.getTraversalIdxOfParentOfNode(operationNodeTraversalIdx);
                 const auto  parentNodeOfOperationNode                    = *postOrderTraversalContainer.getNode(traversalIndexOfParentOfCurrentOperationNode);
                 const auto  operationOfParentNode                        = *parentNodeOfOperationNode.fetchStoredOperation();

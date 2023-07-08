@@ -9,13 +9,14 @@
 #include "core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.hpp"
 
 #include <vector>
+#include "statement_iteration_helper.hpp"
 namespace deadStoreElimination {
     class DeadStoreEliminator {
     public:
         struct AssignmentStatementIndexInControlFlowGraph {
-            std::vector<std::size_t> relativeStatementIndexPerControlBlock;
+            std::vector<StatementIterationHelper::StatementIndexInBlock> relativeStatementIndexPerControlBlock;
 
-            explicit AssignmentStatementIndexInControlFlowGraph(std::vector<std::size_t> relativeIndexInControlFlowGraphOfStatement):
+            explicit AssignmentStatementIndexInControlFlowGraph(std::vector<StatementIterationHelper::StatementIndexInBlock> relativeIndexInControlFlowGraphOfStatement):
                 relativeStatementIndexPerControlBlock(std::move(relativeIndexInControlFlowGraphOfStatement)) {}
         };
 
@@ -23,7 +24,7 @@ namespace deadStoreElimination {
             syrec::VariableAccess::ptr                assignedToSignalParts;
             AssignmentStatementIndexInControlFlowGraph indexInControlFlowGraph;
 
-            PotentiallyDeadAssignmentStatement(syrec::VariableAccess::ptr assignedToSignalParts, std::vector<std::size_t> relativeIndexInControlFlowGraphOfStatement):
+            PotentiallyDeadAssignmentStatement(syrec::VariableAccess::ptr assignedToSignalParts, std::vector<StatementIterationHelper::StatementIndexInBlock> relativeIndexInControlFlowGraphOfStatement):
                 assignedToSignalParts(std::move(assignedToSignalParts)),
                 indexInControlFlowGraph(std::move(relativeIndexInControlFlowGraphOfStatement)) {}
 
@@ -43,12 +44,23 @@ namespace deadStoreElimination {
          *
          */
         [[nodiscard]] std::vector<AssignmentStatementIndexInControlFlowGraph> findDeadStores(const syrec::Statement::vec& statementList);
-        void                                                                  removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores);
+        void                                                                  removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores) const;
 
     private:
         std::map<std::string, std::vector<PotentiallyDeadAssignmentStatement>> assignmentStmtIndizesPerSignal;
         std::map<std::string, DeadStoreStatusLookup::ptr>                      livenessStatusLookup;
         const parser::SymbolTable::ptr&                                        symbolTable;
+
+        struct LoopStatementInformation {
+            std::size_t nestingLevelOfLoop;
+            std::size_t numRemainingNonControlFlowStatementsInLoopBody;
+            bool        performsMoreThanOneIteration;
+
+            LoopStatementInformation(std::size_t nestingLevelOfLoop, std::size_t numRemainingNonControlFlowStatementsInLoopBody, bool performsOnlyOneIteration):
+                nestingLevelOfLoop(nestingLevelOfLoop), numRemainingNonControlFlowStatementsInLoopBody(numRemainingNonControlFlowStatementsInLoopBody), performsMoreThanOneIteration(performsOnlyOneIteration) {}
+        };
+        std::vector<LoopStatementInformation>                                   remainingNonControlFlowStatementsPerLoopBody;
+
 
         /*
          * Can be used to determine if an IF or LOOP statement can be removed if its branch/body does only contain dead stores
@@ -79,7 +91,7 @@ namespace deadStoreElimination {
          *
          */
         void               markAccessedVariablePartsAsLive(const syrec::VariableAccess::ptr& signalAccess);
-        [[nodiscard]] bool isAccessedVariablePartLive(const syrec::VariableAccess::ptr& signalAccess);
+        [[nodiscard]] bool isAccessedVariablePartLive(const syrec::VariableAccess::ptr& signalAccess) const;
 
         [[nodiscard]] std::vector<std::optional<unsigned int>>                                transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::expression::ptr>& dimensionAccess) const;
         [[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> transformUserDefinedBitRangeAccess(unsigned int accessedSignalBitwidth, const std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>>& bitRangeAccess) const;
@@ -87,10 +99,22 @@ namespace deadStoreElimination {
 
         void markAccessedSignalsAsLiveInExpression(const syrec::expression::ptr& expr);
         void markAccessedSignalsAsLiveInCallStatement(const  std::shared_ptr<syrec::CallStatement>& callStmt);
-        void insertPotentiallyDeadAssignmentStatement(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::vector<std::size_t>& relativeIndexOfStatementInControlFlowGraph);
+        void insertPotentiallyDeadAssignmentStatement(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::vector<StatementIterationHelper::StatementIndexInBlock>& relativeIndexOfStatementInControlFlowGraph);
         void removeNoLongerDeadStores(const std::string& accessedSignalIdent);
         void markAccessedSignalPartsAsDead(const syrec::VariableAccess::ptr& signalAccess) const;
         void resetInternalData();
+
+        void removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores, std::size_t& currDeadStoreIndex, std::size_t nestingLevelOfCurrentBlock) const;
+
+        void decrementReferenceCountOfUsedSignalsInStatement(const syrec::Statement::ptr& statement) const;
+        void decrementReferenceCountsOfUsedSignalsInExpression(const syrec::expression::ptr& expr) const;
+        void decrementReferenceCountForAccessedSignal(const syrec::VariableAccess::ptr& accessedSignal) const;
+        void decrementReferenceCountOfNumber(const syrec::Number::ptr& number) const;
+
+        [[nodiscard]] bool isAssignmentDefinedInLoopPerformingMoreThanOneIteration() const;
+        [[nodiscard]] bool doesLoopPerformMoreThanOneIteration(const std::shared_ptr<syrec::ForStatement>& loopStmt) const;
+        void               markStatementAsProcessedInLoopBody(const syrec::Statement::ptr& stmt, std::size_t nestingLevelOfStmt);
+        void               addInformationAboutLoopWithMoreThanOneStatement(const std::shared_ptr<syrec::ForStatement>& loopStmt, std::size_t nestingLevelOfStmt);
     };
 }
 
