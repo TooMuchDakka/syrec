@@ -46,17 +46,29 @@ namespace deadStoreElimination {
 
     private:
         struct BlockTypeSwitch {
+            std::size_t activeForBlockAtNestingLevel;
             std::size_t activeStartingFromStatementWithIndex;
             BlockType   switchedToBlockType;
 
-            BlockTypeSwitch(std::size_t activeStartingFromStatementWithIndex, BlockType switchedToBlockType):
-                activeStartingFromStatementWithIndex(activeStartingFromStatementWithIndex), switchedToBlockType(switchedToBlockType) {}
+            BlockTypeSwitch(std::size_t activeForBlockAtNestingLevel, std::size_t activeStartingFromStatementWithIndex, BlockType switchedToBlockType):
+                activeForBlockAtNestingLevel(activeForBlockAtNestingLevel), activeStartingFromStatementWithIndex(activeStartingFromStatementWithIndex), switchedToBlockType(switchedToBlockType) {}
         };
 
-        std::vector<StatementIndexInBlock> perControlBlockRelativeStatementCounter;
-        std::stack<syrec::Statement::vec>  remainingStatementsToParse;
-        std::stack<BlockTypeSwitch>        blockTypeSwitches;
-        std::size_t                        statementIndexInCurrentBlock;
+        struct PerBlockRelativeStatementIndexNormalizer {
+            std::size_t activeForBlockAtNestingLevel;
+            std::size_t activeStartingFromStatementWithIndex;
+
+            PerBlockRelativeStatementIndexNormalizer(std::size_t activeForBlockAtNestingLevel,
+                                                     std::size_t activeStartingFromStatementWithIndex):
+                activeForBlockAtNestingLevel(activeForBlockAtNestingLevel), activeStartingFromStatementWithIndex(activeStartingFromStatementWithIndex) {}
+        };
+        
+        std::vector<StatementIndexInBlock>                    perControlBlockRelativeStatementCounter;
+        std::stack<syrec::Statement::vec>                     remainingStatementsToParse;
+        std::vector<BlockTypeSwitch>                          blockTypeSwitches;
+        std::vector<PerBlockRelativeStatementIndexNormalizer> relativeStatementIndexNormalizers;
+        
+        std::size_t                          statementIndexInCurrentBlock;
 
         void                                             createAndPushNewStatementBlock(const syrec::Statement::vec& statements, BlockType typeOfNewBlock);
         void                                             appendStatementsWithBlockTypeSwitch(const syrec::Statement::vec& statements, BlockType typeOfNewBlock, std::size_t offsetForBlockSwitch);
