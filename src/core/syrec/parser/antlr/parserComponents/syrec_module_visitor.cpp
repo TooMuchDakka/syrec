@@ -114,7 +114,11 @@ std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
 
                 const auto& foundDeadStores = sharedData->optionalDeadStoreEliminator.value()->findDeadStores(statementsToProcess);
                 sharedData->optionalDeadStoreEliminator.value()->removeDeadStoresFrom(statementsToProcess, foundDeadStores);
-                // TODO: What if there are no remaining statements in the module body after the dead store elimination
+
+                // TODO: What if there are no remaining statements in the module body after the dead store elimination, currently we opt to simply insert a skip statement
+                if (statementsToProcess.empty()) {
+                    statementsToProcess.emplace_back(std::make_shared<syrec::SkipStatement>());
+                }
                 module->statements = statementsToProcess;
             } else {
                 module->statements = *validUserDefinedModuleStatements;      

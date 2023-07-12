@@ -15,6 +15,9 @@ std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> Statement
         if (numberOfRemainingStatementsInCurrentBlock == 0) {
             remainingStatementsToParse.pop();
             perControlBlockRelativeStatementCounter.erase(std::prev(perControlBlockRelativeStatementCounter.end()));
+            if (!perControlBlockRelativeStatementCounter.empty()) {
+                statementIndexInCurrentBlock = perControlBlockRelativeStatementCounter.back().relativeIndexInBlock;
+            }
 
             if (!relativeStatementIndexNormalizers.empty() && relativeStatementIndexNormalizers.back().activeForBlockAtNestingLevel > perControlBlockRelativeStatementCounter.size() - 1) {
                 relativeStatementIndexNormalizers.erase(std::prev(relativeStatementIndexNormalizers.cend()));
@@ -49,31 +52,38 @@ std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> Statement
 
 [[nodiscard]] std::vector<StatementIterationHelper::StatementIndexInBlock> StatementIterationHelper::buildRelativeIndexForCurrentStatement() const {
     std::vector<StatementIndexInBlock> builtIndexForStatement = std::vector(perControlBlockRelativeStatementCounter.begin(), perControlBlockRelativeStatementCounter.end());
-    builtIndexForStatement.back().relativeIndexInBlock                                = statementIndexInCurrentBlock;
+    
 
-    bool        continueIndexFixup              = true;
-    for (std::size_t i = 0; i < relativeStatementIndexNormalizers.size() && continueIndexFixup; ++i) {
-        const auto& relativeStatementIndexNormalizerForCurrBlock = relativeStatementIndexNormalizers.at(i);
-        const auto  indexOfEffectedBlockForBlockTypeSwitch       = relativeStatementIndexNormalizerForCurrBlock.activeForBlockAtNestingLevel;
+    if (relativeStatementIndexNormalizers.empty()) {
+        builtIndexForStatement.back().relativeIndexInBlock = statementIndexInCurrentBlock;    
+    } else {
+        //bool continueIndexFixup = true;
+        for (std::size_t i = 0; i < relativeStatementIndexNormalizers.size(); ++i) {
+            const auto& relativeStatementIndexNormalizerForCurrBlock = relativeStatementIndexNormalizers.at(i);
+            const auto  indexOfEffectedBlockForBlockTypeSwitch       = relativeStatementIndexNormalizerForCurrBlock.activeForBlockAtNestingLevel;
 
-        /*
+            /*
          * We do stop performing the relative statement index fixup if we are either processing the current block (since the index is already correctly fixed up)
          * or if the relative index in the current block is smaller than the index for which the block type switch will be activated initially.
          */
-        if (indexOfEffectedBlockForBlockTypeSwitch == perControlBlockRelativeStatementCounter.size() - 1 
+            /*if (indexOfEffectedBlockForBlockTypeSwitch == perControlBlockRelativeStatementCounter.size() - 1 
             || perControlBlockRelativeStatementCounter.at(indexOfEffectedBlockForBlockTypeSwitch).relativeIndexInBlock < relativeStatementIndexNormalizerForCurrBlock.activeStartingFromStatementWithIndex) {
             continueIndexFixup = false;
         } else {
             builtIndexForStatement.at(indexOfEffectedBlockForBlockTypeSwitch).relativeIndexInBlock -= relativeStatementIndexNormalizerForCurrBlock.activeStartingFromStatementWithIndex;
+        }*/
+
+            if (perControlBlockRelativeStatementCounter.at(indexOfEffectedBlockForBlockTypeSwitch).relativeIndexInBlock >= relativeStatementIndexNormalizerForCurrBlock.activeStartingFromStatementWithIndex) {
+                builtIndexForStatement.at(indexOfEffectedBlockForBlockTypeSwitch).relativeIndexInBlock -= relativeStatementIndexNormalizerForCurrBlock.activeStartingFromStatementWithIndex;
+            }
         }
     }
-
     return builtIndexForStatement;
 }
 
 void StatementIterationHelper::createAndPushNewStatementBlock(const syrec::Statement::vec& statements, BlockType typeOfNewBlock) {
     remainingStatementsToParse.push(statements);
-    perControlBlockRelativeStatementCounter.back().relativeIndexInBlock = statementIndexInCurrentBlock;
+    //perControlBlockRelativeStatementCounter.back().relativeIndexInBlock = statementIndexInCurrentBlock;
     statementIndexInCurrentBlock                   = 0;
     perControlBlockRelativeStatementCounter.emplace_back(StatementIndexInBlock(typeOfNewBlock, statementIndexInCurrentBlock));
 }
@@ -81,7 +91,8 @@ void StatementIterationHelper::createAndPushNewStatementBlock(const syrec::State
 void StatementIterationHelper::appendStatementsWithBlockTypeSwitch(const syrec::Statement::vec& statements, BlockType typeOfNewBlock, std::size_t offsetForBlockSwitch) {
     auto& currentRemainingStatementsToParse = remainingStatementsToParse.top();
     currentRemainingStatementsToParse.insert(std::end(currentRemainingStatementsToParse), statements.begin(), statements.end());
-    blockTypeSwitches.emplace_back(BlockTypeSwitch(perControlBlockRelativeStatementCounter.size() - 1, offsetForBlockSwitch, typeOfNewBlock));
+    //blockTypeSwitches.emplace_back(BlockTypeSwitch(perControlBlockRelativeStatementCounter.size() - 1, offsetForBlockSwitch, typeOfNewBlock));
+    blockTypeSwitches.emplace_back(BlockTypeSwitch(perControlBlockRelativeStatementCounter.size(), offsetForBlockSwitch, typeOfNewBlock));
     relativeStatementIndexNormalizers.emplace_back(PerBlockRelativeStatementIndexNormalizer(perControlBlockRelativeStatementCounter.size() - 1, offsetForBlockSwitch));
 }
 
@@ -93,7 +104,9 @@ void StatementIterationHelper::updateStatementIndexInCurrentBlock() {
     
     ++perControlBlockRelativeStatementCounter.back().relativeIndexInBlock;
     ++statementIndexInCurrentBlock;
-    if (!blockTypeSwitches.empty() && statementIndexInCurrentBlock == blockTypeSwitches.back().activeStartingFromStatementWithIndex) {
+    if (!blockTypeSwitches.empty() 
+        && perControlBlockRelativeStatementCounter.size() == blockTypeSwitches.back().activeForBlockAtNestingLevel 
+        && statementIndexInCurrentBlock == blockTypeSwitches.back().activeStartingFromStatementWithIndex) {
         perControlBlockRelativeStatementCounter.back().blockType = blockTypeSwitches.back().switchedToBlockType;
         statementIndexInCurrentBlock                             = 0;
         blockTypeSwitches.erase(std::prev(blockTypeSwitches.cend()));

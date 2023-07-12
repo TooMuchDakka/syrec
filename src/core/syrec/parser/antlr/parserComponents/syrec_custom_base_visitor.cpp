@@ -12,7 +12,6 @@
 
 using namespace parser;
 
-
 bool SyReCCustomBaseVisitor::checkIfSignalWasDeclaredOrLogError(const std::string& signalIdent, const bool isLoopVariable, const TokenPosition& signalIdentTokenPosition) {
     const std::string signalIdentTransformed = isLoopVariable ? "$" + signalIdent : signalIdent;
     if (!sharedData->currentSymbolTableScope->contains(signalIdentTransformed)) {
@@ -255,6 +254,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
     return std::nullopt;
 }
 
+// TODO: GENERAL Check that defined number can be stored in data type used for numbers
 std::any SyReCCustomBaseVisitor::visitNumberFromConstant(SyReCParser::NumberFromConstantContext* context) {
     if (context->INT() == nullptr) {
         return std::nullopt;

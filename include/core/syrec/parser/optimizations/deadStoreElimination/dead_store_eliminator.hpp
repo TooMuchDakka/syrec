@@ -48,9 +48,33 @@ namespace deadStoreElimination {
 
     private:
         std::map<std::string, std::vector<PotentiallyDeadAssignmentStatement>> assignmentStmtIndizesPerSignal;
-        std::map<std::string, DeadStoreStatusLookup::ptr>                      livenessStatusLookup;
+        std::optional<AssignmentStatementIndexInControlFlowGraph>              indexOfLastProcessedStatementInControlFlowGraph;
         const parser::SymbolTable::ptr&                                        symbolTable;
 
+        // Could also be renamed to liveness status lookup conditional scope since a new scope is only opened for a branch in an if statement
+        struct LivenessStatusLookupScope {
+            std::map<std::string, DeadStoreStatusLookup::ptr> livenessStatusLookup;
+        };
+
+        std::vector<std::shared_ptr<LivenessStatusLookupScope>> livenessStatusScopes;
+        [[nodiscard]] bool                     tryCreateCopyOfLivenessStatusForSignalInCurrentScope(const std::string& signalIdent);
+        void                                   mergeLivenessStatusOfCurrentScopeWithParent();
+        void                                   createNewLivenessStatusScope();
+        void                                   destroyCurrentLivenessStatusScope();
+
+
+        /*
+         * Either create new scopes if the nesting level in comparison to the last statement increased
+         * Or remove and merge scopes if the nesting level decreased
+         */
+        void updateLivenessStatusScopeAccordingToNestingLevelOfStatement(const std::optional<AssignmentStatementIndexInControlFlowGraph>& indexOfLastProcessedStatement, const AssignmentStatementIndexInControlFlowGraph& indexOfCurrentStatement);
+
+
+        [[nodiscard]] std::optional<std::size_t>                                findScopeContainingEntryForSignal(const std::string& signalIdent) const;
+        [[nodiscard]] bool isReachableInReverseControlFlowGraph(const AssignmentStatementIndexInControlFlowGraph& assignmentStatement, const AssignmentStatementIndexInControlFlowGraph& usageOfAssignedToSignal) const;
+        [[nodiscard]] std::size_t determineNestingLevelMeasuredForIfStatements(const AssignmentStatementIndexInControlFlowGraph& statementIndexInControlFlowGraph) const;
+        [[nodiscard]] std::optional<std::shared_ptr<LivenessStatusLookupScope>> getLivenessStatusLookupForCurrentScope() const;
+        
         struct LoopStatementInformation {
             std::size_t nestingLevelOfLoop;
             std::size_t numRemainingNonControlFlowStatementsInLoopBody;
@@ -61,23 +85,11 @@ namespace deadStoreElimination {
         };
         std::vector<LoopStatementInformation>                                   remainingNonControlFlowStatementsPerLoopBody;
 
-
-        /*
-         * Can be used to determine if an IF or LOOP statement can be removed if its branch/body does only contain dead stores
-         * or module calls without side effects
-         *
-         */
-        //[[nodiscard]] bool containsOnlyDeadStores(const syrec::Statement::vec& statementList);
-
-        /*
-         *  I.      Module does not contain critical operations
-         *  II.     Liveness status of modifiable parameters is not changed 
-         */
-        //[[nodiscard]] bool moduleCallDoesNotModifyLivenessStatusOfParameters(const syrec::Module::ptr& module);
-
         /*
          * I.   Division with unknown divisor
-         * II.  SignalAccess with either unknown accessed value of dimension or bit range 
+         * II.  SignalAccess with either unknown accessed value of dimension or bit range
+         * III. Assignment to variable with global side effect
+         * IV.  Assignment to undeclared variable
          *
          */
         [[nodiscard]] bool                        doesAssignmentContainPotentiallyUnsafeOperation(const syrec::Statement::ptr& stmt) const;
@@ -86,21 +98,25 @@ namespace deadStoreElimination {
         [[nodiscard]] bool                        isAssignedToSignalAModifiableParameter(const std::string_view& assignedToSignalIdent) const;
         [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& number) const;
 
+        [[nodiscard]] bool isNextDeadStoreInSameBranch(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores, std::size_t currentNestingLevel) const;
+
         /*
          * Used to mark signals as live when its value is read in an expression
          *
          */
-        void               markAccessedVariablePartsAsLive(const syrec::VariableAccess::ptr& signalAccess);
+        void               markAccessedVariablePartsAsLive(const syrec::VariableAccess::ptr& signalAccess, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingSignalAccess);
         [[nodiscard]] bool isAccessedVariablePartLive(const syrec::VariableAccess::ptr& signalAccess) const;
 
         [[nodiscard]] std::vector<std::optional<unsigned int>>                                transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::expression::ptr>& dimensionAccess) const;
         [[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> transformUserDefinedBitRangeAccess(unsigned int accessedSignalBitwidth, const std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>>& bitRangeAccess) const;
         [[nodiscard]] std::vector<AssignmentStatementIndexInControlFlowGraph>                 combineAndSortDeadRemainingDeadStores();
 
-        void markAccessedSignalsAsLiveInExpression(const syrec::expression::ptr& expr);
-        void markAccessedSignalsAsLiveInCallStatement(const  std::shared_ptr<syrec::CallStatement>& callStmt);
+        [[nodiscard]] static std::size_t getBlockTypePrecedence(StatementIterationHelper::BlockType blockType);
+
+        void markAccessedSignalsAsLiveInExpression(const syrec::expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression);
+        void markAccessedSignalsAsLiveInCallStatement(const std::shared_ptr<syrec::CallStatement>& callStmt, const AssignmentStatementIndexInControlFlowGraph& indexOfCallStmt);
         void insertPotentiallyDeadAssignmentStatement(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::vector<StatementIterationHelper::StatementIndexInBlock>& relativeIndexOfStatementInControlFlowGraph);
-        void removeNoLongerDeadStores(const std::string& accessedSignalIdent);
+        void removeNoLongerDeadStores(const std::string& accessedSignalIdent, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingSignalAccess);
         void markAccessedSignalPartsAsDead(const syrec::VariableAccess::ptr& signalAccess) const;
         void resetInternalData();
 
