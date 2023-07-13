@@ -34,14 +34,12 @@ namespace deadStoreElimination {
                 statement(std::move(statement)), relativeIndexInControlFlowGraph(std::move(relativeIndexInControlFlowGraph)) {}
         };
 
-        StatementIterationHelper(const syrec::Statement::vec& statementsToIterate) {
+        explicit StatementIterationHelper(const syrec::Statement::vec& statementsToIterate) {
             statementIndexInCurrentBlock = 0;
             perControlBlockRelativeStatementCounter.emplace_back(StatementIndexInBlock(BlockType::Module, statementIndexInCurrentBlock));
             remainingStatementsToParse.push(statementsToIterate);
         }
-            
 
-        // TODO: Naming, module call representing dead store is technically also a control flow statement
         [[nodiscard]] std::optional<StatementAndRelativeIndexPair> getNextStatement();
 
     private:

@@ -1,0 +1,193 @@
+{
+  "DISABLED_deadStoreOnModuleLevelRemoved": {
+    "circuit": "module main(in a(4)) wire b(4) b += a; ++= b",
+    "expectedCircuit": "module main() skip"
+  },
+  "deadStoreInTrueBranchWithMoreThanOneStatementRemoved": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) if (a = b) then ++= b; ++= c else skip fi (a = b)",
+    "expectedCircuit": "module main(in a(4), out b(4)) if (a = b) then ++= b else skip fi (a = b)"
+  },
+  "deadStoreInFalseBranchWithMoreThanOneStatementRemoved": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) if (a = b) then skip else ++= b; ++= c fi (a = b)",
+    "expectedCircuit": "module main(in a(4), out b(4)) if (a = b) then skip else ++= b fi (a = b)"
+  },
+  "deadStoreInTrueBranchWithNoOtherStatementsReplacedWithSkipIfElseBranchIsNotEmpty": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) if (a = b) then ++= c else skip fi (a = b)",
+    "expectedCircuit": "module main(in a(4), out b(4)) if (a = b) then skip else skip fi (a = b)"
+  },
+  "deadStoreInFalseBranchWithNoOtherStatementsReplacedWithSkipIfTrueBranchIsNotEmpty": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) if (a = b) then skip else ++= c fi (a = b)",
+    "expectedCircuit": "module main(in a(4), out b(4)) if (a = b) then skip else skip fi (a = b)"
+  },
+  "ifStatementRemovedIfDeadStoreInTrueBranchIsRemovedWithEmptyElseBranch": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) if (a = b) then ++= c else --= c fi (a = b)",
+    "expectedCircuit": "module main() skip"
+  },
+  "ifStatementRemovedIfDeadStoreInFalseBranchIsRemovedWithEmptyTrueBranch": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) if (a = b) then ++= c else --= c fi (a = b)",
+    "expectedCircuit": "module main() skip"
+  },
+  "deadStoreInLoopWithMoreThanOneStatementRemovedIfLoopPerformsOnlyOneIteration": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; for 2 to 2 step 2 do skip; ++= c rof",
+    "expectedCircuit": "module main(out b(4)) ++= b; skip"
+  },
+  "deadStoreInLoopWithMoreThanOneStatementNotRemovedIfLoopPerformsMoreThanOneIteration": {
+    "circuit": "module main(out b(4)) wire c(4) ++= b; for 0 to 2 step 2 do skip; ++= c rof"
+  },
+  "loopWithSingleStatementRemovedCompletelyIfStatementWasDeadStoreAndLoopPerformsOnlyOneIteration": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; for 0 to 2 step 3 do ++= c rof",
+    "expectedCircuit": "module main(out b(4)) ++= b"
+  },
+  "loopWithSingleStatementLeftUnchangedIfStatementWasDeadStoreAndLoopPerformsMoreThanOneIteration": {
+    "circuit": "module main(out b(4)) wire c(4) ++= b; for 0 to 2 step 2 do ++= c rof"
+  },
+  "loopwithSingleStatementLeftunchangedIfStatementWasDeadStoreAndLoopIterationRangeContainsUnknownValue": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; for $i = 0 to 5 step 1 do for 0 to $i step 1 do ++= c rof rof"
+  },
+
+
+  "assignmentInTrueBranchDoesNotMakeDeadStoreInFalseBranchLiveAgain": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c; b += c else ++= c fi (b = c)",
+    "expectedCircuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then ++= c; b += c else skip fi (b = c)"
+  },
+  "assignmentInFalseBranchDoesNotMakeDeadStoreInTrueBranchLiveAgain": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c else --= c; b += c fi (b = c)",
+    "expectedCircuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then skip else --= c; b += c fi (b = c)"
+  },
+  "deadStoresLocalToBranchesAreMadeLiveByUsageOfAssignedToSignalAfterIfStatement": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c.0 else --= c.3 fi (b = c); b += c",
+    "expectedCircuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then ++= c.0 else --= c.3 fi (b = c); b += c"
+  },
+  "deadStoresLocalToBranchesRemoved": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c.0 else --= c.3 fi (b = c)",
+    "expectedCircuit": "module main(out b(4)) ++= b"
+  },
+  "assignmentInTrueBranchDoesNotMakeDeadStoreInStatementsOfFalseBranchWithNestedIfLiveAgain": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c.0 else ++= c; if (a = b) then --= c; b += c else ++= c fi (a = b) fi (b = c)",
+    "expectedCircuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then skip else ++= c; if (a = b) then --= c; b += c else skip fi (a = b) fi (b = c)"
+  },
+  "assignmentInFalseBranchDoesNotMakeDeadStoreInStatementsOfTrueBranchWithNestedIfLiveAgain": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c; if (a = b) then --= c; b += c else ++= c fi (a = b) else ++= c.0 fi (b = c)",
+    "expectedCircuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c; if (a = b) then --= c; b += c else skip fi (a = b) else skip fi (b = c)"
+  },
+  "deadStoresLocalToBranchOfNestedIfAreMadeLiveByUsageOfAssignedToSignalAfterNestedIfStatementInSameBranchWithTrueBranchContainingNestedIf": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b); b.0:2 += c.0:2 else ++= c.3 fi (b = c)",
+    "expectedCircuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b); b.0:2 += c.0:2 else skip fi (b = c)"
+  },
+  "deadStoresLocalToBranchOfNestedIfAreMadeLiveByUsageOfAssignedToSignalAfterNestedIfStatementInSameBranchWithFalseBranchContainingNestedIf": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c.3 else if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b); b.0:2 += c.0:2 fi (b = c)",
+    "expectedCircuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then skip else if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b); b.0:2 += c.0:2 fi (b = c)"
+  },
+  "deadStoresLocalToBranchOfNestedIfAreRemovedIfTrueBranchContainedNestedIf": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b) else ++= c.3 fi (b = c)",
+    "expectedCircuit": "module main(out b(4)) ++= b"
+  },
+  "deadStoresLocalToBranchOfNestedIfAreRemovedIfFalseBranchContainedNestedIf": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c.3 else if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b) fi (b = c)",
+    "expectedCircuit": "module main(out b(4)) ++= b"
+  },
+  "deadStoresLocalToBranchAreRemovedAfterLivenessStatusIsUpdatedAfterNestedIfWithTrueBranchContainingNestedIf": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; ++= c; if (b = c) then if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b); b.0:2 += c.0:2; ++= c.0; --= c.2; b.1 += c.1; ++= c.1 else ++= c.3 fi (b = c)",
+    "expectedCircuit": "module main(in a(4), out b(4)) wire c(4) ++= b; ++= c; if (b = c) then if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b); b.0:2 += c.0:2; b.1 += c.1 else skip fi (b = c)"
+  },
+  "deadStoresLocalToBranchAreRemovedAfterLivenessStatusIsUpdatedAfterNestedIfWithFalseBranchContainingNestedIf": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; ++= c; if (b = c) then ++= c.3 else if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b); b.0:2 += c.0:2; ++= c.0; --= c.2; b.1 += c.1; ++= c.1 fi (b = c)",
+    "expectedCircuit": "module main(in a(4), out b(4)) wire c(4) ++= b; ++= c; if (b = c) then skip else if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b); b.0:2 += c.0:2; b.1 += c.1 fi (b = c)"
+  },
+
+
+  "deadStoreMadeLiveByAccessOnWholeSignal": {
+    "circuit": "module main(out a(4)) wire c(4) ++= c; a += c"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitOfWholeSignal": {
+    "circuit": "module main(out a(4)) wire c(4) ++= c; a.0 += c.0"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingUnknownBitOfWholeSignal": {
+    "circuit": "module main(out a(4)) wire c(4) ++= c; for $i = 0 to 2 step 1 do a.$i += c.$i rof"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitRangeOfWholeSignal": {
+    "circuit": "module main(out a(4)) wire c(4) ++= c; a.0:2 += c.0:2"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownStartOfWholeSignal": {
+    "circuit": "module main(out a(4)) wire c(4) ++= c; for $i = 0 to 2 step 1 do a.$i:2 += c.$i:2 rof"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownEndOfWholeSignal": {
+    "circuit": "module main(out a(4)) wire c(4) ++= c; for $i = 0 to 2 step 1 do a.0:$i += c.0:$i rof"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; a[0] += c[0]"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitOfValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; a[0].0 += c[0].0"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingUnknownBitOfValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; for $i = 0 to 2 step 1 do a[0].$i += c[0].$i rof"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitRangeOfValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; a[0].0:2 += c[0].0:2"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownStartOfValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; for $i = 0 to 2 step 1 do a[0].$i:2 += c[0].$i:2 rof"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownEndOfValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; for $i = 0 to 2 step 1 do a[0].0:$i += c[0].0:$i rof"
+  },
+
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingUnknownValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0]; for $i = 0 to 2 step 1 do a[$i] += c[$i] rof"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitOfUnknownValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0]; for $i = 0 to 2 step 1 do a[$i].0 += c[$i].2 rof"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingUnknownBitOfUnknownValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0]; for $i = 0 to 2 step 1 do a[$i].$i += c[$i].$i rof"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitRangeOfUnknownValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0].1; for $i = 0 to 2 step 1 do a[$i].0:2 += c[$i].0:2 rof"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownStartOfUnknownValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0].1:2; for $i = 0 to 2 step 1 do a[$i].$i:2 += c[$i].$i:2 rof"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownEndOfUnknownValueOfDimension": {
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0].1:2; for $i = 0 to 2 step 1 do a[$i].0:$i += c[$i].0:$i rof"
+  },
+
+
+  "deadStoreMadeLiveByAccessOnOverlappingValueOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; a[1] += c[1]"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; a[1].2 += c[1].0"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingUnknownBitOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; for $i = 0 to 2 step 1 do a[1].$i += c[1].$i rof"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitRangeOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2].1; a[1].0:2 += c[1].0:2"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownStartOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; for $i = 0 to 2 step 1 do a[1].$i:2 += c[1].$i:2 rof"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownEndOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; for $i = 0 to 2 step 1 do a[1].0:$i += c[1].0:$i rof"
+  },
+
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingUnknownValueOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; for $i = 0 to 2 step 1 do a[$i] += c[$i] rof"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitOfUnknownValueOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; for $i = 0 to 2 step 1 do a[$i].2 += c[$i].2 rof"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingUnknownBitOfUnknownValueOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; for $i = 0 to 2 step 1 do a[$i].$i += c[$i].$i rof"
+  },
+  "deadStoreMadeLiveByAccessOnOverlappingBitRangeOfUnknownValueOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; for $i = 0 to 2 step 1 do a[$i].1:3 += c[$i].1:3 rof"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownStartOfUnknownValueOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; for $i = 0 to 2 step 1 do a[$i].$i:2 += c[$i].$i:2 rof"
+  },
+  "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownEndOfUnknownValueOfNotFullySpecifiedDimensionAccess": {
+    "circuit": "module main(out a[2][3](4)) wire c[2][3](4) ++= c[1][2]; for $i = 0 to 2 step 1 do a[$i].0:$i += c[$i].0:$i rof"
+  }
+}

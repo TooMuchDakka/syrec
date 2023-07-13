@@ -4,6 +4,16 @@
 
 using namespace deadStoreElimination;
 
+void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementList) {
+    const auto& foundDeadStores = findDeadStores(statementList);
+    if (foundDeadStores.empty()) {
+        return;
+    }
+
+    std::size_t deadStoreIndex = 0;
+    removeDeadStoresFrom(statementList, foundDeadStores, deadStoreIndex, 0);
+}
+
 std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> DeadStoreEliminator::findDeadStores(const syrec::Statement::vec& statementList) {
     resetInternalData();
     const std::unique_ptr<StatementIterationHelper> statementIterationHelper = std::make_unique<StatementIterationHelper>(statementList);
@@ -55,36 +65,12 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
         const auto& deadStoreIndex          = foundDeadStores.at(currDeadStoreIndex);
         // Since the first index in the relative index chain is always the position of the statement in the module, we can omit this one nesting level
         const auto& nestingLevelOfDeadStore = deadStoreIndex.relativeStatementIndexPerControlBlock.size() - 1;
-
-        /*
-         * Number of removed statements is not persisted and if the sorting is not done correctly leads to an error
-         * i.e.
-         *
-         * if ...
-         *  S1
-         * else
-         *  S2
-         *  S3
-         *
-         *  and the ordering would be S2, S1, S3 => the information for the fixup required for the removal of S3 due to S2 being removed is lost
-         *  due to the branch switch to remove S1
-         */
         const auto& relativeStatementIndexInCurrentBlockOfDeadStore = deadStoreIndex.relativeStatementIndexPerControlBlock.at(nestingLevelOfCurrentBlock).relativeIndexInBlock - numRemovedStmtsInBlock;
 
         const auto& referencedStatement = statementList.at(relativeStatementIndexInCurrentBlockOfDeadStore);
         const auto  copyOfCurrentDeadStoreIndex = currDeadStoreIndex;
         if (nestingLevelOfDeadStore > nestingLevelOfCurrentBlock) {
-            /*const auto typeOfNestedBlock = nestingLevelOfCurrentBlock == 0
-                ? deadStoreIndex.relativeStatementIndexPerControlBlock.at(nestingLevelOfCurrentBlock + 1).blockType
-                : deadStoreIndex.relativeStatementIndexPerControlBlock.at(nestingLevelOfCurrentBlock).blockType;*/
-
-            const auto typeOfNestedBlock = deadStoreIndex.relativeStatementIndexPerControlBlock.at(nestingLevelOfCurrentBlock + 1).blockType;
-
-            /*const auto typeOfNestedBlock = nestingLevelOfCurrentBlock + 1 <= nestingLevelOfDeadStore
-                ? deadStoreIndex.relativeStatementIndexPerControlBlock.at(nestingLevelOfCurrentBlock + 1).blockType
-                : StatementIterationHelper::BlockType::Module;
-            */
-            switch (typeOfNestedBlock) {
+            switch (deadStoreIndex.relativeStatementIndexPerControlBlock.at(nestingLevelOfCurrentBlock + 1).blockType) {
                 /*
                  * We could perform a flip of the branches (which would also require a flip of the guard as well as closing guard expression)
                  * in case the true branch is empty while the false branch is not
@@ -165,11 +151,6 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
         
         stopProcessing = currDeadStoreIndex >= foundDeadStores.size() || statementList.empty() || !isNextDeadStoreInSameBranch(copyOfCurrentDeadStoreIndex, foundDeadStores, nestingLevelOfCurrentBlock + 1);
     }
-}
-
-void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores) const {
-    std::size_t deadStoreIndex = 0;
-    removeDeadStoresFrom(statementList, foundDeadStores, deadStoreIndex, 0);
 }
 
 bool DeadStoreEliminator::doesAssignmentContainPotentiallyUnsafeOperation(const syrec::Statement::ptr& stmt) const {
@@ -411,43 +392,6 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
             return thisElem.relativeStatementIndexPerControlBlock.size() <= thatElem.relativeStatementIndexPerControlBlock.size();
         }
         return false;
-
-        //const auto& lastElementOfThisElem     = std::next(thisElem.relativeStatementIndexPerControlBlock.cbegin(), numElementsToCompare);
-        //const auto& lastElementOfThatElem     = std::next(thatElem.relativeStatementIndexPerControlBlock.cbegin(), numElementsToCompare);
-
-        //const auto& pairOfMismatchedElements = std::mismatch(
-        //        thisElem.relativeStatementIndexPerControlBlock.cbegin(),
-        //        lastElementOfThisElem,
-        //        thatElem.relativeStatementIndexPerControlBlock.cbegin(),
-        //        lastElementOfThatElem,
-        //        [](const StatementIterationHelper::StatementIndexInBlock& operandOne, const StatementIterationHelper::StatementIndexInBlock& operandTwo) {
-        //            return operandOne.relativeIndexInBlock == operandTwo.relativeIndexInBlock;
-        //        });
-
-        // If relative statement index per block matches, compare according to block type (which is necessary to guarantee correct ordering of if branch statements
-        if (pairOfMismatchedElements.first == lastElementOfThisElem) {
-            // Statements with smaller overall index in control flow graph are placed before statements with longer relative index in the control flow graph
-            if (thisElem.relativeStatementIndexPerControlBlock.size() < thatElem.relativeStatementIndexPerControlBlock.size()) {
-                return true;
-            }
-
-            const auto& pairOfMismatchedBlockTypes = std::mismatch(
-            thisElem.relativeStatementIndexPerControlBlock.cbegin(),
-            lastElementOfThisElem,
-            thatElem.relativeStatementIndexPerControlBlock.cbegin(),
-            lastElementOfThatElem,
-            [](const StatementIterationHelper::StatementIndexInBlock& operandOne, const StatementIterationHelper::StatementIndexInBlock& operandTwo) {
-                return operandOne.blockType == operandTwo.blockType;
-            });
-
-            /*
-             * If every relative index per block matches between the two statements to compare, sort according to the block type precedence of the first mismatched block type 
-             */
-            if (pairOfMismatchedBlockTypes.first != lastElementOfThisElem) {
-                return getBlockTypePrecedence(pairOfMismatchedBlockTypes.first->blockType) < getBlockTypePrecedence(pairOfMismatchedBlockTypes.second->blockType);
-            }
-        }
-        return pairOfMismatchedElements.first->relativeIndexInBlock < pairOfMismatchedElements.second->relativeIndexInBlock;
     });
 
     return deadStoreStatementIndizesInFlowGraph;

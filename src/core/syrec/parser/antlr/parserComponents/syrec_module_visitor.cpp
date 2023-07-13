@@ -111,9 +111,7 @@ std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
             if (sharedData->parserConfig->deadStoreEliminationEnabled && sharedData->optionalDeadStoreEliminator.has_value()) {
                 auto        statementsToProcess = *std::move(validUserDefinedModuleStatements);
                 validUserDefinedModuleStatements.reset();
-
-                const auto& foundDeadStores = sharedData->optionalDeadStoreEliminator.value()->findDeadStores(statementsToProcess);
-                sharedData->optionalDeadStoreEliminator.value()->removeDeadStoresFrom(statementsToProcess, foundDeadStores);
+                sharedData->optionalDeadStoreEliminator.value()->removeDeadStoresFrom(statementsToProcess);
 
                 // TODO: What if there are no remaining statements in the module body after the dead store elimination, currently we opt to simply insert a skip statement
                 if (statementsToProcess.empty()) {
