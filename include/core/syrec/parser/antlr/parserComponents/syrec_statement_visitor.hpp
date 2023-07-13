@@ -134,6 +134,10 @@ namespace parser {
         [[nodiscard]] bool                                 isValuePropagationBlockedDueToLoopDataFlowAnalysis(const syrec::VariableAccess::ptr& accessedPartsOfSignalToBeUpdated) const;
         void                                               addOrUpdateLoopVariableEntryAndOptionallyMakeItsValueAvailableForEvaluations(const std::string& loopVariableIdent, const std::optional<unsigned int>& valueOfLoopVariable, bool& wasNewSymbolTableScopeOpened) const;
         void                                               removeLoopVariableAndMakeItsValueUnavailableForEvaluations(const std::string& loopVariableIdent, bool wasNewSymbolTableScopeOpenedForLoopVariable) const;
+
+        [[nodiscard]] static bool doesModuleOnlyHaveReadOnlyParameters(const syrec::Module::ptr& calledModule);
+        [[nodiscard]] static bool doesModuleOnlyConsistOfSkipStatements(const syrec::Module::ptr& calledModule);
+        void                                          decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(const syrec::Module::ptr& calledModule, const std::vector<std::string>& filteredCalleeArguments) const;
     };
 } // namespace parser
 #endif

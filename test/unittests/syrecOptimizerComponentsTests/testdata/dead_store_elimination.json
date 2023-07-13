@@ -95,6 +95,10 @@
     "expectedCircuit": "module main(in a(4), out b(4)) wire c(4) ++= b; ++= c; if (b = c) then skip else if (a = b) then ++= c.0; --= c.1 else ++= c.2 fi (a = b); b.0:2 += c.0:2; b.1 += c.1 fi (b = c)"
   },
 
+  "calledModuleWithOnlyDeadStoresRemoved": {
+    "circuit": "module add(in a(4), in b(4)) wire c(4) c += (a + b) module main(in a(4), in b(4), out c(4)) call add(a, b); uncall add(a, b)",
+    "expectedCircuit": "module main() skip"
+  },
 
   "deadStoreMadeLiveByAccessOnWholeSignal": {
     "circuit": "module main(out a(4)) wire c(4) ++= c; a += c"

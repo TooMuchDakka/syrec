@@ -21,7 +21,6 @@ syrec::Module::vec       SyReCModuleVisitor::getFoundModules() const {
     return foundModules;
 }
 
-// TODO: DEAD_CODE_ELIMINATION: Modules with only in parameters can also be removed
 std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) {
     SymbolTable::openScope(sharedData->currentSymbolTableScope);
 
@@ -53,7 +52,6 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
                 SymbolTable::closeScope(sharedData->currentSymbolTableScope);
                 sharedData->currentSymbolTableScope->addEntry(unoptimizedModuleVersion, unusedStatusPerModuleParameter);
                 unoptimizedModules.emplace_back(unoptimizedModuleVersion);
-                // P1
                 foundModules.emplace_back(optimizedModuleVersion);   
             }
         }
@@ -67,10 +65,14 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
     // TODO: UNUSED_REFERENCE - Marked as used
     if (sharedData->parserConfig->deadCodeEliminationEnabled) {
         removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(unoptimizedModules, foundModules, nameOfTopLevelModule);
+        /*
+         * If a module consists of only dead stores, all parameters as well as locals should already be removed and thus the module should be removed by this call
+         * and thus no extra check is required after the dead store optimization
+         */
         removeModulesWithoutParameters(foundModules, nameOfTopLevelModule);
         // TODO: Remove now empty modules after dead code elimination (either here or at pos P1)?
     }
-
+    addSkipStatementToMainModuleIfEmpty(foundModules, nameOfTopLevelModule);
     return 0;
 }
 
@@ -250,7 +252,7 @@ void SyReCModuleVisitor::removeUnusedVariablesAndParametersFromModule(const syre
 }
 
 // TODO: UNUSED_REFERENCE - Marked as used
-void SyReCModuleVisitor::removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(syrec::Module::vec& unoptimizedModules, syrec::Module::vec& optimizedModules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const {
+void SyReCModuleVisitor::removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(const syrec::Module::vec& unoptimizedModules, syrec::Module::vec& optimizedModules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const {
     const auto& wasUsedStatusPerFoundModule = sharedData->currentSymbolTableScope->determineIfModuleWasUsed(unoptimizedModules);
     std::size_t moduleIdx                   = 0;
 
@@ -362,4 +364,19 @@ std::optional<syrec::Variable::Types> SyReCModuleVisitor::getSignalType(const an
             break;
     }
     return signalType;
+}
+
+void SyReCModuleVisitor::addSkipStatementToMainModuleIfEmpty(const syrec::Module::vec& modules, const std::string_view& expectedIdentOfTopLevelModule) const {
+    const auto& foundTopLevelModule = std::find_if(
+        modules.begin(),
+        modules.end(),
+        [&expectedIdentOfTopLevelModule](const syrec::Module::ptr& module) {
+            return module->name == expectedIdentOfTopLevelModule;
+        }
+    );
+    if (foundTopLevelModule == modules.end() || !(*foundTopLevelModule)->statements.empty()) {
+        return;
+    }
+
+    (*foundTopLevelModule)->statements.emplace_back(std::make_shared<syrec::SkipStatement>());
 }

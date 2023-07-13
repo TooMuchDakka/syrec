@@ -16,6 +16,11 @@ namespace deadStoreElimination {
         explicit DeadStoreEliminator(const parser::SymbolTable::ptr& symbolTable):
             symbolTable(symbolTable) {}
 
+        // TODO: Currently stores without global side effects are not removed (since they are not detected as 'dead' stores)
+        // Since the current definition does not apply to them
+        // If we would extend this definition to something of the sort of, if for a given list of assignment to some signal x there does not exist a global side effect that overlaps
+        // with any of the assignments with local side effect, the assignment could also be considered as dead.
+
         /**
          * \brief Removes dead stores, i.e. assignments to parts of a signal that are not read by any subsequent statement, in the given list of statements. <br>
          * If an assignment statement does fit this criteria but if also any of the following conditions hold for any of the involved signals or expressions used in the assignment: <br>

@@ -289,6 +289,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
 }
 
 // TODO: DEAD_CODE_ELIMINATION: Module calls with only in parameters can also be removed
+// TODO: DEAD_CODE_ELIMINIATION: Call + uncall of module of empty module (i.e. after dead store removal) can be removed
 std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementContext* context) {
     bool                      isValidCallOperationDefined = context->OP_CALL() != nullptr || context->OP_UNCALL() != nullptr;
     const std::optional<bool> isCallOperation             = isValidCallOperationDefined ? std::make_optional(context->OP_CALL() != nullptr) : std::nullopt;
@@ -407,24 +408,38 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
     }
 
     trimAndDecrementReferenceCountOfUnusedCalleeParameters(calleeArguments, positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters);
-    syrec::Statement::ptr createdCallOrUncallStmt;
-    if (*isCallOperation) {
-        // TODO: CONSTANT_PROPAGATION
-        invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(moduleMatchingCalleeArguments, calleeArguments, positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters);
-        createdCallOrUncallStmt = std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments);
-    } else {
-        createdCallOrUncallStmt = std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments);
-    }
-
-    if (!calleeArguments.empty()) {
-        addStatementToOpenContainer(createdCallOrUncallStmt);
-    }
-    else {
+    /*
+     * At this point the optimizer cannot determine without additional overhead whether a module call will have a global side effect since this depends on the result of other optimizations
+     * that will be performed after the call statement was created. What we can check is, whether the called module consists of only skip statements or has no side effects (i.e. only read only parameters)
+     * but we currently do not check whether the module has any global side effects as mentioned initially. Otherwise, we could also omit the call.
+     *
+     * TODO: Perform relaxed global side effect check by checking whether modifiable parameter are actually modified
+     */
+    if (sharedData->parserConfig->deadCodeEliminationEnabled 
+        && (doesModuleOnlyHaveReadOnlyParameters(moduleMatchingCalleeArguments) 
+            || doesModuleOnlyConsistOfSkipStatements(moduleMatchingCalleeArguments))) {
         if (!sharedData->modificationsOfReferenceCountsDisabled) {
-            sharedData->currentSymbolTableScope->decrementReferenceCountOfModulesMatchingSignature(moduleMatchingCalleeArguments);   
+            decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(moduleMatchingCalleeArguments, calleeArguments);   
         }
-    }
+    } else {
+        syrec::Statement::ptr createdCallOrUncallStmt;
+        if (*isCallOperation) {
+            // TODO: CONSTANT_PROPAGATION
+            invalidateValuesForVariablesUsedAsParametersChangeableByModuleCall(moduleMatchingCalleeArguments, calleeArguments, positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters);
+            createdCallOrUncallStmt = std::make_shared<syrec::CallStatement>(moduleMatchingCalleeArguments, calleeArguments);
+        } else {
+            createdCallOrUncallStmt = std::make_shared<syrec::UncallStatement>(moduleMatchingCalleeArguments, calleeArguments);
+        }
 
+        if (!calleeArguments.empty()) {
+            addStatementToOpenContainer(createdCallOrUncallStmt);
+        } else {
+            if (!sharedData->modificationsOfReferenceCountsDisabled) {
+                sharedData->currentSymbolTableScope->decrementReferenceCountOfModulesMatchingSignature(moduleMatchingCalleeArguments);
+            }
+        }        
+    }
+    
     return 0;
 }
 
@@ -1606,4 +1621,29 @@ void SyReCStatementVisitor::removeLoopVariableAndMakeItsValueUnavailableForEvalu
     if (sharedData->loopVariableMappingLookup.count(loopVariableIdent) != 0) {
         sharedData->loopVariableMappingLookup.erase(loopVariableIdent);
     }
+}
+
+bool SyReCStatementVisitor::doesModuleOnlyConsistOfSkipStatements(const syrec::Module::ptr& calledModule) {
+    return std::all_of(
+    calledModule->statements.cbegin(),
+    calledModule->statements.cend(),
+    [](const syrec::Statement::ptr& statement) {
+        return std::dynamic_pointer_cast<syrec::SkipStatement>(statement) != nullptr;
+    });
+}
+
+bool SyReCStatementVisitor::doesModuleOnlyHaveReadOnlyParameters(const syrec::Module::ptr& calledModule) {
+    return std::all_of(
+    calledModule->parameters.cbegin(),
+    calledModule->parameters.cend(),
+    [](const syrec::Variable::ptr& parameter) {
+        return parameter->type == syrec::Variable::In;
+    });
+}
+
+void SyReCStatementVisitor::decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(const syrec::Module::ptr& calledModule, const std::vector<std::string>& filteredCalleeArguments) const {
+    for (const auto& actuallyUsedCalleeArgument: filteredCalleeArguments) {
+        decrementReferenceCountOfSignal(actuallyUsedCalleeArgument);
+    }
+    sharedData->currentSymbolTableScope->decrementReferenceCountOfModulesMatchingSignature(calledModule);
 }

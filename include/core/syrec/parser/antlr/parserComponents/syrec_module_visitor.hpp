@@ -13,8 +13,7 @@ namespace parser {
     public:
         explicit SyReCModuleVisitor(const std::shared_ptr<SharedVisitorData>& sharedVisitorData) : SyReCCustomBaseVisitor(sharedVisitorData),
             foundModules(syrec::Module::vec()),
-            statementVisitor(std::make_unique<SyReCStatementVisitor>(SyReCStatementVisitor(sharedVisitorData))),
-            lastDeclaredModuleIdent("")
+            statementVisitor(std::make_unique<SyReCStatementVisitor>(SyReCStatementVisitor(sharedVisitorData)))
         {}
 
         std::any visitProgram(SyReCParser::ProgramContext* context) override;
@@ -36,8 +35,9 @@ namespace parser {
         std::any visitStatementList(SyReCParser::StatementListContext* context) override;
 
         void removeUnusedVariablesAndParametersFromModule(const syrec::Module::ptr& module) const;
-        void removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(syrec::Module::vec& unoptimizedModules, syrec::Module::vec& optimizedModules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const;
+        void removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(const syrec::Module::vec& unoptimizedModules, syrec::Module::vec& optimizedModules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const;
         void removeModulesWithoutParameters(syrec::Module::vec& modules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const;
+        void addSkipStatementToMainModuleIfEmpty(const syrec::Module::vec& modules, const std::string_view& expectedIdentOfTopLevelModule) const;
 
         [[nodiscard]] std::string determineExpectedNameOfTopLevelModule() const;
         [[nodiscard]] syrec::Module::ptr createCopyOfModule(const syrec::Module::ptr& moduleToCreateCopyFrom) const;
