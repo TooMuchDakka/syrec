@@ -156,11 +156,11 @@ target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 set_target_properties(${PROJECT_NAME} PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
 
 # add MQT::qfr library
-add_subdirectory("${PROJECT_SOURCE_DIR}/extern/qfr" "extern/qfr")
+add_subdirectory("${PROJECT_SOURCE_DIR}/extern/qfr" "extern/qfr" EXCLUDE_FROM_ALL)
 target_link_libraries(${PROJECT_NAME} PUBLIC MQT::qfr_dd)
 
 # add fmt library
-add_subdirectory("${PROJECT_SOURCE_DIR}/extern/fmt" "extern/fmt")
+add_subdirectory("${PROJECT_SOURCE_DIR}/extern/fmt" "extern/fmt" EXCLUDE_FROM_ALL)
 target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
 
 # add header-only part of the Boost library
