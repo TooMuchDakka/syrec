@@ -31,13 +31,11 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
             if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsAssignmentStatement) && !isAssignmentDefinedInLoopPerformingMoreThanOneIteration()) {
                 insertPotentiallyDeadAssignmentStatement(nextStatementAsAssignmentStatement->lhs, nextStatement->relativeIndexInControlFlowGraph);   
             }
-            //insertPotentiallyDeadAssignmentStatement(nextStatementAsAssignmentStatement->lhs, nextStatement->relativeIndexInControlFlowGraph);   
         } else if (const auto& nextStatementAsUnaryAssignmentStatement = std::dynamic_pointer_cast<syrec::UnaryStatement>(nextStatement->statement); nextStatementAsUnaryAssignmentStatement != nullptr) {
             markAccessedVariablePartsAsLive(nextStatementAsUnaryAssignmentStatement->var, indexOfCurrentStmtInControlFlowGraph);
             if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsUnaryAssignmentStatement) && !isAssignmentDefinedInLoopPerformingMoreThanOneIteration()) {
                 insertPotentiallyDeadAssignmentStatement(nextStatementAsUnaryAssignmentStatement->var, nextStatement->relativeIndexInControlFlowGraph);   
             }
-            //insertPotentiallyDeadAssignmentStatement(nextStatementAsUnaryAssignmentStatement->var, nextStatement->relativeIndexInControlFlowGraph);   
         } else if (const auto& nextStatementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(nextStatement->statement); nextStatementAsIfStatement != nullptr) {
             markAccessedSignalsAsLiveInExpression(nextStatementAsIfStatement->condition, indexOfCurrentStmtInControlFlowGraph);
         } else if (const auto& nextStatementAsCallStatement = std::dynamic_pointer_cast<syrec::CallStatement>(nextStatement->statement); nextStatementAsCallStatement != nullptr) {
@@ -46,7 +44,8 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
             markAccessedVariablePartsAsLive(nextStatementAsSwapStatement->lhs, indexOfCurrentStmtInControlFlowGraph);
             markAccessedVariablePartsAsLive(nextStatementAsSwapStatement->rhs, indexOfCurrentStmtInControlFlowGraph);
         }
-        
+
+        markAccessedLocalSignalsInStatementAsUsedInNonLocalAssignment(nextStatement->statement, indexOfCurrentStmtInControlFlowGraph);
         markStatementAsProcessedInLoopBody(nextStatement->statement, nextStatement->relativeIndexInControlFlowGraph.size());
         indexOfLastProcessedStatementInControlFlowGraph.emplace(nextStatement->relativeIndexInControlFlowGraph);
 
@@ -55,6 +54,7 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
             nextStatement.emplace(*nextFetchedStatement);
         }
     }
+    addAssignmentsUsedOnlyInAssignmentsToLocalSignalsAsDeadStores();
     return combineAndSortDeadRemainingDeadStores();
 }
 
@@ -209,7 +209,7 @@ bool DeadStoreEliminator::wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndW
 
         if (const auto& accessedValueOfDimensionAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimension); accessedValueOfDimensionAsNumericExpr != nullptr) {
             const auto accessedValueOfDimensionEvaluated = tryEvaluateNumber(accessedValueOfDimensionAsNumericExpr->value);
-            dimensionAccessOK                            = accessedValueOfDimensionEvaluated.has_value() && *accessedValueOfDimensionEvaluated < maximumValidValueOfDimension;    
+            dimensionAccessOK                            = accessedValueOfDimensionEvaluated.has_value() && *accessedValueOfDimensionEvaluated <= maximumValidValueOfDimension;    
         }
         else {
             dimensionAccessOK = false;
@@ -249,6 +249,12 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
         return;
     }
 
+    // Since assignments to readonly signals are not allowed, we also do not need to keep track of the liveness status of readonly signals
+    const auto& backingVariableEntryForAccessedSignal = std::get<syrec::Variable::ptr>(*signalTableEntryForAccessedSignal);
+    if (backingVariableEntryForAccessedSignal->type == syrec::Variable::Types::In) {
+        return;
+    }
+
     const auto& currentLivenessStatusLookup = getLivenessStatusLookupForCurrentScope();
     if (currentLivenessStatusLookup.value()->livenessStatusLookup.count(signalAccess->var->name) == 0) {
         if (!tryCreateCopyOfLivenessStatusForSignalInCurrentScope(signalAccess->var->name)) {
@@ -262,7 +268,6 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
     }
 
     auto&       livenessStatusForAccessedVariable     = currentLivenessStatusLookup.value()->livenessStatusLookup.at(signalAccess->var->name);
-    const auto& backingVariableEntryForAccessedSignal = std::get<syrec::Variable::ptr>(*signalTableEntryForAccessedSignal);
     const auto& transformedDimensionAccess = transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), signalAccess->indexes);
     const auto& transformedBitRangeAccess  = transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, signalAccess->range);
     if (transformedBitRangeAccess.has_value()) {
@@ -322,22 +327,22 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
     return transformedAccessOnDimension;
 }
 
-[[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> DeadStoreEliminator::transformUserDefinedBitRangeAccess(unsigned int accessedSignalBitRange, const std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> & bitRangeAccess) const {
+[[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> DeadStoreEliminator::transformUserDefinedBitRangeAccess(unsigned int accessedSignalBitwidth, const std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>>& bitRangeAccess) const {
     if (!bitRangeAccess.has_value()) {
-        return std::make_optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>(0, accessedSignalBitRange - 1);
+        return std::make_optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>(0, accessedSignalBitwidth - 1);
     }
 
     auto bitRangeStartEvaluated = tryEvaluateNumber(bitRangeAccess->first);
     auto bitRangeEndEvaluated   = tryEvaluateNumber(bitRangeAccess->second);
     if (!bitRangeStartEvaluated.has_value() || !bitRangeEndEvaluated.has_value()) {
-        return std::make_optional(optimizations::BitRangeAccessRestriction::BitRangeAccess(0, accessedSignalBitRange - 1));
+        return std::make_optional(optimizations::BitRangeAccessRestriction::BitRangeAccess(0, accessedSignalBitwidth - 1));
     }
 
-    if (*bitRangeStartEvaluated > accessedSignalBitRange - 1) {
-        bitRangeStartEvaluated = accessedSignalBitRange - 1;
+    if (*bitRangeStartEvaluated > accessedSignalBitwidth - 1) {
+        bitRangeStartEvaluated = accessedSignalBitwidth - 1;
     }
-    if (*bitRangeEndEvaluated > accessedSignalBitRange - 1) {
-        bitRangeEndEvaluated = accessedSignalBitRange - 1;
+    if (*bitRangeEndEvaluated > accessedSignalBitwidth - 1) {
+        bitRangeEndEvaluated = accessedSignalBitwidth - 1;
     }
     return std::make_optional(optimizations::BitRangeAccessRestriction::BitRangeAccess(*bitRangeStartEvaluated, *bitRangeEndEvaluated));
 }
@@ -382,8 +387,12 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
             if (isCurrentBlockOfFirstOperandIfBranch && isCurrentBlockOfSecondOperandIBranch) {
                 if (getBlockTypePrecedence(operandOne.blockType) > getBlockTypePrecedence(operandTwo.blockType)) {
                     return false;
+                } if (getBlockTypePrecedence(operandOne.blockType) < getBlockTypePrecedence(operandTwo.blockType)) {
+                    return true;
                 }
             }
+
+            
             return operandOne.relativeIndexInBlock <= operandTwo.relativeIndexInBlock;
         });
 
@@ -462,10 +471,13 @@ std::remove_if(
 
             // TODO: Could we adapt the typedef for the pointer made in the base value lookup to be automatically cast to derived class (aka a polymorphic typedef)
             // This could then also be used syrec polymorphism (expression, etc).
-            return !livenessStatusLookupForAssignedToSignal->areAccessedSignalPartsDead(
-                    transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), assignedToSignalParts->indexes),
-                    transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, assignedToSignalParts->range)
-            );
+            if (!livenessStatusLookupForAssignedToSignal->areAccessedSignalPartsDead(
+                transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), assignedToSignalParts->indexes),
+                transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, assignedToSignalParts->range))) {
+                markPreviouslyDeadStoreAsLiveWithoutUsageInGlobalSideEffect(assignmentStmtInformation.assignedToSignalParts, assignmentStmtInformation.indexInControlFlowGraph);
+                return true;
+            }
+            return false;
         }),
 potentiallyDeadStores.end());
 
@@ -494,11 +506,10 @@ void DeadStoreEliminator::markAccessedSignalPartsAsDead(const syrec::VariableAcc
 }
 
 void DeadStoreEliminator::resetInternalData() {
-    //livenessStatusLookup.clear();
     assignmentStmtIndizesPerSignal.clear();
-
     indexOfLastProcessedStatementInControlFlowGraph.reset();
     livenessStatusScopes.clear();
+    liveStoresWithoutUsageInGlobalSideEffect.clear();
 }
 
 void DeadStoreEliminator::decrementReferenceCountOfUsedSignalsInStatement(const syrec::Statement::ptr& statement) const {
@@ -797,3 +808,187 @@ bool DeadStoreEliminator::isNextDeadStoreInSameBranch(std::size_t currentDeadSto
 
     return foundMismatchInIndexOrBlockType.first == lastElementToCheckInCurrentDeadStore;
 }
+
+bool DeadStoreEliminator::doesAssignmentOverlapAnyAccessedPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalParts, const syrec::VariableAccess::ptr& accessedSignalParts) const {
+    if (assignedToSignalParts->var->name != accessedSignalParts->var->name) {
+        return false;
+    }
+
+    const auto& sharedSignalIdent = assignedToSignalParts->var->name;
+    if (!symbolTable->contains(sharedSignalIdent)) {
+        return false;
+    }
+
+    const auto& symbolTableEntryForAccessedSignal = *symbolTable->getVariable(sharedSignalIdent);
+    if (!std::holds_alternative<syrec::Variable::ptr>(symbolTableEntryForAccessedSignal)) {
+        return false;
+    }
+
+    const auto& backingVariableEntryForAccessedSignal        = std::get<syrec::Variable::ptr>(*symbolTable->getVariable(sharedSignalIdent));
+    const auto& transformedDimensionAccessOfAssignedToSignal = transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), assignedToSignalParts->indexes);
+    const auto& transformedDimensionAccessOfAccessedSignal   = transformUserDefinedDimensionAccess(backingVariableEntryForAccessedSignal->dimensions.size(), accessedSignalParts->indexes);
+    if (!doDimensionAccessesOverlap(transformedDimensionAccessOfAssignedToSignal, transformedDimensionAccessOfAccessedSignal)) {
+        return false;
+    }
+
+    const auto& transformedBitRangeOfAssignedToSignalParts = transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, assignedToSignalParts->range);
+    const auto& transformedBitRangeOfAccessedSignalParts   = transformUserDefinedBitRangeAccess(backingVariableEntryForAccessedSignal->bitwidth, accessedSignalParts->range);
+
+    if (transformedBitRangeOfAccessedSignalParts.has_value() != transformedBitRangeOfAssignedToSignalParts.has_value()) {
+         return false;
+    }
+    if (transformedBitRangeOfAssignedToSignalParts.has_value() && transformedBitRangeOfAccessedSignalParts.has_value()) {
+        return doBitRangesOverlap(*transformedBitRangeOfAssignedToSignalParts, *transformedBitRangeOfAccessedSignalParts);
+    }
+    return true;
+}
+
+bool DeadStoreEliminator::doBitRangesOverlap(const optimizations::BitRangeAccessRestriction::BitRangeAccess& assignedToBitRange, const optimizations::BitRangeAccessRestriction::BitRangeAccess& accessedBitRange) {
+    const bool doesAssignedToBitRangePrecedeAccessedBitRange = assignedToBitRange.first < accessedBitRange.first;
+    const bool doesAssignedToBitRangeExceedAccessedBitRange  = assignedToBitRange.second > accessedBitRange.second;
+    /*
+     * Check cases:
+     * Assigned TO: |---|
+     * Accessed BY:      |---|
+     *
+     * and
+     * Assigned TO:      |---|
+     * Accessed BY: |---|
+     *
+     */
+    if (doesAssignedToBitRangePrecedeAccessedBitRange && assignedToBitRange.second < accessedBitRange.first
+        || doesAssignedToBitRangeExceedAccessedBitRange && assignedToBitRange.first > accessedBitRange.second) {
+        return false;
+    }
+    return true;
+}
+
+bool DeadStoreEliminator::doDimensionAccessesOverlap(const std::vector<std::optional<unsigned int>>& assignedToDimensionAccess, const std::vector<std::optional<unsigned int>>& accessedDimensionAccess) {
+    return std::mismatch(
+        assignedToDimensionAccess.cbegin(),
+        assignedToDimensionAccess.cend(),
+        accessedDimensionAccess.cbegin(),
+        accessedDimensionAccess.cend(),
+        [](const std::optional<unsigned int>& accessedValueOfDimensionOfAssignedToSignal, const std::optional<unsigned int>& accessedValueOfDimensionOfAccessedToSignal) {
+           if (accessedValueOfDimensionOfAssignedToSignal.has_value() && accessedValueOfDimensionOfAccessedToSignal.has_value()) {
+               return *accessedValueOfDimensionOfAssignedToSignal != *accessedValueOfDimensionOfAccessedToSignal;
+           }
+           return false;
+    }).first != assignedToDimensionAccess.cend();
+}
+
+std::vector<syrec::VariableAccess::ptr> DeadStoreEliminator::getAccessedLocalSignalsFromExpression(const syrec::expression::ptr& expr) const {
+    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
+        auto foundLocalsSignalsFromLhsExpr = getAccessedLocalSignalsFromExpression(exprAsBinaryExpr->lhs);
+        const auto& foundLocalsSignalsFromRhsExpr = getAccessedLocalSignalsFromExpression(exprAsBinaryExpr->rhs);
+        foundLocalsSignalsFromLhsExpr.insert(foundLocalsSignalsFromLhsExpr.end(), foundLocalsSignalsFromRhsExpr.begin(), foundLocalsSignalsFromRhsExpr.end());
+        return foundLocalsSignalsFromLhsExpr;
+    } if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
+        return getAccessedLocalSignalsFromExpression(exprAsShiftExpr->lhs);
+    } if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableExpr != nullptr) {
+        if (isAccessedSignalLocalOfModule(exprAsVariableExpr->var)) {
+            return {exprAsVariableExpr->var};
+        }
+    }
+    return {};
+}
+
+void DeadStoreEliminator::markAssignmentsToLocalSignalAsRequiredForGlobalSideEffect(const syrec::VariableAccess::ptr& accessedLocalSignalParts, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingSignalAccess) {
+    if (liveStoresWithoutUsageInGlobalSideEffect.count(accessedLocalSignalParts->var->name) == 0) {
+        return;
+    }
+
+    auto& assignmentsForAccessedSignal = liveStoresWithoutUsageInGlobalSideEffect.at(accessedLocalSignalParts->var->name);
+    for (auto assignmentStmtIterator = assignmentsForAccessedSignal.begin(); assignmentStmtIterator != assignmentsForAccessedSignal.end();) {
+        if (isReachableInReverseControlFlowGraph(assignmentStmtIterator->indexInControlFlowGraph, indexOfStatementContainingSignalAccess) 
+            && doesAssignmentOverlapAnyAccessedPartOfSignal(assignmentStmtIterator->assignedToSignalParts, accessedLocalSignalParts)) {
+            assignmentStmtIterator = assignmentsForAccessedSignal.erase(assignmentStmtIterator); 
+        }
+        else {
+            ++assignmentStmtIterator;
+        }
+    }
+
+    if (assignmentsForAccessedSignal.empty()) {
+        liveStoresWithoutUsageInGlobalSideEffect.erase(accessedLocalSignalParts->var->name);
+    }
+}
+
+void DeadStoreEliminator::markPreviouslyDeadStoreAsLiveWithoutUsageInGlobalSideEffect(const syrec::VariableAccess::ptr& assignedToSignalParts, const AssignmentStatementIndexInControlFlowGraph& indexOfAssignmentStatement) {
+    if (liveStoresWithoutUsageInGlobalSideEffect.count(assignedToSignalParts->var->name) == 0) {
+        liveStoresWithoutUsageInGlobalSideEffect.insert(std::make_pair<std::string_view, std::vector<PotentiallyDeadAssignmentStatement>>(assignedToSignalParts->var->name, {}));
+    }
+    liveStoresWithoutUsageInGlobalSideEffect.at(assignedToSignalParts->var->name).emplace_back(assignedToSignalParts, indexOfAssignmentStatement.relativeStatementIndexPerControlBlock);
+}
+
+void DeadStoreEliminator::markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(const syrec::expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression) {
+    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
+        markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(exprAsBinaryExpr->lhs, indexOfStatementContainingExpression);
+        markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(exprAsBinaryExpr->rhs, indexOfStatementContainingExpression);
+    }
+    else if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableExpr != nullptr) {
+        markAccessedLocalSignalAsUsedInNonLocalAssignment(exprAsVariableExpr->var, indexOfStatementContainingExpression);
+    }
+    else if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
+        markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(exprAsShiftExpr->lhs, indexOfStatementContainingExpression);
+    }
+}
+
+void DeadStoreEliminator::markAccessedLocalSignalsInStatementAsUsedInNonLocalAssignment(const syrec::Statement::ptr& stmt, const AssignmentStatementIndexInControlFlowGraph& indexOfStatement) {
+    if (const auto& stmtAsAssignmentStmt = std::dynamic_pointer_cast<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
+        if (!isAccessedSignalLocalOfModule(stmtAsAssignmentStmt->lhs)) {
+            markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(stmtAsAssignmentStmt->rhs, indexOfStatement);
+        }
+    } else if (const auto& stmtAsCallStmt = std::dynamic_pointer_cast<syrec::CallStatement>(stmt); stmtAsCallStmt != nullptr) {
+        for (const auto& calleeArgument: stmtAsCallStmt->parameters) {
+            const auto& signalTableEntryForAccessedSignal = symbolTable->getVariable(calleeArgument);
+            if (!signalTableEntryForAccessedSignal.has_value() || !std::holds_alternative<syrec::Variable::ptr>(*signalTableEntryForAccessedSignal)) {
+                continue;
+            }
+            auto variableAccessForCalleeArgument = std::make_shared<syrec::VariableAccess>();
+            variableAccessForCalleeArgument->setVar(std::get<syrec::Variable::ptr>(signalTableEntryForAccessedSignal.value()));
+            if (isAccessedSignalLocalOfModule(variableAccessForCalleeArgument)) {
+                markAccessedLocalSignalAsUsedInNonLocalAssignment(variableAccessForCalleeArgument, indexOfStatement);   
+            }
+        }
+    } else if (const auto& stmtAsSwapStmt = std::dynamic_pointer_cast<syrec::SwapStatement>(stmt); stmtAsSwapStmt != nullptr) {
+        const bool isLhsSignalLocalToModule = isAccessedSignalLocalOfModule(stmtAsSwapStmt->lhs);
+        const bool isRhsSignalLocalToModule = isAccessedSignalLocalOfModule(stmtAsSwapStmt->rhs);
+
+        if (isLhsSignalLocalToModule ^ isRhsSignalLocalToModule && (isLhsSignalLocalToModule || isRhsSignalLocalToModule)) {
+            markAccessedLocalSignalAsUsedInNonLocalAssignment(stmtAsSwapStmt->lhs, indexOfStatement);
+            markAccessedLocalSignalAsUsedInNonLocalAssignment(stmtAsSwapStmt->rhs, indexOfStatement);    
+        }
+    } else if (const auto& stmtAsIfStmt = std::dynamic_pointer_cast<syrec::IfStatement>(stmt); stmtAsIfStmt != nullptr) {
+        markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(stmtAsIfStmt->condition, indexOfStatement);
+    }
+}
+
+void DeadStoreEliminator::markAccessedLocalSignalAsUsedInNonLocalAssignment(const syrec::VariableAccess::ptr& accessedSignal, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementDefiningAccess) {
+    if (!isAccessedSignalLocalOfModule(accessedSignal) || liveStoresWithoutUsageInGlobalSideEffect.count(accessedSignal->var->name) == 0) {
+        return;
+    }
+
+    markAssignmentsToLocalSignalAsRequiredForGlobalSideEffect(accessedSignal, indexOfStatementDefiningAccess);
+}
+
+bool DeadStoreEliminator::isAccessedSignalLocalOfModule(const syrec::VariableAccess::ptr& accessedSignal) const {
+    if (const auto& symbolTableEntryForAssignedToSignal = symbolTable->getVariable(accessedSignal->var->name); symbolTableEntryForAssignedToSignal.has_value()) {
+        if (std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForAssignedToSignal)) {
+            const auto& assignedToVariable = std::get<syrec::Variable::ptr>(*symbolTableEntryForAssignedToSignal);
+            return assignedToVariable->type == syrec::Variable::Types::Wire || assignedToVariable->type == syrec::Variable::Types::State;
+        }
+    }
+    return false;
+}
+
+void DeadStoreEliminator::addAssignmentsUsedOnlyInAssignmentsToLocalSignalsAsDeadStores() {
+    if (!liveStoresWithoutUsageInGlobalSideEffect.empty()) {
+        for (const auto& [_, assignmentsForSignal]: liveStoresWithoutUsageInGlobalSideEffect) {
+            for (const auto& assignment : assignmentsForSignal) {
+                insertPotentiallyDeadAssignmentStatement(assignment.assignedToSignalParts, assignment.indexInControlFlowGraph.relativeStatementIndexPerControlBlock);
+            }
+        }
+    }
+}
+

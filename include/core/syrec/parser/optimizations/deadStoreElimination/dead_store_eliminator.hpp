@@ -80,6 +80,7 @@ namespace deadStoreElimination {
          */
 
         std::map<std::string, std::vector<PotentiallyDeadAssignmentStatement>> assignmentStmtIndizesPerSignal;
+        std::map<std::string, std::vector<PotentiallyDeadAssignmentStatement>> liveStoresWithoutUsageInGlobalSideEffect;
         std::optional<AssignmentStatementIndexInControlFlowGraph>              indexOfLastProcessedStatementInControlFlowGraph;
         const parser::SymbolTable::ptr&                                        symbolTable;
         std::vector<std::shared_ptr<LivenessStatusLookupScope>>                livenessStatusScopes;
@@ -151,6 +152,21 @@ namespace deadStoreElimination {
         [[nodiscard]] bool doesLoopPerformMoreThanOneIteration(const std::shared_ptr<syrec::ForStatement>& loopStmt) const;
         void               markStatementAsProcessedInLoopBody(const syrec::Statement::ptr& stmt, std::size_t nestingLevelOfStmt);
         void               addInformationAboutLoopWithMoreThanOneStatement(const std::shared_ptr<syrec::ForStatement>& loopStmt, std::size_t nestingLevelOfStmt);
+        
+        [[nodiscard]] bool                                    doesAssignmentOverlapAnyAccessedPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalParts, const syrec::VariableAccess::ptr& accessedSignalParts) const;
+        [[nodiscard]] static bool                             doBitRangesOverlap(const optimizations::BitRangeAccessRestriction::BitRangeAccess& assignedToBitRange, const optimizations::BitRangeAccessRestriction::BitRangeAccess& accessedBitRange);
+        [[nodiscard]] static bool                             doDimensionAccessesOverlap(const std::vector<std::optional<unsigned>>& assignedToDimensionAccess, const std::vector<std::optional<unsigned int>>& accessedDimensionAccess);
+        [[nodiscard]] std::vector<syrec::VariableAccess::ptr> getAccessedLocalSignalsFromExpression(const syrec::expression::ptr& expr) const;
+
+        // TODO: Renaming of all calls below of this comment
+        void                                                  markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(const syrec::expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression);
+        void                                                  markAccessedLocalSignalsInStatementAsUsedInNonLocalAssignment(const syrec::Statement::ptr& stmt, const AssignmentStatementIndexInControlFlowGraph& indexOfStatement);
+        void                                                  markAccessedLocalSignalAsUsedInNonLocalAssignment(const syrec::VariableAccess::ptr& accessedSignal, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementDefiningAccess);
+        [[nodiscard]] bool                                    isAccessedSignalLocalOfModule(const syrec::VariableAccess::ptr& accessedSignal) const;
+
+        void                                                  markAssignmentsToLocalSignalAsRequiredForGlobalSideEffect(const syrec::VariableAccess::ptr& accessedLocalSignalParts, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingSignalAccess);
+        void                                                  markPreviouslyDeadStoreAsLiveWithoutUsageInGlobalSideEffect(const syrec::VariableAccess::ptr& assignedToSignalParts, const AssignmentStatementIndexInControlFlowGraph& indexOfAssignmentStatement);
+        void                                                  addAssignmentsUsedOnlyInAssignmentsToLocalSignalsAsDeadStores();
     };
 }
 #endif
