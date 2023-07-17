@@ -59,6 +59,7 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
                                     config.noAdditionalLineOptimizationEnabled,
                                     config.operationStrengthReductionEnabled,
                                     config.deadStoreEliminationEnabled,
+                                    config.combineRedundantInstructions,
                                     config.multiplicationSimplificationMethod,
                                     config.optionalLoopUnrollConfig,
                                     config.expectedMainModuleName));

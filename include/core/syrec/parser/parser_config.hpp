@@ -17,6 +17,7 @@ namespace parser {
         bool                                                 noAdditionalLineOptimizationEnabled;
         bool                                                 operationStrengthReductionEnabled;
         bool                                                 deadStoreEliminationEnabled;
+        bool                                                 combineRedundantInstructions;
         optimizations::MultiplicationSimplificationMethod    multiplicationSimplificationMethod;
         std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig;
         std::string  expectedMainModuleName;
@@ -31,6 +32,7 @@ namespace parser {
                 const bool         noAdditionalLineOptimizationEnabled         = false,
                 const bool         operationStrengthReductionEnabled           = false,
                 const bool deadStoreEliminationEnabled = false,
+                const bool combineRedundantInstructions = false,
                 const optimizations::MultiplicationSimplificationMethod multiplicationSimplificationMethod = optimizations::MultiplicationSimplificationMethod::None,
                 const std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig = std::nullopt,
                 std::string  expectedMainModuleName                      = "main"):
@@ -43,6 +45,7 @@ namespace parser {
                 noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
                 operationStrengthReductionEnabled(operationStrengthReductionEnabled),
                 deadStoreEliminationEnabled(deadStoreEliminationEnabled),
+                combineRedundantInstructions(combineRedundantInstructions),
                 multiplicationSimplificationMethod(multiplicationSimplificationMethod),
                 optionalLoopUnrollConfig(optionalLoopUnrollConfig),
                 expectedMainModuleName(std::move(expectedMainModuleName))
@@ -59,6 +62,7 @@ namespace parser {
             noAdditionalLineOptimizationEnabled          = copy.noAdditionalLineOptimizationEnabled;
             operationStrengthReductionEnabled            = copy.operationStrengthReductionEnabled;
             deadStoreEliminationEnabled                  = copy.deadStoreEliminationEnabled;
+            combineRedundantInstructions                 = copy.combineRedundantInstructions;
             multiplicationSimplificationMethod           = copy.multiplicationSimplificationMethod;
             if (copy.optionalLoopUnrollConfig.has_value()) {
                 optionalLoopUnrollConfig.emplace(*copy.optionalLoopUnrollConfig);

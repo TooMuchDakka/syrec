@@ -19,6 +19,7 @@ namespace syrec {
             bool                                                 noAdditionalLineOptimizationEnabled = false,
             bool                                                 operationStrengthReductionEnabled   = false,
             bool                                                 deadStoreEliminationEnabled         = false,
+            bool                                                 combineRedundantInstructions        = false,
             optimizations::MultiplicationSimplificationMethod multiplicationSimplificationMethod = optimizations::MultiplicationSimplificationMethod::None,
             std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig = std::nullopt,
             std::string expectedMainModuleName = "main"):
@@ -29,6 +30,7 @@ namespace syrec {
             noAdditionalLineOptimizationEnabled(noAdditionalLineOptimizationEnabled),
             operationStrengthReductionEnabled(operationStrengthReductionEnabled),
             deadStoreEliminationEnabled(deadStoreEliminationEnabled),
+            combineRedundantInstructions(combineRedundantInstructions),
             multiplicationSimplificationMethod(multiplicationSimplificationMethod),
             optionalLoopUnrollConfig(optionalLoopUnrollConfig),
             expectedMainModuleName(std::move(expectedMainModuleName))
@@ -41,6 +43,7 @@ namespace syrec {
         bool                                                 noAdditionalLineOptimizationEnabled;
         bool                                                 operationStrengthReductionEnabled;
         bool                                                 deadStoreEliminationEnabled;
+        bool                                                 combineRedundantInstructions;
         optimizations::MultiplicationSimplificationMethod    multiplicationSimplificationMethod;
         std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig;
         std::string                                          expectedMainModuleName;
@@ -54,6 +57,7 @@ namespace syrec {
             swap(noAdditionalLineOptimizationEnabled, other.noAdditionalLineOptimizationEnabled);
             swap(operationStrengthReductionEnabled, other.operationStrengthReductionEnabled);
             swap(deadStoreEliminationEnabled, other.deadStoreEliminationEnabled);
+            swap(combineRedundantInstructions, other.combineRedundantInstructions),
             swap(multiplicationSimplificationMethod, other.multiplicationSimplificationMethod);
             if (other.optionalLoopUnrollConfig.has_value()) {
                 optionalLoopUnrollConfig.emplace(*other.optionalLoopUnrollConfig);

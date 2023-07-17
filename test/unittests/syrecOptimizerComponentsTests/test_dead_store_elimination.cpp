@@ -20,7 +20,7 @@ protected:
 
     syrec::ReadProgramSettings getDefaultParserConfig() override {
         //const auto loopUnrollConfig = std::make_optional(optimizations::LoopOptimizationConfig(2, 2, UINT_MAX, true, false));
-        return syrec::ReadProgramSettings(defaultSignalBitwidth, false, true, false, false, false, true, optimizations::MultiplicationSimplificationMethod::None, std::nullopt);
+        return syrec::ReadProgramSettings(defaultSignalBitwidth, false, true, false, false, false, true, false, optimizations::MultiplicationSimplificationMethod::None, std::nullopt);
     }
 };
 
