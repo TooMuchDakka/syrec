@@ -1624,11 +1624,18 @@ void SyReCStatementVisitor::removeLoopVariableAndMakeItsValueUnavailableForEvalu
 }
 
 bool SyReCStatementVisitor::doesModuleOnlyConsistOfSkipStatements(const syrec::Module::ptr& calledModule) {
+    /*
+     * Since we have no other way than this 'hack' to differentiate whether a given Statement struct has the specific subtype 'SkipStatement' that is not
+     * define as a variant of the statement struct but rather as a type alias of the base statement struct, we have to use the typeid at runtime for
+     * this distinction (we cannot use the std::dynamic_pointer_cast function to perform this check since the sidecast between a subtype and the base type does always work).
+     *
+     */
+    const auto& typeIdOfSkipStatement = typeid(std::make_shared<syrec::SkipStatement>());
     return std::all_of(
     calledModule->statements.cbegin(),
     calledModule->statements.cend(),
-    [](const syrec::Statement::ptr& statement) {
-        return std::dynamic_pointer_cast<syrec::SkipStatement>(statement) != nullptr;
+    [&typeIdOfSkipStatement](const syrec::Statement::ptr& statement) {
+        return typeid(statement.get()) == typeIdOfSkipStatement;
     });
 }
 
