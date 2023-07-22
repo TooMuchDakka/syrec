@@ -46,6 +46,7 @@ namespace syrec_operation {
     [[nodiscard]] std::optional<unsigned int> apply(operation operation, unsigned int operand) noexcept;
     [[nodiscard]] bool                        isCommutative(operation operation) noexcept;
     [[nodiscard]] std::optional<operation>    invert(operation operation) noexcept;
+    [[nodiscard]] std::optional<operation>    getMatchingAssignmentOperationForOperation(operation operation) noexcept;
 };
 
 #endif

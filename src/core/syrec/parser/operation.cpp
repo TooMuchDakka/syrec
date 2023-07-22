@@ -225,3 +225,16 @@ std::optional<operation> syrec_operation::invert(operation operation) noexcept {
     }
     return mappedToInverseOperation;
 }
+
+std::optional<operation> syrec_operation::getMatchingAssignmentOperationForOperation(operation operation) noexcept {
+    switch (operation) {
+        case operation::addition:
+            return std::make_optional(operation::add_assign);
+        case operation::subtraction:
+            return std::make_optional(operation::minus_assign);
+        case operation::bitwise_xor:
+            return std::make_optional(operation::xor_assign);
+        default:
+            return std::nullopt;
+    }
+}
