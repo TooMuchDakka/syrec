@@ -6,14 +6,9 @@ BaseAssignmentSimplifier::~BaseAssignmentSimplifier() = default;
 
 syrec::Statement::vec BaseAssignmentSimplifier::simplify(const syrec::AssignStatement::ptr& assignmentStmt) {
     const auto& assignStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
-    if (assignStmtCasted == nullptr) {
+    if (assignStmtCasted == nullptr || !simplificationPrecondition(assignmentStmt)) {
         return {};
     }
-    const auto preconditionStatus = isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(assignStmtCasted->rhs);
-    if (!preconditionStatus.has_value()) {
-        return {};
-    }
-
     return simplifyWithoutPreconditionCheck(assignmentStmt);
 }
 

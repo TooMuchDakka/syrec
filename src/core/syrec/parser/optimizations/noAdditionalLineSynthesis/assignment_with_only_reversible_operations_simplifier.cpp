@@ -17,7 +17,7 @@ syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplify
     return {};
 }
 
-syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplifyWithoutPreconditionCheck(syrec::BinaryExpression::ptr& expr) {
+syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplifyWithoutPreconditionCheck(const syrec::BinaryExpression::ptr& expr) {
     const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     if (exprAsBinaryExpr == nullptr) {
         return {};
@@ -81,10 +81,7 @@ bool AssignmentWithOnlyReversibleOperationsSimplifier::simplificationPreconditio
     }
 
     const auto preconditionStatus = isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(assignStmtCasted->rhs);
-    if (!preconditionStatus.has_value()) {
-        return false;
-    }
-    return true;
+    return preconditionStatus.has_value() && *preconditionStatus;
 }
 
 //

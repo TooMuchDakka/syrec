@@ -1,6 +1,7 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/simple_additional_line_for_assignment_reducer.hpp"
 
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_only_reversible_operations_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_reversible_ops_and_multilevel_signal_occurrence_simplifier.hpp"
 
 using namespace noAdditionalLineSynthesis;
 
@@ -60,8 +61,19 @@ syrec::AssignStatement::vec SimpleAdditionalLineForAssignmentReducer::tryReduceR
         //    */
         //    return {};
         //}
+
+        /*
+         * Apply rule R1
+         */
         const auto& assignmentStmtSimplifier = std::make_unique<AssignmentWithOnlyReversibleOperationsSimplifier>(symbolTable);
-        return assignmentStmtSimplifier->simplify(assignmentStmt);
+        if (const auto& generatedAssignments     = assignmentStmtSimplifier->simplify(assignmentStmt); !generatedAssignments.empty()) {
+            return generatedAssignments;   
+        }
+        const auto& assignmentStmtSimplifierWithNonUniqueSignalAccesses = std::make_unique<AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence>(symbolTable);
+        if (const auto& generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses = assignmentStmtSimplifierWithNonUniqueSignalAccesses->simplify(assignmentStmt); !generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses.empty()) {
+            return generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses;
+        }
+        return {};
     }
 
     syrec::expression::ptr     lhsExprOfTopMostExprOfAssignmentRhs;
@@ -82,7 +94,7 @@ syrec::AssignStatement::vec SimpleAdditionalLineForAssignmentReducer::tryReduceR
 
     syrec::AssignStatement::vec generatedAssignments;
     if ((isLhsSignalAccessOfAssignmentRhs ^ isRhsSignalAccessOfAssignmentRhs) && assignmentStmtRhsExprAsBinaryExpr != nullptr && syrec_operation::invert(*topMostOperationNodeOfRhsExpr).has_value()) {
-        bool       isLhsRelevantSignalAccess;
+        bool isLhsRelevantSignalAccess = false;
         if (const auto exprContainingSignalAccessDefinedOnlyOnceInExpr = findExpressionContainingSignalAccessDefinedOnlyOnceInAssignmentRhs(assignmentStmtRhsExprAsBinaryExpr->rhs, isLhsRelevantSignalAccess); exprContainingSignalAccessDefinedOnlyOnceInExpr.has_value()) {
             if (const auto relevantExprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(*exprContainingSignalAccessDefinedOnlyOnceInExpr); relevantExprAsBinaryExpr != nullptr) {
                 const auto relevantVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(isLhsRelevantSignalAccess ? relevantExprAsBinaryExpr->lhs : relevantExprAsBinaryExpr->rhs);
@@ -460,7 +472,6 @@ void SimpleAdditionalLineForAssignmentReducer::createLookupForSignalsNotUsableAs
 bool SimpleAdditionalLineForAssignmentReducer::doesAssignmentToAccessedSignalPartsAlreadyExists(const syrec::VariableAccess::ptr& accessedSignalParts) const {
     return false;
 }
-
 
 // TODO: Implement me
 std::optional<syrec::VariableAccess::ptr> SimpleAdditionalLineForAssignmentReducer::tryCreateSubstituteForExpr(const syrec::expression::ptr& expr, const LookupOfExcludedSignalsForReplacement& signalPartsToExcludeAsPotentialReplacements) {
