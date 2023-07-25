@@ -17,7 +17,6 @@ namespace noAdditionalLineSynthesis {
     private:
         [[nodiscard]] syrec::Statement::vec                            simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt) override;
         [[nodiscard]] static bool                                      isXorOperationOnlyDefinedForLeaveNodesInAST(const syrec::expression::ptr& binaryExpr);
-        //[[nodiscard]] static syrec_operation::operation                determineRequiredAssignmentOperation(syrec_operation::operation topMostAssignmentOperation, syrec_operation::operation operationNodeOperation);
         [[nodiscard]] static unsigned int                              mapAssignmentOperationEnumValueToFlag(syrec_operation::operation assignmentOperation);
         [[nodiscard]] static std::optional<syrec_operation::operation> tryMapBinaryOperationFlagToCorrespondingAssignmentOperationEnumValue(unsigned int operationFlag);
         [[nodiscard]] static std::optional<syrec_operation::operation> tryMapAssignmentOperationFlagToEnum(unsigned int operationFlag);

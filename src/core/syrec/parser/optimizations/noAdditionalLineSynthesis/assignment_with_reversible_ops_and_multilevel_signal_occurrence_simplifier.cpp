@@ -1,5 +1,4 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_reversible_ops_and_multilevel_signal_occurrence_simplifier.hpp"
-
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/post_order_expr_traversal_helper.hpp"
 
 using namespace noAdditionalLineSynthesis;
@@ -32,9 +31,9 @@ syrec::Statement::vec AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::
         assignmentStmtCasted->rhs
     );
     
-    const syrec_operation::operation                                         topMostAssignmentStatement       = *tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op);
+    const syrec_operation::operation                                         initialAssignmentOperation       = *tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op);
     std::optional<PostOrderExprTraversalHelper::PostOrderTraversalNode::ptr> potentialNextSignalAccess        = exprTraversalHelper->getNextElement();
-    //bool                                                                     wasFirstExprInPostOrderProcessed = false;
+    bool                                                                     wasFirstExprInPostOrderProcessed = false;
 
     // TODO: Since this case should not happen, do we need this check ?
     if (!potentialNextSignalAccess.has_value()) {
@@ -43,14 +42,14 @@ syrec::Statement::vec AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::
 
     do {
         const auto& nextSignalAccessInPostOrder = *potentialNextSignalAccess;
-        auto assignmentOperationToUse    = topMostAssignmentStatement;
+        auto assignmentOperationToUse    = initialAssignmentOperation;
 
         syrec::expression::ptr assignmentRhsExpr;
         if (exprTraversalHelper->areBothOperandsOfOperationNodeLeaves(nextSignalAccessInPostOrder)) {
             const auto& rhsOperand = exprTraversalHelper->getNextElement();
             assignmentRhsExpr             = std::make_shared<syrec::BinaryExpression>(
                 std::make_shared<syrec::VariableExpression>(nextSignalAccessInPostOrder->signalAccess),
-                    mapAssignmentOperationEnumValueToFlag(exprTraversalHelper->getOperationOfParent(nextSignalAccessInPostOrder)),
+                mapAssignmentOperationEnumValueToFlag(*syrec_operation::getMatchingAssignmentOperationForOperation(exprTraversalHelper->getOperationOfParent(nextSignalAccessInPostOrder))),
                 std::make_shared<syrec::VariableExpression>(rhsOperand.value()->signalAccess));
 
             if (const auto& requiredAssignmentOperationForSubexpression = exprTraversalHelper->tryGetRequiredAssignmentOperation(*potentialNextSignalAccess); requiredAssignmentOperationForSubexpression.has_value()) {
@@ -58,47 +57,37 @@ syrec::Statement::vec AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::
             } else {
                 if (const auto& grandParentOperation = exprTraversalHelper->getOperationOfGrandParent(nextSignalAccessInPostOrder); grandParentOperation.has_value()) {
                     assignmentOperationToUse = *syrec_operation::getMatchingAssignmentOperationForOperation(*grandParentOperation);
-                } else {
-                    assignmentOperationToUse = topMostAssignmentStatement;
                 }
             }
-
-            //assignmentOperationToUse = *exprTraversalHelper->tryGetRequiredAssignmentOperation(*potentialNextSignalAccess);
-            //assignmentOperationToUse = *syrec_operation::getMatchingAssignmentOperationForOperation(*exprTraversalHelper->getOperationOfGrandParent(nextSignalAccessInPostOrder));
-
         } else {
             assignmentRhsExpr = std::make_shared<syrec::VariableExpression>(nextSignalAccessInPostOrder->signalAccess);
             if (const auto& requiredAssignmentOperationForSubexpression = exprTraversalHelper->tryGetRequiredAssignmentOperation(*potentialNextSignalAccess); requiredAssignmentOperationForSubexpression.has_value()) {
                 assignmentOperationToUse = *requiredAssignmentOperationForSubexpression;
             } else {
-                /*
-                 * When the assignment operation was defined as '-=', the leaf of an operation nodes (with binary operation b_op) with only one leaf as its operands
-                 * will get added as the assignment statement assignment_lhs b_op^(-1)= leaf
-                 */
-                /*assignmentOperationToUse = *syrec_operation::getMatchingAssignmentOperationForOperation(
-                    topMostAssignmentStatement == syrec_operation::operation::minus_assign
-                    ? *syrec_operation::invert(exprTraversalHelper->getOperationOfParent(nextSignalAccessInPostOrder))
-                    : exprTraversalHelper->getOperationOfParent(nextSignalAccessInPostOrder)
-                );*/
                 assignmentOperationToUse = *syrec_operation::getMatchingAssignmentOperationForOperation(exprTraversalHelper->getOperationOfParent(nextSignalAccessInPostOrder));
-
             }
+        }
+
+        // When we are adding the top most expression of the rhs expr of the initial assignment statement we need to reuse the assignment operation of the assignment statement
+        if (!wasFirstExprInPostOrderProcessed) {
+            assignmentOperationToUse = initialAssignmentOperation;
+            wasFirstExprInPostOrderProcessed = true;
+        } else {
+            /*
+             * When the assignment operation was defined as '-=', the value of the current operation node (with binary operation b_op) will get inverted and thus the assignment statement: assignment_lhs b_op^(-1)= leaf will be created
+             */
+            assignmentOperationToUse = initialAssignmentOperation == syrec_operation::operation::minus_assign
+                ? *syrec_operation::invert(assignmentOperationToUse)
+                : assignmentOperationToUse;
         }
 
         const auto& generatedAssignmentStmt = std::make_shared<syrec::AssignStatement>(
                 assignmentStmtCasted->lhs,
                 mapAssignmentOperationEnumValueToFlag(assignmentOperationToUse),
                 assignmentRhsExpr);
-
-        /*const auto& generatedAssignmentStmt = std::make_shared<syrec::AssignStatement>(
-            assignmentStmtCasted->lhs,
-                mapAssignmentOperationEnumValueToFlag(wasFirstExprInPostOrderProcessed ? determineRequiredAssignmentOperation(topMostAssignmentStatement, assignmentOperationToUse) : assignmentOperationToUse),
-            assignmentRhsExpr
-        );*/
         generatedAssignments.emplace_back(generatedAssignmentStmt);
 
         potentialNextSignalAccess        = exprTraversalHelper->getNextElement();
-        //wasFirstExprInPostOrderProcessed = true;
     } while (potentialNextSignalAccess.has_value());
     return generatedAssignments;
 }
@@ -109,11 +98,6 @@ bool AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::isXorOperationOnl
     }
     return true;
 }
-
-//syrec_operation::operation AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::determineRequiredAssignmentOperation(syrec_operation::operation topMostAssignmentOperation, syrec_operation::operation operationNodeOperation) {
-//    // We are assuming that the assignment to simplify consists of only reversible operations and thus the invert operation should return a valid operation
-//    return topMostAssignmentOperation == syrec_operation::operation::minus_assign ? *syrec_operation::invert(operationNodeOperation) : operationNodeOperation;
-//}
 
 unsigned int AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::mapAssignmentOperationEnumValueToFlag(syrec_operation::operation assignmentOperation) {
     // We are assuming that the assignment to simplify consists of only reversible operations
