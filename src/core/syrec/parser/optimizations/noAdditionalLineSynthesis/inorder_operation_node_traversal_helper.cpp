@@ -2,19 +2,27 @@
 
 using namespace noAdditionalLineSynthesis;
 
-std::optional<syrec::NumericExpression::ptr> InorderOperationNodeTraversalHelper::OperationNodeLeaf::getAsNumber()  const {
+std::optional<std::shared_ptr<syrec::NumericExpression>> InorderOperationNodeTraversalHelper::OperationNodeLeaf::getAsNumber()  const {
     if (std::holds_alternative<std::shared_ptr<syrec::NumericExpression>>(nodeVariantData)) {
         return std::make_optional(std::get<std::shared_ptr<syrec::NumericExpression>>(nodeVariantData));
     }
     return std::nullopt;
 }
 
-std::optional<syrec::VariableExpression::ptr> InorderOperationNodeTraversalHelper::OperationNodeLeaf::getAsSignalAccess() const {
+std::optional<std::shared_ptr<syrec::VariableExpression>> InorderOperationNodeTraversalHelper::OperationNodeLeaf::getAsSignalAccess() const {
     if (std::holds_alternative<std::shared_ptr<syrec::VariableExpression>>(nodeVariantData)) {
         return std::make_optional(std::get<std::shared_ptr<syrec::VariableExpression>>(nodeVariantData));
     }
     return std::nullopt;
 }
+
+syrec::expression::ptr InorderOperationNodeTraversalHelper::OperationNodeLeaf::getData() const {
+    if (const auto& dataAsSignalAccess = getAsSignalAccess(); dataAsSignalAccess.has_value()) {
+        return *dataAsSignalAccess;
+    }
+    return *getAsNumber();
+}
+
 
 std::optional<InorderOperationNodeTraversalHelper::OperationNodeReference> InorderOperationNodeTraversalHelper::getNextOperationNode() {
     while (!operationNodeTraversalQueue.empty()) {
@@ -25,27 +33,52 @@ std::optional<InorderOperationNodeTraversalHelper::OperationNodeReference> Inord
     return std::nullopt;
 }
 
-void InorderOperationNodeTraversalHelper::buildOperationNodesQueue(const syrec::expression::ptr& expr) {
-    buildOperationNode(expr);
+std::optional<InorderOperationNodeTraversalHelper::OperationNodeReference> InorderOperationNodeTraversalHelper::peekNextOperationNode() const {
+    if (operationNodeTraversalQueue.empty()) {
+        return std::nullopt;
+    }
+    return std::make_optional(operationNodesLookup.at(operationNodeTraversalQueue.front()));
 }
 
-InorderOperationNodeTraversalHelper::TraversalNode InorderOperationNodeTraversalHelper::buildOperationNode(const syrec::expression::ptr& expr) {
+std::optional<std::size_t> InorderOperationNodeTraversalHelper::getNodeIdOfLastOperationIdOfCurrentSubexpression() const {
+    if (operationNodeTraversalQueue.empty()) {
+        return std::nullopt;
+    }
+
+    const auto& nextOperationNode = operationNodesLookup.at(operationNodeTraversalQueue.front());
+    if (!nextOperationNode->parentNodeId.has_value()) {
+        return std::make_optional(operationNodeTraversalQueue.front());
+    }
+
+    const auto& parentOperationNode = operationNodesLookup.at(*nextOperationNode->parentNodeId);
+    if (parentOperationNode->lhs.nodeId == nextOperationNode->nodeId) {
+        return parentOperationNode->rhs.nodeId - 1;
+    }
+    return parentOperationNode->lhs.nodeId - 1;
+}
+
+
+void InorderOperationNodeTraversalHelper::buildOperationNodesQueue(const syrec::expression::ptr& expr) {
+    buildOperationNode(expr, std::nullopt);
+}
+
+InorderOperationNodeTraversalHelper::TraversalNode InorderOperationNodeTraversalHelper::buildOperationNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentNodeId) {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         const auto operationNodeId = operationNodeIdCounter++;
         operationNodeTraversalQueue.emplace(operationNodeId);
-        const auto& lhsNode = buildOperationNode(exprAsBinaryExpr->lhs);
-        const auto& rhsNode = buildOperationNode(exprAsBinaryExpr->rhs);
-        const auto& mappedBinaryOperation = *tryMapBinaryExprOperationFlagToEnum(exprAsBinaryExpr);
-        operationNodesLookup.insert(std::make_pair(operationNodeId, std::make_shared<OperationNode>(operationNodeId, mappedBinaryOperation, lhsNode, rhsNode)));
+        const auto& lhsNode = buildOperationNode(exprAsBinaryExpr->lhs, std::make_optional(operationNodeId));
+        const auto& rhsNode               = buildOperationNode(exprAsBinaryExpr->rhs, std::make_optional(operationNodeId));
+        const auto& mappedBinaryOperation = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+        operationNodesLookup.insert(std::make_pair(operationNodeId, std::make_shared<OperationNode>(operationNodeId, parentNodeId, mappedBinaryOperation, lhsNode, rhsNode)));
         return TraversalNode(operationNodeId, true);
     }
     if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
         const auto operationNodeId = operationNodeIdCounter++;
         operationNodeTraversalQueue.emplace(operationNodeId);
-        const auto& lhsNode               = buildOperationNode(exprAsShiftExpr->lhs);
+        const auto& lhsNode               = buildOperationNode(exprAsShiftExpr->lhs, std::make_optional(operationNodeId));
         const auto& rhsNode              = buildOperationNode(exprAsShiftExpr->rhs, determineBitwidthOfExpr(exprAsShiftExpr->lhs));
-        const auto& mappedShiftOperation  = *tryMapShiftOperationExprFlagToEnum(exprAsShiftExpr);
-        operationNodesLookup.insert(std::make_pair(operationNodeId, std::make_shared<OperationNode>(operationNodeId, mappedShiftOperation, lhsNode, rhsNode)));
+        const auto& mappedShiftOperation  = *syrec_operation::tryMapShiftOperationFlagToEnum(exprAsShiftExpr->op);
+        operationNodesLookup.insert(std::make_pair(operationNodeId, std::make_shared<OperationNode>(operationNodeId, parentNodeId, mappedShiftOperation, lhsNode, rhsNode)));
         return TraversalNode(operationNodeId, true);
     }
 
@@ -60,6 +93,17 @@ InorderOperationNodeTraversalHelper::TraversalNode InorderOperationNodeTraversal
     }
     leafNodesLookup.insert(std::make_pair(leafNodeId, std::make_shared<OperationNodeLeaf>(leafNodeId, leafNodeData)));
     return TraversalNode(leafNodeId, false);
+}
+
+std::optional<InorderOperationNodeTraversalHelper::OperationNodeLeafReference> InorderOperationNodeTraversalHelper::getLeafNodeOfOperationNode(const OperationNodeReference& operationNode) const {
+    if (operationNode->lhs.isOperationNode && operationNode->rhs.isOperationNode) {
+        return std::nullopt;
+    }
+    return std::make_optional(leafNodesLookup.at(!operationNode->lhs.isOperationNode ? operationNode->lhs.nodeId : operationNode->rhs.nodeId));
+}
+
+std::optional<InorderOperationNodeTraversalHelper::OperationNodeReference> InorderOperationNodeTraversalHelper::getOperationNodeForId(std::size_t operationNodeId) const {
+    return operationNodeId < operationNodesLookup.size() ? std::make_optional(operationNodesLookup.at(operationNodeId)) : std::nullopt;
 }
 
 InorderOperationNodeTraversalHelper::TraversalNode InorderOperationNodeTraversalHelper::buildOperationNode(const syrec::Number::ptr& number, unsigned int expectedBitwidthOfOperation) {
@@ -84,62 +128,6 @@ std::optional<std::pair<InorderOperationNodeTraversalHelper::OperationNodeLeafRe
         return std::nullopt;
     }
     return std::make_optional(std::make_pair(leafNodesLookup.at(operationNode->lhs.nodeId), leafNodesLookup.at(operationNode->rhs.nodeId)));
-}
-
-std::optional<InorderOperationNodeTraversalHelper::OperationNodeLeafReference> InorderOperationNodeTraversalHelper::getLeafNodeOfOperationNode(const OperationNodeReference& operationNode, bool fetchLeftOperand) const {
-    if ((fetchLeftOperand && operationNode->lhs.isOperationNode) || (!fetchLeftOperand && operationNode->rhs.isOperationNode)) {
-        return std::nullopt;
-    }
-    return std::make_optional(leafNodesLookup.at(fetchLeftOperand ? operationNode->lhs.nodeId : operationNode->rhs.nodeId));
-}
-
-std::optional<InorderOperationNodeTraversalHelper::OperationNodeReference> InorderOperationNodeTraversalHelper::getOperationNodeForId(std::size_t operationNodeId) const {
-    return operationNodeId < operationNodesLookup.size() ? std::make_optional(operationNodesLookup.at(operationNodeId)) : std::nullopt;
-}
-
-std::optional<syrec_operation::operation> InorderOperationNodeTraversalHelper::tryMapShiftOperationExprFlagToEnum(const std::shared_ptr<syrec::ShiftExpression>& shiftExpr) {
-    return std::make_optional(shiftExpr->op == syrec::ShiftExpression::Left ? syrec_operation::operation::shift_left : syrec_operation::operation::shift_right);
-}
-
-std::optional<syrec_operation::operation> InorderOperationNodeTraversalHelper::tryMapBinaryExprOperationFlagToEnum(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
-    switch (binaryExpr->op) {
-        case syrec::BinaryExpression::Add:
-            return std::make_optional(syrec_operation::operation::addition);
-        case syrec::BinaryExpression::Subtract:
-            return std::make_optional(syrec_operation::operation::subtraction);
-        case syrec::BinaryExpression::Multiply:
-            return std::make_optional(syrec_operation::operation::multiplication);
-        case syrec::BinaryExpression::Divide:
-            return std::make_optional(syrec_operation::operation::division);
-        case syrec::BinaryExpression::Modulo:
-            return std::make_optional(syrec_operation::operation::modulo);
-        case syrec::BinaryExpression::LogicalAnd:
-            return std::make_optional(syrec_operation::operation::logical_and);
-        case syrec::BinaryExpression::LogicalOr:
-            return std::make_optional(syrec_operation::operation::logical_or);
-        case syrec::BinaryExpression::BitwiseAnd:
-            return std::make_optional(syrec_operation::operation::bitwise_and);
-        case syrec::BinaryExpression::BitwiseOr:
-            return std::make_optional(syrec_operation::operation::bitwise_or);
-        case syrec::BinaryExpression::Exor:
-            return std::make_optional(syrec_operation::operation::bitwise_xor);
-        case syrec::BinaryExpression::FracDivide:
-            return std::make_optional(syrec_operation::operation::upper_bits_multiplication);
-        case syrec::BinaryExpression::LessThan:
-            return std::make_optional(syrec_operation::operation::less_than);
-        case syrec::BinaryExpression::GreaterThan:
-            return std::make_optional(syrec_operation::operation::greater_than);
-        case syrec::BinaryExpression::LessEquals:
-            return std::make_optional(syrec_operation::operation::less_than);
-        case syrec::BinaryExpression::GreaterEquals:
-            return std::make_optional(syrec_operation::operation::greater_equals);
-        case syrec::BinaryExpression::Equals:
-            return std::make_optional(syrec_operation::operation::equals);
-        case syrec::BinaryExpression::NotEquals:
-            return std::make_optional(syrec_operation::operation::not_equals);
-        default:
-            return std::nullopt;
-    }
 }
 
 bool InorderOperationNodeTraversalHelper::doesExprDefineSignalAccess(const syrec::expression::ptr& expr) {
@@ -168,4 +156,21 @@ unsigned InorderOperationNodeTraversalHelper::determineBitwidthOfSignalAccess(co
         return signalAccess->range->second->evaluate({}) - signalAccess->range->first->evaluate({});
     }
     return symbolTableEntryForSignal->bitwidth;
+}
+
+unsigned InorderOperationNodeTraversalHelper::mapBinaryOperationValueToFlag(syrec_operation::operation operation) {
+    switch (operation) {
+        
+    }
+}
+
+unsigned InorderOperationNodeTraversalHelper::mapAssignmentEnumValueToFlag(syrec_operation::operation operation) {
+    switch (operation) {
+        case syrec_operation::operation::AddAssign:
+            return syrec::AssignStatement::Add;
+        case syrec_operation::operation::MinusAssign:
+            return syrec::AssignStatement::Subtract;
+        default:
+            return syrec::AssignStatement::Exor; 
+    }
 }

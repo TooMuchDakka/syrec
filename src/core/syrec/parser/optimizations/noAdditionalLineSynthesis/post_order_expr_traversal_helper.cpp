@@ -68,11 +68,11 @@ syrec_operation::operation PostOrderExprTraversalHelper::mapBinaryExprOperationT
     const auto& binaryExprCasted = std::dynamic_pointer_cast<syrec::BinaryExpression>(binaryExpr);
     switch (binaryExprCasted->op) {
         case syrec::BinaryExpression::Add:
-            return syrec_operation::operation::addition;
+            return syrec_operation::operation::Addition;
         case syrec::BinaryExpression::Subtract:
-            return syrec_operation::operation::subtraction;
+            return syrec_operation::operation::Subtraction;
         default:
-            return syrec_operation::operation::bitwise_xor;
+            return syrec_operation::operation::BitwiseXor;
     }
 }
 
@@ -150,5 +150,5 @@ std::size_t PostOrderExprTraversalHelper::fetchAndIncrementOperationNodeIdx() {
 }
 
 void PostOrderExprTraversalHelper::createBlankOperationNode() {
-    operationNodes.emplace_back(OperationNode(syrec_operation::operation::addition, std::nullopt, BaseNodeIdx(0, false), BaseNodeIdx(0, false)));
+    operationNodes.emplace_back(OperationNode(syrec_operation::operation::Addition, std::nullopt, BaseNodeIdx(0, false), BaseNodeIdx(0, false)));
 }

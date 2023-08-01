@@ -182,7 +182,7 @@ namespace syrec {
             /**
          * @brief Multiplication (most significant bits)
          *
-         * Performs multiplication and returns the n most significant bits, where n is the bit-width of lhs() and rhs()
+         * Performs Multiplication and returns the n most significant bits, where n is the bit-width of lhs() and rhs()
          */
             FracDivide,
 

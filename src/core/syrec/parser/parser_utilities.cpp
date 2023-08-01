@@ -57,148 +57,148 @@ std::optional<unsigned int> ParserUtilities::convertToNumber(const std::string& 
     }
 }
 
-std::optional<unsigned int> ParserUtilities::mapOperationToInternalFlag(const syrec_operation::operation& operation) {
-    std::optional<unsigned int> internalOperationFlag;
-
-    switch (operation) {
-        case syrec_operation::operation::add_assign:
-            internalOperationFlag.emplace(syrec::AssignStatement::Add);
-            break;
-        case syrec_operation::operation::minus_assign:
-            internalOperationFlag.emplace(syrec::AssignStatement::Subtract);
-            break;
-        case syrec_operation::operation::xor_assign:
-            internalOperationFlag.emplace(syrec::AssignStatement::Exor);
-            break;
-        case syrec_operation::operation::increment_assign:
-            internalOperationFlag.emplace(syrec::UnaryStatement::Increment);
-            break;
-        case syrec_operation::operation::decrement_assign:
-            internalOperationFlag.emplace(syrec::UnaryStatement::Decrement);
-            break;
-        case syrec_operation::operation::invert_assign:
-            internalOperationFlag.emplace(syrec::UnaryStatement::Invert);
-            break;
-        case syrec_operation::operation::shift_left:
-            internalOperationFlag.emplace(syrec::ShiftExpression::Left);
-            break;
-        case syrec_operation::operation::shift_right:
-            internalOperationFlag.emplace(syrec::ShiftExpression::Right);
-            break;
-        case syrec_operation::operation::addition:
-            internalOperationFlag.emplace(syrec::BinaryExpression::Add);
-            break;
-        case syrec_operation::operation::subtraction:
-            internalOperationFlag.emplace(syrec::BinaryExpression::Subtract);
-            break;
-        case syrec_operation::operation::multiplication:
-            internalOperationFlag.emplace(syrec::BinaryExpression::Multiply);
-            break;
-        case syrec_operation::operation::division:
-            internalOperationFlag.emplace(syrec::BinaryExpression::Divide);
-            break;
-        case syrec_operation::operation::modulo:
-            internalOperationFlag.emplace(syrec::BinaryExpression::Modulo);
-            break;
-        case syrec_operation::operation::upper_bits_multiplication:
-            internalOperationFlag.emplace(syrec::BinaryExpression::FracDivide);
-            break;
-        case syrec_operation::operation::bitwise_xor:
-            internalOperationFlag.emplace(syrec::BinaryExpression::Exor);
-            break;
-        case syrec_operation::operation::logical_and:
-            internalOperationFlag.emplace(syrec::BinaryExpression::LogicalAnd);
-            break;
-        case syrec_operation::operation::logical_or:
-            internalOperationFlag.emplace(syrec::BinaryExpression::LogicalOr);
-            break;
-        case syrec_operation::operation::bitwise_and:
-            internalOperationFlag.emplace(syrec::BinaryExpression::BitwiseAnd);
-            break;
-        case syrec_operation::operation::bitwise_or:
-            internalOperationFlag.emplace(syrec::BinaryExpression::BitwiseOr);
-            break;
-        case syrec_operation::operation::less_than:
-            internalOperationFlag.emplace(syrec::BinaryExpression::LessThan);
-            break;
-        case syrec_operation::operation::greater_than:
-            internalOperationFlag.emplace(syrec::BinaryExpression::GreaterThan);
-            break;
-        case syrec_operation::operation::equals:
-            internalOperationFlag.emplace(syrec::BinaryExpression::Equals);
-            break;
-        case syrec_operation::operation::not_equals:
-            internalOperationFlag.emplace(syrec::BinaryExpression::NotEquals);
-            break;
-        case syrec_operation::operation::less_equals:
-            internalOperationFlag.emplace(syrec::BinaryExpression::LessEquals);
-            break;
-        case syrec_operation::operation::greater_equals:
-            internalOperationFlag.emplace(syrec::BinaryExpression::GreaterEquals);
-            break;
-        default:
-            break;
-    }
-    return internalOperationFlag;
-}
-
-std::optional<syrec_operation::operation> ParserUtilities::mapInternalBinaryOperationFlagToEnum(const unsigned int& internalOperationFlag) {
-    std::optional<syrec_operation::operation> mappedToEnumValue;
-
-    switch (internalOperationFlag) {
-        case syrec::BinaryExpression::Add:
-            mappedToEnumValue.emplace(syrec_operation::operation::addition);
-            break;
-        case syrec::BinaryExpression::BitwiseAnd:
-            mappedToEnumValue.emplace(syrec_operation::operation::bitwise_and);
-            break;
-        case syrec::BinaryExpression::BitwiseOr:
-            mappedToEnumValue.emplace(syrec_operation::operation::bitwise_or);
-            break;
-        case syrec::BinaryExpression::Divide:
-            mappedToEnumValue.emplace(syrec_operation::operation::division);
-            break;
-        case syrec::BinaryExpression::Equals:
-            mappedToEnumValue.emplace(syrec_operation::operation::equals);
-            break;
-        case syrec::BinaryExpression::Exor:
-            mappedToEnumValue.emplace(syrec_operation::operation::bitwise_xor);
-            break;
-        case syrec::BinaryExpression::FracDivide:
-            mappedToEnumValue.emplace(syrec_operation::operation::upper_bits_multiplication);
-            break;
-        case syrec::BinaryExpression::GreaterEquals:
-            mappedToEnumValue.emplace(syrec_operation::operation::greater_equals);
-            break;
-        case syrec::BinaryExpression::GreaterThan:
-            mappedToEnumValue.emplace(syrec_operation::operation::greater_than);
-            break;
-        case syrec::BinaryExpression::LessEquals:
-            mappedToEnumValue.emplace(syrec_operation::operation::less_equals);
-            break;
-        case syrec::BinaryExpression::LessThan:
-            mappedToEnumValue.emplace(syrec_operation::operation::less_than);
-            break;
-        case syrec::BinaryExpression::LogicalAnd:
-            mappedToEnumValue.emplace(syrec_operation::operation::logical_and);
-            break;
-        case syrec::BinaryExpression::LogicalOr:
-            mappedToEnumValue.emplace(syrec_operation::operation::logical_or);
-            break;
-        case syrec::BinaryExpression::Modulo:
-            mappedToEnumValue.emplace(syrec_operation::operation::modulo);
-            break;
-        case syrec::BinaryExpression::Multiply:
-            mappedToEnumValue.emplace(syrec_operation::operation::multiplication);
-            break;
-        case syrec::BinaryExpression::NotEquals:
-            mappedToEnumValue.emplace(syrec_operation::operation::not_equals);
-            break;
-        case syrec::BinaryExpression::Subtract:
-            mappedToEnumValue.emplace(syrec_operation::operation::subtraction);
-            break;
-        default:
-            break;
-    }
-    return mappedToEnumValue;
-}
+//std::optional<unsigned int> ParserUtilities::mapOperationToInternalFlag(const syrec_operation::operation& operation) {
+//    std::optional<unsigned int> internalOperationFlag;
+//
+//    switch (operation) {
+//        case syrec_operation::operation::AddAssign:
+//            internalOperationFlag.emplace(syrec::AssignStatement::Add);
+//            break;
+//        case syrec_operation::operation::MinusAssign:
+//            internalOperationFlag.emplace(syrec::AssignStatement::Subtract);
+//            break;
+//        case syrec_operation::operation::XorAssign:
+//            internalOperationFlag.emplace(syrec::AssignStatement::Exor);
+//            break;
+//        case syrec_operation::operation::IncrementAssign:
+//            internalOperationFlag.emplace(syrec::UnaryStatement::Increment);
+//            break;
+//        case syrec_operation::operation::DecrementAssign:
+//            internalOperationFlag.emplace(syrec::UnaryStatement::Decrement);
+//            break;
+//        case syrec_operation::operation::InvertAssign:
+//            internalOperationFlag.emplace(syrec::UnaryStatement::Invert);
+//            break;
+//        case syrec_operation::operation::ShiftLeft:
+//            internalOperationFlag.emplace(syrec::ShiftExpression::Left);
+//            break;
+//        case syrec_operation::operation::ShiftRight:
+//            internalOperationFlag.emplace(syrec::ShiftExpression::Right);
+//            break;
+//        case syrec_operation::operation::Addition:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::Add);
+//            break;
+//        case syrec_operation::operation::Subtraction:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::Subtract);
+//            break;
+//        case syrec_operation::operation::Multiplication:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::Multiply);
+//            break;
+//        case syrec_operation::operation::Division:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::Divide);
+//            break;
+//        case syrec_operation::operation::Modulo:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::Modulo);
+//            break;
+//        case syrec_operation::operation::UpperBitsMultiplication:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::FracDivide);
+//            break;
+//        case syrec_operation::operation::BitwiseXor:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::Exor);
+//            break;
+//        case syrec_operation::operation::LogicalAnd:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::LogicalAnd);
+//            break;
+//        case syrec_operation::operation::LogicalOr:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::LogicalOr);
+//            break;
+//        case syrec_operation::operation::BitwiseAnd:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::BitwiseAnd);
+//            break;
+//        case syrec_operation::operation::BitwiseOr:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::BitwiseOr);
+//            break;
+//        case syrec_operation::operation::LessThan:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::LessThan);
+//            break;
+//        case syrec_operation::operation::GreaterThan:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::GreaterThan);
+//            break;
+//        case syrec_operation::operation::Equals:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::Equals);
+//            break;
+//        case syrec_operation::operation::NotEquals:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::NotEquals);
+//            break;
+//        case syrec_operation::operation::LessEquals:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::LessEquals);
+//            break;
+//        case syrec_operation::operation::GreaterEquals:
+//            internalOperationFlag.emplace(syrec::BinaryExpression::GreaterEquals);
+//            break;
+//        default:
+//            break;
+//    }
+//    return internalOperationFlag;
+//}
+//
+//std::optional<syrec_operation::operation> ParserUtilities::mapInternalBinaryOperationFlagToEnum(const unsigned int& internalOperationFlag) {
+//    std::optional<syrec_operation::operation> mappedToEnumValue;
+//
+//    switch (internalOperationFlag) {
+//        case syrec::BinaryExpression::Add:
+//            mappedToEnumValue.emplace(syrec_operation::operation::Addition);
+//            break;
+//        case syrec::BinaryExpression::BitwiseAnd:
+//            mappedToEnumValue.emplace(syrec_operation::operation::BitwiseAnd);
+//            break;
+//        case syrec::BinaryExpression::BitwiseOr:
+//            mappedToEnumValue.emplace(syrec_operation::operation::BitwiseOr);
+//            break;
+//        case syrec::BinaryExpression::Divide:
+//            mappedToEnumValue.emplace(syrec_operation::operation::Division);
+//            break;
+//        case syrec::BinaryExpression::Equals:
+//            mappedToEnumValue.emplace(syrec_operation::operation::Equals);
+//            break;
+//        case syrec::BinaryExpression::Exor:
+//            mappedToEnumValue.emplace(syrec_operation::operation::BitwiseXor);
+//            break;
+//        case syrec::BinaryExpression::FracDivide:
+//            mappedToEnumValue.emplace(syrec_operation::operation::UpperBitsMultiplication);
+//            break;
+//        case syrec::BinaryExpression::GreaterEquals:
+//            mappedToEnumValue.emplace(syrec_operation::operation::GreaterEquals);
+//            break;
+//        case syrec::BinaryExpression::GreaterThan:
+//            mappedToEnumValue.emplace(syrec_operation::operation::GreaterThan);
+//            break;
+//        case syrec::BinaryExpression::LessEquals:
+//            mappedToEnumValue.emplace(syrec_operation::operation::LessEquals);
+//            break;
+//        case syrec::BinaryExpression::LessThan:
+//            mappedToEnumValue.emplace(syrec_operation::operation::LessThan);
+//            break;
+//        case syrec::BinaryExpression::LogicalAnd:
+//            mappedToEnumValue.emplace(syrec_operation::operation::LogicalAnd);
+//            break;
+//        case syrec::BinaryExpression::LogicalOr:
+//            mappedToEnumValue.emplace(syrec_operation::operation::LogicalOr);
+//            break;
+//        case syrec::BinaryExpression::Modulo:
+//            mappedToEnumValue.emplace(syrec_operation::operation::Modulo);
+//            break;
+//        case syrec::BinaryExpression::Multiply:
+//            mappedToEnumValue.emplace(syrec_operation::operation::Multiplication);
+//            break;
+//        case syrec::BinaryExpression::NotEquals:
+//            mappedToEnumValue.emplace(syrec_operation::operation::NotEquals);
+//            break;
+//        case syrec::BinaryExpression::Subtract:
+//            mappedToEnumValue.emplace(syrec_operation::operation::Subtraction);
+//            break;
+//        default:
+//            break;
+//    }
+//    return mappedToEnumValue;
+//}

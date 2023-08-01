@@ -6,7 +6,6 @@
 #include "core/syrec/parser/infix_iterator.hpp"
 #include "core/syrec/parser/module_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
-#include "core/syrec/parser/parser_utilities.hpp"
 #include "core/syrec/parser/signal_access_restriction.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/value_broadcaster.hpp"
@@ -16,6 +15,9 @@
 #include "core/syrec/parser/utils/bit_helpers.hpp"
 #include "core/syrec/parser/optimizations/no_additional_line_assignment.hpp"
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_none_reversible_operations_and_unique_signal_occurrences_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_only_reversible_operations_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_reversible_ops_and_multilevel_signal_occurrence_simplifier.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
 #include "core/syrec/parser/utils/loop_range_utils.hpp"
 
@@ -90,7 +92,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
     }
 
     const auto definedAssignmentOperation = getDefinedOperation(context->assignmentOp);
-    if (!definedAssignmentOperation.has_value() || (syrec_operation::operation::xor_assign != *definedAssignmentOperation && syrec_operation::operation::add_assign != *definedAssignmentOperation && syrec_operation::operation::minus_assign != *definedAssignmentOperation)) {
+    if (!definedAssignmentOperation.has_value() || (syrec_operation::operation::XorAssign != *definedAssignmentOperation && syrec_operation::operation::AddAssign != *definedAssignmentOperation && syrec_operation::operation::MinusAssign != *definedAssignmentOperation)) {
         // TODO: Error position
         createError(mapAntlrTokenPosition(context->assignmentOp), InvalidAssignOperation);
         allSemanticChecksOk = false;
@@ -125,7 +127,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
             
             const auto assignStmt = std::make_shared<syrec::AssignStatement>(
                     assignedToSignalParts,
-                    *ParserUtilities::mapOperationToInternalFlag(*definedAssignmentOperation),
+                    *syrec_operation::tryMapAssignmentOperationEnumToFlag(*definedAssignmentOperation),
                     exprContainingNewValue);
 
             if (!sharedData->parserConfig->noAdditionalLineOptimizationEnabled) {
@@ -165,8 +167,12 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
              * the inverted assignment statement if it exists]
              *
              */
-            const auto& optimizationResultOfAssignmentStmt = optimizations::LineAwareOptimization::optimize(assignStmt);
-            const auto& createdAssignmentStmts = optimizationResultOfAssignmentStmt.statements;
+            // TODO: Uncomment
+            //const auto& optimizationResultOfAssignmentStmt = optimizations::LineAwareOptimization::optimize(assignStmt);
+            //const auto& createdAssignmentStmts = optimizationResultOfAssignmentStmt.statements;
+            // TODO: Delete
+            std::vector<syrec::AssignStatement::ptr> createdAssignmentStmts = {};
+            createdAssignmentStmts.emplace_back(assignStmt);
 
             std::vector omitStatusPerAssignStatement(createdAssignmentStmts.size(), false);
             std::size_t statementIdx = 0;
@@ -205,7 +211,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                     }
 
                     /*
-                     * Since the reassociate expression optimization also incorporates the simplification of multiplication operations, we only need the perform the latter when the former optimization is not enabled
+                     * Since the reassociate expression optimization also incorporates the simplification of Multiplication operations, we only need the perform the latter when the former optimization is not enabled
                      */
                     if (const auto& rhsOperandAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentStmtRhsExpr); rhsOperandAsBinaryExpr != nullptr && sharedData->optionalMultiplicationSimplifier.has_value()) {
                         if (const auto optionalSimplificationResultOfMultiplicationsOfRhsOperand = sharedData->optionalMultiplicationSimplifier.value()->trySimplify(rhsOperandAsBinaryExpr); optionalSimplificationResultOfMultiplicationsOfRhsOperand.has_value()) {
@@ -225,11 +231,12 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                         /*
                          * If the current assignment statement leaves the lhs unchanged we can both skip the current assignment statement as well the associated revert statement (only if the latter actually exists)
                          */
-                        if (optimizationResultOfAssignmentStmt.revertStatementLookup.count(statementIdx) != 0) {
+                        // TODO: uncomment, was only commented out for testing of optimization of assignments with nonreversible operations rework
+                        /*if (optimizationResultOfAssignmentStmt.revertStatementLookup.count(statementIdx) != 0) {
                             omitStatusPerAssignStatement[optimizationResultOfAssignmentStmt.revertStatementLookup.at(statementIdx)] = true;
                             statementIdx++;
                             continue;
-                        } 
+                        } */
                     }
                 }
 
@@ -240,13 +247,24 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                             typecastedAssignmentStmt->op,
                             assignmentStmtRhsExpr);
                 }
-                addStatementToOpenContainer(finalAssignmentStmt);
-
+                //std::unique_ptr<noAdditionalLineSynthesis::AssignmentWithOnlyReversibleOperationsSimplifier> test   = std::make_unique<noAdditionalLineSynthesis::AssignmentWithOnlyReversibleOperationsSimplifier>(sharedData->currentSymbolTableScope);
+                //const auto& test   = std::make_unique<noAdditionalLineSynthesis::AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence>(sharedData->currentSymbolTableScope);
+                /*const auto& test   = std::make_unique<noAdditionalLineSynthesis::AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(sharedData->currentSymbolTableScope);
+                const auto& result = test->simplify(finalAssignmentStmt);
+                if (!result.empty()) {
+                    for (const auto& assignment : result) {
+                        addStatementToOpenContainer(assignment);
+                    }
+                }
+                else {
+                    addStatementToOpenContainer(finalAssignmentStmt);                    
+                }*/
+                addStatementToOpenContainer(finalAssignmentStmt);                    
                 if (isValuePropagationBlockedDueToLoopDataFlowAnalysis(finalAssignmentStmt->lhs)) {
                     invalidateStoredValueFor(finalAssignmentStmt->lhs);
                 }
                 else {
-                    const auto usedAssignmentOperationOfFinalAssignmentStmt = *ParserUtilities::mapInternalBinaryOperationFlagToEnum(typecastedAssignmentStmt->op);
+                    const auto usedAssignmentOperationOfFinalAssignmentStmt = *syrec_operation::tryMapBinaryOperationFlagToEnum(typecastedAssignmentStmt->op);
                     // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
                     tryUpdateOrInvalidateStoredValueFor(finalAssignmentStmt->lhs, tryDetermineNewSignalValueFromAssignment(typecastedAssignmentStmt->lhs, usedAssignmentOperationOfFinalAssignmentStmt, finalAssignmentStmt->rhs));                    
                 }
@@ -776,7 +794,7 @@ std::any SyReCStatementVisitor::visitUnaryStatement(SyReCParser::UnaryStatementC
     bool       allSemanticChecksOk = true;
     const auto unaryOperation      = getDefinedOperation(context->unaryOp);
 
-    if (!unaryOperation.has_value() || (syrec_operation::operation::invert_assign != *unaryOperation && syrec_operation::operation::increment_assign != *unaryOperation && syrec_operation::operation::decrement_assign != *unaryOperation)) {
+    if (!unaryOperation.has_value() || (syrec_operation::operation::InvertAssign != *unaryOperation && syrec_operation::operation::IncrementAssign != *unaryOperation && syrec_operation::operation::DecrementAssign != *unaryOperation)) {
         allSemanticChecksOk = false;
         // TODO: Error position
         createError(mapAntlrTokenPosition(context->unaryOp), InvalidUnaryOperation);
@@ -809,7 +827,7 @@ std::any SyReCStatementVisitor::visitUnaryStatement(SyReCParser::UnaryStatementC
         else {
             invalidateStoredValueFor(accessedSignalParts);
         }
-        addStatementToOpenContainer(std::make_shared<syrec::UnaryStatement>(*ParserUtilities::mapOperationToInternalFlag(*unaryOperation), accessedSignalParts));
+        addStatementToOpenContainer(std::make_shared<syrec::UnaryStatement>(*syrec_operation::tryMapUnaryAssignmentOperationEnumToFlag(*unaryOperation), accessedSignalParts));
     }
 
     return 0;
@@ -912,6 +930,7 @@ bool SyReCStatementVisitor::areExpressionsEqual(const ExpressionEvaluationResult
 
 // TODO: CONSTANT_PROPAGATION: Handling of out of range indizes for dimension or bit range
 // TODO: CONSTANT_PROPAGATION: In case the rhs expr was a constant, should we trim its value in case it cannot be stored in the lhs ?
+// TODO: CONSTANT_PROPAGATION: When updating N-D signals with another N-D signal, multiple updates need to be performed (one per accessed value of dimension), i.e. wire a[2][4], b[2][4], a += b => a[0][0] += a[0][0]; a[0][1] += b[0][1] ... a[0][3] += b[0][3]; a[1][0] += b[1][0] ... a[1][3] += a[1][3]
 void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const {
     if (!sharedData->parserConfig->performConstantPropagation) {
         return;
@@ -1327,7 +1346,6 @@ std::size_t SyReCStatementVisitor::determineNumberOfLoopIterations(const LoopIte
     return *utils::determineNumberOfLoopIterations(static_cast<unsigned int>(loopIterationRange.startValue), static_cast<unsigned int>(loopIterationRange.endValue), static_cast<unsigned int>(loopIterationRange.stepSize));
 }
 
-
 SyReCStatementVisitor::CustomLoopContextInformation SyReCStatementVisitor::buildCustomLoopContextInformation(SyReCParser::ForStatementContext* loopStatement) {
     std::vector<CustomLoopContextInformation> childLoops;
     for (const auto& stmtContext : loopStatement->statementList()->stmts) {
@@ -1653,4 +1671,9 @@ void SyReCStatementVisitor::decrementReferenceCountsOfCalledModuleAndActuallyUse
         decrementReferenceCountOfSignal(actuallyUsedCalleeArgument);
     }
     sharedData->currentSymbolTableScope->decrementReferenceCountOfModulesMatchingSignature(calledModule);
+}
+
+syrec::AssignStatement::vec SyReCStatementVisitor::trySimplifyAssignmentStatement(const syrec::AssignStatement::ptr& assignmentStmt) {
+    return {};
+    //return assignmentStmt;
 }

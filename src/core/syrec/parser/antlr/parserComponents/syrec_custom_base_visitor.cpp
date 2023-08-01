@@ -50,85 +50,85 @@ std::optional<syrec_operation::operation> SyReCCustomBaseVisitor::getDefinedOper
     std::optional<syrec_operation::operation> definedOperation;
     switch (definedOperationToken->getType()) {
         case SyReCParser::OP_PLUS:
-            definedOperation.emplace(syrec_operation::operation::addition);
+            definedOperation.emplace(syrec_operation::operation::Addition);
             break;
         case SyReCParser::OP_MINUS:
-            definedOperation.emplace(syrec_operation::operation::subtraction);
+            definedOperation.emplace(syrec_operation::operation::Subtraction);
             break;
         case SyReCParser::OP_MULTIPLY:
-            definedOperation.emplace(syrec_operation::operation::multiplication);
+            definedOperation.emplace(syrec_operation::operation::Multiplication);
             break;
         case SyReCParser::OP_UPPER_BIT_MULTIPLY:
-            definedOperation.emplace(syrec_operation::operation::upper_bits_multiplication);
+            definedOperation.emplace(syrec_operation::operation::UpperBitsMultiplication);
             break;
         case SyReCParser::OP_DIVISION:
-            definedOperation.emplace(syrec_operation::operation::division);
+            definedOperation.emplace(syrec_operation::operation::Division);
             break;
         case SyReCParser::OP_MODULO:
-            definedOperation.emplace(syrec_operation::operation::modulo);
+            definedOperation.emplace(syrec_operation::operation::Modulo);
             break;
         case SyReCParser::OP_GREATER_THAN:
-            definedOperation.emplace(syrec_operation::operation::greater_than);
+            definedOperation.emplace(syrec_operation::operation::GreaterThan);
             break;
         case SyReCParser::OP_GREATER_OR_EQUAL:
-            definedOperation.emplace(syrec_operation::operation::greater_equals);
+            definedOperation.emplace(syrec_operation::operation::GreaterEquals);
             break;
         case SyReCParser::OP_LESS_THAN:
-            definedOperation.emplace(syrec_operation::operation::less_than);
+            definedOperation.emplace(syrec_operation::operation::LessThan);
             break;
         case SyReCParser::OP_LESS_OR_EQUAL:
-            definedOperation.emplace(syrec_operation::operation::less_equals);
+            definedOperation.emplace(syrec_operation::operation::LessEquals);
             break;
         case SyReCParser::OP_EQUAL:
-            definedOperation.emplace(syrec_operation::operation::equals);
+            definedOperation.emplace(syrec_operation::operation::Equals);
             break;
         case SyReCParser::OP_NOT_EQUAL:
-            definedOperation.emplace(syrec_operation::operation::not_equals);
+            definedOperation.emplace(syrec_operation::operation::NotEquals);
             break;
         case SyReCParser::OP_BITWISE_AND:
-            definedOperation.emplace(syrec_operation::operation::bitwise_and);
+            definedOperation.emplace(syrec_operation::operation::BitwiseAnd);
             break;
         case SyReCParser::OP_BITWISE_NEGATION:
-            definedOperation.emplace(syrec_operation::operation::bitwise_negation);
+            definedOperation.emplace(syrec_operation::operation::BitwiseNegation);
             break;
         case SyReCParser::OP_BITWISE_OR:
-            definedOperation.emplace(syrec_operation::operation::bitwise_or);
+            definedOperation.emplace(syrec_operation::operation::BitwiseOr);
             break;
         case SyReCParser::OP_BITWISE_XOR:
-            definedOperation.emplace(syrec_operation::operation::bitwise_xor);
+            definedOperation.emplace(syrec_operation::operation::BitwiseXor);
             break;
         case SyReCParser::OP_LOGICAL_AND:
-            definedOperation.emplace(syrec_operation::operation::logical_and);
+            definedOperation.emplace(syrec_operation::operation::LogicalAnd);
             break;
         case SyReCParser::OP_LOGICAL_OR:
-            definedOperation.emplace(syrec_operation::operation::logical_or);
+            definedOperation.emplace(syrec_operation::operation::LogicalOr);
             break;
         case SyReCParser::OP_LOGICAL_NEGATION:
-            definedOperation.emplace(syrec_operation::operation::logical_negation);
+            definedOperation.emplace(syrec_operation::operation::LogicalNegation);
             break;
         case SyReCParser::OP_LEFT_SHIFT:
-            definedOperation.emplace(syrec_operation::operation::shift_left);
+            definedOperation.emplace(syrec_operation::operation::ShiftLeft);
             break;
         case SyReCParser::OP_RIGHT_SHIFT:
-            definedOperation.emplace(syrec_operation::operation::shift_right);
+            definedOperation.emplace(syrec_operation::operation::ShiftRight);
             break;
         case SyReCParser::OP_INCREMENT_ASSIGN:
-            definedOperation.emplace(syrec_operation::operation::increment_assign);
+            definedOperation.emplace(syrec_operation::operation::IncrementAssign);
             break;
         case SyReCParser::OP_DECREMENT_ASSIGN:
-            definedOperation.emplace(syrec_operation::operation::decrement_assign);
+            definedOperation.emplace(syrec_operation::operation::DecrementAssign);
             break;
         case SyReCParser::OP_INVERT_ASSIGN:
-            definedOperation.emplace(syrec_operation::operation::invert_assign);
+            definedOperation.emplace(syrec_operation::operation::InvertAssign);
             break;
         case SyReCParser::OP_ADD_ASSIGN:
-            definedOperation.emplace(syrec_operation::operation::add_assign);
+            definedOperation.emplace(syrec_operation::operation::AddAssign);
             break;
         case SyReCParser::OP_SUB_ASSIGN:
-            definedOperation.emplace(syrec_operation::operation::minus_assign);
+            definedOperation.emplace(syrec_operation::operation::MinusAssign);
             break;
         case SyReCParser::OP_XOR_ASSIGN:
-            definedOperation.emplace(syrec_operation::operation::xor_assign);
+            definedOperation.emplace(syrec_operation::operation::XorAssign);
             break;
         default:
             // TODO: Error position
@@ -312,19 +312,19 @@ std::any SyReCCustomBaseVisitor::visitNumberFromExpression(SyReCParser::NumberFr
     if (!canEvaluateNumber(*lhsOperand) || !canEvaluateNumber(*rhsOperand)) {
         syrec::Number::Operation mappedOperation;
         switch (*operation) {
-            case syrec_operation::operation::addition: {
+            case syrec_operation::operation::Addition: {
                 mappedOperation = syrec::Number::Operation::Addition;
                 break;
             }
-            case syrec_operation::operation::subtraction: {
+            case syrec_operation::operation::Subtraction: {
                 mappedOperation = syrec::Number::Operation::Subtraction;
                 break;
             }
-            case syrec_operation::operation::multiplication: {
+            case syrec_operation::operation::Multiplication: {
                 mappedOperation = syrec::Number::Operation::Multiplication;
                 break;
             }
-            case syrec_operation::operation::division: {
+            case syrec_operation::operation::Division: {
                 mappedOperation = syrec::Number::Operation::Division;
                 break;
             }
@@ -440,7 +440,7 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateCompileTimeExpression
 }
 
 std::optional<unsigned> SyReCCustomBaseVisitor::applyBinaryOperation(syrec_operation::operation operation, unsigned leftOperand, unsigned rightOperand, const TokenPosition& potentialErrorPosition) {
-    if (operation == syrec_operation::operation::division && rightOperand == 0) {
+    if (operation == syrec_operation::operation::Division && rightOperand == 0) {
         // TODO: GEN_ERROR
         // TODO: Error position
         createError(potentialErrorPosition, DivisionByZero);

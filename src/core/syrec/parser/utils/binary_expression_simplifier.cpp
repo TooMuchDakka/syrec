@@ -2,8 +2,6 @@
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/optimizations/operation_strength_reduction.hpp"
 
-#include <core/syrec/parser/parser_utilities.hpp>
-
 using namespace optimizations;
 
 static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExpr(const std::variant<std::shared_ptr<syrec::ShiftExpression>, std::shared_ptr<syrec::BinaryExpression>>& exprToOptimize, bool onlyTopLevelExpr, bool shouldPerformOperationStrengthReduction) {
@@ -27,7 +25,7 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
         usedOperation              = exprAsShiftOne->op;
     }
 
-    auto mappedFlagToEnum = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(usedOperation);
+    auto mappedFlagToEnum = syrec_operation::tryMapBinaryOperationFlagToEnum(usedOperation);
     if (!mappedFlagToEnum.has_value()) {
         return BinaryExpressionSimplificationResult(false, referenceExpression);
     }
@@ -73,21 +71,21 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
 
         std::optional<unsigned int> operationSpecificSimplificationResult;
         switch (*mappedFlagToEnum) {
-            case syrec_operation::operation::division:
+            case syrec_operation::operation::Division:
                 if (isLeftOperandConstant && *lExprAsConstantValue == 0) {
                     operationSpecificSimplificationResult.emplace(0);
                 }
                 break;
-            case syrec_operation::operation::bitwise_and:
-            case syrec_operation::operation::logical_and:
-            case syrec_operation::operation::multiplication:
+            case syrec_operation::operation::BitwiseAnd:
+            case syrec_operation::operation::LogicalAnd:
+            case syrec_operation::operation::Multiplication:
                 if ((isLeftOperandConstant && *lExprAsConstantValue == 0) 
                     || (!isLeftOperandConstant && *rExprAsConstantValue == 0)) {
                     operationSpecificSimplificationResult.emplace(0);
                 }
                 break;
-            case syrec_operation::operation::shift_left:
-            case syrec_operation::operation::shift_right:
+            case syrec_operation::operation::ShiftLeft:
+            case syrec_operation::operation::ShiftRight:
                 if (!isLeftOperandConstant && *rExprAsConstantValue == 0) {
                     const auto& simplificationResultOfNonConstantOperand = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction);
                     return BinaryExpressionSimplificationResult(true, simplificationResultOfNonConstantOperand.simplifiedExpression);
@@ -111,7 +109,7 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
          * Since operation strength can change the operation of a binary expression, we need to update the used operation of the binary expression
          */
         if (tryPerformOperationStrengthReduction(referenceExpression)) {
-            mappedFlagToEnum = parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(usedOperation);
+            mappedFlagToEnum = syrec_operation::tryMapBinaryOperationFlagToEnum(usedOperation);
             if (!mappedFlagToEnum.has_value()) {
                 return BinaryExpressionSimplificationResult(false, referenceExpression);
             }
@@ -128,7 +126,7 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
     if (simplificationResultOfLhs.couldSimplify || simplificationResultOfRhs.couldSimplify) {
         const auto& newBinaryExpr = std::make_shared<syrec::BinaryExpression>(
                 simplificationResultOfLhs.simplifiedExpression,
-                *parser::ParserUtilities::mapOperationToInternalFlag(*mappedFlagToEnum),
+                *syrec_operation::tryMapBinaryOperationEnumToFlag(*mappedFlagToEnum),
                 simplificationResultOfRhs.simplifiedExpression);
 
         const auto& simplificationResultOfNewTopLevelBinaryExpr = trySimplifyOptionallyOnlyTopLevelExpr(newBinaryExpr, true, shouldPerformOperationStrengthReduction);

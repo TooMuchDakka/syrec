@@ -135,7 +135,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                 // TODO: Call to bitwidth does not work with loop variables here
                 //const auto binaryExpressionBitwidth = std::max((*lhsOperandAsExpression)->bitwidth(), (*rhsOperandAsExpression)->bitwidth());
 
-                syrec::BinaryExpression::ptr createdBinaryExpr = std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), *rhsOperandAsExpression);
+                syrec::BinaryExpression::ptr createdBinaryExpr = std::make_shared<syrec::BinaryExpression>(*lhsOperandAsExpression, *syrec_operation::tryMapBinaryOperationEnumToFlag(*userDefinedOperation), *rhsOperandAsExpression);
                 if (const auto typecastedBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(createdBinaryExpr); typecastedBinaryExpr != nullptr && sharedData->optionalMultiplicationSimplifier.has_value()) {
                     const auto exprWithPotentiallySimplifiedMultiplications = sharedData->optionalMultiplicationSimplifier.value()->trySimplify(typecastedBinaryExpr);
                     if (exprWithPotentiallySimplifiedMultiplications.has_value()) {
@@ -152,7 +152,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                 */
                 if (sharedData->currentlyParsingAssignmentStmtRhs && sharedData->parserConfig->noAdditionalLineOptimizationEnabled 
                     && sharedData->parserConfig->performConstantPropagation 
-                    && *userDefinedOperation == syrec_operation::operation::subtraction
+                    && *userDefinedOperation == syrec_operation::operation::Subtraction
                     && (lhsOperandConversionToConstant.has_value() || rhsOperandConversionToConstant.has_value())) {
 
                     const bool isLhsConstant = lhsOperandConversionToConstant.has_value();
@@ -168,7 +168,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                     }
 
                     if (notConstantOperandAsVariableAccess != nullptr && constantOperandReevaluatedAsVariableAccess != nullptr) {
-                        createdBinaryExpr = std::make_shared<syrec::BinaryExpression>(notConstantOperandAsVariableAccess, *ParserUtilities::mapOperationToInternalFlag(*userDefinedOperation), constantOperandReevaluatedAsVariableAccess);   
+                        createdBinaryExpr = std::make_shared<syrec::BinaryExpression>(notConstantOperandAsVariableAccess, *syrec_operation::tryMapBinaryOperationEnumToFlag(*userDefinedOperation), constantOperandReevaluatedAsVariableAccess);   
                     }
                 } else {
                     if (sharedData->parserConfig->reassociateExpressionsEnabled) {
@@ -192,7 +192,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
 std::any SyReCExpressionVisitor::visitUnaryExpression(SyReCParser::UnaryExpressionContext* context)
 {
     const auto userDefinedOperation = getDefinedOperation(context->unaryOperation);
-    if (!userDefinedOperation.has_value() || (*userDefinedOperation != syrec_operation::operation::bitwise_negation && *userDefinedOperation != syrec_operation::operation::logical_negation)) {
+    if (!userDefinedOperation.has_value() || (*userDefinedOperation != syrec_operation::operation::BitwiseNegation && *userDefinedOperation != syrec_operation::operation::LogicalNegation)) {
         createError(mapAntlrTokenPosition(context->unaryOperation), InvalidUnaryOperation);
     }
 
@@ -206,7 +206,7 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     const auto expressionToShift     = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->expression());
     const auto definedShiftOperation = context->shiftOperation != nullptr ? getDefinedOperation(context->shiftOperation) : std::nullopt;
 
-    if (!definedShiftOperation.has_value() || (*definedShiftOperation != syrec_operation::operation::shift_left && *definedShiftOperation != syrec_operation::operation::shift_right)) {
+    if (!definedShiftOperation.has_value() || (*definedShiftOperation != syrec_operation::operation::ShiftLeft && *definedShiftOperation != syrec_operation::operation::ShiftRight)) {
         createError(mapAntlrTokenPosition(context->shiftOperation), InvalidShiftOperation);
     }
 
@@ -256,7 +256,7 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     */
 
     // TODO: Handling of shift expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
-    syrec::expression::ptr createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *ParserUtilities::mapOperationToInternalFlag(*definedShiftOperation), *shiftAmount);
+    syrec::expression::ptr createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *syrec_operation::tryMapShiftOperationEnumToFlag(*definedShiftOperation), *shiftAmount);
     if (sharedData->parserConfig->reassociateExpressionsEnabled) {
         createdShiftExpression = optimizations::simplifyBinaryExpression(createdShiftExpression, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier);
     }
@@ -264,30 +264,26 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
 }
 
 bool SyReCExpressionVisitor::isValidBinaryOperation(syrec_operation::operation userDefinedOperation) {
-    bool isValid;
     switch (userDefinedOperation) {
-        case syrec_operation::operation::addition:
-        case syrec_operation::operation::subtraction:
-        case syrec_operation::operation::bitwise_xor:
-        case syrec_operation::operation::multiplication:
-        case syrec_operation::operation::division:
-        case syrec_operation::operation::modulo:
-        case syrec_operation::operation::upper_bits_multiplication:
-        case syrec_operation::operation::logical_and:
-        case syrec_operation::operation::logical_or:
-        case syrec_operation::operation::bitwise_and:
-        case syrec_operation::operation::bitwise_or:
-        case syrec_operation::operation::less_than:
-        case syrec_operation::operation::greater_than:
-        case syrec_operation::operation::equals:
-        case syrec_operation::operation::not_equals:
-        case syrec_operation::operation::less_equals:
-        case syrec_operation::operation::greater_equals:
-            isValid = true;
-            break;
+        case syrec_operation::operation::Addition:
+        case syrec_operation::operation::Subtraction:
+        case syrec_operation::operation::BitwiseXor:
+        case syrec_operation::operation::Multiplication:
+        case syrec_operation::operation::Division:
+        case syrec_operation::operation::Modulo:
+        case syrec_operation::operation::UpperBitsMultiplication:
+        case syrec_operation::operation::LogicalAnd:
+        case syrec_operation::operation::LogicalOr:
+        case syrec_operation::operation::BitwiseAnd:
+        case syrec_operation::operation::BitwiseOr:
+        case syrec_operation::operation::LessThan:
+        case syrec_operation::operation::GreaterThan:
+        case syrec_operation::operation::Equals:
+        case syrec_operation::operation::NotEquals:
+        case syrec_operation::operation::LessEquals:
+        case syrec_operation::operation::GreaterEquals:
+            return true;
         default:
-            isValid = false;
-            break;
+            return false;
     }
-    return isValid;
 }

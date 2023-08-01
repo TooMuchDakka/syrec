@@ -1,5 +1,8 @@
 #include "core/syrec/parser/operation.hpp"
 
+#include "core/syrec/expression.hpp"
+#include "core/syrec/statement.hpp"
+
 using namespace syrec_operation;
 
 bool syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(operation operation, unsigned operand) noexcept {
@@ -8,11 +11,11 @@ bool syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(operation ope
     }
 
     switch (operation) {
-        case operation::addition:
-        case operation::shift_left:
-        case operation::shift_right:
+        case operation::Addition:
+        case operation::ShiftLeft:
+        case operation::ShiftRight:
             return operand == 0;
-        case operation::multiplication:
+        case operation::Multiplication:
             return operand == 1;
         default:
             return false;
@@ -21,16 +24,16 @@ bool syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(operation ope
 
 bool syrec_operation::isOperandUseAsRhsInOperationIdentityElement(const operation operation, const unsigned int operand) noexcept {
     switch (operation) {
-        case operation::addition:
-        case operation::add_assign:
-        case operation::subtraction:
-        case operation::minus_assign:
-        case operation::shift_left:
-        case operation::shift_right:
+        case operation::Addition:
+        case operation::AddAssign:
+        case operation::Subtraction:
+        case operation::MinusAssign:
+        case operation::ShiftLeft:
+        case operation::ShiftRight:
             return operand == 0;
-        case operation::division:
-        case operation::multiplication:
-        case operation::modulo:
+        case operation::Division:
+        case operation::Multiplication:
+        case operation::Modulo:
             return operand == 1;
         default:
             return false;
@@ -42,20 +45,20 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
     unsigned int result;
     bool         isValidBinaryOperation = true;
     switch (operation) {
-        case operation::addition:
-        case operation::add_assign:
+        case operation::Addition:
+        case operation::AddAssign:
             result = leftOperand + rightOperand;
             break;
-        case operation::subtraction:
-        case operation::minus_assign:
+        case operation::Subtraction:
+        case operation::MinusAssign:
             result = leftOperand - rightOperand;
             break;
-        case operation::multiplication:
+        case operation::Multiplication:
             // TODO: Implement correctly
-        case operation::upper_bits_multiplication:
+        case operation::UpperBitsMultiplication:
             result = leftOperand * rightOperand;
             break;
-        case operation::division: {
+        case operation::Division: {
             if (rightOperand == 0) {
                 isValidBinaryOperation = false;
             } else {
@@ -63,47 +66,47 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
             }
             break;   
         }
-        case operation::bitwise_and:
+        case operation::BitwiseAnd:
             result = leftOperand & rightOperand;
             break;
-        case operation::bitwise_or:
+        case operation::BitwiseOr:
             result = leftOperand | rightOperand;
             break;
-        case operation::bitwise_xor:
-        case operation::xor_assign:
+        case operation::BitwiseXor:
+        case operation::XorAssign:
             result = leftOperand ^ rightOperand;
             break;
-        case operation::modulo:
+        case operation::Modulo:
             result = leftOperand % rightOperand;
             break;
-        case operation::logical_and:
+        case operation::LogicalAnd:
             result = leftOperand && rightOperand;
             break;
-        case operation::logical_or:
+        case operation::LogicalOr:
             result = leftOperand || rightOperand;
             break;
-        case operation::less_than:
+        case operation::LessThan:
             result = leftOperand < rightOperand;
             break;
-        case operation::greater_than:
+        case operation::GreaterThan:
             result = leftOperand > rightOperand;
             break;
-        case operation::equals:
+        case operation::Equals:
             result = leftOperand == rightOperand;
             break;
-        case operation::not_equals:
+        case operation::NotEquals:
             result = leftOperand != rightOperand;
             break;
-        case operation::less_equals:
+        case operation::LessEquals:
             result = leftOperand <= rightOperand;
             break;
-        case operation::greater_equals:
+        case operation::GreaterEquals:
             result = leftOperand >= rightOperand;
             break;
-        case operation::shift_left:
+        case operation::ShiftLeft:
             result = leftOperand << rightOperand;
             break;
-        case operation::shift_right:
+        case operation::ShiftRight:
             result = leftOperand >> rightOperand;
             break;
         default:
@@ -119,19 +122,19 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
     bool isValidUnaryOperation = true;
 
     switch (operation) {
-        case operation::bitwise_negation:
+        case operation::BitwiseNegation:
             result = ~operand;
             break;
-        case operation::logical_negation:
+        case operation::LogicalNegation:
             result = operand == 0 ? 1 : 0;
             break;
-        case operation::increment_assign:
+        case operation::IncrementAssign:
             result = operand + 1;
             break;
-        case operation::decrement_assign:
+        case operation::DecrementAssign:
             result = operand - 1;
             break;
-        case operation::invert_assign:
+        case operation::InvertAssign:
             result = ~operand;
             break;
         default:
@@ -143,16 +146,16 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
 
 bool syrec_operation::isCommutative(operation operation) noexcept {
     switch (operation) {
-        case operation::addition:
-        case operation::multiplication:
-        case operation::upper_bits_multiplication:
-        case operation::bitwise_and:
-        case operation::bitwise_or:
-        case operation::bitwise_xor:
-        case operation::logical_and:
-        case operation::logical_or:
-        case operation::equals:
-        case operation::not_equals:
+        case operation::Addition:
+        case operation::Multiplication:
+        case operation::UpperBitsMultiplication:
+        case operation::BitwiseAnd:
+        case operation::BitwiseOr:
+        case operation::BitwiseXor:
+        case operation::LogicalAnd:
+        case operation::LogicalOr:
+        case operation::Equals:
+        case operation::NotEquals:
             return true;
         default:
             return false;
@@ -162,63 +165,63 @@ bool syrec_operation::isCommutative(operation operation) noexcept {
 std::optional<operation> syrec_operation::invert(operation operation) noexcept {
     std::optional<syrec_operation::operation> mappedToInverseOperation;
     switch (operation) {
-        case operation::add_assign:
-            mappedToInverseOperation.emplace(operation::minus_assign);
+        case operation::AddAssign:
+            mappedToInverseOperation.emplace(operation::MinusAssign);
             break;
-        case operation::minus_assign:
-            mappedToInverseOperation.emplace(operation::add_assign);
+        case operation::MinusAssign:
+            mappedToInverseOperation.emplace(operation::AddAssign);
             break;
-        case operation::xor_assign:
-            mappedToInverseOperation.emplace(operation::xor_assign);
+        case operation::XorAssign:
+            mappedToInverseOperation.emplace(operation::XorAssign);
             break;
-        case operation::increment_assign:
-            mappedToInverseOperation.emplace(operation::decrement_assign);
+        case operation::IncrementAssign:
+            mappedToInverseOperation.emplace(operation::DecrementAssign);
             break;
-        case operation::decrement_assign:
-            mappedToInverseOperation.emplace(operation::increment_assign);
+        case operation::DecrementAssign:
+            mappedToInverseOperation.emplace(operation::IncrementAssign);
             break;
-        case operation::invert_assign:
-            mappedToInverseOperation.emplace(operation::invert_assign);
+        case operation::InvertAssign:
+            mappedToInverseOperation.emplace(operation::InvertAssign);
             break;
 
-        case operation::addition:
-            mappedToInverseOperation.emplace(operation::subtraction);
+        case operation::Addition:
+            mappedToInverseOperation.emplace(operation::Subtraction);
             break;
-        case operation::subtraction:
-            mappedToInverseOperation.emplace(operation::addition);
+        case operation::Subtraction:
+            mappedToInverseOperation.emplace(operation::Addition);
             break;
-        case operation::bitwise_xor:
-            mappedToInverseOperation.emplace(operation::bitwise_xor);
+        case operation::BitwiseXor:
+            mappedToInverseOperation.emplace(operation::BitwiseXor);
             break;
-        case operation::multiplication:
-            mappedToInverseOperation.emplace(operation::division);
+        case operation::Multiplication:
+            mappedToInverseOperation.emplace(operation::Division);
             break;
-        case operation::division:
-            mappedToInverseOperation.emplace(operation::multiplication);
+        case operation::Division:
+            mappedToInverseOperation.emplace(operation::Multiplication);
             break;
-        case operation::less_than:
-            mappedToInverseOperation.emplace(operation::greater_equals);
+        case operation::LessThan:
+            mappedToInverseOperation.emplace(operation::GreaterEquals);
             break;
-        case operation::greater_than:
-            mappedToInverseOperation.emplace(operation::less_equals);
+        case operation::GreaterThan:
+            mappedToInverseOperation.emplace(operation::LessEquals);
             break;
-        case operation::less_equals:
-            mappedToInverseOperation.emplace(operation::greater_than);
+        case operation::LessEquals:
+            mappedToInverseOperation.emplace(operation::GreaterThan);
             break;
-        case operation::greater_equals:
-            mappedToInverseOperation.emplace(operation::less_than);
+        case operation::GreaterEquals:
+            mappedToInverseOperation.emplace(operation::LessThan);
             break;
-        case operation::equals:
-            mappedToInverseOperation.emplace(operation::not_equals);
+        case operation::Equals:
+            mappedToInverseOperation.emplace(operation::NotEquals);
             break;
-        case operation::not_equals:
-            mappedToInverseOperation.emplace(operation::equals);
+        case operation::NotEquals:
+            mappedToInverseOperation.emplace(operation::Equals);
             break;
-        case operation::shift_left:
-            mappedToInverseOperation.emplace(operation::shift_right);
+        case operation::ShiftLeft:
+            mappedToInverseOperation.emplace(operation::ShiftRight);
             break;
-        case operation::shift_right:
-            mappedToInverseOperation.emplace(operation::shift_left);
+        case operation::ShiftRight:
+            mappedToInverseOperation.emplace(operation::ShiftLeft);
             break;
         default:
             break;
@@ -228,12 +231,175 @@ std::optional<operation> syrec_operation::invert(operation operation) noexcept {
 
 std::optional<operation> syrec_operation::getMatchingAssignmentOperationForOperation(operation operation) noexcept {
     switch (operation) {
-        case operation::addition:
-            return std::make_optional(operation::add_assign);
-        case operation::subtraction:
-            return std::make_optional(operation::minus_assign);
-        case operation::bitwise_xor:
-            return std::make_optional(operation::xor_assign);
+        case operation::Addition:
+            return std::make_optional(operation::AddAssign);
+        case operation::Subtraction:
+            return std::make_optional(operation::MinusAssign);
+        case operation::BitwiseXor:
+            return std::make_optional(operation::XorAssign);
+        default:
+            return std::nullopt;
+    }
+}
+
+ std::optional<operation> syrec_operation::tryMapBinaryOperationFlagToEnum(unsigned int binaryOperation) noexcept {
+    switch (binaryOperation) {
+        case syrec::BinaryExpression::Add:
+            return std::make_optional(operation::Addition);
+        case syrec::BinaryExpression::Subtract:
+            return std::make_optional(operation::Subtraction);
+        case syrec::BinaryExpression::Multiply:
+            return std::make_optional(operation::Multiplication);
+        case syrec::BinaryExpression::Divide:
+            return std::make_optional(operation::Division);
+        case syrec::BinaryExpression::Modulo:
+            return std::make_optional(operation::Modulo);
+        case syrec::BinaryExpression::FracDivide:
+            return std::make_optional(operation::UpperBitsMultiplication);
+        case syrec::BinaryExpression::Exor:
+            return std::make_optional(operation::BitwiseXor);
+        case syrec::BinaryExpression::LogicalAnd:
+            return std::make_optional(operation::LogicalAnd);
+        case syrec::BinaryExpression::LogicalOr:
+            return std::make_optional(operation::LogicalOr);
+        case syrec::BinaryExpression::BitwiseAnd:
+            return std::make_optional(operation::BitwiseAnd);
+        case syrec::BinaryExpression::BitwiseOr:
+            return std::make_optional(operation::BitwiseOr);
+        case syrec::BinaryExpression::LessThan:
+            return std::make_optional(operation::LessThan);
+        case syrec::BinaryExpression::GreaterThan:
+            return std::make_optional(operation::GreaterThan);
+        case syrec::BinaryExpression::Equals:
+            return std::make_optional(operation::Equals);
+        case syrec::BinaryExpression::NotEquals:
+            return std::make_optional(operation::NotEquals);
+        case syrec::BinaryExpression::LessEquals:
+            return std::make_optional(operation::LessEquals);
+        case syrec::BinaryExpression::GreaterEquals:
+            return std::make_optional(operation::GreaterEquals);
+        default:
+            return std::nullopt;
+    }
+}
+
+ std::optional<operation> syrec_operation::tryMapShiftOperationFlagToEnum(unsigned int shiftOperation) noexcept {
+    switch (shiftOperation) {
+        case syrec::ShiftExpression::Left:
+            return std::make_optional(operation::ShiftLeft);
+        case syrec::ShiftExpression::Right:
+            return std::make_optional(operation::ShiftRight);
+        default:
+            return std::nullopt;
+    }
+}
+
+
+ std::optional<operation> syrec_operation::tryMapAssignmentOperationFlagToEnum(unsigned int assignmentOperation) noexcept {
+    switch (assignmentOperation) {
+        case syrec::AssignStatement::Add:
+            return std::make_optional(operation::AddAssign);
+        case syrec::AssignStatement::Subtract:
+            return std::make_optional(operation::MinusAssign);
+        case syrec::AssignStatement::Exor:
+            return std::make_optional(operation::XorAssign);
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<operation> syrec_operation::tryMapUnaryAssignmentOperationFlagToEnum(unsigned int unaryAssignmentOperation) noexcept {
+    switch (unaryAssignmentOperation) {
+        case syrec::UnaryStatement::Increment:
+            return std::make_optional(operation::IncrementAssign);
+        case syrec::UnaryStatement::Decrement:
+            return std::make_optional(operation::DecrementAssign);
+        case syrec::UnaryStatement::Invert:
+            return std::make_optional(operation::InvertAssign);
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<unsigned> syrec_operation::tryMapBinaryOperationEnumToFlag(const operation binaryOperation) noexcept {
+    switch (binaryOperation) {
+        case operation::Addition:
+            return std::make_optional(syrec::BinaryExpression::Add);
+        case operation::Subtraction:
+            return std::make_optional(syrec::BinaryExpression::Subtract);
+        case operation::Multiplication:
+            return std::make_optional(syrec::BinaryExpression::Multiply);
+        case operation::Division:
+            return std::make_optional(syrec::BinaryExpression::Divide);
+        case operation::Modulo:
+            return std::make_optional(syrec::BinaryExpression::Modulo);
+        case operation::UpperBitsMultiplication:
+            return std::make_optional(syrec::BinaryExpression::FracDivide);
+        case operation::BitwiseXor:
+            return std::make_optional(syrec::BinaryExpression::Exor);
+        case operation::LogicalAnd:
+            return std::make_optional(syrec::BinaryExpression::LogicalAnd);
+        case operation::LogicalOr:
+            return std::make_optional(syrec::BinaryExpression::LogicalOr);
+        case operation::BitwiseAnd:
+            return std::make_optional(syrec::BinaryExpression::BitwiseAnd);
+        case operation::BitwiseOr:
+            return std::make_optional(syrec::BinaryExpression::BitwiseOr);
+        case operation::LessThan:
+            return std::make_optional(syrec::BinaryExpression::LessThan);
+        case operation::GreaterThan:
+            return std::make_optional(syrec::BinaryExpression::GreaterThan);
+        case operation::Equals:
+            return std::make_optional(syrec::BinaryExpression::Equals);
+        case operation::NotEquals:
+            return std::make_optional(syrec::BinaryExpression::NotEquals);
+        case operation::LessEquals:
+            return std::make_optional(syrec::BinaryExpression::LessEquals);
+        case operation::GreaterEquals:
+            return std::make_optional(syrec::BinaryExpression::GreaterEquals);
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<unsigned> syrec_operation::tryMapShiftOperationEnumToFlag(const operation shiftOperation) noexcept {
+    switch (shiftOperation) {
+        case operation::ShiftLeft:
+            return std::make_optional(syrec::ShiftExpression::Left);
+        case operation::ShiftRight:
+            return std::make_optional(syrec::ShiftExpression::Right);
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<unsigned int> syrec_operation::tryMapAssignmentOperationEnumToFlag(operation assignmentOperation) noexcept {
+    switch (assignmentOperation) {
+        case operation::AddAssign:
+            return std::make_optional(syrec::AssignStatement::Add);
+        case operation::MinusAssign:
+            return std::make_optional(syrec::AssignStatement::Subtract);
+        case operation::XorAssign:
+            return std::make_optional(syrec::AssignStatement::Exor);
+        case operation::IncrementAssign:
+            return std::make_optional(syrec::UnaryStatement::Increment);
+        case operation::DecrementAssign:
+            return std::make_optional(syrec::UnaryStatement::Decrement);
+        case operation::InvertAssign:
+            return std::make_optional(syrec::UnaryStatement::Invert);
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<unsigned int> syrec_operation::tryMapUnaryAssignmentOperationEnumToFlag(operation unaryAssignmentOperation) noexcept {
+    switch (unaryAssignmentOperation) {
+        case operation::IncrementAssign:
+            return std::make_optional(syrec::UnaryStatement::Increment);
+        case operation::DecrementAssign:
+            return std::make_optional(syrec::UnaryStatement::Decrement);
+        case operation::InvertAssign:
+            return std::make_optional(syrec::UnaryStatement::Invert);
         default:
             return std::nullopt;
     }

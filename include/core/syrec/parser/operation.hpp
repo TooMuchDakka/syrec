@@ -6,38 +6,38 @@ namespace syrec_operation {
     enum class operation {
         // Binary expression operations
         // BEGIN: Number operations
-        addition,
-        subtraction,
-        multiplication,
-        division,
+        Addition,
+        Subtraction,
+        Multiplication,
+        Division,
         // END: Number operations
-        modulo,
-        upper_bits_multiplication,
-        bitwise_xor,
-        logical_and,
-        logical_or,
-        bitwise_and,
-        bitwise_or,
-        less_than,
-        greater_than,
-        equals,
-        not_equals,
-        less_equals,
-        greater_equals,
+        Modulo,
+        UpperBitsMultiplication,
+        BitwiseXor,
+        LogicalAnd,
+        LogicalOr,
+        BitwiseAnd,
+        BitwiseOr,
+        LessThan,
+        GreaterThan,
+        Equals,
+        NotEquals,
+        LessEquals,
+        GreaterEquals,
         // Unary statement operations
-        increment_assign,
-        decrement_assign,
-        invert_assign,
+        IncrementAssign,
+        DecrementAssign,
+        InvertAssign,
         //Assign statement operations
-        add_assign,
-        minus_assign,
-        xor_assign,
+        AddAssign,
+        MinusAssign,
+        XorAssign,
         // Unary expression operations
-        bitwise_negation,
-        logical_negation,
+        BitwiseNegation,
+        LogicalNegation,
         // Shift expression operations
-        shift_left,
-        shift_right
+        ShiftLeft,
+        ShiftRight
     };
 
     [[nodiscard]] bool                        isOperandUsedAsLhsInOperationIdentityElement(operation operation, unsigned int operand) noexcept;
@@ -47,6 +47,20 @@ namespace syrec_operation {
     [[nodiscard]] bool                        isCommutative(operation operation) noexcept;
     [[nodiscard]] std::optional<operation>    invert(operation operation) noexcept;
     [[nodiscard]] std::optional<operation>    getMatchingAssignmentOperationForOperation(operation operation) noexcept;
+
+    [[nodiscard]] std::optional<operation> tryMapBinaryOperationFlagToEnum(unsigned int binaryOperation) noexcept;
+    [[nodiscard]] std::optional<operation> tryMapShiftOperationFlagToEnum(unsigned int shiftOperation) noexcept;
+    [[nodiscard]] std::optional<operation> tryMapAssignmentOperationFlagToEnum(unsigned int assignmentOperation) noexcept;
+    [[nodiscard]] std::optional<operation> tryMapUnaryAssignmentOperationFlagToEnum(unsigned int unaryAssignmentOperation) noexcept;
+    // TODO: Add mappings for unary expression if support for it is added within syrec
+    //[[nodiscard]] std::optional<unsigned int> tryMapUnaryExpressionOperationEnumToFlag(operation unaryExpressionOperation) noexcept;
+
+    [[nodiscard]] std::optional<unsigned int> tryMapBinaryOperationEnumToFlag(operation binaryOperation) noexcept;
+    [[nodiscard]] std::optional<unsigned int> tryMapShiftOperationEnumToFlag(operation shiftOperation) noexcept;
+    [[nodiscard]] std::optional<unsigned int> tryMapAssignmentOperationEnumToFlag(operation assignmentOperation) noexcept;
+    [[nodiscard]] std::optional<unsigned int> tryMapUnaryAssignmentOperationEnumToFlag(operation unaryAssignmentOperation) noexcept;
+    // TODO: Add mappings for unary expression if support for it is added within syrec
+    //[[nodiscard]] std::optional<unsigned int> tryMapUnaryAssignmentOperationEnumToFlag(operation unaryAssignmentOperation) noexcept;
 };
 
 #endif

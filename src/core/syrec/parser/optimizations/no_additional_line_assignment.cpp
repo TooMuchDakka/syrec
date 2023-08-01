@@ -1,7 +1,5 @@
 #include "core/syrec/parser/optimizations/no_additional_line_assignment.hpp"
 #include "core/syrec/parser/operation.hpp"
-// TODO: Refactor mapping of operation into own header file to not drag requirement for antlr dependencies into this class
-#include "core/syrec/parser/parser_utilities.hpp"
 
 #include <algorithm>
 #include <set>
@@ -184,11 +182,11 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
 std::optional<syrec_operation::operation> LineAwareOptimization::tryMapAssignmentOperand(unsigned assignmentOperand) {
     switch (assignmentOperand) {
         case syrec::AssignStatement::Add:
-            return std::make_optional(syrec_operation::operation::add_assign);
+            return std::make_optional(syrec_operation::operation::AddAssign);
         case syrec::AssignStatement::Subtract:
-            return std::make_optional(syrec_operation::operation::minus_assign);
+            return std::make_optional(syrec_operation::operation::MinusAssign);
         case syrec::AssignStatement::Exor: 
-            return std::make_optional(syrec_operation::operation::xor_assign);
+            return std::make_optional(syrec_operation::operation::XorAssign);
     }
     return std::nullopt;
 }
@@ -221,14 +219,14 @@ void LineAwareOptimization::traverseExpressionOperand(const syrec::expression::p
             referenceExprVariant     = exprAsBinaryExpr;
             lhsExprOfCurrentExpr = exprAsBinaryExpr->lhs;
             rhsExprOfCurrentExpr = exprAsBinaryExpr->rhs;
-            operationOfOperationNode = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+            operationOfOperationNode = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
         }
         else {
             const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr);
             referenceExprVariant        = exprAsShiftExpr;
             lhsExprOfCurrentExpr        = exprAsShiftExpr->lhs;
             rhsExprOfCurrentExpr        = std::make_shared<syrec::NumericExpression>(exprAsShiftExpr->rhs, exprAsShiftExpr->bitwidth());
-            operationOfOperationNode    = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(exprAsShiftExpr->op);
+            operationOfOperationNode    = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsShiftExpr->op);
         }
 
         /*
@@ -272,9 +270,9 @@ bool LineAwareOptimization::isExpressionOperandLeafNode(const syrec::expression:
 
 bool LineAwareOptimization::isOperationAdditionSubtractionOrXor(syrec_operation::operation operation) {
     switch (operation) {
-        case syrec_operation::operation::addition:
-        case syrec_operation::operation::subtraction:
-        case syrec_operation::operation::bitwise_xor:
+        case syrec_operation::operation::Addition:
+        case syrec_operation::operation::Subtraction:
+        case syrec_operation::operation::BitwiseXor:
             return true;
         default:
             return false;
@@ -283,17 +281,17 @@ bool LineAwareOptimization::isOperationAdditionSubtractionOrXor(syrec_operation:
 
 bool LineAwareOptimization::isOperationAssociative(syrec_operation::operation operation) {
     switch (operation) {
-        case syrec_operation::operation::addition:
-        case syrec_operation::operation::bitwise_xor:
-        case syrec_operation::operation::bitwise_and:
-        case syrec_operation::operation::bitwise_or:
-        case syrec_operation::operation::multiplication:
+        case syrec_operation::operation::Addition:
+        case syrec_operation::operation::BitwiseXor:
+        case syrec_operation::operation::BitwiseAnd:
+        case syrec_operation::operation::BitwiseOr:
+        case syrec_operation::operation::Multiplication:
         // TODO:
         //case syrec_operation::operation::upper_bits_multiplication:
-        case syrec_operation::operation::equals:
-        case syrec_operation::operation::not_equals:
-        case syrec_operation::operation::logical_and:
-        case syrec_operation::operation::logical_or:
+        case syrec_operation::operation::Equals:
+        case syrec_operation::operation::NotEquals:
+        case syrec_operation::operation::LogicalAnd:
+        case syrec_operation::operation::LogicalOr:
             return true;
         default:
             return false;
@@ -301,8 +299,8 @@ bool LineAwareOptimization::isOperationAssociative(syrec_operation::operation op
 }
 
 bool LineAwareOptimization::canOptimizeAssignStatement(syrec_operation::operation assignmentOperand, const PostOrderTreeTraversal& postOrderTraversalContainer) {
-    bool canOptimize = assignmentOperand != syrec_operation::operation::addition
-        ? postOrderTraversalContainer.doOperandsOperateOnLeafNodesOnly({syrec_operation::operation::subtraction, syrec_operation::operation::bitwise_xor})
+    bool canOptimize = assignmentOperand != syrec_operation::operation::Addition
+        ? postOrderTraversalContainer.doOperandsOperateOnLeafNodesOnly({syrec_operation::operation::Subtraction, syrec_operation::operation::BitwiseXor})
         : true;
 
     if (!postOrderTraversalContainer.areOperandsOnlyAdditionSubtractionOrXor()) {
@@ -330,13 +328,13 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithOn
 
     const auto binaryExprOfInitialAssignment = std::make_shared<syrec::BinaryExpression>(
             *childNodesOfDeepestOperationNode.first.fetchStoredExpr(),
-            *parser::ParserUtilities::mapOperationToInternalFlag(*deepestOperationNode.fetchStoredOperation()),
+            *syrec_operation::tryMapBinaryOperationEnumToFlag(*deepestOperationNode.fetchStoredOperation()),
             *childNodesOfDeepestOperationNode.second.fetchStoredExpr());
 
     const auto initialAssignmentFromDeepestBinaryExpr = std::make_shared<syrec::AssignStatement>(
         assignStmtLhs,
-        *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperand),
-            binaryExprOfInitialAssignment);
+        *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperand),
+        binaryExprOfInitialAssignment);
     
     createdAssignStatements.emplace_back(initialAssignmentFromDeepestBinaryExpr);
 
@@ -349,7 +347,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithOn
         const auto childNodeIndizes = *postOrderTraversalContainer.getChildNodesForOperationNode(*parentOperationNodeTraversalIdx);
         const std::pair childNodesOfOperationNode = std::make_pair(*postOrderTraversalContainer.getNode(childNodeIndizes.first), *postOrderTraversalContainer.getNode(childNodeIndizes.second));
 
-        const bool needToInvertAssignmentOperation = assignmentOperand == syrec_operation::operation::minus_assign;
+        const bool needToInvertAssignmentOperation = assignmentOperand == syrec_operation::operation::MinusAssign;
         syrec_operation::operation assignmentOperandToUse          = assignmentOperand;
         syrec::expression::ptr     rhsExprOfAssignment;
 
@@ -378,7 +376,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithOn
 
             const auto binaryExpr = std::make_shared<syrec::BinaryExpression>(
                     lhsOperandOfBinaryExpr,
-                    *parser::ParserUtilities::mapOperationToInternalFlag(binaryExprOperand),
+                    *syrec_operation::tryMapBinaryOperationEnumToFlag(binaryExprOperand),
                     rhsOperandOfBinaryExpr
             );
 
@@ -392,7 +390,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithOn
         }
         const auto createdAssignmentStatement = std::make_shared<syrec::AssignStatement>(
                 assignStmtLhs,
-                *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperandToUse),
+                *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperandToUse),
                 rhsExprOfAssignment);
 
         visitedStatusPerNode.insert(*parentOperationNodeTraversalIdx);
@@ -413,9 +411,9 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeComplexAssignStatemen
     });
 
     /*
-     * We can invert a subtraction to an addition by using the inverted inputs of the subtraction (i.e. (a - b) => (~a + ~b) ???)
-     * Since our optimizations only work when the subtraction and xor operation operate on leaf nodes only, we need to invert all other operation nodes with non-leaf nodes that use such operations
-     * Thus we need to identify which internal operation nodes use the subtraction operation and need to be inverted (i.e. x += (a - (b - (d - e))) => x+= (~a + (~b + (~d + ~e)))
+     * We can invert a Subtraction to an Addition by using the inverted inputs of the Subtraction (i.e. (a - b) => (~a + ~b) ???)
+     * Since our optimizations only work when the Subtraction and xor operation operate on leaf nodes only, we need to invert all other operation nodes with non-leaf nodes that use such operations
+     * Thus we need to identify which internal operation nodes use the Subtraction operation and need to be inverted (i.e. x += (a - (b - (d - e))) => x+= (~a + (~b + (~d + ~e)))
      */
     std::set<std::size_t> operationNodesToInvert;
     
@@ -432,7 +430,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeComplexAssignStatemen
         const bool isRightChildALeaf         = hasAnyLeafNodesAsChildren && !childNodes.second.isInternalNode;
 
         const auto                 operationOfCurrentOperationNode = *operationNode.fetchStoredOperation();
-        const bool                 useInvertedAssignmentOperation = assignmentOperand == syrec_operation::operation::minus_assign;
+        const bool                 useInvertedAssignmentOperation = assignmentOperand == syrec_operation::operation::MinusAssign;
         syrec_operation::operation assignmentOperationToUse       = useInvertedAssignmentOperation ? *syrec_operation::invert(assignmentOperand) : assignmentOperand;
         
         if (!hasAnyLeafNodesAsChildren) {   
@@ -458,7 +456,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeComplexAssignStatemen
                 assignmentOperationToUse = assignmentOperand;
                 assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
                         *childNodes.first.fetchStoredExpr(),
-                        *parser::ParserUtilities::mapOperationToInternalFlag(*operationNode.fetchStoredOperation()),
+                        *syrec_operation::tryMapBinaryOperationEnumToFlag(*operationNode.fetchStoredOperation()),
                         *childNodes.second.fetchStoredExpr());
             } else {
                 const auto& traversalIndexOfParentOfCurrentOperationNode = *postOrderTraversalContainer.getTraversalIdxOfParentOfNode(operationNodeTraversalIdx);
@@ -473,14 +471,14 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeComplexAssignStatemen
                 assignmentOperationToUse = useInvertedAssignmentOperation ? *syrec_operation::invert(operationOfParentNode) : operationOfParentNode;
                 assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
                         *childNodes.first.fetchStoredExpr(),
-                        *parser::ParserUtilities::mapOperationToInternalFlag(*operationNode.fetchStoredOperation()),
+                        *syrec_operation::tryMapBinaryOperationEnumToFlag(*operationNode.fetchStoredOperation()),
                         *childNodes.second.fetchStoredExpr());
             }
         }
 
         const auto createdAssignmentStatement = std::make_shared<syrec::AssignStatement>(
                 assignmentStmtLhsOperand,
-                *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperationToUse),
+                *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperationToUse),
                 assignmentStmtRhsOperand);
 
         const auto potentiallySplitAssignmentStatement = splitAssignmentStatementIfAssignmentAndRhsExpressionOperationMatch(createdAssignmentStatement);
@@ -493,7 +491,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeComplexAssignStatemen
 }
 
 LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimizeAssignStatementWithRhsContainingOperationsWithoutAssignEquivalent(const std::shared_ptr<syrec::AssignStatement>& assignStmt, const PostOrderTreeTraversal& postOrderTraversalContainer) {
-    const auto                        assignmentOperand = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(assignStmt->op);
+    const auto                        assignmentOperand = *syrec_operation::tryMapAssignmentOperationFlagToEnum(assignStmt->op);
     const syrec::VariableAccess::ptr& assignStmtLhs     = assignStmt->lhs;
 
     const auto& operationNodesInPostOrder = postOrderTraversalContainer.getTraversalIndexOfAllOperationNodes();
@@ -506,9 +504,9 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
             });
 
     /*
-     * We can invert a subtraction to an addition by using the inverted inputs of the subtraction (i.e. (a - b) => (~a + ~b) ???)
-     * Since our optimizations only work when the subtraction and xor operation operate on leaf nodes only, we need to invert all other operation nodes with non-leaf nodes that use such operations
-     * Thus we need to identify which internal operation nodes use the subtraction operation and need to be inverted (i.e. x += (a - (b - (d - e))) => x+= (~a + (~b + (~d + ~e)))
+     * We can invert a Subtraction to an Addition by using the inverted inputs of the Subtraction (i.e. (a - b) => (~a + ~b) ???)
+     * Since our optimizations only work when the Subtraction and xor operation operate on leaf nodes only, we need to invert all other operation nodes with non-leaf nodes that use such operations
+     * Thus we need to identify which internal operation nodes use the Subtraction operation and need to be inverted (i.e. x += (a - (b - (d - e))) => x+= (~a + (~b + (~d + ~e)))
      */
     std::set<std::size_t> operationNodesToInvert;
 
@@ -534,7 +532,7 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
         const bool isRightChildALeaf         = hasAnyLeafNodesAsChildren && !childNodes.second.isInternalNode;
 
         const auto                 operationOfCurrentOperationNode = *operationNode.fetchStoredOperation();
-        const bool                 useInvertedAssignmentOperation  = assignmentOperand == syrec_operation::operation::minus_assign;
+        const bool                 useInvertedAssignmentOperation  = assignmentOperand == syrec_operation::operation::MinusAssign;
         syrec_operation::operation assignmentOperationToUse        = useInvertedAssignmentOperation ? *syrec_operation::invert(assignmentOperand) : assignmentOperand;
 
         /*
@@ -573,11 +571,11 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
             assignmentOperationToUse            = operationOfCurrentOperationNode;
             const auto assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
                     lhsExpr,
-                    *parser::ParserUtilities::mapOperationToInternalFlag(operationOfCurrentOperationNode),
+                    *syrec_operation::tryMapBinaryOperationEnumToFlag(operationOfCurrentOperationNode),
                     rhsExpr);
             const auto& assignmentStmt = std::make_shared<syrec::AssignStatement>(
                     assignStmtLhs,
-                    *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperand),
+                    *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperand),
                     assignmentStmtRhsOperand);
             generatedAssignmentStatement.emplace_back(assignmentStmt);
             continue;
@@ -606,7 +604,7 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
                 assignmentOperationToUse = assignmentOperand;
                 assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
                         *childNodes.first.fetchStoredExpr(),
-                        *parser::ParserUtilities::mapOperationToInternalFlag(*operationNode.fetchStoredOperation()),
+                        *syrec_operation::tryMapBinaryOperationEnumToFlag(*operationNode.fetchStoredOperation()),
                         *childNodes.second.fetchStoredExpr());
             } else {
                 if (isOperationAdditionSubtractionOrXor(operationOfCurrentOperationNode)) {
@@ -633,7 +631,7 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
                     assignmentOperationToUse = useInvertedAssignmentOperation ? *syrec_operation::invert(operationOfParentNode) : operationOfParentNode;
                     assignmentStmtRhsOperand = std::make_shared<syrec::BinaryExpression>(
                             *childNodes.first.fetchStoredExpr(),
-                            *parser::ParserUtilities::mapOperationToInternalFlag(*operationNode.fetchStoredOperation()),
+                            *syrec_operation::tryMapBinaryOperationEnumToFlag(*operationNode.fetchStoredOperation()),
                             *childNodes.second.fetchStoredExpr());
                 }
             }
@@ -641,7 +639,7 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
 
         const auto createdAssignmentStatement = std::make_shared<syrec::AssignStatement>(
                 assignmentStmtLhsOperand,
-                *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperationToUse),
+                *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperationToUse),
                 assignmentStmtRhsOperand);
 
         const auto potentiallySplitAssignmentStatement = splitAssignmentStatementIfAssignmentAndRhsExpressionOperationMatch(createdAssignmentStatement);
@@ -652,7 +650,7 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
                 const auto  invertedAssignmentOperation = *syrec_operation::invert(*tryMapAssignmentOperand(assignmentStmtToCheck->op));
                 const auto  invertedAssignmentStmt      = std::make_shared<syrec::AssignStatement>(
                         assignmentStmtToCheck->lhs,
-                        *parser::ParserUtilities::mapOperationToInternalFlag(invertedAssignmentOperation),
+                        *syrec_operation::tryMapAssignmentOperationEnumToFlag(invertedAssignmentOperation),
                         assignmentStmtToCheck->rhs);
                 assignmentStatementsToRevert.emplace_back(invertedAssignmentStmt);
                 // Added index for revert statement is only relative and needs to be corrected after all assignment statements were added
@@ -677,12 +675,12 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
 
 bool LineAwareOptimization::doAssignmentAndRhsExpressionOperationMatch(syrec_operation::operation assignmentOperation, syrec_operation::operation rhsOperation) {
     switch (assignmentOperation) {
-        case syrec_operation::operation::add_assign:
-            return rhsOperation == syrec_operation::operation::addition;
-        case syrec_operation::operation::minus_assign:
-            return rhsOperation == syrec_operation::operation::subtraction;
-        case syrec_operation::operation::xor_assign:
-            return rhsOperation == syrec_operation::operation::bitwise_xor;
+        case syrec_operation::operation::AddAssign:
+            return rhsOperation == syrec_operation::operation::Addition;
+        case syrec_operation::operation::MinusAssign:
+            return rhsOperation == syrec_operation::operation::Subtraction;
+        case syrec_operation::operation::XorAssign:
+            return rhsOperation == syrec_operation::operation::BitwiseXor;
         default:
             return false;
     }
@@ -692,16 +690,16 @@ syrec::AssignStatement::vec LineAwareOptimization::splitAssignmentStatementIfAss
     syrec::AssignStatement::vec createdAssignmentStatements;
     if (const auto& rhsAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentStatement->rhs); rhsAsBinaryExpr != nullptr) {
         const auto assignmentOperation = *tryMapAssignmentOperand(assignmentStatement->op);
-        const auto rhsOperation        = *parser::ParserUtilities::mapInternalBinaryOperationFlagToEnum(rhsAsBinaryExpr->op);
+        const auto rhsOperation        = *syrec_operation::tryMapBinaryOperationFlagToEnum(rhsAsBinaryExpr->op);
         if (doAssignmentAndRhsExpressionOperationMatch(assignmentOperation, rhsOperation)) {
             const auto assignmentStmtWithLhsOperandOfRhsExpr = std::make_shared<syrec::AssignStatement>(
                     assignmentStatement->lhs,
-                    *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperation),
+                    *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperation),
                     rhsAsBinaryExpr->lhs);
 
             const auto assignmentStmtWithRhsOperandOfRhsExpr = std::make_shared<syrec::AssignStatement>(
                     assignmentStatement->lhs,
-                    *parser::ParserUtilities::mapOperationToInternalFlag(assignmentOperation),
+                    *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperation),
                     rhsAsBinaryExpr->rhs);
             createdAssignmentStatements.emplace_back(assignmentStmtWithLhsOperandOfRhsExpr);
             createdAssignmentStatements.emplace_back(assignmentStmtWithRhsOperandOfRhsExpr);
