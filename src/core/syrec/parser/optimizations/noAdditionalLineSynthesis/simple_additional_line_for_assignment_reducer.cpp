@@ -1,5 +1,6 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/simple_additional_line_for_assignment_reducer.hpp"
 
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_none_reversible_operations_and_unique_signal_occurrences_simplifier.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_only_reversible_operations_simplifier.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_reversible_ops_and_multilevel_signal_occurrence_simplifier.hpp"
 
@@ -11,7 +12,7 @@ syrec::AssignStatement::vec SimpleAdditionalLineForAssignmentReducer::tryReduceR
         return {};
     }
 
-    const auto assignmentOperation = tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op);
+    const auto assignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op);
     if (!assignmentOperation.has_value() 
         || !syrec_operation::invert(*assignmentOperation).has_value()
         || isExpressionEitherBinaryOrShiftExpression(assignmentStmtCasted->rhs)) {
@@ -76,16 +77,21 @@ syrec::AssignStatement::vec SimpleAdditionalLineForAssignmentReducer::tryReduceR
         return {};
     }
 
+    const auto& assignmentWithNonReversibleOperationsSimplifier = std::make_unique<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(symbolTable);
+    if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmt); !generatedAssignments.empty()) {
+        return generatedAssignments;
+    }
+
     syrec::expression::ptr     lhsExprOfTopMostExprOfAssignmentRhs;
     syrec::expression::ptr     rhsExprOfTopMostExprOfAssignmentRhs = nullptr;
     std::optional<syrec_operation::operation> topMostOperationNodeOfRhsExpr;
 
     if (assignmentStmtRhsExprAsBinaryExpr != nullptr) {
-        topMostOperationNodeOfRhsExpr       = tryMapOperationFlagToEnum(assignmentStmtRhsExprAsBinaryExpr, assignmentStmtRhsExprAsBinaryExpr->op);
+        topMostOperationNodeOfRhsExpr       = syrec_operation::tryMapBinaryOperationFlagToEnum(assignmentStmtRhsExprAsBinaryExpr->op);
         lhsExprOfTopMostExprOfAssignmentRhs = assignmentStmtRhsExprAsBinaryExpr->lhs;
         rhsExprOfTopMostExprOfAssignmentRhs = assignmentStmtRhsExprAsBinaryExpr->rhs;
     } else {
-        topMostOperationNodeOfRhsExpr = tryMapOperationFlagToEnum(assignmentStmtRhsExprAsShiftExpr, assignmentStmtRhsExprAsShiftExpr->op);
+        topMostOperationNodeOfRhsExpr = syrec_operation::tryMapShiftOperationFlagToEnum(assignmentStmtRhsExprAsShiftExpr->op);
         lhsExprOfTopMostExprOfAssignmentRhs = assignmentStmtRhsExprAsShiftExpr->lhs;
     }
 
@@ -156,7 +162,7 @@ bool SimpleAdditionalLineForAssignmentReducer::isExpressionEitherBinaryOrShiftEx
 
 bool SimpleAdditionalLineForAssignmentReducer::doesExpressionOnlyContainReversibleOperations(const syrec::expression::ptr& expr) {
     if (const auto exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
-        const auto mappedToOperationFlagOfBinaryExpr = tryMapOperationFlagToEnum(exprAsBinaryExpr, exprAsBinaryExpr->op);
+        const auto mappedToOperationFlagOfBinaryExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
         if (!mappedToOperationFlagOfBinaryExpr.has_value() || syrec_operation::invert(*mappedToOperationFlagOfBinaryExpr).has_value() || !syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationFlagOfBinaryExpr).has_value()) {
             return false;
         }
@@ -190,93 +196,6 @@ bool SimpleAdditionalLineForAssignmentReducer::isExpressionConstantNumber(const 
     return false;
 }
 
-std::optional<syrec_operation::operation> SimpleAdditionalLineForAssignmentReducer::tryMapAssignmentOperationFlagToEnum(unsigned operationFlag) {
-    switch (operationFlag) {
-        case syrec::AssignStatement::Add:
-            return std::make_optional(syrec_operation::operation::AddAssign);
-        case syrec::AssignStatement::Subtract:
-            return std::make_optional(syrec_operation::operation::MinusAssign);
-        case syrec::AssignStatement::Exor:
-            return std::make_optional(syrec_operation::operation::XorAssign);
-        default:
-            return std::nullopt;
-    }
-}
-
-std::optional<syrec_operation::operation> SimpleAdditionalLineForAssignmentReducer::tryMapBinaryOperationFlagToEnum(unsigned operationFlag) {
-    switch (operationFlag) {
-        case syrec::BinaryExpression::Add:
-            return std::make_optional(syrec_operation::operation::Addition);
-        case syrec::BinaryExpression::Subtract:
-            return std::make_optional(syrec_operation::operation::Subtraction);
-        case syrec::BinaryExpression::Exor:
-            return std::make_optional(syrec_operation::operation::BitwiseXor);
-        case syrec::BinaryExpression::Multiply:
-            return std::make_optional(syrec_operation::operation::Multiplication);
-        case syrec::BinaryExpression::Divide:
-            return std::make_optional(syrec_operation::operation::Division);
-        case syrec::BinaryExpression::Modulo:
-            return std::make_optional(syrec_operation::operation::Modulo);
-        case syrec::BinaryExpression::FracDivide:
-            return std::make_optional(syrec_operation::operation::UpperBitsMultiplication);
-        case syrec::BinaryExpression::LogicalAnd:
-            return std::make_optional(syrec_operation::operation::LogicalAnd);
-        case syrec::BinaryExpression::LogicalOr:
-            return std::make_optional(syrec_operation::operation::LogicalOr);
-        case syrec::BinaryExpression::BitwiseAnd:
-            return std::make_optional(syrec_operation::operation::BitwiseAnd);
-        case syrec::BinaryExpression::BitwiseOr:
-            return std::make_optional(syrec_operation::operation::BitwiseOr);
-        case syrec::BinaryExpression::LessThan:
-            return std::make_optional(syrec_operation::operation::LessThan);
-        case syrec::BinaryExpression::GreaterThan:
-            return std::make_optional(syrec_operation::operation::GreaterThan);
-        case syrec::BinaryExpression::Equals:
-            return std::make_optional(syrec_operation::operation::Equals);
-        case syrec::BinaryExpression::NotEquals:
-            return std::make_optional(syrec_operation::operation::NotEquals);
-        case syrec::BinaryExpression::LessEquals:
-            return std::make_optional(syrec_operation::operation::LessEquals);
-        case syrec::BinaryExpression::GreaterEquals:
-            return std::make_optional(syrec_operation::operation::GreaterEquals);
-        default:
-            return std::nullopt;
-    }
-}
-
-std::optional<syrec_operation::operation> SimpleAdditionalLineForAssignmentReducer::tryMapShiftOperationFlagToEnum(unsigned operationFlag) {
-    if (operationFlag == syrec::ShiftExpression::Left) {
-        return std::make_optional(syrec_operation::operation::ShiftLeft);
-    }
-    if (operationFlag == syrec::ShiftExpression::Right) {
-        return std::make_optional(syrec_operation::operation::ShiftRight);
-    }
-    return std::nullopt;
-}
-
-std::optional<syrec_operation::operation> SimpleAdditionalLineForAssignmentReducer::tryMapOperationFlagToEnum(const syrec::expression::ptr& expr, unsigned operationFlag) {
-    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
-        return tryMapBinaryOperationFlagToEnum(operationFlag);
-    }
-    if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
-        return tryMapShiftOperationFlagToEnum(operationFlag);
-    }
-    return std::nullopt;
-}
-
-std::optional<unsigned> SimpleAdditionalLineForAssignmentReducer::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation assignmentOperation) {
-    switch (assignmentOperation) {
-        case syrec_operation::operation::AddAssign:
-            return std::make_optional(syrec::AssignStatement::Add);
-        case syrec_operation::operation::MinusAssign:
-            return std::make_optional(syrec::AssignStatement::Subtract);
-        case syrec_operation::operation::XorAssign:
-            return std::make_optional(syrec::AssignStatement::Exor);
-        default:
-            return std::nullopt;
-    }
-}
-
 // TODO: Implement me
 bool SimpleAdditionalLineForAssignmentReducer::doVariableAccessesOverlap(const syrec::VariableAccess::ptr& signalPartsToCheck, const syrec::VariableAccess::ptr& signalPartsToBeCheckedForOverlap) {
     return false;
@@ -292,7 +211,7 @@ syrec::Statement::vec SimpleAdditionalLineForAssignmentReducer::invertAssignment
                 const auto assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
                 return std::make_shared<syrec::AssignStatement>(
                         assignmentCasted->lhs,
-                        *tryMapAssignmentOperationEnumToFlag(*syrec_operation::invert(*tryMapAssignmentOperationFlagToEnum(assignmentCasted->op))),
+                        *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::invert(*syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op))),
                         assignmentCasted->rhs);
             });
     return invertedAssignments;
@@ -417,7 +336,7 @@ bool SimpleAdditionalLineForAssignmentReducer::canAddAssignmentBeReplacedWithXor
         return false;
     }
 
-    const auto definedAssignmentOperation = tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op);
+    const auto definedAssignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op);
     if (!definedAssignmentOperation.has_value() || *definedAssignmentOperation != syrec_operation::operation::AddAssign) {
         return false;
     }

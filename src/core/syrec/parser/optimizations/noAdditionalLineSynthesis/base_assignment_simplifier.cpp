@@ -1,5 +1,7 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/base_assignment_simplifier.hpp"
 
+#include "core/syrec/parser/operation.hpp"
+
 using namespace noAdditionalLineSynthesis;
 
 BaseAssignmentSimplifier::~BaseAssignmentSimplifier() = default;
@@ -162,6 +164,24 @@ void BaseAssignmentSimplifier::markSignalAccessAsNotUsableInExpr(const syrec::Va
     } else {
         notUsableSignals.at(accessedSignalIdent).emplace_back(accessedSignalParts);
     }
+}
+
+void BaseAssignmentSimplifier::invertAssignments(syrec::Statement::vec& assignmentsToInvert, bool excludeLastAssignment) {
+    syrec::Statement::vec invertedAssignments;
+    const auto&           firstAssignmentToInvert = assignmentsToInvert.cbegin();
+    const auto&           lastAssignmentToInvert  = excludeLastAssignment ? std::prev(assignmentsToInvert.cend()) : assignmentsToInvert.cend();
+
+    std::transform(
+    firstAssignmentToInvert,
+    lastAssignmentToInvert,
+    std::back_inserter(assignmentsToInvert),
+    [](const syrec::AssignStatement::ptr& assignmentStmt) {
+        const auto assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
+        return std::make_shared<syrec::AssignStatement>(
+                assignmentCasted->lhs,
+                *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::invert(*syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op))),
+                assignmentCasted->rhs);
+    });
 }
 
 std::optional<unsigned int> BaseAssignmentSimplifier::tryFetchValueOfNumber(const syrec::Number::ptr& number) {

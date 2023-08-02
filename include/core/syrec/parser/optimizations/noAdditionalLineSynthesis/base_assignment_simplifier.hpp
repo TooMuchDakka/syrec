@@ -5,6 +5,7 @@
 #include "core/syrec/statement.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 
+// TODO: Handling of compile time constant expressions in both simplifiers as well as traversal helpers
 namespace noAdditionalLineSynthesis {
     class BaseAssignmentSimplifier {
     public:
@@ -24,6 +25,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                        doesExprDefineNestedExpr(const syrec::expression::ptr& expr);
         [[nodiscard]] static std::optional<unsigned int> tryFetchValueOfNumber(const syrec::Number::ptr& number);
         [[nodiscard]] static std::optional<unsigned int> tryFetchValueOfExpr(const syrec::expression::ptr& expr);
+        static void                                      invertAssignments(syrec::Statement::vec& assignmentsToInvert, bool excludeLastAssignment);
 
         [[nodiscard]] bool                                                                    doAccessedBitRangesOverlap(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::VariableAccess::ptr& potentiallyEnclosingSignalAccess, bool shouldAccessedBitRangeBeFullyEnclosed) const;
         [[nodiscard]] bool                                                                    doAccessedSignalPartsOverlap(const syrec::VariableAccess::ptr& accessedSignalPartsOfLhs, const syrec::VariableAccess::ptr& accessedSignalPartsOfRhs) const;

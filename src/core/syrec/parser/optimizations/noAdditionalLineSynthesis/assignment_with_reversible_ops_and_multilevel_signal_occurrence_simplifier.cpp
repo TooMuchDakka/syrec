@@ -95,7 +95,12 @@ syrec::Statement::vec AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::
 
 bool AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::isXorOperationOnlyDefinedForLeaveNodesInAST(const syrec::expression::ptr& expr) {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
-        return exprAsBinaryExpr->op == syrec::BinaryExpression::Exor ? !doesExprDefineNestedExpr(exprAsBinaryExpr->lhs) && !doesExprDefineNestedExpr(exprAsBinaryExpr->rhs) : true;
+        return exprAsBinaryExpr->op == syrec::BinaryExpression::Exor || exprAsBinaryExpr->op == syrec::BinaryExpression::Subtract ? ((doesExprDefineNestedExpr(exprAsBinaryExpr->lhs) 
+            ? isXorOperationOnlyDefinedForLeaveNodesInAST(exprAsBinaryExpr->lhs) : true) && (doesExprDefineNestedExpr(exprAsBinaryExpr->rhs) ? isXorOperationOnlyDefinedForLeaveNodesInAST(exprAsBinaryExpr->rhs) : true))
+            : true;
+    }
+    if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
+        return doesExprDefineNestedExpr(exprAsShiftExpr->lhs) ? isXorOperationOnlyDefinedForLeaveNodesInAST(exprAsShiftExpr->lhs) : true;
     }
     return true;
 }

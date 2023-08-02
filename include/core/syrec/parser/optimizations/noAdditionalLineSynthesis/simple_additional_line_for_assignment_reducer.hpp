@@ -58,11 +58,6 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                                      doesExpressionOnlyContainReversibleOperations(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                                      doesExpressionDefineSignalAccess(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                                      isExpressionConstantNumber(const syrec::expression::ptr& expr);
-        [[nodiscard]] static std::optional<syrec_operation::operation> tryMapOperationFlagToEnum(const syrec::expression::ptr& expr, unsigned int operationFlag);
-        [[nodiscard]] static std::optional<syrec_operation::operation> tryMapAssignmentOperationFlagToEnum(unsigned int operationFlag);
-        [[nodiscard]] static std::optional<syrec_operation::operation> tryMapBinaryOperationFlagToEnum(unsigned int operationFlag);
-        [[nodiscard]] static std::optional<syrec_operation::operation> tryMapShiftOperationFlagToEnum(unsigned int operationFlag);
-        [[nodiscard]] static std::optional<unsigned int>               tryMapAssignmentOperationEnumToFlag(syrec_operation::operation assignmentOperation);
         [[nodiscard]] static bool                                      doVariableAccessesOverlap(const syrec::VariableAccess::ptr& signalPartsToCheck, const syrec::VariableAccess::ptr& signalPartsToBeCheckedForOverlap);
         [[nodiscard]] static syrec::Statement::vec                     invertAssignments(const syrec::AssignStatement::vec& assignments);
         [[nodiscard]] static std::optional<unsigned int>               tryEvaluateNumberAsConstant(const syrec::Number::ptr& number);

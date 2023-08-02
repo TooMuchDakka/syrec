@@ -26,8 +26,7 @@ syrec::expression::ptr InorderOperationNodeTraversalHelper::OperationNodeLeaf::g
 
 std::optional<InorderOperationNodeTraversalHelper::OperationNodeReference> InorderOperationNodeTraversalHelper::getNextOperationNode() {
     while (!operationNodeTraversalQueue.empty()) {
-        const auto& nextOperationNode = std::make_optional(operationNodesLookup.at(operationNodeTraversalQueue.front()));
-        operationNodeTraversalQueue.pop();
+        const auto& nextOperationNode = std::make_optional(operationNodesLookup.at(operationNodeTraversalQueueIdx++));
         return nextOperationNode;
     }
     return std::nullopt;
@@ -37,7 +36,7 @@ std::optional<InorderOperationNodeTraversalHelper::OperationNodeReference> Inord
     if (operationNodeTraversalQueue.empty()) {
         return std::nullopt;
     }
-    return std::make_optional(operationNodesLookup.at(operationNodeTraversalQueue.front()));
+    return std::make_optional(operationNodesLookup.at(operationNodeTraversalQueue.at(operationNodeTraversalQueueIdx)));
 }
 
 std::optional<std::size_t> InorderOperationNodeTraversalHelper::getNodeIdOfLastOperationIdOfCurrentSubexpression() const {
@@ -45,16 +44,68 @@ std::optional<std::size_t> InorderOperationNodeTraversalHelper::getNodeIdOfLastO
         return std::nullopt;
     }
 
-    const auto& nextOperationNode = operationNodesLookup.at(operationNodeTraversalQueue.front());
+    const auto& nextOperationNode = operationNodesLookup.at(operationNodeTraversalQueueIdx);
+    /*
+     * The only operation node without a parent is the top most one and thus the last operation node of the subtree of the current operation node
+     * is, in case the right subtree has no operation nodes defined, the last entry in the operation node traversal queue. Otherwise, if
+     * the left subtree defines an subexpression, the node with id = node_id_first_of_rhs - 1 is the last one. If none of these conditions match,
+     * no value is returned
+     *
+     */
     if (!nextOperationNode->parentNodeId.has_value()) {
-        return std::make_optional(operationNodeTraversalQueue.front());
+        const auto& firstOperationNodeOfRightSubtree = operationNodesLookup.at(0)->rhs.isOperationNode ? std::make_optional(operationNodesLookup.at(0)->rhs) : std::nullopt;
+
+        if (firstOperationNodeOfRightSubtree.has_value()) {
+            return std::make_optional(firstOperationNodeOfRightSubtree->nodeId - 1);
+        }
+        return std::make_optional(operationNodeTraversalQueue.back());
+        std::optional<std::size_t> lastOperationNodeOfLeftSubtree = firstOperationNodeOfRightSubtree.has_value()
+            ? std::make_optional(firstOperationNodeOfRightSubtree->nodeId - 1)
+            : std::nullopt;
+
+        if (lastOperationNodeOfLeftSubtree.has_value()) {
+            const auto& foundLastOperationNodeOfLeftSubtree = std::find_if(
+            operationNodeTraversalQueue.cbegin(),
+            operationNodeTraversalQueue.cend(),
+            [&firstOperationNodeOfRightSubtree, &nextOperationNode](const std::size_t nodeId) {
+                if (firstOperationNodeOfRightSubtree.has_value()) {
+                    return nodeId > nextOperationNode->nodeId && nodeId < firstOperationNodeOfRightSubtree->nodeId;
+                }
+                return nodeId > nextOperationNode->nodeId;
+            });
+            if (foundLastOperationNodeOfLeftSubtree != operationNodeTraversalQueue.cend()) {
+                return *foundLastOperationNodeOfLeftSubtree;
+            }
+        }
+        return lastOperationNodeOfLeftSubtree;
     }
 
     const auto& parentOperationNode = operationNodesLookup.at(*nextOperationNode->parentNodeId);
-    if (parentOperationNode->lhs.nodeId == nextOperationNode->nodeId) {
+    if (nextOperationNode->nodeId == parentOperationNode->lhs.nodeId && parentOperationNode->rhs.isOperationNode) {
         return parentOperationNode->rhs.nodeId - 1;
     }
-    return parentOperationNode->lhs.nodeId - 1;
+
+    /*
+     * Search for the next operation node, considering the inorder traversal order of the operation nodes, after the current subexpression tree was traversed
+     * (i.e. search for the next operation node in one of the parent nodes). If none was found, the last operation node in the traversal queue is also the last
+     * of the subexpression.
+     */
+    const auto& nextOperationNodeInOneOfParents = findNextOperationNodeInOneOfParents(nextOperationNode);
+    if (!nextOperationNodeInOneOfParents.has_value()) {
+        return std::make_optional(operationNodeTraversalQueue.back());
+    }
+
+    // Otherwise, the first operation node with a node id smaller then the one found in the parent is the last one of the subexpression.
+    const auto& foundLastOperationNodeOfSubtree = std::find_if(
+    operationNodeTraversalQueue.rbegin(),
+    operationNodeTraversalQueue.rend(),
+[&nextOperationNodeInOneOfParents](const std::size_t nodeId) {
+            return nodeId == nextOperationNodeInOneOfParents.value() - 1;
+      }
+    );
+
+    // If both checks above do not return a result, the current operation node is the last one of the current subexpression
+    return std::make_optional(foundLastOperationNodeOfSubtree != operationNodeTraversalQueue.rend() ? *foundLastOperationNodeOfSubtree : nextOperationNode->nodeId);
 }
 
 
@@ -65,7 +116,7 @@ void InorderOperationNodeTraversalHelper::buildOperationNodesQueue(const syrec::
 InorderOperationNodeTraversalHelper::TraversalNode InorderOperationNodeTraversalHelper::buildOperationNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentNodeId) {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         const auto operationNodeId = operationNodeIdCounter++;
-        operationNodeTraversalQueue.emplace(operationNodeId);
+        operationNodeTraversalQueue.emplace_back(operationNodeId);
         const auto& lhsNode = buildOperationNode(exprAsBinaryExpr->lhs, std::make_optional(operationNodeId));
         const auto& rhsNode               = buildOperationNode(exprAsBinaryExpr->rhs, std::make_optional(operationNodeId));
         const auto& mappedBinaryOperation = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
@@ -74,7 +125,7 @@ InorderOperationNodeTraversalHelper::TraversalNode InorderOperationNodeTraversal
     }
     if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
         const auto operationNodeId = operationNodeIdCounter++;
-        operationNodeTraversalQueue.emplace(operationNodeId);
+        operationNodeTraversalQueue.emplace_back(operationNodeId);
         const auto& lhsNode               = buildOperationNode(exprAsShiftExpr->lhs, std::make_optional(operationNodeId));
         const auto& rhsNode              = buildOperationNode(exprAsShiftExpr->rhs, determineBitwidthOfExpr(exprAsShiftExpr->lhs));
         const auto& mappedShiftOperation  = *syrec_operation::tryMapShiftOperationFlagToEnum(exprAsShiftExpr->op);
@@ -158,19 +209,15 @@ unsigned InorderOperationNodeTraversalHelper::determineBitwidthOfSignalAccess(co
     return symbolTableEntryForSignal->bitwidth;
 }
 
-unsigned InorderOperationNodeTraversalHelper::mapBinaryOperationValueToFlag(syrec_operation::operation operation) {
-    switch (operation) {
-        
+std::optional<std::size_t> InorderOperationNodeTraversalHelper::findNextOperationNodeInOneOfParents(const OperationNodeReference& operationNode) const {
+    const auto& parentOperationNode = operationNode->parentNodeId.has_value() ? std::make_optional(operationNodesLookup.at(*operationNode->parentNodeId)) : std::nullopt;
+    if (!parentOperationNode.has_value()) {
+        return std::nullopt;
     }
-}
 
-unsigned InorderOperationNodeTraversalHelper::mapAssignmentEnumValueToFlag(syrec_operation::operation operation) {
-    switch (operation) {
-        case syrec_operation::operation::AddAssign:
-            return syrec::AssignStatement::Add;
-        case syrec_operation::operation::MinusAssign:
-            return syrec::AssignStatement::Subtract;
-        default:
-            return syrec::AssignStatement::Exor; 
+    const auto isCurrentOperationNodeLeftChildOfParent = operationNode->nodeId == parentOperationNode.value()->lhs.nodeId && parentOperationNode.value()->lhs.isOperationNode;
+    if (isCurrentOperationNodeLeftChildOfParent && parentOperationNode.value()->rhs.isOperationNode) {
+        return std::make_optional(parentOperationNode.value()->rhs.nodeId);
     }
+    return findNextOperationNodeInOneOfParents(parentOperationNode.value());
 }
