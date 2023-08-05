@@ -166,22 +166,28 @@ void BaseAssignmentSimplifier::markSignalAccessAsNotUsableInExpr(const syrec::Va
     }
 }
 
-void BaseAssignmentSimplifier::invertAssignments(syrec::Statement::vec& assignmentsToInvert, bool excludeLastAssignment) {
-    syrec::Statement::vec invertedAssignments;
-    const auto&           firstAssignmentToInvert = assignmentsToInvert.cbegin();
-    const auto&           lastAssignmentToInvert  = excludeLastAssignment ? std::prev(assignmentsToInvert.cend()) : assignmentsToInvert.cend();
+syrec::Statement::vec BaseAssignmentSimplifier::invertAssignments(const syrec::Statement::vec& assignmentsToInvert, bool excludeLastAssignment) {
+    if (assignmentsToInvert.size() == 1 && excludeLastAssignment) {
+        return assignmentsToInvert;
+    }
 
-    std::transform(
-    firstAssignmentToInvert,
-    lastAssignmentToInvert,
-    std::back_inserter(assignmentsToInvert),
-    [](const syrec::AssignStatement::ptr& assignmentStmt) {
-        const auto assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
-        return std::make_shared<syrec::AssignStatement>(
-                assignmentCasted->lhs,
-                *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::invert(*syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op))),
-                assignmentCasted->rhs);
-    });
+    auto numTotalAssignments = assignmentsToInvert.size() * 2;
+    if (excludeLastAssignment) {
+        numTotalAssignments--;
+    }
+    syrec::Statement::vec invertedAssignments(numTotalAssignments);
+    std::copy(assignmentsToInvert.cbegin(), assignmentsToInvert.cend(), invertedAssignments.begin());
+
+    std::size_t assignmentToInvertIdx = assignmentsToInvert.size() - (excludeLastAssignment ? 2 : 1);
+    for (auto i = assignmentsToInvert.size(); i < numTotalAssignments; ++i) {
+        const auto assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentsToInvert.at(assignmentToInvertIdx--));
+        invertedAssignments.at(i) = std::make_shared<syrec::AssignStatement>(
+            assignmentCasted->lhs,
+            *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::invert(*syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op))),
+            assignmentCasted->rhs
+        );
+    }
+    return invertedAssignments;
 }
 
 std::optional<unsigned int> BaseAssignmentSimplifier::tryFetchValueOfNumber(const syrec::Number::ptr& number) {

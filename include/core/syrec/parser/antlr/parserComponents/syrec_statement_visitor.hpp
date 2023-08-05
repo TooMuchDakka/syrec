@@ -132,13 +132,16 @@ namespace parser {
         [[nodiscard]] static std::optional<std::string> tryGetLoopVariableIdent(SyReCParser::ForStatementContext* loopContext);
         [[nodiscard]] std::optional<syrec::Statement::vec> determineLoopBodyWithSideEffectsDisabled(SyReCParser::StatementListContext* loopBodyStmtsContext);
         [[nodiscard]] bool                                 isValuePropagationBlockedDueToLoopDataFlowAnalysis(const syrec::VariableAccess::ptr& accessedPartsOfSignalToBeUpdated) const;
-        [[nodiscard]] syrec::AssignStatement::vec          trySimplifyAssignmentStatement(const syrec::AssignStatement::ptr& assignmentStmt);
+        [[nodiscard]] syrec::AssignStatement::vec          trySimplifyAssignmentStatement(const syrec::AssignStatement::ptr& assignmentStmt) const;
         void                                               addOrUpdateLoopVariableEntryAndOptionallyMakeItsValueAvailableForEvaluations(const std::string& loopVariableIdent, const std::optional<unsigned int>& valueOfLoopVariable, bool& wasNewSymbolTableScopeOpened) const;
         void                                               removeLoopVariableAndMakeItsValueUnavailableForEvaluations(const std::string& loopVariableIdent, bool wasNewSymbolTableScopeOpenedForLoopVariable) const;
 
         [[nodiscard]] static bool doesModuleOnlyHaveReadOnlyParameters(const syrec::Module::ptr& calledModule);
         [[nodiscard]] static bool doesModuleOnlyConsistOfSkipStatements(const syrec::Module::ptr& calledModule);
-        void                      decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(const syrec::Module::ptr& calledModule, const std::vector<std::string>& filteredCalleeArguments) const;
+        
+        void                                                       decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(const syrec::Module::ptr& calledModule, const std::vector<std::string>& filteredCalleeArguments) const;
+        void                                                       performAssignmentRhsExprSimplification(syrec::expression::ptr& assignmentRhsExpr) const;
+        void                                                       performAssignmentOperation(const syrec::AssignStatement::ptr& assignmentStmt) const;
     };
 } // namespace parser
 #endif

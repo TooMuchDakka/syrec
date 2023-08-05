@@ -50,5 +50,148 @@
   },
   "simpleTest": {
     "circuit": "module main(in x0(16), in x1(16), in x2(16), in x3(16), in x4(16), out x5(16)) x5 -= (((x0 * x1) + x1) + ((x2 * x1) + (x1 / (x2 - x3))))"
+  },
+  "simplifyWithEverySignalAccessDefinedOnceOnEveryLevel": {
+    "circuit": "module main(out x1, in x2, in x3, in x4, in x5, in x6, in x7, in x8, in x9, in x10) x1 -= ((x2 + ((x5 + x10) - (x3 - x4))) - (x7 + (x8 - x9)))"
+  },
+  "simplifyWithEverySignalAccessDefinedOnceOnEveryLevelOther": {
+    "circuit": "module main(out x1(2), in x2(2), in x3(2), in x4(2), in x5(2), in x6(2), in x7(2), in x8(2), in x9(2), in x10(2)) x1.0 -= ((x2.0 + ((x5.0 + x10.0) - (x3.0 - x1.1))) - (x7.0 + (x7.1 - x9.0)))"
+  },
+
+
+  "binaryOperationLeftUnchangedForNonNestedBinaryExpressionWithReversibleOperationButNonUniqueSignalAccessesWithAssignmentOperationBeingAddition": {
+    "circuit": "module main(out a(16), in b(16)) a += (b + b)"
+  },
+  "binaryOperationsLeftUnchangedForBinaryExpressionWithNestedLhsExprWithReversibleOperationsButNonUniqueSignalAccessesWithAssignmentOperationBeingAddition": {
+    "circuit": "module main(out a(16), in b(16), in c(16)) a += ((b - b) - c)",
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) a += (b - b); a -= c"
+  },
+  "binaryOperationsLeftUnchangedForBinaryExpressionWithNestedRhsExprWithReversibleOperationsButNonUniqueSignalAccessesWithAssignmentOperationBeingSubtraction": {
+    "circuit": "module main(out a(16), in b(16), in c(16)) a += (c - (b - b))",
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) a += c; a -= (b - b)"
+  },
+  "binaryOperationLeftUnchangedForNonNestedBinaryExpressionWithReversibleOperationButNonUniqueSignalAccessesWithAssignmentOperationBeingXor": {
+    "circuit": "module main(out a(16), in b(16)) a ^= (b + b)"
+  },
+  "binaryOperationLeftUnchangedForNonNestedBinaryExpressionWithReversibleOperationButNonUniqueSignalAccessesWithAssignmentOperationBeingSubtraction": {
+    "circuit": "module main(out a(16), in b(16)) a -= (b + b)"
+  },
+  "binaryOperationInvertedForBinaryExpressionWithNestedLhsExprWithReversibleOperationsButNonUniqueSignalAccessesWithAssignmentOperationBeingSubtraction": {
+    "circuit": "module main(out a(16), in b(16), in c(16)) a -= ((b - b) + c)",
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) a -= (b - b); a -= c"
+  },
+  "binaryOperationInvertedForBinaryExpressionWithNestedRhsExprWithReversibleOperationsButNonUniqueSignalAccessesWithAssignmentOperationBeingSubtraction": {
+    "circuit": "module main(out a(16), in b(16), in c(16)) a -= (c + (b - b))",
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) a -= c; a -= (b - b)"
+  },
+
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingAdditionWithBalancedAST": {
+    "circuit": "TODO",
+    "expectedCircuit": "TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingAdditionWithDegeneratedLhsSubASTOfLhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) x0 -= (((x6 + x1) - (((x2 - (x3 + x4)) + x6) - (x1 ^ x2))) + (x8 - (x3 ^ x4)))",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) x0 -= (x6 + x1); x0 += x2; x0 += (x3 + x4); x0 -= x6; x0 += (x1 ^ x2); x0 -= x8; x0 += (x3 ^ x4)"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingAdditionWithDegeneratedRhsSubASTOfLhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) skip",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingAdditionWithDegeneratedLhsSubASTOfRhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) skip",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingAdditionWithDegeneratedRhsSubASTOfRhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) skip",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingXorWithBalancedAST": {
+    "circuit": "TODO",
+    "expectedCircuit": "TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingXorWithDegeneratedLhsSubASTOfLhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) x0 -= (((x6 + x1) - (((x2 - (x3 + x4)) + x6) - (x1 ^ x2))) + (x8 - (x3 ^ x4)))",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) x0 -= (x6 + x1); x0 -= x2; x0 -= (x3 + x4); x0 += x6; x0 -= (x1 ^ x2); x0 += x8; x0 -= (x3 ^ x4)"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingXorWithDegeneratedRhsSubASTOfLhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) skip",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingXorWithDegeneratedLhsSubASTOfRhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) skip",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingXorWithDegeneratedRhsSubASTOfRhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) skip",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingMinusWithBalancedAST": {
+    "circuit": "TODO",
+    "expectedCircuit": "TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingMinusWithDegeneratedLhsSubASTOfLhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) x0 -= (((x6 + x1) - (((x2 - (x3 + x4)) + x6) - (x1 ^ x2))) + (x8 - (x3 ^ x4)))",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) x0 -= (x6 + x1); x0 -= x2; x0 -= (x3 + x4); x0 += x6; x0 -= (x1 ^ x2); x0 += x8; x0 -= (x3 ^ x4)"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingMinusWithDegeneratedRhsSubASTOfLhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) skip",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingMinusWithDegeneratedLhsSubASTOfRhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) skip",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) TODO"
+  },
+  "simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingMinusWithDegeneratedRhsSubASTOfRhsOfAssignmentExpr": {
+    "circuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) skip",
+    "expectedCircuit": "module main(out x0(16), in x1(16), in x2(16), in x3(16), in x4(16), in x5(16), in x6(16), in x7(16), in x8(16)) TODO"
+  },
+  "testTEst": {
+    "circuit": "module main(out x0, in x1, in x2, in x3, in x4) x0 -= ((x1 + x2) - (x3 ^ x1))"
+  },
+
+  "simplifyWithNoneReversibleOperationsComplexExample": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in d(16), in e(16), in f(16), in g(16), in h(16), in j(16), in k(16), in l(16), in m(16), in n(16)) x -= (((((a / e) + (b / g)) * (((m + n) * l) + d)) + k) * ((f * (g - h)) + j))",
+    "expectedCircuit": "module main(out x(16), in a(16), in b(16), in d(16), in e(16), in f(16), in g(16), in h(16), in j(16), in k(16), in l(16), in m(16), in n(16)) m += n; d += (m * l); k += (((a / e) + (b / g)) * d); g -= h; j += (f * g); x -= (k * j); j -= (f * g); g += h; k -= (((a / e) + (b / g)) * d); d -= (m * l); m -= n"
+  },
+  "simplifyWithNoneReversibleOperationsAndDegeneratedRhsExpression": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16), in e(16), in g(16)) x -= ((((a / e) + (b / g)) + (b / c)) * d)",
+    "expectedCircuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16), in e(16), in g(16)) a -= e; a += (b * g); a += (b / c); x -= (a * d); a -= (b / c); a -= (b * g); a += e"
+  },
+  "simplifyWithNoneReversibleOperationsAndDegeneratedLhsExpression": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16), in e(16), in g(16)) x -= (d * (((a / e) + (b / g)) + (b / c)))",
+    "expectedCircuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16), in e(16), in g(16)) a -= e; a += (b * g); a += (b / c); x -= (d * a); a -= (b / c); a -= (b * g); a += e"
+  },
+  "simplifyWithNoneReversibleOperationsAndTwoConsecutiveNoneReversibleOperationsInLhsExprLeavesAssignmentUnchanged": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16), in e(16), in g(16)) x -= (d * (((a / e) + (b / g)) / (b / c)))"
+  },
+  "simplifyWithNoneReversibleOperationsAndTwoConsecutiveNoneReversibleOperationsInRhsExprLeavesAssignmentUnchanged": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16), in e(16), in g(16)) x -= ((((a / e) + (b / g)) / (b / c)) * d)"
+  },
+  "simplifyWithNoneReversibleOperationsAndOperationNodeWithOneLeafAndSubtractionOperationWithSignalAccessInRhsCreatesExpressionInsteadOfAssignment": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16)) x -= (((a / d) - b) * c)"
+  },
+  "simplifyWithNoneReversibleOperationWithSimpleExpressionWithOneOperandWithTwoLeavesCreatesAssignmentCorrectly": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16)) x -= ((a + b) * c)",
+    "expectedCircuit": "module main(out x(16), in a(16), in b(16), in c(16)) a += b; x -= (a * c); a -= b"
+  },
+  "simplifyWithNoneReversibleOperationWithSimpleExpressionWithOperandNodeWithTwoLeavesCreatesAssignmentCorrectly": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16)) x -= ((a + b) * c)",
+    "expectedCircuit": "module main(out x(16), in a(16), in b(16), in c(16)) a += b; x -= (a * c); a -= b"
+  },
+  "simplifyWithNoneReversibleOperationWithSimpleExpressionWithXorOperandNodeWithTwoLeavesCreatesAssignmentAndIsInvertedCorrectly": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16)) x -= ((a ^ b) * c)",
+    "expectedCircuit": "module main(out x(16), in a(16), in b(16), in c(16)) a ^= b; x -= (a * c); a ^= b"
+  },
+  "simplifyWithNoneReversibleOperationWithOperationNodeWithOneLeafAndSubsequentExpressionDoesNotCreateAssignment": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16)) x -= ((((a / b) + (c * b)) + d) * c)",
+    "expectedCircuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16)) d += ((a / b) + (c * b)); x -= (d * c); d -= ((a / b) + (c * b))"
+  },
+  "simplifyWithNoneReversibleOperationWithOperationNodeWithOneLeafAndSubsequentExpressionDoesCreateAssignment": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16)) x -= ((((a / b) + c) + d) * a)",
+    "expectedCircuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16)) c += (a / b); d += c; x -= (d * a); d -= c; c -= (a / b)"
+  },
+  "simplifyWithNoneReversibleOperationsWithOperationNodeWithTwoSubexpressionsFusedCorrectlyWhenNoAssignmentIsPossible": {
+    "circuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16)) x -= (((a / b) + (c * b)) ^ d)",
+    "expectedCircuit": "module main(out x(16), in a(16), in b(16), in c(16), in d(16)) d ^= ((a / b) + (c * b)); x -= d; d ^= ((a / b) + (c * b))"
   }
 }

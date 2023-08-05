@@ -34,8 +34,7 @@ syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurr
 
     syrec::Statement::vec generatedAssignments = globalCreatedAssignmentContainer;
     generatedAssignments.emplace_back(std::make_shared<syrec::AssignStatement>(assignmentStmtCasted->lhs, assignmentStmtCasted->op, generatedAssignmentRhs));
-    invertAssignments(generatedAssignments, true);
-    return generatedAssignments;
+    return invertAssignments(generatedAssignments, true);
 }
 
 AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::SimplificationScopeReference AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::simplifyExpressionSubtree(const std::shared_ptr<InorderOperationNodeTraversalHelper>& operationNodeTraversalHelper) {
@@ -152,7 +151,6 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
             generatedSimplificationScope->expressionsRequiringFixup.emplace_back(createExpressionFor(generatedExprLhsOperand, operationNode->operation, generatedExprRhsOperand));
         }
     }
-
     return generatedSimplificationScope;
 }
 
@@ -190,21 +188,29 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
         generatedStatementRhs = std::make_shared<syrec::VariableExpression>(std::dynamic_pointer_cast<syrec::AssignStatement>(simplificationResultOfNonLeafNode->generatedAssignments.back())->lhs);
     }
 
+    const bool isLeafNodeLeftOperandOfOperation = !operationNode->lhs.isOperationNode;
     /*
      * Currently we have no way to convert expressions of the form (expr - signalAccess) to (-signalAccess += expr) since an assignment with the lhs negated is not allowed
      * by the SyReC grammar and we currently have not determine how we correctly negate an unsigned integer value. Thus, we create an binary expression instead of an assignment for now.
      * TODO: If assignment lhs can be defined as negated and unsigned integer values can be negated, an assignment instead of an binary expression should be created
      */
     const auto shouldExpressionInsteadOfAssignmentBeCreated = operationNode->operation == syrec_operation::operation::Subtraction && !operationNode->rhs.isOperationNode;
-    if (isOperationReversible && shouldExpressionInsteadOfAssignmentBeCreated) {
+    if (isOperationReversible && !shouldExpressionInsteadOfAssignmentBeCreated) {
         const auto& generatedAssignmentStatement = std::make_shared<syrec::AssignStatement>(
-            leafNode.value()->getAsSignalAccess().value()->var,
-            *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::getMatchingAssignmentOperationForOperation(operationNode->operation)),
-            generatedStatementRhs);
+                leafNode.value()->getAsSignalAccess().value()->var,
+                *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::getMatchingAssignmentOperationForOperation(operationNode->operation)),
+                generatedStatementRhs);  
+
         generatedScope->generatedAssignments.emplace_back(generatedAssignmentStatement);
         globalCreatedAssignmentContainer.emplace_back(generatedAssignmentStatement);
     } else {
-        generatedScope->expressionsRequiringFixup.emplace_back(createExpressionFor(leafNode.value()->getData(), operationNode->operation, generatedStatementRhs));
+        // We should keep the order of the operands in our generated expression, thus the distinction whether the leaf node was the left or right operand is needed
+        if (isLeafNodeLeftOperandOfOperation) {
+            generatedScope->expressionsRequiringFixup.emplace_back(createExpressionFor(leafNode.value()->getData(), operationNode->operation, generatedStatementRhs));    
+        }
+        else {
+            generatedScope->expressionsRequiringFixup.emplace_back(createExpressionFor(generatedStatementRhs, operationNode->operation, leafNode.value()->getData()));
+        }
     }
     return generatedScope;
 }

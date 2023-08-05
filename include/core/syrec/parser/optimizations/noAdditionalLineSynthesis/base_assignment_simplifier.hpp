@@ -25,7 +25,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                        doesExprDefineNestedExpr(const syrec::expression::ptr& expr);
         [[nodiscard]] static std::optional<unsigned int> tryFetchValueOfNumber(const syrec::Number::ptr& number);
         [[nodiscard]] static std::optional<unsigned int> tryFetchValueOfExpr(const syrec::expression::ptr& expr);
-        static void                                      invertAssignments(syrec::Statement::vec& assignmentsToInvert, bool excludeLastAssignment);
+        [[nodiscard]] static syrec::Statement::vec       invertAssignments(const syrec::Statement::vec& assignmentsToInvert, bool excludeLastAssignment);
 
         [[nodiscard]] bool                                                                    doAccessedBitRangesOverlap(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::VariableAccess::ptr& potentiallyEnclosingSignalAccess, bool shouldAccessedBitRangeBeFullyEnclosed) const;
         [[nodiscard]] bool                                                                    doAccessedSignalPartsOverlap(const syrec::VariableAccess::ptr& accessedSignalPartsOfLhs, const syrec::VariableAccess::ptr& accessedSignalPartsOfRhs) const;

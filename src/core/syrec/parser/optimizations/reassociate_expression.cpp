@@ -49,8 +49,8 @@ bool isOperationCombinedWithMultiplicationDistributive(syrec_operation::operatio
     }
 }
 
-syrec::expression::ptr createExpressionForNumber(const unsigned int number) {
-    return std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(number), 0);
+syrec::expression::ptr createExpressionForNumber(const unsigned int number, unsigned int expectedBitWidthOfCreatedExpression) {
+    return std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(number), expectedBitWidthOfCreatedExpression);
 }
 
 std::optional<unsigned int> tryGetConstantValueOfExpression(const syrec::expression::ptr& expr) {
@@ -192,7 +192,8 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
                                         *syrec_operation::apply(
                                                 syrec_operation::operation::Addition,
                                                 std::get<unsigned int>(*lhsExprDividedIntoConstantAndNonExprOperand),
-                                                std::get<unsigned int>(*rhsExprDividedIntoConstantAndNonExprOperand))),
+                                                std::get<unsigned int>(*rhsExprDividedIntoConstantAndNonExprOperand)),
+                                        std::get<syrec::expression::ptr>(*lhsExprDividedIntoConstantAndNonExprOperand)->bitwidth()),
                                 syrec::BinaryExpression::Add,
                                 createBinaryExpression(
                                         std::get<syrec::expression::ptr>(*lhsExprDividedIntoConstantAndNonExprOperand),
@@ -262,7 +263,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
 
             if (*childBinaryExprOperation == syrec_operation::operation::Multiplication) {
                 return createBinaryExpression(
-                        createExpressionForNumber(*productOfParentAndChildConstOperand),
+                        createExpressionForNumber(*productOfParentAndChildConstOperand, std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr)->bitwidth()),
                         (*childBinaryExpression)->op,
                         std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr));
             }
@@ -277,7 +278,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
             *
             */
             return createBinaryExpression(
-                    createExpressionForNumber(*productOfParentAndChildConstOperand),
+                    createExpressionForNumber(*productOfParentAndChildConstOperand, std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr)->bitwidth()),
                     (*childBinaryExpression)->op,
                     simplifyBinaryExpression(
                             createBinaryExpression(
@@ -346,7 +347,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
 
             return simplifyBinaryExpression(
                     createBinaryExpression(
-                            createExpressionForNumber(*sumOfParentAndChildConstOperand),
+                            createExpressionForNumber(*sumOfParentAndChildConstOperand, std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr)->bitwidth()),
                             syrec::BinaryExpression::Add,
                             std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr)), 
                 operationStrengthReductionEnabled, optionalMultiplicationSimplifier);

@@ -90,6 +90,10 @@ syrec::Statement::vec AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::
 
         potentialNextSignalAccess        = exprTraversalHelper->getNextElement();
     } while (potentialNextSignalAccess.has_value());
+
+    if (!generatedAssignments.empty()) {
+        return invertAssignments(generatedAssignments, true);
+    }
     return generatedAssignments;
 }
 

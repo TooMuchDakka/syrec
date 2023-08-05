@@ -1,5 +1,5 @@
-#ifndef SIMPLE_ADDITIONAL_LINE_FOR_ASSIGNMENT_REDUCER_HPP
-#define SIMPLE_ADDITIONAL_LINE_FOR_ASSIGNMENT_REDUCER_HPP
+#ifndef MAIN_ADDITIONAL_LINE_FOR_ASSIGNMENT_SIMPLIFIER_HPP
+#define MAIN_ADDITIONAL_LINE_FOR_ASSIGNMENT_SIMPLIFIER_HPP
 #pragma once
 
 #include "core/syrec/statement.hpp"
@@ -7,7 +7,7 @@
 #include "core/syrec/parser/symbol_table.hpp"
 
 namespace noAdditionalLineSynthesis {
-    class SimpleAdditionalLineForAssignmentReducer {
+    class MainAdditionalLineForAssignmentSimplifier {
     public:
         /**
          * \brief Callback used to perform further simplification of the given assignment statement
@@ -16,10 +16,11 @@ namespace noAdditionalLineSynthesis {
         using FurtherAssignmentStatementSimplificationCallback = void(*)(syrec::AssignStatement::ptr& assignmentStmt);
         /**
          * \brief Callback used to perform the actual assignment
-         * \param assignmentStmt The assignment statement to be performed
-         * \param symbolTable The symbol table instance that should be updated with the side effect of the assignment statement
+         * \param assignmentStmt The statement defining the assignment to be performed
+         * \param symbolTable TODO: REMOVE The symbol table instance that should be updated with the side effect of the assignment statement
          */
-        using AssignmentStatementApplicationCallback = void(*)(const syrec::AssignStatement::ptr& assignmentStmt, const parser::SymbolTable::ptr& symbolTable);
+        //using AssignmentStatementApplicationCallback = void(*)(const syrec::AssignStatement::ptr& assignmentStmt, const parser::SymbolTable::ptr& symbolTable);
+        using AssignmentStatementApplicationCallback = void(*)(const syrec::AssignStatement::ptr& assignmentStmt);
 
         struct NotUsableAsReplacementSignalParts {
             syrec::VariableAccess::ptr blockedSignalParts;
@@ -29,10 +30,10 @@ namespace noAdditionalLineSynthesis {
         };        
         using LookupOfExcludedSignalsForReplacement = std::unique_ptr<std::map<std::string_view, std::vector<NotUsableAsReplacementSignalParts>>>;
 
-        explicit SimpleAdditionalLineForAssignmentReducer(parser::SymbolTable::ptr symbolTable, FurtherAssignmentStatementSimplificationCallback assignmentStatementSimplificationCallback, AssignmentStatementApplicationCallback assignmentApplicationCallback)
+        explicit MainAdditionalLineForAssignmentSimplifier(parser::SymbolTable::ptr symbolTable, FurtherAssignmentStatementSimplificationCallback assignmentStatementSimplificationCallback, AssignmentStatementApplicationCallback assignmentApplicationCallback)
             : symbolTable(std::move(symbolTable)), furtherAssignmentSimplificationCallback(assignmentStatementSimplificationCallback), assignmentApplicationCallback(assignmentApplicationCallback) {}
 
-        syrec::AssignStatement::vec tryReduceRequiredAdditionalLinesFor(const syrec::AssignStatement::ptr& assignmentStmt);
+        [[nodiscard]] syrec::AssignStatement::vec tryReduceRequiredAdditionalLinesFor(const syrec::AssignStatement::ptr& assignmentStmt) const;
 
     private:
         using TransformedDimensionAccess = std::vector<std::optional<unsigned int>>;
@@ -63,7 +64,10 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static std::optional<unsigned int>               tryEvaluateNumberAsConstant(const syrec::Number::ptr& number);
         [[nodiscard]] static bool                                      doBitRangesOverlap(const optimizations::BitRangeAccessRestriction::BitRangeAccess& thisBitRange, const optimizations::BitRangeAccessRestriction::BitRangeAccess& thatBitRange);
         [[nodiscard]] static bool                                      doDimensionAccessesOverlap(const TransformedDimensionAccess& thisDimensionAccess, const TransformedDimensionAccess& thatDimensionAccess);
-        
+        [[nodiscard]] static std::optional<syrec::expression::ptr>     tryConvertCompileTimeConstantExpressionToBinaryExpression(const syrec::Number::ptr& potentialCompileTimeExpression, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable);
+        [[nodiscard]] static std::optional<syrec_operation::operation> tryMapCompileTimeConstantOperation(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression);
+        [[nodiscard]] static std::optional<syrec::expression::ptr>     tryMapNumberToExpression(const syrec::Number::ptr& number, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable);
+
         struct VariableAccessCountPair {
             std::size_t                accessCount;
             syrec::VariableAccess::ptr accessedSignalParts;

@@ -10,14 +10,11 @@
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/value_broadcaster.hpp"
 #include "core/syrec/parser/optimizations/loop_optimizer.hpp"
-
 #include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 #include "core/syrec/parser/utils/bit_helpers.hpp"
 #include "core/syrec/parser/optimizations/no_additional_line_assignment.hpp"
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
-#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_none_reversible_operations_and_unique_signal_occurrences_simplifier.hpp"
-#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_only_reversible_operations_simplifier.hpp"
-#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_reversible_ops_and_multilevel_signal_occurrence_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/main_additional_line_for_assignment_simplifier.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
 #include "core/syrec/parser/utils/loop_range_utils.hpp"
 
@@ -120,156 +117,16 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
             }
         } else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(mapAntlrTokenPosition(context->signal()->start), lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
             // TODO: CONSTANT_PROPAGATION: Invalidate stored values if rhs is not constant
-            const auto& assignedToSignalParts = *(*assignedToSignal)->getAsVariableAccess();
-
-            const auto& containerOfExpressionContainingNewValue = (*assignmentOpRhsOperand)->getAsExpression();
-            const auto& exprContainingNewValue = *containerOfExpressionContainingNewValue;
-            
             const auto assignStmt = std::make_shared<syrec::AssignStatement>(
-                    assignedToSignalParts,
+                    *(*assignedToSignal)->getAsVariableAccess(),
                     *syrec_operation::tryMapAssignmentOperationEnumToFlag(*definedAssignmentOperation),
-                    exprContainingNewValue);
+                    *(*assignmentOpRhsOperand)->getAsExpression());
 
-            if (!sharedData->parserConfig->noAdditionalLineOptimizationEnabled) {
-                if (const auto& rhsAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(exprContainingNewValue); rhsAsNumericExpr != nullptr) {
-                    const std::optional<unsigned int> optionalConstantValueOfRhs = rhsAsNumericExpr->value->isConstant() ? std::make_optional(rhsAsNumericExpr->value->evaluate(sharedData->loopVariableMappingLookup)) : std::nullopt;
-
-                    if (optionalConstantValueOfRhs.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*definedAssignmentOperation, *optionalConstantValueOfRhs) 
-                        && sharedData->parserConfig->deadCodeEliminationEnabled) {
-                        return 0;
-                    }
-                }
-                addStatementToOpenContainer(assignStmt);
-
-                if (isValuePropagationBlockedDueToLoopDataFlowAnalysis(assignedToSignalParts)) {
-                    invalidateStoredValueFor(assignedToSignalParts);
-                }
-                else {
-                    // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
-                    tryUpdateOrInvalidateStoredValueFor(assignedToSignalParts, tryDetermineNewSignalValueFromAssignment(assignedToSignalParts, *definedAssignmentOperation, exprContainingNewValue));                    
-                }
-
-
-                if (sharedData->optionalExpectedExpressionSignalWidth.has_value()) {
-                    sharedData->optionalExpectedExpressionSignalWidth.reset();
-                }
-
-                if (needToResetSignalRestriction) {
-                    sharedData->resetSignalAccessRestriction();
-                }
-                return 0;
-            }
-
-            /*
-             * For this optimization we should disable the constant propagation in case that it evaluates to a constant that cannot be dropped for the given binary expr.
-             * Otherwise, perform the no additional line synthesis optimization and only then apply the reorder expression and constant propagation on the generated assign statements
-             * This also means that we also no the check after the simplification if an assignment statement can be dropped (i.e. a += 0, etc.) [which means we would also need to delete
-             * the inverted assignment statement if it exists]
-             *
-             */
-            // TODO: Uncomment
-            //const auto& optimizationResultOfAssignmentStmt = optimizations::LineAwareOptimization::optimize(assignStmt);
-            //const auto& createdAssignmentStmts = optimizationResultOfAssignmentStmt.statements;
-            // TODO: Delete
-            std::vector<syrec::AssignStatement::ptr> createdAssignmentStmts = {};
-            createdAssignmentStmts.emplace_back(assignStmt);
-
-            std::vector omitStatusPerAssignStatement(createdAssignmentStmts.size(), false);
-            std::size_t statementIdx = 0;
-
-            // TODO: If the rhs of the assignment operation does not change the value of the lhs (i.e. a += 0) we can drop the statement all together
-            // TODO: If we start dropping statements, we should also check if the checks for empty statement blocks in IF, FOR statements and MODULE definitions are correct
-            for (const auto& assignmentStmt: createdAssignmentStmts) {
-                const auto& typecastedAssignmentStmt = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
-                if (typecastedAssignmentStmt == nullptr || omitStatusPerAssignStatement[statementIdx]) {
-                    statementIdx++;
-                    continue;
-                }
-
-                // TODO: Loop variables should probably also not be automatically substituted with their respective value ?
-                if (sharedData->parserConfig->performConstantPropagation) {
-                /*
-                 * TODO: This should only be relevant for expressions containing operations different than (^,+,-)
-                 * This would also mean that we would perform constant propagation only in case the above condition does not hold (i.e. only in expressions containing (^,+,-)
-                 */ 
-
-                }
-
-                bool                   couldSimplifyRhsExpr  = false;
-                syrec::expression::ptr assignmentStmtRhsExpr = typecastedAssignmentStmt->rhs;
-                if (!sharedData->parserConfig->reassociateExpressionsEnabled) {
-                    const auto& simplifiedRhsExpr = optimizations::simplifyBinaryExpression(assignmentStmtRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier);
-                    couldSimplifyRhsExpr = assignmentStmtRhsExpr != simplifiedRhsExpr;
-                    if (couldSimplifyRhsExpr) {
-                        assignmentStmtRhsExpr = simplifiedRhsExpr;
-                    }
-                } else {
-                    const auto& simplificationResultOfRhsExpr = optimizations::trySimplify(assignmentStmtRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled);
-                    if (simplificationResultOfRhsExpr.couldSimplify) {
-                        assignmentStmtRhsExpr = simplificationResultOfRhsExpr.simplifiedExpression;
-                        couldSimplifyRhsExpr  = true;
-                    }
-
-                    /*
-                     * Since the reassociate expression optimization also incorporates the simplification of Multiplication operations, we only need the perform the latter when the former optimization is not enabled
-                     */
-                    if (const auto& rhsOperandAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentStmtRhsExpr); rhsOperandAsBinaryExpr != nullptr && sharedData->optionalMultiplicationSimplifier.has_value()) {
-                        if (const auto optionalSimplificationResultOfMultiplicationsOfRhsOperand = sharedData->optionalMultiplicationSimplifier.value()->trySimplify(rhsOperandAsBinaryExpr); optionalSimplificationResultOfMultiplicationsOfRhsOperand.has_value()) {
-                            assignmentStmtRhsExpr = *optionalSimplificationResultOfMultiplicationsOfRhsOperand;
-                            couldSimplifyRhsExpr  = true;
-                        }
-                    }
-                }
-
-                if (const auto& assignmentStmtRhsAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(assignmentStmtRhsExpr); assignmentStmtRhsAsNumericExpr != nullptr) {
-                    const std::optional<unsigned int> optionalConstantValueOfRhs = assignmentStmtRhsAsNumericExpr->value->isConstant()
-                        ? std::make_optional(assignmentStmtRhsAsNumericExpr->value->evaluate(sharedData->loopVariableMappingLookup))
-                        : std::nullopt;
-                    
-                    if (optionalConstantValueOfRhs.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*definedAssignmentOperation, *optionalConstantValueOfRhs)
-                        && sharedData->parserConfig->deadCodeEliminationEnabled) {
-                        /*
-                         * If the current assignment statement leaves the lhs unchanged we can both skip the current assignment statement as well the associated revert statement (only if the latter actually exists)
-                         */
-                        // TODO: uncomment, was only commented out for testing of optimization of assignments with nonreversible operations rework
-                        /*if (optimizationResultOfAssignmentStmt.revertStatementLookup.count(statementIdx) != 0) {
-                            omitStatusPerAssignStatement[optimizationResultOfAssignmentStmt.revertStatementLookup.at(statementIdx)] = true;
-                            statementIdx++;
-                            continue;
-                        } */
-                    }
-                }
-
-                auto finalAssignmentStmt = typecastedAssignmentStmt;
-                if (couldSimplifyRhsExpr) {
-                    finalAssignmentStmt = std::make_shared<syrec::AssignStatement>(
-                            typecastedAssignmentStmt->lhs,
-                            typecastedAssignmentStmt->op,
-                            assignmentStmtRhsExpr);
-                }
-                //std::unique_ptr<noAdditionalLineSynthesis::AssignmentWithOnlyReversibleOperationsSimplifier> test   = std::make_unique<noAdditionalLineSynthesis::AssignmentWithOnlyReversibleOperationsSimplifier>(sharedData->currentSymbolTableScope);
-                //const auto& test   = std::make_unique<noAdditionalLineSynthesis::AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence>(sharedData->currentSymbolTableScope);
-                /*const auto& test   = std::make_unique<noAdditionalLineSynthesis::AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(sharedData->currentSymbolTableScope);
-                const auto& result = test->simplify(finalAssignmentStmt);
-                if (!result.empty()) {
-                    for (const auto& assignment : result) {
-                        addStatementToOpenContainer(assignment);
-                    }
-                }
-                else {
-                    addStatementToOpenContainer(finalAssignmentStmt);                    
-                }*/
-                addStatementToOpenContainer(finalAssignmentStmt);                    
-                if (isValuePropagationBlockedDueToLoopDataFlowAnalysis(finalAssignmentStmt->lhs)) {
-                    invalidateStoredValueFor(finalAssignmentStmt->lhs);
-                }
-                else {
-                    const auto usedAssignmentOperationOfFinalAssignmentStmt = *syrec_operation::tryMapBinaryOperationFlagToEnum(typecastedAssignmentStmt->op);
-                    // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
-                    tryUpdateOrInvalidateStoredValueFor(finalAssignmentStmt->lhs, tryDetermineNewSignalValueFromAssignment(typecastedAssignmentStmt->lhs, usedAssignmentOperationOfFinalAssignmentStmt, finalAssignmentStmt->rhs));                    
-                }
-
-                statementIdx++;
+            if (const auto& simplificationResultOfAssignment = trySimplifyAssignmentStatement(assignStmt); !simplificationResultOfAssignment.empty()) {
+                for (const auto& generatedAssignment : simplificationResultOfAssignment) {
+                    performAssignmentOperation(generatedAssignment);
+                    addStatementToOpenContainer(generatedAssignment);
+                }    
             }
         }
         else {
@@ -299,10 +156,8 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
      * What we do need is to refactor the dimension propagation blocked functionality into a separate class
      */ 
     if (needToResetSignalRestriction) {
-        const auto assignedToSignalIdent = (*(*assignedToSignal)->getAsVariableAccess())->getVar()->name;
         sharedData->resetSignalAccessRestriction();
     }
-
     return 0;
 }
 
@@ -1673,7 +1528,76 @@ void SyReCStatementVisitor::decrementReferenceCountsOfCalledModuleAndActuallyUse
     sharedData->currentSymbolTableScope->decrementReferenceCountOfModulesMatchingSignature(calledModule);
 }
 
-syrec::AssignStatement::vec SyReCStatementVisitor::trySimplifyAssignmentStatement(const syrec::AssignStatement::ptr& assignmentStmt) {
-    return {};
-    //return assignmentStmt;
+syrec::AssignStatement::vec SyReCStatementVisitor::trySimplifyAssignmentStatement(const syrec::AssignStatement::ptr& assignmentStmt) const {
+    // TODO: Remove, only used for testing
+    // TODO: Bitwidth is not set for simplification of binary expression for example circuit bn_2
+    //return {assignmentStmt};
+
+    const auto& assignmentStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
+    if (assignmentStmtCasted == nullptr) {
+        return {assignmentStmt};
+    }
+    const auto definedAssignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op);
+    if (!definedAssignmentOperation.has_value()) {
+        return {assignmentStmt};
+    }
+
+    auto assignmentStmtRhs = assignmentStmtCasted->rhs;
+    performAssignmentRhsExprSimplification(assignmentStmtRhs);
+
+    if (const auto& assignmentStmtRhsAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(assignmentStmtRhs); 
+        assignmentStmtRhsAsNumericExpr != nullptr && (sharedData->parserConfig->deadCodeEliminationEnabled || sharedData->parserConfig->deadStoreEliminationEnabled)) {
+        const auto& optionalConstantValueOfRhs = assignmentStmtRhsAsNumericExpr->value->isConstant()
+            ? std::make_optional(assignmentStmtRhsAsNumericExpr->value->evaluate(sharedData->loopVariableMappingLookup))
+            : std::nullopt;
+
+        if (optionalConstantValueOfRhs.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*definedAssignmentOperation, *optionalConstantValueOfRhs)) {
+            return {};
+        }
+    }
+
+    const auto& transformedAssignmentStmt = assignmentStmtRhs == assignmentStmtCasted->rhs
+        ? assignmentStmt
+        : std::make_shared<syrec::AssignStatement>(assignmentStmtCasted->lhs, assignmentStmtCasted->op, assignmentStmtRhs);
+    
+     if (sharedData->parserConfig->noAdditionalLineOptimizationEnabled) {
+        const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::MainAdditionalLineForAssignmentSimplifier>(sharedData->currentSymbolTableScope, nullptr, nullptr);
+        if (const auto& generatedSimplifierAssignments = noAdditionalLineAssignmentSimplifier->tryReduceRequiredAdditionalLinesFor(transformedAssignmentStmt); !generatedSimplifierAssignments.empty()) {
+            return generatedSimplifierAssignments;
+        }
+     }
+     return {transformedAssignmentStmt};
+}
+
+/*
+ * TODO: Behaviour during loop unrolling
+ *
+ * When the readonly parse step of the loop body takes place, the assignment will probably invalidate the stored value of the signal
+ * Is the value, if available prior to the loop unroll, preserved for the non-readonly step ?
+ */
+void SyReCStatementVisitor::performAssignmentOperation(const syrec::AssignStatement::ptr& assignmentStmt) const {
+    const auto& assignmentStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
+    const auto  definedAssignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op);
+    if (assignmentStmtCasted == nullptr) {
+        return;
+    }
+
+    if (isValuePropagationBlockedDueToLoopDataFlowAnalysis(assignmentStmtCasted->lhs) || !definedAssignmentOperation.has_value()) {
+        invalidateStoredValueFor(assignmentStmtCasted->lhs);
+    } else {
+        // We need to update the currently stored value for the assigned to signal if the rhs expression evaluates to a constant, otherwise invalidate the stored value for the former
+        tryUpdateOrInvalidateStoredValueFor(assignmentStmtCasted->lhs, tryDetermineNewSignalValueFromAssignment(assignmentStmtCasted->lhs, *definedAssignmentOperation, assignmentStmtCasted->rhs));
+    }
+}
+
+void SyReCStatementVisitor::performAssignmentRhsExprSimplification(syrec::expression::ptr& assignmentRhsExpr) const {
+    if (std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentRhsExpr) != nullptr || std::dynamic_pointer_cast<syrec::ShiftExpression>(assignmentRhsExpr) != nullptr) {
+        if (sharedData->parserConfig->reassociateExpressionsEnabled) {
+            if (const auto& reassociateExpressionOptimizationResult = optimizations::simplifyBinaryExpression(assignmentRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier); reassociateExpressionOptimizationResult != assignmentRhsExpr) {
+                assignmentRhsExpr = reassociateExpressionOptimizationResult;
+            }
+        } else if (const auto& defaultBinaryExpressionOptimizationResult = optimizations::trySimplify(assignmentRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled); defaultBinaryExpressionOptimizationResult.couldSimplify) {
+            assignmentRhsExpr = defaultBinaryExpressionOptimizationResult.simplifiedExpression;
+        }
+    }
 }
