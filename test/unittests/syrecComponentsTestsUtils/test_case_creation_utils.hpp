@@ -24,6 +24,8 @@ namespace syrecTestUtils {
     }
 
     inline std::vector<std::string> loadTestCasesNamesFromFile(const std::string& testDataJsonFilename, const std::vector<std::string>& testCasesToIgnore) {
+        const std::string gTestIgnorePrefix = "DISABLED";
+
         std::ifstream testDataFileStream(testDataJsonFilename, std::ios_base::in);
         if (!testDataFileStream.good()) {
             return {"DISABLED_FAILED_TO_LOAD_TEST_DATA_FROM_FILE"};
@@ -48,12 +50,15 @@ namespace syrecTestUtils {
 
             if (doesStringContainOnlyAsciiCharactersAndNoUnderscores(testCaseName)) {
                 if (setOfTestCasesToIgnore.count(testCaseName) != 0) {
-                    foundTestCases.emplace_back("DISABLED_" + testCaseName);
-                } else {
+                    foundTestCases.emplace_back(gTestIgnorePrefix + "_" + testCaseName);
+                } else if (testCaseName.find_first_of(gTestIgnorePrefix) == 0) {
+                    continue;
+                }
+                else {
                     foundTestCases.emplace_back(testCaseName);
                 }   
             } else {
-                foundTestCases.emplace_back("DISABLED_Test" + std::to_string(testCaseIdx) + "ContainedNonAsciiOrUnderscoreCharacter");
+                foundTestCases.emplace_back(gTestIgnorePrefix + "_Test" + std::to_string(testCaseIdx) + "ContainedNonAsciiOrUnderscoreCharacter");
             }
             testCaseIdx++;
         }

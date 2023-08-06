@@ -3,14 +3,34 @@
 
 using namespace noAdditionalLineSynthesis;
 
+/*
+ * TODO: a ^= ((c - 2) ^ (b / 2)) not correctly synthesized
+ * TODO: a ^= ((d - 2) + (b ^ 2)) not correctly synthesized
+ * TODO: a -= ((d - 2) + (b - 2)) not correctly synthesized, inverted statements missing
+ * TODO: a ^= ((d - 2) + (b ^ (c + d)))
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ */
+
 bool AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::simplificationPrecondition(const syrec::AssignStatement::ptr& assignmentStmt) {
     if (const auto& assignmentStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt); assignmentStmtCasted != nullptr) {
         const auto couldDetermineWhetherEverySignalAccessOfLhsIsDefineOnceOnEveryLevelOfAST = isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(assignmentStmtCasted->rhs);
-        if (!couldDetermineWhetherEverySignalAccessOfLhsIsDefineOnceOnEveryLevelOfAST.has_value() || !*couldDetermineWhetherEverySignalAccessOfLhsIsDefineOnceOnEveryLevelOfAST) {
-            return false;
-        }
-        return isMinusAndXorOperationOnlyDefinedForLeaveNodesInAST(assignmentStmtCasted->rhs)
-            && checkNoConsecutiveNonReversibleOperationsDefinedInExpressionAST(assignmentStmtCasted->rhs, std::nullopt);
+        
+        /*
+         * TODO: Temporarily relaxed precondition of originally proposed algorithm since this implementation only include some of its concepts but is otherwise a new implementation
+         * and thus the following precondition no longer apply (still need to be checked more thoroughly):
+         * I. The "^" and "-" operation only operate on leaf nodes only
+         * II. There exist no two consecutive operation nodes with operations without an assignment operation counterpart
+         */
+        return couldDetermineWhetherEverySignalAccessOfLhsIsDefineOnceOnEveryLevelOfAST.value_or(false);
     }
     return false;
 }
@@ -20,7 +40,7 @@ syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurr
     const auto& operationNodeTraversalHelper = std::make_shared<InorderOperationNodeTraversalHelper>(assignmentStmtCasted->rhs, symbolTable);
 
     const auto& simplificationResultOfAssignmentRhs = simplifyExpressionSubtree(operationNodeTraversalHelper);
-    if (globalCreatedAssignmentContainer.empty() || simplificationResultOfAssignmentRhs->expressionsRequiringFixup.empty()) {
+    if (globalCreatedAssignmentContainer.empty() && simplificationResultOfAssignmentRhs->expressionsRequiringFixup.empty()) {
         return {};
     }
 
@@ -33,8 +53,9 @@ syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurr
     }
 
     syrec::Statement::vec generatedAssignments = globalCreatedAssignmentContainer;
-    generatedAssignments.emplace_back(std::make_shared<syrec::AssignStatement>(assignmentStmtCasted->lhs, assignmentStmtCasted->op, generatedAssignmentRhs));
-    return invertAssignments(generatedAssignments, true);
+    const auto&           finalAssignmentStatements = createFinalAssignmentFromOptimizedRhsOfInitialAssignment(assignmentStmtCasted->lhs, assignmentStmtCasted->op, simplificationResultOfAssignmentRhs);
+    generatedAssignments.insert(generatedAssignments.cend(), finalAssignmentStatements.begin(), finalAssignmentStatements.end());
+    return invertAssignmentsButIgnoreSome(generatedAssignments, finalAssignmentStatements.size());
 }
 
 AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::SimplificationScopeReference AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::simplifyExpressionSubtree(const std::shared_ptr<InorderOperationNodeTraversalHelper>& operationNodeTraversalHelper) {
@@ -111,6 +132,7 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
                         *potentialAssignmentCandidateLhs,
                         *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::getMatchingAssignmentOperationForOperation(operationNode->operation)),
                         *potentialAssignmentCandidateRhs);
+                generatedSimplificationScope->generatedAssignments.clear();
                 generatedSimplificationScope->generatedAssignments.emplace_back(generatedAssignmentStmt);
                 generatedSimplificationScope->expressionsRequiringFixup.clear();
                 globalCreatedAssignmentContainer.emplace_back(generatedAssignmentStmt);
@@ -158,15 +180,35 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
     auto generatedSimplificationScope = std::make_unique<SimplificationScope>();
     if (const auto& leafNodes = operationNodeTraversalHelper->getLeafNodesOfOperationNode(operationNode); leafNodes.has_value()) {
         if (const auto& equivalentAssignmentOperationForBinaryOp = syrec_operation::getMatchingAssignmentOperationForOperation(operationNode->operation); equivalentAssignmentOperationForBinaryOp.has_value()) {
-            const auto& lhsLeafAsSignalAccess = leafNodes->first->getAsSignalAccess().value()->var;
-            const auto& assignmentRhs         = leafNodes->second->getData();
+            /*
+             * We should only create an assignment if one of the following conditions holds:
+             * I. The lhs operand of the expression is a signal access and the operation has a matching assignment operation counterpart, the latter is already checked at this point
+             * II. The rhs operand is a signal access while the lhs is not, additionally the given assignment operation is commutative.
+             * In all other cases an expression should be generated instead
+             */
+            if (leafNodes->first->getAsSignalAccess().has_value()) {
+                const auto& lhsLeafAsSignalAccess = leafNodes->first->getAsSignalAccess().value()->var;
+                const auto& assignmentRhs         = leafNodes->second->getData();
 
-            const auto& generatedAssignmentStmt = std::make_shared<syrec::AssignStatement>(
-                    lhsLeafAsSignalAccess,
-                    *syrec_operation::tryMapAssignmentOperationEnumToFlag(*equivalentAssignmentOperationForBinaryOp),
-                    assignmentRhs);
-            generatedSimplificationScope->generatedAssignments.emplace_back(generatedAssignmentStmt);
-            globalCreatedAssignmentContainer.emplace_back(generatedAssignmentStmt);
+                const auto& generatedAssignmentStmt = std::make_shared<syrec::AssignStatement>(
+                        lhsLeafAsSignalAccess,
+                        *syrec_operation::tryMapAssignmentOperationEnumToFlag(*equivalentAssignmentOperationForBinaryOp),
+                        assignmentRhs);
+                generatedSimplificationScope->generatedAssignments.emplace_back(generatedAssignmentStmt);
+                globalCreatedAssignmentContainer.emplace_back(generatedAssignmentStmt);   
+            } else {
+                if (leafNodes->second->getAsSignalAccess().has_value() && equivalentAssignmentOperationForBinaryOp.has_value() && syrec_operation::isCommutative(operationNode->operation)) {
+                    const auto assignmentRhs = leafNodes->first->getData();
+                    const auto& generatedAssignmentStmt = std::make_shared<syrec::AssignStatement>(
+                            leafNodes->second->getAsSignalAccess().value()->var,
+                            *syrec_operation::tryMapAssignmentOperationEnumToFlag(*equivalentAssignmentOperationForBinaryOp),
+                            assignmentRhs);
+                    generatedSimplificationScope->generatedAssignments.emplace_back(generatedAssignmentStmt);
+                    globalCreatedAssignmentContainer.emplace_back(generatedAssignmentStmt);   
+                } else {
+                    generatedSimplificationScope->expressionsRequiringFixup.emplace_back(createExpressionFor(leafNodes->first->getData(), operationNode->operation, leafNodes->second->getData()));                    
+                }
+            }
         } else {
             generatedSimplificationScope->expressionsRequiringFixup.emplace_back(createExpressionFor(leafNodes->first->getData(), operationNode->operation, leafNodes->second->getData()));
         }
@@ -182,24 +224,46 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
     auto generatedScope = std::make_unique<SimplificationScope>();
 
     syrec::expression::ptr generatedStatementRhs;
+    bool                   didRhsGeneratedAssignmentStmt = false;
     if (!simplificationResultOfNonLeafNode->expressionsRequiringFixup.empty()) {
         generatedStatementRhs = simplificationResultOfNonLeafNode->expressionsRequiringFixup.front();
     } else {
         generatedStatementRhs = std::make_shared<syrec::VariableExpression>(std::dynamic_pointer_cast<syrec::AssignStatement>(simplificationResultOfNonLeafNode->generatedAssignments.back())->lhs);
+        didRhsGeneratedAssignmentStmt = true;
     }
 
     const bool isLeafNodeLeftOperandOfOperation = !operationNode->lhs.isOperationNode;
     /*
      * Currently we have no way to convert expressions of the form (expr - signalAccess) to (-signalAccess += expr) since an assignment with the lhs negated is not allowed
      * by the SyReC grammar and we currently have not determine how we correctly negate an unsigned integer value. Thus, we create an binary expression instead of an assignment for now.
+     *
+     * Additionally, if the leaf node did not define a signal access we need to create an expression instead of an assignment if:
+     * I. The leaf node did not define a signal access and the non-leaf node did not define an assignment
+     * II. The leaf node did not define a signal access while the non-leaf node did define an assignment but the operation of the operation node is not commutative
+     *
      * TODO: If assignment lhs can be defined as negated and unsigned integer values can be negated, an assignment instead of an binary expression should be created
      */
-    const auto shouldExpressionInsteadOfAssignmentBeCreated = operationNode->operation == syrec_operation::operation::Subtraction && !operationNode->rhs.isOperationNode;
+    const auto shouldExpressionInsteadOfAssignmentBeCreated =
+        (operationNode->operation == syrec_operation::operation::Subtraction && !operationNode->rhs.isOperationNode)
+        || (!leafNode.value()->getAsSignalAccess().has_value() && !didRhsGeneratedAssignmentStmt)
+        || (!leafNode.value()->getAsSignalAccess() && didRhsGeneratedAssignmentStmt && (isOperationReversible ? !syrec_operation::isCommutative(operationNode->operation) : true));
+
     if (isOperationReversible && !shouldExpressionInsteadOfAssignmentBeCreated) {
+        syrec::VariableAccess::ptr assignedToSignal;
+        syrec::expression::ptr     assignmentRhs;
+
+        if (!leafNode.value()->getAsSignalAccess().has_value()) {
+            assignedToSignal = std::dynamic_pointer_cast<syrec::AssignStatement>(simplificationResultOfNonLeafNode->generatedAssignments.back())->lhs;
+            assignmentRhs    = leafNode.value()->getData();
+        } else {
+            assignedToSignal = leafNode.value()->getAsSignalAccess().value()->var;
+            assignmentRhs    = generatedStatementRhs;
+        }
+
         const auto& generatedAssignmentStatement = std::make_shared<syrec::AssignStatement>(
-                leafNode.value()->getAsSignalAccess().value()->var,
+                assignedToSignal,
                 *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::getMatchingAssignmentOperationForOperation(operationNode->operation)),
-                generatedStatementRhs);  
+                assignmentRhs);  
 
         generatedScope->generatedAssignments.emplace_back(generatedAssignmentStatement);
         globalCreatedAssignmentContainer.emplace_back(generatedAssignmentStatement);
@@ -213,6 +277,98 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
         }
     }
     return generatedScope;
+}
+
+syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::createFinalAssignmentFromOptimizedRhsOfInitialAssignment(const syrec::VariableAccess::ptr& initialAssignmentLhs, unsigned int initialAssignmentOperation, const SimplificationScopeReference& optimizedRhsOfInitialAssignment) const {
+    if (!syrec_operation::tryMapAssignmentOperationFlagToEnum(initialAssignmentOperation).has_value()) {
+        const auto& finalAssignmentStmtRhsExpr = optimizedRhsOfInitialAssignment->expressionsRequiringFixup.empty()
+            ? std::make_shared<syrec::VariableExpression>(std::dynamic_pointer_cast<syrec::AssignStatement>(optimizedRhsOfInitialAssignment->generatedAssignments.front())->lhs)
+            : optimizedRhsOfInitialAssignment->expressionsRequiringFixup.front();
+
+        const auto& finalAssignmentStatement = std::make_shared<syrec::AssignStatement>(
+                initialAssignmentLhs,
+                initialAssignmentOperation,
+                finalAssignmentStmtRhsExpr);
+        return {finalAssignmentStatement};
+    }
+
+    auto                   finalAssignmentOperation = *syrec_operation::tryMapAssignmentOperationFlagToEnum(initialAssignmentOperation);
+    syrec::expression::ptr finalAssignmentRhsExpr;
+    
+    if (!optimizedRhsOfInitialAssignment->expressionsRequiringFixup.empty()) {
+        const auto& finalAssignmentRhs = optimizedRhsOfInitialAssignment->expressionsRequiringFixup.front();
+        if (const auto& finalAssignmentRhsAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(finalAssignmentRhs); finalAssignmentRhsAsBinaryExpr != nullptr) {
+            if (const auto& definedBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(finalAssignmentRhsAsBinaryExpr->op); definedBinaryOperation.has_value()) {
+                
+                std::optional<std::pair<syrec_operation::operation, syrec_operation::operation>> assignmentOperationsForRhsSplit;
+                if (finalAssignmentOperation == syrec_operation::operation::AddAssign) {
+                    if (const auto& preAssignmentValueOfAssignedToSignal = symbolTable->tryFetchValueForLiteral(initialAssignmentLhs);
+                        preAssignmentValueOfAssignedToSignal.has_value() && *preAssignmentValueOfAssignedToSignal == 0) {
+                        finalAssignmentOperation = syrec_operation::operation::XorAssign;
+
+                        /*
+                         * Assignment of the form a += (b ^ c) can be split into a ^= b; a ^= c iff a = 0 prior to the initial assignment
+                         */
+                        if (*definedBinaryOperation == syrec_operation::operation::BitwiseXor) {
+                            assignmentOperationsForRhsSplit = std::make_optional(std::make_pair(finalAssignmentOperation, syrec_operation::operation::XorAssign));
+                        } else {
+                            if (const auto& mappedToAssignmentOperationOfBinaryExprOperation = syrec_operation::getMatchingAssignmentOperationForOperation(*definedBinaryOperation); mappedToAssignmentOperationOfBinaryExprOperation.has_value()) {
+                                assignmentOperationsForRhsSplit = std::make_optional(std::make_pair(finalAssignmentOperation, *mappedToAssignmentOperationOfBinaryExprOperation));
+                            }
+                        }
+                    }
+                    if (*definedBinaryOperation == syrec_operation::operation::Subtraction) {
+                        assignmentOperationsForRhsSplit = std::make_optional(std::make_pair(finalAssignmentOperation, syrec_operation::operation::MinusAssign));
+                    }
+                } else if (finalAssignmentOperation == syrec_operation::operation::MinusAssign) {
+                    if (*definedBinaryOperation == syrec_operation::operation::Addition) {
+                        assignmentOperationsForRhsSplit = std::make_optional(std::make_pair(syrec_operation::operation::MinusAssign, syrec_operation::operation::MinusAssign));
+                    }
+                    if (*definedBinaryOperation == syrec_operation::operation::Subtraction) {
+                        assignmentOperationsForRhsSplit = std::make_optional(std::make_pair(syrec_operation::operation::MinusAssign, syrec_operation::operation::AddAssign));
+                    }
+                } else {
+                    /*
+                     * Assignment of the form a ^= (b ^ c) can be split into a ^= b; a ^= c iff a = 0 prior to the initial assignment
+                     */
+                    if (const auto& preAssignmentValueOfAssignedToSignal = symbolTable->tryFetchValueForLiteral(initialAssignmentLhs);
+                        preAssignmentValueOfAssignedToSignal.has_value() && *preAssignmentValueOfAssignedToSignal == 0 
+                            && *definedBinaryOperation == syrec_operation::operation::BitwiseXor) {
+
+                        assignmentOperationsForRhsSplit = std::make_optional(std::make_pair(syrec_operation::operation::XorAssign, syrec_operation::operation::XorAssign));
+                    }
+                }
+                if (assignmentOperationsForRhsSplit.has_value()) {
+                    const auto& assignmentForLhsOfRhsExpr = std::make_shared<syrec::AssignStatement>(
+                            initialAssignmentLhs,
+                            *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperationsForRhsSplit->first),
+                            finalAssignmentRhsAsBinaryExpr->lhs);
+
+                    const auto& assignmentForRhsOfRhsExpr = std::make_shared<syrec::AssignStatement>(
+                            initialAssignmentLhs,
+                            *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperationsForRhsSplit->second),
+                            finalAssignmentRhsAsBinaryExpr->rhs);
+
+                    return {assignmentForLhsOfRhsExpr, assignmentForRhsOfRhsExpr};
+                }
+            }
+        }
+        finalAssignmentRhsExpr = optimizedRhsOfInitialAssignment->expressionsRequiringFixup.front();
+    } else {
+        const auto& finalAssignmentRhs = std::make_shared<syrec::VariableExpression>(std::dynamic_pointer_cast<syrec::AssignStatement>(optimizedRhsOfInitialAssignment->generatedAssignments.front())->lhs);
+        // Transform assignment of the form a += X to a ^= X if a = 0 prior to the assignment
+        if (const auto& preAssignmentValueOfAssignedToSignal = symbolTable->tryFetchValueForLiteral(initialAssignmentLhs); 
+            preAssignmentValueOfAssignedToSignal.has_value() && *preAssignmentValueOfAssignedToSignal == 0 && finalAssignmentOperation == syrec_operation::operation::AddAssign) {
+            finalAssignmentOperation = syrec_operation::operation::XorAssign;
+        }
+        finalAssignmentRhsExpr = std::make_shared<syrec::VariableExpression>(finalAssignmentRhs->var);
+    }
+
+    const auto& finalAssignmentStatement = std::make_shared<syrec::AssignStatement>(
+            initialAssignmentLhs,
+            *syrec_operation::tryMapAssignmentOperationEnumToFlag(finalAssignmentOperation),
+            finalAssignmentRhsExpr);
+    return {finalAssignmentStatement};
 }
 
 void AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::copyGeneratedAssignmentsAndExpressionsTo(const SimplificationScopeReference& copiedToScope, const SimplificationScopeReference& copiedFromScope) {

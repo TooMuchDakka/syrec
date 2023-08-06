@@ -1214,17 +1214,14 @@ SyReCStatementVisitor::CustomLoopContextInformation SyReCStatementVisitor::build
 std::optional<syrec::Statement::vec> SyReCStatementVisitor::determineLoopBodyWithSideEffectsDisabled(SyReCParser::StatementListContext* loopBodyStmtsContext) {
     const bool backupOfReadonlyParsingOfLoops                     = sharedData->performingReadOnlyParsingOfLoopBody;
     const bool backupOfConstantPropagationOptimizationFlag        = sharedData->parserConfig->performConstantPropagation;
-    const bool backupOfNoAdditionalLineOptimizationFlag           = sharedData->parserConfig->noAdditionalLineOptimizationEnabled;
     const bool backupOfModificationsOfReferenceCountFlag          = sharedData->modificationsOfReferenceCountsDisabled;
     const bool backofReassociateExpressionsFlag                   = sharedData->parserConfig->reassociateExpressionsEnabled;
     sharedData->parserConfig->performConstantPropagation          = false;
-    sharedData->parserConfig->noAdditionalLineOptimizationEnabled = false;
     sharedData->modificationsOfReferenceCountsDisabled            = true;
     sharedData->parserConfig->reassociateExpressionsEnabled       = false;
     sharedData->performingReadOnlyParsingOfLoopBody               = true;
     const auto& loopBodyStmts                                     = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(loopBodyStmtsContext);
     sharedData->parserConfig->performConstantPropagation          = backupOfConstantPropagationOptimizationFlag;
-    sharedData->parserConfig->noAdditionalLineOptimizationEnabled = backupOfNoAdditionalLineOptimizationFlag;
     sharedData->modificationsOfReferenceCountsDisabled            = backupOfModificationsOfReferenceCountFlag;
     sharedData->parserConfig->reassociateExpressionsEnabled       = backofReassociateExpressionsFlag;
     sharedData->performingReadOnlyParsingOfLoopBody               = backupOfReadonlyParsingOfLoops;

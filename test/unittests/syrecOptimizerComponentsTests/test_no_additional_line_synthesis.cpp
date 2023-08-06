@@ -26,7 +26,7 @@ protected:
     std::string expectedOptimizedCircuit;
 
     explicit NoAdditionalLineSynthesisTest():
-        astDumper(syrecAstDumpUtils::SyrecASTDumper(true)), config(16, true, false, true, true) {}
+        astDumper(syrecAstDumpUtils::SyrecASTDumper(true)), config(16, false, false, true, true) {}
 
     void SetUp() override {
         const std::string testCaseJsonKey = GetParam();

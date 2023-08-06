@@ -25,14 +25,6 @@ namespace noAdditionalLineSynthesis {
         struct SimplificationScope {
             std::vector<syrec::AssignStatement::ptr>              generatedAssignments;
             std::vector<syrec::expression::ptr>                   expressionsRequiringFixup;
-
-            /*explicit SimplificationScope(
-                    std::vector<syrec::AssignStatement::ptr> generatedAssignments,
-                    std::vector<std::shared_ptr<syrec::AssignStatement>> assignmentsRequiringFixup,
-                    std::vector<std::shared_ptr<syrec::BinaryExpression>> expressionsRequiringFixup):
-                    generatedAssignments(std::move(generatedAssignments)),
-                    assignmentsRequiringFixup(std::move(assignmentsRequiringFixup)),
-                    expressionsRequiringFixup(std::move(expressionsRequiringFixup)) {}*/
         };
 
         using SimplificationScopeReference = std::unique_ptr<SimplificationScope>;
@@ -41,6 +33,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] SimplificationScopeReference handleOperationNodeWithTwoLeafNodes(const InorderOperationNodeTraversalHelper::OperationNodeReference& operationNode, const std::shared_ptr<InorderOperationNodeTraversalHelper>& operationNodeTraversalHelper);
         [[nodiscard]] SimplificationScopeReference handleOperationNodeWithTwoNonLeafNodes(const InorderOperationNodeTraversalHelper::OperationNodeReference& operationNode, const std::shared_ptr<InorderOperationNodeTraversalHelper>& operationNodeTraversalHelper);
         [[nodiscard]] SimplificationScopeReference handleOperationNodeWithOneLeafNode(const InorderOperationNodeTraversalHelper::OperationNodeReference& operationNode, const std::shared_ptr<InorderOperationNodeTraversalHelper>& operationNodeTraversalHelper);
+        [[nodiscard]] syrec::Statement::vec  createFinalAssignmentFromOptimizedRhsOfInitialAssignment(const syrec::VariableAccess::ptr& initialAssignmentLhs, unsigned int initialAssignmentOperation, const SimplificationScopeReference& optimizedRhsOfInitialAssignment) const;
 
         //static void mergeSimplificationScopes(const SimplificationScopeReference& parentScope, const SimplificationScopeReference& childScope);
         static void                                 fuseGeneratedExpressionsOf(const SimplificationScopeReference& scope, syrec_operation::operation operation);

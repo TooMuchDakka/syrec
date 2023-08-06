@@ -7,11 +7,15 @@ using namespace noAdditionalLineSynthesis;
 BaseAssignmentSimplifier::~BaseAssignmentSimplifier() = default;
 
 syrec::Statement::vec BaseAssignmentSimplifier::simplify(const syrec::AssignStatement::ptr& assignmentStmt) {
+    resetInternals();
     const auto& assignStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
     if (assignStmtCasted == nullptr || !simplificationPrecondition(assignmentStmt)) {
         return {};
     }
     return simplifyWithoutPreconditionCheck(assignmentStmt);
+}
+
+void BaseAssignmentSimplifier::resetInternals() {
 }
 
 std::optional<bool> BaseAssignmentSimplifier::isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(const syrec::BinaryExpression::ptr& rootExpr) const {
@@ -166,29 +170,27 @@ void BaseAssignmentSimplifier::markSignalAccessAsNotUsableInExpr(const syrec::Va
     }
 }
 
-syrec::Statement::vec BaseAssignmentSimplifier::invertAssignments(const syrec::Statement::vec& assignmentsToInvert, bool excludeLastAssignment) {
-    if (assignmentsToInvert.size() == 1 && excludeLastAssignment) {
+syrec::Statement::vec BaseAssignmentSimplifier::invertAssignmentsButIgnoreSome(const syrec::Statement::vec& assignmentsToInvert, const std::size_t numStatementsToIgnoreStartingFromLastOne) {
+    const auto numStatementsToInvert = numStatementsToIgnoreStartingFromLastOne >= assignmentsToInvert.size() ? 0 : assignmentsToInvert.size() - numStatementsToIgnoreStartingFromLastOne;
+    if (numStatementsToInvert == 0) {
         return assignmentsToInvert;
     }
 
-    auto numTotalAssignments = assignmentsToInvert.size() * 2;
-    if (excludeLastAssignment) {
-        numTotalAssignments--;
-    }
+    const auto numTotalAssignments = assignmentsToInvert.size() + numStatementsToInvert;
     syrec::Statement::vec invertedAssignments(numTotalAssignments);
     std::copy(assignmentsToInvert.cbegin(), assignmentsToInvert.cend(), invertedAssignments.begin());
 
-    std::size_t assignmentToInvertIdx = assignmentsToInvert.size() - (excludeLastAssignment ? 2 : 1);
-    for (auto i = assignmentsToInvert.size(); i < numTotalAssignments; ++i) {
-        const auto assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentsToInvert.at(assignmentToInvertIdx--));
-        invertedAssignments.at(i) = std::make_shared<syrec::AssignStatement>(
-            assignmentCasted->lhs,
-            *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::invert(*syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op))),
-            assignmentCasted->rhs
-        );
+    auto invertedStatementIdxInFinalContainer = assignmentsToInvert.size();
+    for (auto statementsToInvertIterator = std::next(assignmentsToInvert.rbegin(), numStatementsToIgnoreStartingFromLastOne); statementsToInvertIterator != assignmentsToInvert.rend(); ++statementsToInvertIterator) {
+        const auto assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(*statementsToInvertIterator);
+        invertedAssignments.at(invertedStatementIdxInFinalContainer++)   = std::make_shared<syrec::AssignStatement>(
+                assignmentCasted->lhs,
+                *syrec_operation::tryMapAssignmentOperationEnumToFlag(*syrec_operation::invert(*syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op))),
+                assignmentCasted->rhs);
     }
     return invertedAssignments;
 }
+
 
 std::optional<unsigned int> BaseAssignmentSimplifier::tryFetchValueOfNumber(const syrec::Number::ptr& number) {
     return number->isConstant() ? std::make_optional(number->evaluate({})) : std::nullopt;

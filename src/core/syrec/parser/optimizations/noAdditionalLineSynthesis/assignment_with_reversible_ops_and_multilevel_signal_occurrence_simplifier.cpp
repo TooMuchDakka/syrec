@@ -92,7 +92,7 @@ syrec::Statement::vec AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence::
     } while (potentialNextSignalAccess.has_value());
 
     if (!generatedAssignments.empty()) {
-        return invertAssignments(generatedAssignments, true);
+        return invertAssignmentsButIgnoreSome(generatedAssignments, 1);
     }
     return generatedAssignments;
 }

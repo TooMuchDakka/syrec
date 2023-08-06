@@ -67,6 +67,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static std::optional<syrec::expression::ptr>     tryConvertCompileTimeConstantExpressionToBinaryExpression(const syrec::Number::ptr& potentialCompileTimeExpression, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable);
         [[nodiscard]] static std::optional<syrec_operation::operation> tryMapCompileTimeConstantOperation(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression);
         [[nodiscard]] static std::optional<syrec::expression::ptr>     tryMapNumberToExpression(const syrec::Number::ptr& number, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable);
+        [[nodiscard]] static std::optional<syrec::expression::ptr>     tryPerformReorderingOfSubexpressions(const syrec::expression::ptr& expr);
 
         struct VariableAccessCountPair {
             std::size_t                accessCount;

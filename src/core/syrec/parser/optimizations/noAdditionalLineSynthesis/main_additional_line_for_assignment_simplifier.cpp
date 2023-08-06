@@ -25,6 +25,13 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
         );
     }
 
+    if (const auto& reorderExprResult = tryPerformReorderingOfSubexpressions(assignmentStmtCasted->rhs); reorderExprResult.has_value()) {
+        assignmentStmtCasted = std::make_shared<syrec::AssignStatement>(
+                assignmentStmtCasted->lhs,
+                assignmentStmtCasted->op,
+                *reorderExprResult);
+    }
+
     const auto assignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op);
     if (!assignmentOperation.has_value() 
         || !syrec_operation::invert(*assignmentOperation).has_value()
@@ -178,21 +185,27 @@ bool MainAdditionalLineForAssignmentSimplifier::isExpressionEitherBinaryOrShiftE
 bool MainAdditionalLineForAssignmentSimplifier::doesExpressionOnlyContainReversibleOperations(const syrec::expression::ptr& expr) {
     if (const auto exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         const auto mappedToOperationFlagOfBinaryExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
-        if (!mappedToOperationFlagOfBinaryExpr.has_value() || syrec_operation::invert(*mappedToOperationFlagOfBinaryExpr).has_value() || !syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationFlagOfBinaryExpr).has_value()) {
+        if (!mappedToOperationFlagOfBinaryExpr.has_value() || !syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationFlagOfBinaryExpr).has_value() 
+            || !syrec_operation::invert(*syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationFlagOfBinaryExpr)).has_value()
+            || !syrec_operation::invert(*mappedToOperationFlagOfBinaryExpr).has_value()) {
             return false;
         }
 
         bool doesLhsExprContainOnlyReversibleOperations = false;
-        if (const auto lhsExprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprAsBinaryExpr->lhs); lhsExprAsBinaryExpr != nullptr) {
+        if (const auto& lhsExprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprAsBinaryExpr->lhs); lhsExprAsBinaryExpr != nullptr) {
             doesLhsExprContainOnlyReversibleOperations = doesExpressionOnlyContainReversibleOperations(lhsExprAsBinaryExpr);
-        } else if (const auto lhsExprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(exprAsBinaryExpr->lhs); lhsExprAsVariableAccess != nullptr) {
+        } else if (const auto& lhsExprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(exprAsBinaryExpr->lhs); lhsExprAsVariableAccess != nullptr) {
             doesLhsExprContainOnlyReversibleOperations = true;    
+        } else if (const auto& lhsExprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(exprAsBinaryExpr->lhs); lhsExprAsNumericExpr != nullptr) {
+            doesLhsExprContainOnlyReversibleOperations = true;
         }
 
         if (doesLhsExprContainOnlyReversibleOperations) {
-            if (const auto rhsExprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprAsBinaryExpr->rhs); rhsExprAsBinaryExpr != nullptr) {
+            if (const auto& rhsExprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprAsBinaryExpr->rhs); rhsExprAsBinaryExpr != nullptr) {
                 return doesExpressionOnlyContainReversibleOperations(rhsExprAsBinaryExpr);
-            } if (const auto rhsExprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(exprAsBinaryExpr->rhs); rhsExprAsVariableAccess != nullptr) {
+            } if (const auto& rhsExprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(exprAsBinaryExpr->rhs); rhsExprAsVariableAccess != nullptr) {
+                return true;
+            } if (const auto& rhsExprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(exprAsBinaryExpr->rhs); rhsExprAsNumericExpr != nullptr) {
                 return true;
             }   
         }
@@ -325,6 +338,45 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
     }
     return tryConvertCompileTimeConstantExpressionToBinaryExpression(number, expectedBitWidth, symbolTable);
 }
+
+std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryPerformReorderingOfSubexpressions(const syrec::expression::ptr& expr) {
+    const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
+    const auto& exprAsShiftExpr = exprAsBinaryExpr == nullptr ? std::dynamic_pointer_cast<syrec::ShiftExpression>(expr) : nullptr;
+
+    if (exprAsBinaryExpr == nullptr && exprAsShiftExpr == nullptr) {
+        return std::make_optional(expr);
+    }
+
+    if (exprAsShiftExpr != nullptr) {
+        if (const auto& reorderResultOfLhs = tryPerformReorderingOfSubexpressions(exprAsShiftExpr->lhs); reorderResultOfLhs.has_value()) {
+            return std::make_optional(std::make_shared<syrec::ShiftExpression>(
+                *reorderResultOfLhs,
+                exprAsShiftExpr->op,
+                exprAsShiftExpr->rhs
+            ));
+        }
+        return std::make_optional(expr);
+    }
+
+    const auto& mappedToOperationFromFlag = syrec_operation::tryMapAssignmentOperationFlagToEnum(exprAsBinaryExpr->op);
+    if (doesExpressionDefineSignalAccess(exprAsBinaryExpr->rhs) 
+        && !doesExpressionDefineSignalAccess(exprAsBinaryExpr->lhs) 
+        && mappedToOperationFromFlag.has_value()
+        && syrec_operation::isCommutative(*mappedToOperationFromFlag)) {
+
+        syrec::expression::ptr newExprLhs = exprAsBinaryExpr->rhs;
+        syrec::expression::ptr newExprRhs = exprAsBinaryExpr->lhs;
+        if (const auto& reorderResultOfRhs = tryPerformReorderingOfSubexpressions(exprAsBinaryExpr->rhs); reorderResultOfRhs.has_value()) {
+            newExprRhs = *reorderResultOfRhs;
+        }
+        return std::make_optional(std::make_shared<syrec::BinaryExpression>(
+                newExprLhs,
+                exprAsBinaryExpr->op,
+                newExprRhs));
+    }
+    return std::make_optional(expr);
+}
+
 
 std::shared_ptr<MainAdditionalLineForAssignmentSimplifier::VariableAccessCountLookup> MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered) const {
     auto buildLookup = std::make_shared<VariableAccessCountLookup>();
