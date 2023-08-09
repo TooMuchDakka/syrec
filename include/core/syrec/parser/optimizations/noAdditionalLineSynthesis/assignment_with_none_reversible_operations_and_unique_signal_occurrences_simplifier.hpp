@@ -17,7 +17,7 @@ namespace noAdditionalLineSynthesis {
         ~AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier() override = default;
 
     protected:
-        [[nodiscard]] syrec::Statement::vec simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt) override;
+        [[nodiscard]] syrec::Statement::vec simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) override;
         [[nodiscard]] bool                  simplificationPrecondition(const syrec::AssignStatement::ptr& assignmentStmt) override;
     private:
         syrec::Statement::vec globalCreatedAssignmentContainer;
@@ -33,7 +33,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] SimplificationScopeReference handleOperationNodeWithTwoLeafNodes(const InorderOperationNodeTraversalHelper::OperationNodeReference& operationNode, const std::shared_ptr<InorderOperationNodeTraversalHelper>& operationNodeTraversalHelper);
         [[nodiscard]] SimplificationScopeReference handleOperationNodeWithTwoNonLeafNodes(const InorderOperationNodeTraversalHelper::OperationNodeReference& operationNode, const std::shared_ptr<InorderOperationNodeTraversalHelper>& operationNodeTraversalHelper);
         [[nodiscard]] SimplificationScopeReference handleOperationNodeWithOneLeafNode(const InorderOperationNodeTraversalHelper::OperationNodeReference& operationNode, const std::shared_ptr<InorderOperationNodeTraversalHelper>& operationNodeTraversalHelper);
-        [[nodiscard]] syrec::Statement::vec  createFinalAssignmentFromOptimizedRhsOfInitialAssignment(const syrec::VariableAccess::ptr& initialAssignmentLhs, unsigned int initialAssignmentOperation, const SimplificationScopeReference& optimizedRhsOfInitialAssignment) const;
+        [[nodiscard]] syrec::Statement::vec        createFinalAssignmentFromOptimizedRhsOfInitialAssignment(const syrec::VariableAccess::ptr& initialAssignmentLhs, unsigned int initialAssignmentOperation, const SimplificationScopeReference& optimizedRhsOfInitialAssignment, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) const;
 
         //static void mergeSimplificationScopes(const SimplificationScopeReference& parentScope, const SimplificationScopeReference& childScope);
         static void                                 fuseGeneratedExpressionsOf(const SimplificationScopeReference& scope, syrec_operation::operation operation);

@@ -6,7 +6,7 @@
 
 using namespace noAdditionalLineSynthesis;
 
-syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduceRequiredAdditionalLinesFor(const syrec::AssignStatement::ptr& assignmentStmt) const {
+syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduceRequiredAdditionalLinesFor(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) const {
     auto assignmentStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
     if (assignmentStmtCasted == nullptr) {
         return {};
@@ -59,7 +59,7 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
     /*
      * Apply rule R2
      */
-    if (canAddAssignmentBeReplacedWithXorAssignment(assignmentStmtCasted)) {
+    if (canAddAssignmentBeReplacedWithXorAssignment(assignmentStmtCasted, isValueOfAssignedToSignalBlockedByDataFlowAnalysis)) {
         const auto updatedAssignmentStatement = std::make_shared<syrec::AssignStatement>(
                 assignmentStmtCasted->lhs,
                 syrec::AssignStatement::Exor,
@@ -87,18 +87,18 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
          * Apply rule R1
          */
         const auto& assignmentStmtSimplifier = std::make_unique<AssignmentWithOnlyReversibleOperationsSimplifier>(symbolTable);
-        if (const auto& generatedAssignments     = assignmentStmtSimplifier->simplify(assignmentStmt); !generatedAssignments.empty()) {
+        if (const auto& generatedAssignments     = assignmentStmtSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
             return generatedAssignments;   
         }
         const auto& assignmentStmtSimplifierWithNonUniqueSignalAccesses = std::make_unique<AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence>(symbolTable);
-        if (const auto& generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses = assignmentStmtSimplifierWithNonUniqueSignalAccesses->simplify(assignmentStmt); !generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses.empty()) {
+        if (const auto& generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses = assignmentStmtSimplifierWithNonUniqueSignalAccesses->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses.empty()) {
             return generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses;
         }
         return {};
     }
 
     const auto& assignmentWithNonReversibleOperationsSimplifier = std::make_unique<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(symbolTable);
-    if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmt); !generatedAssignments.empty()) {
+    if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
         return generatedAssignments;
     }
     return {};
@@ -454,7 +454,11 @@ MainAdditionalLineForAssignmentSimplifier::EstimatedSignalAccessSize MainAdditio
     return EstimatedSignalAccessSize(sizeOfDimensions, bitWidth);
 }
 
-bool MainAdditionalLineForAssignmentSimplifier::canAddAssignmentBeReplacedWithXorAssignment(const syrec::AssignStatement::ptr& assignmentStmt) const {
+bool MainAdditionalLineForAssignmentSimplifier::canAddAssignmentBeReplacedWithXorAssignment(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) const {
+    if (isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
+        return false;
+    }
+
     const auto assignmentStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
     if (assignmentStmtCasted == nullptr) {
         return false;

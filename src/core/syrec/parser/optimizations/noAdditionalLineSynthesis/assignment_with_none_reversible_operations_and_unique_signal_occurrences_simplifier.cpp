@@ -35,7 +35,7 @@ bool AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::
     return false;
 }
 
-syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt) {
+syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
     const auto& assignmentStmtCasted         = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
     const auto& operationNodeTraversalHelper = std::make_shared<InorderOperationNodeTraversalHelper>(assignmentStmtCasted->rhs, symbolTable);
 
@@ -53,7 +53,7 @@ syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurr
     }
 
     syrec::Statement::vec generatedAssignments = globalCreatedAssignmentContainer;
-    const auto&           finalAssignmentStatements = createFinalAssignmentFromOptimizedRhsOfInitialAssignment(assignmentStmtCasted->lhs, assignmentStmtCasted->op, simplificationResultOfAssignmentRhs);
+    const auto&           finalAssignmentStatements = createFinalAssignmentFromOptimizedRhsOfInitialAssignment(assignmentStmtCasted->lhs, assignmentStmtCasted->op, simplificationResultOfAssignmentRhs, isValueOfAssignedToSignalBlockedByDataFlowAnalysis);
     generatedAssignments.insert(generatedAssignments.cend(), finalAssignmentStatements.begin(), finalAssignmentStatements.end());
     return invertAssignmentsButIgnoreSome(generatedAssignments, finalAssignmentStatements.size());
 }
@@ -279,7 +279,7 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
     return generatedScope;
 }
 
-syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::createFinalAssignmentFromOptimizedRhsOfInitialAssignment(const syrec::VariableAccess::ptr& initialAssignmentLhs, unsigned int initialAssignmentOperation, const SimplificationScopeReference& optimizedRhsOfInitialAssignment) const {
+syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::createFinalAssignmentFromOptimizedRhsOfInitialAssignment(const syrec::VariableAccess::ptr& initialAssignmentLhs, unsigned int initialAssignmentOperation, const SimplificationScopeReference& optimizedRhsOfInitialAssignment, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) const {
     if (!syrec_operation::tryMapAssignmentOperationFlagToEnum(initialAssignmentOperation).has_value()) {
         const auto& finalAssignmentStmtRhsExpr = optimizedRhsOfInitialAssignment->expressionsRequiringFixup.empty()
             ? std::make_shared<syrec::VariableExpression>(std::dynamic_pointer_cast<syrec::AssignStatement>(optimizedRhsOfInitialAssignment->generatedAssignments.front())->lhs)
@@ -303,7 +303,8 @@ syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurr
                 std::optional<std::pair<syrec_operation::operation, syrec_operation::operation>> assignmentOperationsForRhsSplit;
                 if (finalAssignmentOperation == syrec_operation::operation::AddAssign) {
                     if (const auto& preAssignmentValueOfAssignedToSignal = symbolTable->tryFetchValueForLiteral(initialAssignmentLhs);
-                        preAssignmentValueOfAssignedToSignal.has_value() && *preAssignmentValueOfAssignedToSignal == 0) {
+                        preAssignmentValueOfAssignedToSignal.has_value() && *preAssignmentValueOfAssignedToSignal == 0
+                        && !isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
                         finalAssignmentOperation = syrec_operation::operation::XorAssign;
 
                         /*
@@ -333,8 +334,8 @@ syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurr
                      */
                     if (const auto& preAssignmentValueOfAssignedToSignal = symbolTable->tryFetchValueForLiteral(initialAssignmentLhs);
                         preAssignmentValueOfAssignedToSignal.has_value() && *preAssignmentValueOfAssignedToSignal == 0 
-                            && *definedBinaryOperation == syrec_operation::operation::BitwiseXor) {
-
+                            && *definedBinaryOperation == syrec_operation::operation::BitwiseXor 
+                            && !isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
                         assignmentOperationsForRhsSplit = std::make_optional(std::make_pair(syrec_operation::operation::XorAssign, syrec_operation::operation::XorAssign));
                     }
                 }
@@ -358,7 +359,8 @@ syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurr
         const auto& finalAssignmentRhs = std::make_shared<syrec::VariableExpression>(std::dynamic_pointer_cast<syrec::AssignStatement>(optimizedRhsOfInitialAssignment->generatedAssignments.front())->lhs);
         // Transform assignment of the form a += X to a ^= X if a = 0 prior to the assignment
         if (const auto& preAssignmentValueOfAssignedToSignal = symbolTable->tryFetchValueForLiteral(initialAssignmentLhs); 
-            preAssignmentValueOfAssignedToSignal.has_value() && *preAssignmentValueOfAssignedToSignal == 0 && finalAssignmentOperation == syrec_operation::operation::AddAssign) {
+            preAssignmentValueOfAssignedToSignal.has_value() && *preAssignmentValueOfAssignedToSignal == 0 && finalAssignmentOperation == syrec_operation::operation::AddAssign
+            && !isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
             finalAssignmentOperation = syrec_operation::operation::XorAssign;
         }
         finalAssignmentRhsExpr = std::make_shared<syrec::VariableExpression>(finalAssignmentRhs->var);

@@ -33,7 +33,7 @@ namespace noAdditionalLineSynthesis {
         explicit MainAdditionalLineForAssignmentSimplifier(parser::SymbolTable::ptr symbolTable, FurtherAssignmentStatementSimplificationCallback assignmentStatementSimplificationCallback, AssignmentStatementApplicationCallback assignmentApplicationCallback)
             : symbolTable(std::move(symbolTable)), furtherAssignmentSimplificationCallback(assignmentStatementSimplificationCallback), assignmentApplicationCallback(assignmentApplicationCallback) {}
 
-        [[nodiscard]] syrec::AssignStatement::vec tryReduceRequiredAdditionalLinesFor(const syrec::AssignStatement::ptr& assignmentStmt) const;
+        [[nodiscard]] syrec::AssignStatement::vec tryReduceRequiredAdditionalLinesFor(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) const;
 
     private:
         using TransformedDimensionAccess = std::vector<std::optional<unsigned int>>;
@@ -112,7 +112,7 @@ namespace noAdditionalLineSynthesis {
          * \param assignmentStmt The assignment statement to check
          * \return Whether a given add assignment operation can be replaced with a xor assignment
          */
-        [[nodiscard]] bool canAddAssignmentBeReplacedWithXorAssignment(const syrec::AssignStatement::ptr& assignmentStmt) const;
+        [[nodiscard]] bool canAddAssignmentBeReplacedWithXorAssignment(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) const;
         
         /**
          * \brief Precondition for transformation rule <br>

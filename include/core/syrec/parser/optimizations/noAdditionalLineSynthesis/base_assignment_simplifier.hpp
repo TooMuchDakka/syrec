@@ -11,7 +11,7 @@ namespace noAdditionalLineSynthesis {
     public:
         // TODO: We can only perform the simplification of a += ... to a ^= ... iff a = 0 prior to the assignment (if value propagation is not blocked by data flow analysis [thus an additional parameter is required])
         // We are assuming that the given assignment statement does conform to the grammar and all semantic checks are valid
-        [[nodiscard]] syrec::Statement::vec simplify(const syrec::AssignStatement::ptr& assignmentStmt);
+        [[nodiscard]] syrec::Statement::vec simplify(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis);
 
         explicit BaseAssignmentSimplifier(parser::SymbolTable::ptr symbolTable):
             symbolTable(std::move(symbolTable)) {}
@@ -44,7 +44,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<bool> isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(const syrec::BinaryExpression::ptr& expr, bool isRootExpr, RestrictionMap& notUsableSignals) const;
         void                              markSignalAccessAsNotUsableInExpr(const syrec::VariableAccess::ptr& accessedSignalParts, RestrictionMap& notUsableSignals) const;
 
-        [[nodiscard]] virtual syrec::Statement::vec simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt) = 0;
+        [[nodiscard]] virtual syrec::Statement::vec simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) = 0;
         [[nodiscard]] virtual bool                  simplificationPrecondition(const syrec::AssignStatement::ptr& assignmentStmt)       = 0;
         virtual void                                resetInternals();
     };

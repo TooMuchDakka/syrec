@@ -6,13 +6,13 @@ using namespace noAdditionalLineSynthesis;
 
 BaseAssignmentSimplifier::~BaseAssignmentSimplifier() = default;
 
-syrec::Statement::vec BaseAssignmentSimplifier::simplify(const syrec::AssignStatement::ptr& assignmentStmt) {
+syrec::Statement::vec BaseAssignmentSimplifier::simplify(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
     resetInternals();
     const auto& assignStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
     if (assignStmtCasted == nullptr || !simplificationPrecondition(assignmentStmt)) {
         return {};
     }
-    return simplifyWithoutPreconditionCheck(assignmentStmt);
+    return simplifyWithoutPreconditionCheck(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis);
 }
 
 void BaseAssignmentSimplifier::resetInternals() {

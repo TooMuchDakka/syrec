@@ -1538,7 +1538,7 @@ syrec::AssignStatement::vec SyReCStatementVisitor::trySimplifyAssignmentStatemen
     if (!definedAssignmentOperation.has_value()) {
         return {assignmentStmt};
     }
-
+    
     auto assignmentStmtRhs = assignmentStmtCasted->rhs;
     performAssignmentRhsExprSimplification(assignmentStmtRhs);
 
@@ -1559,7 +1559,13 @@ syrec::AssignStatement::vec SyReCStatementVisitor::trySimplifyAssignmentStatemen
     
      if (sharedData->parserConfig->noAdditionalLineOptimizationEnabled) {
         const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::MainAdditionalLineForAssignmentSimplifier>(sharedData->currentSymbolTableScope, nullptr, nullptr);
-        if (const auto& generatedSimplifierAssignments = noAdditionalLineAssignmentSimplifier->tryReduceRequiredAdditionalLinesFor(transformedAssignmentStmt); !generatedSimplifierAssignments.empty()) {
+         /*
+          * Since some of the used simplifiers convert an += assignment operation to ^= iff the value of the assigned to signal is 0,
+          * we also need to take into account the data flow analysis performed while performing a loop unroll to determine whether the current value of the assigned to signal
+          * is actually usable for this operation conversion.
+          */
+         const bool isValueOfAssignedToSignalBlockedPriorToAssignmentByDataFlowAnalysis = sharedData->performingReadOnlyParsingOfLoopBody ? true : isValuePropagationBlockedDueToLoopDataFlowAnalysis(assignmentStmtCasted->lhs);
+        if (const auto& generatedSimplifierAssignments = noAdditionalLineAssignmentSimplifier->tryReduceRequiredAdditionalLinesFor(transformedAssignmentStmt, isValueOfAssignedToSignalBlockedPriorToAssignmentByDataFlowAnalysis); !generatedSimplifierAssignments.empty()) {
             return generatedSimplifierAssignments;
         }
      }
@@ -1570,7 +1576,7 @@ syrec::AssignStatement::vec SyReCStatementVisitor::trySimplifyAssignmentStatemen
  * TODO: Behaviour during loop unrolling
  *
  * When the readonly parse step of the loop body takes place, the assignment will probably invalidate the stored value of the signal
- * Is the value, if available prior to the loop unroll, preserved for the non-readonly step ?
+ * Is the value, if available prior to the loop unroll, preserved for the non-readonly step, if a full unroll of the loop takes place ?
  */
 void SyReCStatementVisitor::performAssignmentOperation(const syrec::AssignStatement::ptr& assignmentStmt) const {
     const auto& assignmentStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);

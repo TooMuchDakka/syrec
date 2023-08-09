@@ -2,9 +2,9 @@
 
 using namespace noAdditionalLineSynthesis;
 
-syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt) {
+syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
     const auto& assignStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
-    if (auto simplifiedRhsExpr = simplifyWithoutPreconditionCheck(assignStmtCasted->rhs); !simplifiedRhsExpr.empty()) {
+    if (auto simplifiedRhsExpr = simplifyWithoutPreconditionCheck(assignStmtCasted->rhs, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !simplifiedRhsExpr.empty()) {
         const auto& lastAssignedToSignalInRhs = std::dynamic_pointer_cast<syrec::AssignStatement>(simplifiedRhsExpr.back())->lhs;
 
         const auto topMostAssignment = std::make_shared<syrec::AssignStatement>(
@@ -17,7 +17,7 @@ syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplify
     return {};
 }
 
-syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplifyWithoutPreconditionCheck(const syrec::BinaryExpression::ptr& expr) {
+syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplifyWithoutPreconditionCheck(const syrec::BinaryExpression::ptr& expr, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
     const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     if (exprAsBinaryExpr == nullptr) {
         return {};
@@ -28,7 +28,7 @@ syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplify
     auto&                 rhsOperandOfExpression = exprAsBinaryExpr->rhs;
 
     if (doesExprDefineNestedExpr(exprAsBinaryExpr->lhs)) {
-        generatedAssignments       = simplifyWithoutPreconditionCheck(exprAsBinaryExpr->lhs);
+        generatedAssignments       = simplifyWithoutPreconditionCheck(exprAsBinaryExpr->lhs, isValueOfAssignedToSignalBlockedByDataFlowAnalysis);
         bool simplificationOfLhsOK = false;
         if (!generatedAssignments.empty()) {
             if (const auto& finalAssignmentForLhsExpr = std::dynamic_pointer_cast<syrec::AssignStatement>(generatedAssignments.back()); finalAssignmentForLhsExpr != nullptr) {
@@ -43,7 +43,7 @@ syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplify
     }
 
     if (doesExprDefineNestedExpr(exprAsBinaryExpr->rhs)) {
-        const auto& generatedAssignmentsForRhsExpr = simplifyWithoutPreconditionCheck(exprAsBinaryExpr->rhs);
+        const auto& generatedAssignmentsForRhsExpr = simplifyWithoutPreconditionCheck(exprAsBinaryExpr->rhs, isValueOfAssignedToSignalBlockedByDataFlowAnalysis);
         bool        simplificationOfRhsOK          = false;
         if (!generatedAssignmentsForRhsExpr.empty()) {
             generatedAssignments.insert(generatedAssignments.end(), generatedAssignmentsForRhsExpr.begin(), generatedAssignmentsForRhsExpr.end());
