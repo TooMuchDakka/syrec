@@ -74,6 +74,37 @@ bool BaseAssignmentSimplifier::doesExprDefineNestedExpr(const syrec::expression:
     return std::dynamic_pointer_cast<syrec::BinaryExpression>(expr) != nullptr;
 }
 
+bool BaseAssignmentSimplifier::doesExprOnlyContainReversibleOperations(const syrec::expression::ptr& expr) {
+    if (const auto exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
+        const auto mappedToOperationFlagOfBinaryExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+        if (!mappedToOperationFlagOfBinaryExpr.has_value() || !syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationFlagOfBinaryExpr).has_value() || !syrec_operation::invert(*syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationFlagOfBinaryExpr)).has_value() || !syrec_operation::invert(*mappedToOperationFlagOfBinaryExpr).has_value()) {
+            return false;
+        }
+
+        bool doesLhsExprContainOnlyReversibleOperations = false;
+        if (const auto& lhsExprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprAsBinaryExpr->lhs); lhsExprAsBinaryExpr != nullptr) {
+            doesLhsExprContainOnlyReversibleOperations = doesExprOnlyContainReversibleOperations(lhsExprAsBinaryExpr);
+        } else if (const auto& lhsExprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(exprAsBinaryExpr->lhs); lhsExprAsVariableAccess != nullptr) {
+            doesLhsExprContainOnlyReversibleOperations = true;
+        } else if (const auto& lhsExprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(exprAsBinaryExpr->lhs); lhsExprAsNumericExpr != nullptr) {
+            doesLhsExprContainOnlyReversibleOperations = true;
+        }
+
+        if (doesLhsExprContainOnlyReversibleOperations) {
+            if (const auto& rhsExprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprAsBinaryExpr->rhs); rhsExprAsBinaryExpr != nullptr) {
+                return doesExprOnlyContainReversibleOperations(rhsExprAsBinaryExpr);
+            }
+            if (const auto& rhsExprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(exprAsBinaryExpr->rhs); rhsExprAsVariableAccess != nullptr) {
+                return true;
+            }
+            if (const auto& rhsExprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(exprAsBinaryExpr->rhs); rhsExprAsNumericExpr != nullptr) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool BaseAssignmentSimplifier::wasAccessOnSignalAlreadyDefined(const syrec::VariableAccess::ptr& accessedSignalParts, const RestrictionMap& notUsableSignals) const {
     if (notUsableSignals.count(accessedSignalParts->var->name) == 0) {
         return false;

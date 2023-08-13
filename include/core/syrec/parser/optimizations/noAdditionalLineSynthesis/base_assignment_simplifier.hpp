@@ -24,6 +24,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                        isExprConstantNumber(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                        doesExprDefineVariableAccess(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                        doesExprDefineNestedExpr(const syrec::expression::ptr& expr);
+        [[nodiscard]] static bool                        doesExprOnlyContainReversibleOperations(const syrec::expression::ptr& expr);
         [[nodiscard]] static std::optional<unsigned int> tryFetchValueOfNumber(const syrec::Number::ptr& number);
         [[nodiscard]] static std::optional<unsigned int> tryFetchValueOfExpr(const syrec::expression::ptr& expr);
         [[nodiscard]] static syrec::Statement::vec       invertAssignmentsButIgnoreSome(const syrec::Statement::vec& assignmentsToInvert, std::size_t numStatementsToIgnoreStartingFromLastOne);

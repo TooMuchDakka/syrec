@@ -6,6 +6,7 @@
 #include "core/syrec/parser/utils/syrec_ast_dump_utils.hpp"
 
 #include "gtest/gtest.h"
+#include "gmock/gmock.h"
 #include <fstream>
 #include <cstdlib>
 #include <cerrno>
@@ -18,6 +19,7 @@ protected:
     const unsigned int defaultSignalBitwidth         = 16;
     const std::string cJsonKeyCircuit               = "circuit";
     const std::string cJsonKeyExpectedCircuitOutput = "expectedCircuit";
+    const std::string cJsonKeyExpectedCircuitOutputs = "expectedCircuits";
     const std::string cJsonKeyEnabledOptimizations  = "optimizations";
 
     const std::string cJsonKeySupportingBroadcastingExpressionOperands = "exprOperandsBroadcastingON";
@@ -44,10 +46,35 @@ protected:
     syrec::program                    parserPublicInterface;
 
     std::string circuitToOptimize;
-    std::string expectedOptimizedCircuit;
+    std::vector<std::string> expectedOptimizedCircuits;
 
     BaseSyrecCircuitComparisonTestFixture():
         astDumper(true) {}
+
+    void determineExpectedCircuitsFromJson(const nlohmann::json& testCaseJsonData, std::vector<std::string>& expectedOptimizedCircuits) {
+        if (testCaseJsonData.contains(cJsonKeyExpectedCircuitOutput)) {
+            ASSERT_TRUE(testCaseJsonData.at(cJsonKeyExpectedCircuitOutput).is_string()) << "Expected entry with key '" << cJsonKeyExpectedCircuitOutput << "' to by a string";
+            expectedOptimizedCircuits.emplace_back(testCaseJsonData.at(cJsonKeyExpectedCircuitOutput).get<std::string>());
+        } else if (testCaseJsonData.contains(cJsonKeyExpectedCircuitOutputs)) {
+            ASSERT_TRUE(testCaseJsonData.at(cJsonKeyExpectedCircuitOutputs).is_array()) << "Expected entry with key '" << cJsonKeyExpectedCircuitOutputs << "' to be an array";
+            const auto& expectedCircuitOutputsJsonData        = testCaseJsonData.at(cJsonKeyExpectedCircuitOutputs);
+            const auto wereAllDefinedExpectedCircuitsStrings = std::all_of(
+                expectedCircuitOutputsJsonData.cbegin(),
+                expectedCircuitOutputsJsonData.cend(),
+                [](const nlohmann::json& jsonArrayElementJsonData) {
+                    return jsonArrayElementJsonData.is_string();
+            });
+            ASSERT_TRUE(wereAllDefinedExpectedCircuitsStrings) << "Expected all entries of json array element '" << cJsonKeyExpectedCircuitOutputs << "' to be json strings";
+            const auto& foundExpectedOptimizedCircuits = expectedCircuitOutputsJsonData.get<std::vector<std::string>>();
+            expectedOptimizedCircuits.insert(
+                expectedOptimizedCircuits.cend(),
+                foundExpectedOptimizedCircuits.begin(),
+                foundExpectedOptimizedCircuits.end()
+            );
+        } else {
+            expectedOptimizedCircuits.emplace_back(circuitToOptimize);
+        }
+    }
 
     void SetUp() override {
         const std::string testCaseJsonKey = getTestCaseJsonKey();
@@ -64,14 +91,8 @@ protected:
         ASSERT_TRUE(testcaseJsonData.contains(cJsonKeyCircuit)) << "Required entry with key '" << cJsonKeyCircuit << "' was not found";
         ASSERT_TRUE(testcaseJsonData.at(cJsonKeyCircuit).is_string()) << "Expected entry with key '" << cJsonKeyCircuit << "' to by a string";
         circuitToOptimize = testcaseJsonData.at(cJsonKeyCircuit).get<std::string>();
-
-        if (testcaseJsonData.contains(cJsonKeyExpectedCircuitOutput)) {
-            ASSERT_TRUE(testcaseJsonData.at(cJsonKeyExpectedCircuitOutput).is_string()) << "Expected entry with key '" << cJsonKeyExpectedCircuitOutput << "' to by an array";
-            expectedOptimizedCircuit = testcaseJsonData.at(cJsonKeyExpectedCircuitOutput).get<std::string>();
-        } else {
-            expectedOptimizedCircuit = circuitToOptimize;
-        }
-
+        ASSERT_NO_FATAL_FAILURE(determineExpectedCircuitsFromJson(testcaseJsonData, expectedOptimizedCircuits));
+        
         std::map<OptimizerOption, std::string> userDefinedOptions;
         if (testcaseJsonData.contains(cJsonKeyEnabledOptimizations)) {
             ASSERT_TRUE(testcaseJsonData.at(cJsonKeyEnabledOptimizations).is_object()) << "Expected entry with key '" << cJsonKeyEnabledOptimizations << "' to be an object";
@@ -272,7 +293,7 @@ protected:
 
         std::string stringifiedProgram;
         ASSERT_NO_THROW(stringifiedProgram = astDumper.stringifyModules(parserPublicInterface.modules())) << "Failed to stringify parsed modules";
-        ASSERT_EQ(expectedOptimizedCircuit, stringifiedProgram);
+        ASSERT_THAT(stringifiedProgram, testing::AnyOfArray(expectedOptimizedCircuits));
     }
 
     [[nodiscard]] std::optional<OptimizerOption> tryMapOptimizationJsonKeyToOptimizerOption(const std::string& jsonKeyOfOptimizationOption) const {

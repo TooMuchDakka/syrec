@@ -127,19 +127,21 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
                     performAssignmentOperation(generatedAssignment);
                     addStatementToOpenContainer(generatedAssignment);
                 }    
+            } else {
+                invalidateStoredValueFor(lhsOperandVariableAccess);
             }
         }
         else {
             invalidateStoredValueFor(lhsOperandVariableAccess);
         }
-        /*
-         * Theoretically we can ignore out of range accesses since the would not destroy the value for any valid value of a dimension.
-         * What should happen if either the bit range access or value of dimension access is out of range (the latter should be covered by the above statement) or is malformed (i.e. syntax errors). Our visitor would not return any value, so what should we update now
-         * Should we opt to just invalidate the whole signal (even if we could identify some of the accessed dimensions ?
-         *
-         * The error handling for such cases should be done in the visitor of the signal (add flag that we are parsing the assigned to signal part to shared data and add handling to signal visitor production).
-         * Name this flag invalidateSignalValueOnError since the same error handling needs to be done in case of inout/out parameters in call statements
-         */
+    /*
+     * Theoretically we can ignore out of range accesses since the would not destroy the value for any valid value of a dimension.
+     * What should happen if either the bit range access or value of dimension access is out of range (the latter should be covered by the above statement) or is malformed (i.e. syntax errors). Our visitor would not return any value, so what should we update now
+     * Should we opt to just invalidate the whole signal (even if we could identify some of the accessed dimensions ?
+     *
+     * The error handling for such cases should be done in the visitor of the signal (add flag that we are parsing the assigned to signal part to shared data and add handling to signal visitor production).
+     * Name this flag invalidateSignalValueOnError since the same error handling needs to be done in case of inout/out parameters in call statements
+    */
     } else if (assignedToSignal.has_value() && (*assignedToSignal)->isVariableAccess()) {
         // If we can determine which parts of the signal on the lhs of the assignment statement were accessed, we simply invalidate them in case not all semantic checks for the latter where correct
         const auto& assignedToSignalParts = *(*assignedToSignal)->getAsVariableAccess();

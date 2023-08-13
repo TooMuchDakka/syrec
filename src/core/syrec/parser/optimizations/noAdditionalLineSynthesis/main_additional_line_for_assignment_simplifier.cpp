@@ -4,6 +4,9 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_only_reversible_operations_simplifier.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_reversible_ops_and_multilevel_signal_occurrence_simplifier.hpp"
 
+
+// TODO: Determine whether there is a difference in the gate cost between the statements a += (b - c) and a += b; a -= c (or in other words whether the split of a binary expression into unary assignments make sense)
+// TODO: Determine whether the optimization of converting an assignment of the form a += 1 to ++= a is an actual optimization (since the are semantically equivalent and would probabily generate the same code in assembly)
 using namespace noAdditionalLineSynthesis;
 
 syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduceRequiredAdditionalLinesFor(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) const {
@@ -46,62 +49,100 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
         return {};
     }
 
-    if (assignmentStmtRhsExprAsBinaryExpr != nullptr
-        && ((isExpressionConstantNumber(assignmentStmtRhsExprAsBinaryExpr->lhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsBinaryExpr->lhs))
-        && (isExpressionConstantNumber(assignmentStmtRhsExprAsBinaryExpr->rhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsBinaryExpr->rhs)))) {
-        return {};
-    }
-    if (assignmentStmtRhsExprAsShiftExpr != nullptr
-        && (isExpressionConstantNumber(assignmentStmtRhsExprAsShiftExpr->lhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsShiftExpr->lhs))) {
-        return {};
-    }
-
     /*
      * Apply rule R2
+     */
+    //if (canAddAssignmentBeReplacedWithXorAssignment(assignmentStmtCasted, isValueOfAssignedToSignalBlockedByDataFlowAnalysis)) {
+    //    const auto updatedAssignmentStatement = std::make_shared<syrec::AssignStatement>(
+    //            assignmentStmtCasted->lhs,
+    //            syrec::AssignStatement::Exor,
+    //            assignmentStmtCasted->rhs);
+    //    /*
+    //     * Assignment of the form A += B with B being a variable access can optimized to A ^= B if A = 0 prior to the assignment
+    //     */
+    //    if (doesExpressionDefineSignalAccess(assignmentStmtCasted->rhs)) {
+    //        return {updatedAssignmentStatement};
+    //    }
+    //    assignmentStmtCasted = updatedAssignmentStatement;
+    //}
+
+    const bool isExprShiftExprWithoutNestedSubexpressions = assignmentStmtRhsExprAsBinaryExpr != nullptr
+        && ((isExpressionConstantNumber(assignmentStmtRhsExprAsBinaryExpr->lhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsBinaryExpr->lhs)) 
+            && (isExpressionConstantNumber(assignmentStmtRhsExprAsBinaryExpr->rhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsBinaryExpr->rhs)));
+    const bool isExprBinaryExprWithoutNestedSubexpressions = assignmentStmtRhsExprAsShiftExpr != nullptr
+        && (isExpressionConstantNumber(assignmentStmtRhsExprAsShiftExpr->lhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsShiftExpr->lhs));
+
+    if (isExprShiftExprWithoutNestedSubexpressions || isExprBinaryExprWithoutNestedSubexpressions) {
+        /*
+        * Apply rule R2
+        */
+        if (canAddAssignmentBeReplacedWithXorAssignment(assignmentStmtCasted, isValueOfAssignedToSignalBlockedByDataFlowAnalysis)) {
+            const auto updatedAssignmentStatement = std::make_shared<syrec::AssignStatement>(
+                    assignmentStmtCasted->lhs,
+                    syrec::AssignStatement::Exor,
+                    assignmentStmtCasted->rhs);
+            return {updatedAssignmentStatement};
+        }
+        return {};
+    }
+    
+    //if (doesExpressionOnlyContainReversibleOperations(assignmentStmtCasted->rhs)) {
+    //    // Check further preconditions
+    //    //const auto operationOfAssignmentExprRhs = assignmentStmtRhsExprAsBinaryExpr != nullptr ? tryMapOperationFlagToEnum(assignmentStmtRhsExprAsBinaryExpr, assignmentStmtRhsExprAsBinaryExpr->op) : std::nullopt;
+    //    //if (operationOfAssignmentExprRhs.has_value() && *operationOfAssignmentExprRhs == *assignmentOperation) {
+    //    //    /*
+    //    //    * TODO: Apply rule R1
+    //    //    */
+    //    //    return {};
+    //    //}
+
+    //    /*
+    //     * Apply rule R1
+    //     */
+    //    const auto& assignmentStmtSimplifier = std::make_unique<AssignmentWithOnlyReversibleOperationsSimplifier>(symbolTable);
+    //    if (const auto& generatedAssignments     = assignmentStmtSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
+    //        return generatedAssignments;   
+    //    }
+    //    const auto& assignmentStmtSimplifierWithNonUniqueSignalAccesses = std::make_unique<AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence>(symbolTable);
+    //    if (const auto& generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses = assignmentStmtSimplifierWithNonUniqueSignalAccesses->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses.empty()) {
+    //        return generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses;
+    //    }
+    //    return {};
+    //}
+
+    //const auto& assignmentWithNonReversibleOperationsSimplifier = std::make_unique<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(symbolTable);
+    //if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
+    //    return generatedAssignments;
+    //}
+
+    /*const auto& assignmentStmtSimplifierWithNonUniqueSignalAccesses = std::make_unique<AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence>(symbolTable);
+    if (const auto& generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses = assignmentStmtSimplifierWithNonUniqueSignalAccesses->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses.empty()) {
+        return generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses;
+    } else {
+        const auto& assignmentWithNonReversibleOperationsSimplifier = std::make_unique<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(symbolTable);
+        if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
+            return generatedAssignments;
+        }    
+    }*/
+
+    const auto& assignmentWithNonReversibleOperationsSimplifier = std::make_unique<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(symbolTable);
+    if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
+        return generatedAssignments;
+    }
+    /*
+     * We should not apply rule R2 before trying to simplify the rhs expression as this could prevent some optimizations:
+     * i.e. replacing the += operation with ^= in the assignment a += (<subExpr_2> - <subExpr_1>) will prevent the split of the rhs expr that would otherwise create the subassignments
+     * a += <subExpr_2>; a -= <subExpr_1>
      */
     if (canAddAssignmentBeReplacedWithXorAssignment(assignmentStmtCasted, isValueOfAssignedToSignalBlockedByDataFlowAnalysis)) {
         const auto updatedAssignmentStatement = std::make_shared<syrec::AssignStatement>(
                 assignmentStmtCasted->lhs,
                 syrec::AssignStatement::Exor,
                 assignmentStmtCasted->rhs);
-        /*
-         * Assignment of the form A += B with B being a variable access can optimized to A ^= B if A = 0 prior to the assignment
-         */
-        if (doesExpressionDefineSignalAccess(assignmentStmtCasted->rhs)) {
-            return {updatedAssignmentStatement};
-        }
-        assignmentStmtCasted = updatedAssignmentStatement;
-    }
-    
-    if (doesExpressionOnlyContainReversibleOperations(assignmentStmtCasted->rhs)) {
-        // Check further preconditions
-        //const auto operationOfAssignmentExprRhs = assignmentStmtRhsExprAsBinaryExpr != nullptr ? tryMapOperationFlagToEnum(assignmentStmtRhsExprAsBinaryExpr, assignmentStmtRhsExprAsBinaryExpr->op) : std::nullopt;
-        //if (operationOfAssignmentExprRhs.has_value() && *operationOfAssignmentExprRhs == *assignmentOperation) {
-        //    /*
-        //    * TODO: Apply rule R1
-        //    */
-        //    return {};
-        //}
-
-        /*
-         * Apply rule R1
-         */
-        const auto& assignmentStmtSimplifier = std::make_unique<AssignmentWithOnlyReversibleOperationsSimplifier>(symbolTable);
-        if (const auto& generatedAssignments     = assignmentStmtSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
-            return generatedAssignments;   
-        }
-        const auto& assignmentStmtSimplifierWithNonUniqueSignalAccesses = std::make_unique<AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence>(symbolTable);
-        if (const auto& generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses = assignmentStmtSimplifierWithNonUniqueSignalAccesses->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses.empty()) {
-            return generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses;
-        }
-        return {};
+        return {updatedAssignmentStatement};
     }
 
-    const auto& assignmentWithNonReversibleOperationsSimplifier = std::make_unique<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(symbolTable);
-    if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
-        return generatedAssignments;
-    }
-    return {};
+    return {assignmentStmtCasted};
     
     // TODO: Ignore this for now
     /*syrec::expression::ptr     lhsExprOfTopMostExprOfAssignmentRhs;

@@ -49,6 +49,27 @@ std::optional<syrec_operation::operation> PostOrderExprTraversalHelper::tryGetRe
     return std::nullopt;
 }
 
+std::optional<syrec::VariableAccess::ptr> PostOrderExprTraversalHelper::PostOrderTraversalNode::tryGetNodeDataAsSignalAccess() const {
+    if (std::holds_alternative<syrec::VariableAccess::ptr>(nodeData)) {
+        return std::make_optional(std::get<syrec::VariableAccess::ptr>(nodeData));
+    }
+    return std::nullopt;
+}
+
+std::optional<syrec::NumericExpression::ptr> PostOrderExprTraversalHelper::PostOrderTraversalNode::tryGetNodeDataAsNonSignalAccess() const {
+    if (std::holds_alternative<syrec::NumericExpression::ptr>(nodeData)) {
+        return std::make_optional(std::get<syrec::NumericExpression::ptr>(nodeData));
+    }
+    return std::nullopt;
+}
+
+syrec::expression::ptr PostOrderExprTraversalHelper::PostOrderTraversalNode::getNodeData() const {
+    if (const auto& nodeDataAsSignalAccess = tryGetNodeDataAsSignalAccess(); nodeDataAsSignalAccess.has_value()) {
+        return std::make_shared<syrec::VariableExpression>(*nodeDataAsSignalAccess);
+    } 
+    return *tryGetNodeDataAsNonSignalAccess();
+}
+
 const PostOrderExprTraversalHelper::OperationNode* PostOrderExprTraversalHelper::getOperationNodeForIdx(std::size_t operationNodeIdx) const {
     if (operationNodes.size() > operationNodeIdx) {
         return &operationNodes.at(operationNodeIdx);
@@ -108,9 +129,16 @@ PostOrderExprTraversalHelper::BaseNodeIdx PostOrderExprTraversalHelper::buildNod
 
         return BaseNodeIdx(operationNodeIdx, true);
     }
+    return buildNodeForLeafNode(expr, parentNodeIdx);
+}
 
-    const auto& exprAsSignalAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(expr);
-    const auto& node               = std::make_shared<PostOrderTraversalNode>(PostOrderTraversalNode(leafNodes.size(), parentNodeIdx, exprAsSignalAccess->var));
+PostOrderExprTraversalHelper::BaseNodeIdx PostOrderExprTraversalHelper::buildNodeForLeafNode(const syrec::expression::ptr& expr, std::size_t parentNodeIdx) {
+    PostOrderTraversalNode::ptr node;
+    if (const auto& exprAsSignalAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsSignalAccess != nullptr) {
+        node = std::make_shared<PostOrderTraversalNode>(PostOrderTraversalNode(leafNodes.size(), parentNodeIdx, exprAsSignalAccess->var));
+    } else {
+        node = std::make_shared<PostOrderTraversalNode>(PostOrderTraversalNode(leafNodes.size(), parentNodeIdx, expr));
+    }
     const auto  nodeIdx            = leafNodes.size();
     leafNodes.emplace_back(node);
     leafNodesInPostOrderQueue.emplace(nodeIdx);

@@ -21,19 +21,26 @@ namespace noAdditionalLineSynthesis {
             using ptr = std::shared_ptr<PostOrderTraversalNode>;
             std::size_t                nodeIdx;
             std::size_t                parentNodeIdx;
-            syrec::VariableAccess::ptr signalAccess;
+
+            std::variant<syrec::VariableAccess::ptr, syrec::NumericExpression::ptr> nodeData;
+
+            explicit PostOrderTraversalNode(std::size_t nodeIdx, std::size_t parentNodeIdx, syrec::NumericExpression::ptr nonSignalAccessData):
+                nodeIdx(nodeIdx), parentNodeIdx(parentNodeIdx), nodeData(std::move(nonSignalAccessData)){ }
 
             explicit PostOrderTraversalNode(std::size_t nodeIdx, std::size_t parentNodeIdx, syrec::VariableAccess::ptr signalAccess):
-                nodeIdx(nodeIdx), parentNodeIdx(parentNodeIdx), signalAccess(std::move(signalAccess)) {
-            }
+                nodeIdx(nodeIdx), parentNodeIdx(parentNodeIdx), nodeData(std::move(signalAccess)) { }
+
+            [[nodiscard]] std::optional<syrec::VariableAccess::ptr>    tryGetNodeDataAsSignalAccess() const;
+            [[nodiscard]] std::optional<syrec::NumericExpression::ptr> tryGetNodeDataAsNonSignalAccess() const;
+            [[nodiscard]] syrec::expression::ptr                       getNodeData() const;
         };
 
-        [[nodiscard]] std::optional<PostOrderTraversalNode::ptr> getNextElement();
-        [[nodiscard]] bool                                       doesOperationNodeOnlyHaveOneLeaf(const PostOrderTraversalNode::ptr& node) const;
-        [[nodiscard]] bool                                       areBothOperandsOfOperationNodeLeaves(const PostOrderTraversalNode::ptr& node) const;
-        [[nodiscard]] syrec_operation::operation                 getOperationOfParent(const PostOrderTraversalNode::ptr& node) const;
-        [[nodiscard]] std::optional<syrec_operation::operation>  getOperationOfGrandParent(const PostOrderTraversalNode::ptr& node) const;
-        [[nodiscard]] std::optional<syrec_operation::operation>  tryGetRequiredAssignmentOperation(const PostOrderTraversalNode::ptr& node) const;
+        [[nodiscard]] std::optional<PostOrderTraversalNode::ptr>          getNextElement();
+        [[nodiscard]] bool                                                doesOperationNodeOnlyHaveOneLeaf(const PostOrderTraversalNode::ptr& node) const;
+        [[nodiscard]] bool                                                areBothOperandsOfOperationNodeLeaves(const PostOrderTraversalNode::ptr& node) const;
+        [[nodiscard]] syrec_operation::operation                          getOperationOfParent(const PostOrderTraversalNode::ptr& node) const;
+        [[nodiscard]] std::optional<syrec_operation::operation>           getOperationOfGrandParent(const PostOrderTraversalNode::ptr& node) const;
+        [[nodiscard]] std::optional<syrec_operation::operation>           tryGetRequiredAssignmentOperation(const PostOrderTraversalNode::ptr& node) const;
     private:
         struct BaseNodeIdx {
             std::size_t idx;
@@ -75,7 +82,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                               doesExprDefineSignalAccess(const syrec::expression::ptr& expr);
         [[nodiscard]] static syrec_operation::operation         mapBinaryExprOperationToEnum(const syrec::BinaryExpression::ptr& binaryExpr);
         [[nodiscard]] BaseNodeIdx                               buildNodeForExpr(const syrec::expression::ptr& expr, std::size_t parentNodeIdx, bool isNodeLeftChildOfParent);
-
+        [[nodiscard]] BaseNodeIdx                               buildNodeForLeafNode(const syrec::expression::ptr& expr, std::size_t parentNodeIdx);
         void                                                    buildPostOrderTraversalQueue(const syrec::BinaryExpression::ptr& binaryExpr, const std::optional<std::size_t>& parentNodeIdx);
         void                                                    decrementReferencesOnOperationNodeAndRemoveIfNoneRemain(std::size_t parentNodeIdx);
         [[nodiscard]] std::size_t                               fetchAndIncrementOperationNodeIdx();
