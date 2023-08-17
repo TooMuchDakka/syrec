@@ -380,26 +380,6 @@ syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurr
                     isValueOfAssignedToSignalZeroPriorToAssignment &= !isValueOfAssignedToSignalBlockedByDataFlowAnalysis;
                     return createAssignmentsForSplitAssignment(initialAssignmentLhs, splitAssignmentRhs(finalAssignmentOperation, finalAssignmentRhs, isValueOfAssignedToSignalZeroPriorToAssignment));
                 }
-                
-                //if (assignmentOperationsForRhsSplit.has_value()) {
-                //    if (doesExprDefineNestedExpr(finalAssignmentRhsAsBinaryExpr->lhs) || doesExprDefineNestedExpr(finalAssignmentRhsAsBinaryExpr->rhs)) {
-                //        return createAssignmentsForSplitAssignment(initialAssignmentLhs, splitAssignmentRhs(assignmentOperationsForRhsSplit->first, finalAssignmentRhsExpr, isValueOfAssignedToSignalZeroPriorToAssignment));
-
-                //        //const auto& assignmentForLhsOfRhsExpr = std::make_shared<syrec::AssignStatement>(
-                //        //        initialAssignmentLhs,
-                //        //        *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperationsForRhsSplit->first),
-                //        //        finalAssignmentRhsAsBinaryExpr->lhs);
-
-                //        //const auto& assignmentForRhsOfRhsExpr = std::make_shared<syrec::AssignStatement>(
-                //        //        initialAssignmentLhs,
-                //        //        *syrec_operation::tryMapAssignmentOperationEnumToFlag(assignmentOperationsForRhsSplit->second),
-                //        //        finalAssignmentRhsAsBinaryExpr->rhs);
-
-                //        //return {assignmentForLhsOfRhsExpr, assignmentForRhsOfRhsExpr};
-                //    } else {
-                //        finalAssignmentOperation = assignmentOperationsForRhsSplit->first;
-                //    }
-                //}
             }
         }
         finalAssignmentRhsExpr = optimizedRhsOfInitialAssignment->expressionsRequiringFixup.front();
@@ -516,27 +496,7 @@ std::vector<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimpl
         return {std::make_shared<SplitAssignmentExprPart>(originalAssignmentOperation, assignmentRhsBinaryExpr)};
     }
 
- /*   if ((!doesExprDefineNestedExpr(binaryExprCasted->lhs) && !doesExprDefineNestedExpr(binaryExprCasted->rhs))) {
-        if (originalAssignmentOperation == syrec_operation::operation::AddAssign && isAssignedToSignalZeroPriorToAssignment) {
-            isAssignedToSignalZeroPriorToAssignment = false;
-            return {std::make_shared<SplitAssignmentExprPart>(syrec_operation::operation::XorAssign, assignmentRhsBinaryExpr)};
-        }
-        isAssignedToSignalZeroPriorToAssignment = false;
-        return {std::make_shared<SplitAssignmentExprPart>(originalAssignmentOperation, assignmentRhsBinaryExpr)};
-    }*/
-
     auto mappedToBinaryOperation = *syrec_operation::tryMapBinaryOperationFlagToEnum(binaryExprCasted->op);
-  /*  if (mappedToBinaryOperation == syrec_operation::operation::BitwiseXor) {
-        if (originalAssignmentOperation == syrec_operation::operation::XorAssign && isAssignedToSignalZeroPriorToAssignment) {
-            auto        createdSubAssignments = splitAssignmentRhs(originalAssignmentOperation, binaryExprCasted->lhs, isAssignedToSignalZeroPriorToAssignment);
-            const auto& splitRhsOperand       = splitAssignmentSubexpression(mappedToBinaryOperation, binaryExprCasted->rhs);
-            createdSubAssignments.insert(createdSubAssignments.cend(), splitRhsOperand.begin(), splitRhsOperand.end());
-            return createdSubAssignments;
-        }
-        isAssignedToSignalZeroPriorToAssignment = false;
-        return {std::make_shared<SplitAssignmentExprPart>(originalAssignmentOperation, assignmentRhsBinaryExpr)};
-    }*/
-
     switch (originalAssignmentOperation) {
         case syrec_operation::operation::AddAssign:
             if (isAssignedToSignalZeroPriorToAssignment) {
@@ -574,20 +534,6 @@ std::vector<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimpl
         default:
             break;
     }
-
-    //if (originalAssignmentOperation == syrec_operation::operation::MinusAssign) {
-    //    if (mappedToBinaryOperation == syrec_operation::operation::Subtraction) {
-    //        mappedToBinaryOperation = syrec_operation::operation::Addition;
-    //    } else if (mappedToBinaryOperation == syrec_operation::operation::Addition) {
-    //        mappedToBinaryOperation = syrec_operation::operation::Subtraction;
-    //    }
-    //} else if (originalAssignmentOperation == syrec_operation::operation::XorAssign) {
-    //    if (mappedToBinaryOperation == syrec_operation::operation::Addition && isAssignedToSignalZeroPriorToAssignment) {
-    //        mappedToBinaryOperation = syrec_operation::operation::BitwiseXor;
-    //    } else {
-    //        return {std::make_shared<SplitAssignmentExprPart>(originalAssignmentOperation, assignmentRhsBinaryExpr)};
-    //    }
-    //}
 
     auto        createdSubAssignments = splitAssignmentRhs(originalAssignmentOperation, binaryExprCasted->lhs, isAssignedToSignalZeroPriorToAssignment);
     const auto& splitRhsOperand       = splitAssignmentSubexpression(mappedToBinaryOperation, binaryExprCasted->rhs);

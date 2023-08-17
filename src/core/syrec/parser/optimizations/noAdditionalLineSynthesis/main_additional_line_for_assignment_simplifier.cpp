@@ -125,6 +125,11 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
         }    
     }*/
 
+    const auto& assignmentStmtSimplifierWithNonUniqueSignalAccesses = std::make_unique<AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence>(symbolTable);
+    if (const auto& generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses = assignmentStmtSimplifierWithNonUniqueSignalAccesses->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses.empty()) {
+        return generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses;
+    } 
+
     const auto& assignmentWithNonReversibleOperationsSimplifier = std::make_unique<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(symbolTable);
     if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
         return generatedAssignments;
