@@ -169,8 +169,8 @@ namespace noAdditionalLineSynthesis {
 
         void markAccessedSignalPartsAsNotUsableForReplacement(const syrec::VariableAccess::ptr& accessedSignalParts) const;
         void markAccessedSignalPartsAsUsableForReplacement(const syrec::VariableAccess::ptr& accessedSignalParts) const;
+        [[nodiscard]] static syrec::expression::ptr transformNumericExpressionsToBinary(const syrec::expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable);
     };
-
 }
 
 #endif

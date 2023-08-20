@@ -15,17 +15,12 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
         return {};
     }
 
-    if (const auto& assignmentRhsAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(assignmentStmtCasted->rhs); assignmentRhsAsNumericExpr != nullptr && assignmentRhsAsNumericExpr->value->isCompileTimeConstantExpression()) {
-        const auto& convertedCompileTimeConstantExpr = tryMapNumberToExpression(assignmentRhsAsNumericExpr->value, 0, symbolTable);
-        if (!convertedCompileTimeConstantExpr.has_value()) {
-            return {};
-        }
-
+    const auto& transformedExprWhenContainingNumericExpressions = transformNumericExpressionsToBinary(assignmentStmtCasted->rhs, symbolTable);
+    if (transformedExprWhenContainingNumericExpressions != assignmentStmtCasted->rhs) {
         assignmentStmtCasted = std::make_shared<syrec::AssignStatement>(
-            assignmentStmtCasted->lhs,
-            assignmentStmtCasted->op,
-            *convertedCompileTimeConstantExpr
-        );
+                assignmentStmtCasted->lhs,
+                assignmentStmtCasted->op,
+                transformedExprWhenContainingNumericExpressions);
     }
 
     if (const auto& reorderExprResult = tryPerformReorderingOfSubexpressions(assignmentStmtCasted->rhs); reorderExprResult.has_value()) {
@@ -66,25 +61,25 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
     //    assignmentStmtCasted = updatedAssignmentStatement;
     //}
 
-    const bool isExprShiftExprWithoutNestedSubexpressions = assignmentStmtRhsExprAsBinaryExpr != nullptr
-        && ((isExpressionConstantNumber(assignmentStmtRhsExprAsBinaryExpr->lhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsBinaryExpr->lhs)) 
-            && (isExpressionConstantNumber(assignmentStmtRhsExprAsBinaryExpr->rhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsBinaryExpr->rhs)));
-    const bool isExprBinaryExprWithoutNestedSubexpressions = assignmentStmtRhsExprAsShiftExpr != nullptr
-        && (isExpressionConstantNumber(assignmentStmtRhsExprAsShiftExpr->lhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsShiftExpr->lhs));
+    //const bool isExprShiftExprWithoutNestedSubexpressions = assignmentStmtRhsExprAsBinaryExpr != nullptr
+    //    && ((isExpressionConstantNumber(assignmentStmtRhsExprAsBinaryExpr->lhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsBinaryExpr->lhs)) 
+    //        && (isExpressionConstantNumber(assignmentStmtRhsExprAsBinaryExpr->rhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsBinaryExpr->rhs)));
+    //const bool isExprBinaryExprWithoutNestedSubexpressions = assignmentStmtRhsExprAsShiftExpr != nullptr
+    //    && (isExpressionConstantNumber(assignmentStmtRhsExprAsShiftExpr->lhs) || doesExpressionDefineSignalAccess(assignmentStmtRhsExprAsShiftExpr->lhs));
 
-    if (isExprShiftExprWithoutNestedSubexpressions || isExprBinaryExprWithoutNestedSubexpressions) {
-        /*
-        * Apply rule R2
-        */
-        if (canAddAssignmentBeReplacedWithXorAssignment(assignmentStmtCasted, isValueOfAssignedToSignalBlockedByDataFlowAnalysis)) {
-            const auto updatedAssignmentStatement = std::make_shared<syrec::AssignStatement>(
-                    assignmentStmtCasted->lhs,
-                    syrec::AssignStatement::Exor,
-                    assignmentStmtCasted->rhs);
-            return {updatedAssignmentStatement};
-        }
-        return {};
-    }
+    //if (isExprShiftExprWithoutNestedSubexpressions || isExprBinaryExprWithoutNestedSubexpressions) {
+    //    /*
+    //    * Apply rule R2
+    //    */
+    //    if (canAddAssignmentBeReplacedWithXorAssignment(assignmentStmtCasted, isValueOfAssignedToSignalBlockedByDataFlowAnalysis)) {
+    //        const auto updatedAssignmentStatement = std::make_shared<syrec::AssignStatement>(
+    //                assignmentStmtCasted->lhs,
+    //                syrec::AssignStatement::Exor,
+    //                assignmentStmtCasted->rhs);
+    //        return {updatedAssignmentStatement};
+    //    }
+    //    return {};
+    //}
     
     //if (doesExpressionOnlyContainReversibleOperations(assignmentStmtCasted->rhs)) {
     //    // Check further preconditions
@@ -125,13 +120,18 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
         }    
     }*/
 
+    const auto& assignmentStmtSimplifier = std::make_unique<AssignmentWithOnlyReversibleOperationsSimplifier>(symbolTable);
+    if (const auto& generatedAssignments     = assignmentStmtSimplifier->simplify(assignmentStmtCasted, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
+        return generatedAssignments;
+    }
+
     const auto& assignmentStmtSimplifierWithNonUniqueSignalAccesses = std::make_unique<AssignmentWithReversibleOpsAndMultiLevelSignalOccurrence>(symbolTable);
-    if (const auto& generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses = assignmentStmtSimplifierWithNonUniqueSignalAccesses->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses.empty()) {
+    if (const auto& generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses = assignmentStmtSimplifierWithNonUniqueSignalAccesses->simplify(assignmentStmtCasted, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses.empty()) {
         return generatedAssignmentsIfOriginalOneContainedNonUniqueSignalAccesses;
     } 
 
     const auto& assignmentWithNonReversibleOperationsSimplifier = std::make_unique<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier>(symbolTable);
-    if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmt, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
+    if (const auto& generatedAssignments = assignmentWithNonReversibleOperationsSimplifier->simplify(assignmentStmtCasted, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !generatedAssignments.empty()) {
         return generatedAssignments;
     }
     /*
@@ -373,12 +373,10 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
     }
     if (number->isLoopVariable()) {
         const auto& loopVariableIdent = number->variableName();
-        if (const auto& symbolTableEntryForIdent = symbolTable->getVariable(loopVariableIdent); symbolTableEntryForIdent.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForIdent)) {
-            const auto& backingVariableForLoopVariable = std::get<syrec::Variable::ptr>(*symbolTableEntryForIdent);
+        if (const auto& symbolTableEntryForIdent = symbolTable->getVariable(loopVariableIdent); symbolTableEntryForIdent.has_value() && std::holds_alternative<syrec::Number::ptr>(*symbolTableEntryForIdent)) {
+            const auto& backingVariableForLoopVariable = std::get<syrec::Number::ptr>(*symbolTableEntryForIdent);
 
-            const auto& generatedSignalAccessForLoopVariable = std::make_shared<syrec::VariableAccess>();
-            generatedSignalAccessForLoopVariable->var        = backingVariableForLoopVariable;
-            return std::make_optional(std::make_shared<syrec::VariableExpression>(generatedSignalAccessForLoopVariable));    
+            return std::make_optional(std::make_shared<syrec::NumericExpression>(backingVariableForLoopVariable, expectedBitWidth));
         }
         return std::nullopt;
     }
@@ -569,4 +567,22 @@ bool MainAdditionalLineForAssignmentSimplifier::doesAssignmentToAccessedSignalPa
 // TODO: Implement me
 std::optional<syrec::VariableAccess::ptr> MainAdditionalLineForAssignmentSimplifier::tryCreateSubstituteForExpr(const syrec::expression::ptr& expr, const LookupOfExcludedSignalsForReplacement& signalPartsToExcludeAsPotentialReplacements) {
     return std::nullopt;
+}
+
+syrec::expression::ptr MainAdditionalLineForAssignmentSimplifier::transformNumericExpressionsToBinary(const syrec::expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable) {
+    if (const auto& exprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expr); exprAsNumericExpr != nullptr) {
+        return tryMapNumberToExpression(exprAsNumericExpr->value, 0, symbolTable).value_or(expr);
+    } else if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
+        return std::make_shared<syrec::BinaryExpression>(
+                transformNumericExpressionsToBinary(exprAsBinaryExpr->lhs, symbolTable),
+                exprAsBinaryExpr->op,
+                transformNumericExpressionsToBinary(exprAsBinaryExpr->rhs, symbolTable));
+    } else if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
+        const auto& transformedRhsExpr = tryMapNumberToExpression(exprAsShiftExpr->rhs, 0, symbolTable);
+        return std::make_shared<syrec::ShiftExpression>(
+                transformNumericExpressionsToBinary(exprAsShiftExpr->lhs, symbolTable),
+                exprAsShiftExpr->op,
+                transformedRhsExpr.has_value() ? std::static_pointer_cast<syrec::NumericExpression>(*transformedRhsExpr)->value : exprAsShiftExpr->rhs);
+    }
+    return expr;
 }
