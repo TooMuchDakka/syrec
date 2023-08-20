@@ -15,8 +15,6 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] bool simplificationPrecondition(const syrec::AssignStatement::ptr& assignmentStmt) override;
     private:
         [[nodiscard]] syrec::Statement::vec simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) override;
-        /*[[nodiscard]] static bool           isXorOperationOnlyDefinedForLeaveNodesInAST(const syrec::expression::ptr& binaryExpr);
-        [[nodiscard]] static bool           isXorOperationOnlyDefinedOnOperationNodesWithRhsBeingLeaf(const syrec::expression::ptr& binaryExpr);*/
     };
 }
 #endif

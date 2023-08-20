@@ -12,6 +12,7 @@ using namespace noAdditionalLineSynthesis;
  * TODO: a += (((2 - b) - (2 - c)) ^ d) should use a different synthesis approach than this optimizer by always assigning to the lhs of the original assignment instead of the leaf node
  * TODO: One could implement the optimization that an assignment of the form a ^= (<subExpr1> - <subExpr2>) could be converted to a += <subExpr1>; a -= <subExpr2> is a was 0 prior to the assignment
  * 
+ * TODO: Subtraction with non-leaves could be handled if no non-reversible operation is defined in any of its operands expressions ? (Already handled ?)
  */
 
 bool AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::simplificationPrecondition(const syrec::AssignStatement::ptr& assignmentStmt) {

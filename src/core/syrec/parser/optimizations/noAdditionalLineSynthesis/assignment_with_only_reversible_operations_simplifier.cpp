@@ -1,85 +1,40 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_only_reversible_operations_simplifier.hpp"
+#include <core/syrec/parser/operation.hpp>
+#include <core/syrec/parser/optimizations/noAdditionalLineSynthesis/post_order_expr_traversal_helper.hpp>
 
 using namespace noAdditionalLineSynthesis;
 
-syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
-    const auto& assignStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
-    if (auto simplifiedRhsExpr = simplifyWithoutPreconditionCheck(assignStmtCasted->rhs, isValueOfAssignedToSignalBlockedByDataFlowAnalysis); !simplifiedRhsExpr.empty()) {
-        const auto& lastAssignedToSignalInRhs = std::dynamic_pointer_cast<syrec::AssignStatement>(simplifiedRhsExpr.back())->lhs;
-
-        const auto topMostAssignment = std::make_shared<syrec::AssignStatement>(
-                assignStmtCasted->lhs,
-                assignStmtCasted->op,
-                std::make_shared<syrec::VariableExpression>(lastAssignedToSignalInRhs));
-        simplifiedRhsExpr.emplace_back(topMostAssignment);
-        return simplifiedRhsExpr;
-    }
-    return {};
-}
-
-syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplifyWithoutPreconditionCheck(const syrec::BinaryExpression::ptr& expr, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
-    const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
-    if (exprAsBinaryExpr == nullptr) {
-        return {};
-    }
-
-    syrec::Statement::vec generatedAssignments;
-    auto&                 lhsOperandOfExpression = exprAsBinaryExpr->lhs;
-    auto&                 rhsOperandOfExpression = exprAsBinaryExpr->rhs;
-
-    if (doesExprDefineNestedExpr(exprAsBinaryExpr->lhs)) {
-        generatedAssignments       = simplifyWithoutPreconditionCheck(exprAsBinaryExpr->lhs, isValueOfAssignedToSignalBlockedByDataFlowAnalysis);
-        bool simplificationOfLhsOK = false;
-        if (!generatedAssignments.empty()) {
-            if (const auto& finalAssignmentForLhsExpr = std::dynamic_pointer_cast<syrec::AssignStatement>(generatedAssignments.back()); finalAssignmentForLhsExpr != nullptr) {
-                lhsOperandOfExpression = std::make_shared<syrec::VariableExpression>(finalAssignmentForLhsExpr->lhs);
-                simplificationOfLhsOK  = true;
-            }
-        }
-
-        if (!simplificationOfLhsOK) {
-            return {};
-        }
-    }
-
-    if (doesExprDefineNestedExpr(exprAsBinaryExpr->rhs)) {
-        const auto& generatedAssignmentsForRhsExpr = simplifyWithoutPreconditionCheck(exprAsBinaryExpr->rhs, isValueOfAssignedToSignalBlockedByDataFlowAnalysis);
-        bool        simplificationOfRhsOK          = false;
-        if (!generatedAssignmentsForRhsExpr.empty()) {
-            generatedAssignments.insert(generatedAssignments.end(), generatedAssignmentsForRhsExpr.begin(), generatedAssignmentsForRhsExpr.end());
-            if (const auto& finalAssignmentForRhsExpr = std::dynamic_pointer_cast<syrec::AssignStatement>(generatedAssignmentsForRhsExpr.back()); finalAssignmentForRhsExpr != nullptr) {
-                rhsOperandOfExpression = std::make_shared<syrec::VariableExpression>(finalAssignmentForRhsExpr->lhs);
-                simplificationOfRhsOK  = true;
-            }
-        }
-
-        if (!simplificationOfRhsOK) {
-            return {};
-        }
-    }
-
-    if (isExprConstantNumber(lhsOperandOfExpression) && doesExprDefineVariableAccess(rhsOperandOfExpression)) {
-        const auto backupOfRhsOperand = rhsOperandOfExpression;
-        rhsOperandOfExpression        = lhsOperandOfExpression;
-        lhsOperandOfExpression        = backupOfRhsOperand;
-    } else if (isExprConstantNumber(lhsOperandOfExpression) && isExprConstantNumber(rhsOperandOfExpression)) {
-        return {};
-    }
-
-    const auto generatedAssignmentStatement = std::make_shared<syrec::AssignStatement>(
-            std::dynamic_pointer_cast<syrec::VariableExpression>(lhsOperandOfExpression)->var,
-            exprAsBinaryExpr->op,
-            rhsOperandOfExpression);
-    generatedAssignments.emplace_back(generatedAssignmentStatement);
-    return generatedAssignments;
-}
-
 bool AssignmentWithOnlyReversibleOperationsSimplifier::simplificationPrecondition(const syrec::AssignStatement::ptr& assignmentStmt) {
+    // Check whether given pointer can be casted to assignment statement is already done in base class
     const auto& assignStmtCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
-    if (assignStmtCasted == nullptr) {
+    return doesExprOnlyContainReversibleOperations(assignStmtCasted->rhs) && std::dynamic_pointer_cast<syrec::BinaryExpression>(assignStmtCasted->rhs) != nullptr;
+}
+
+// TODO: Simplification could work as in the assignment with only reversible operations and multilevel signal occurrences with the difference that "^" operation nodes with nested expressions can be handled
+// if the precondition of unique signal accesses applies to this simplifier (or maybe just in the nested "^" operation but its simplification is still open)
+// TODO: Simplification of += operation to ^= operation for first assignment
+syrec::Statement::vec AssignmentWithOnlyReversibleOperationsSimplifier::simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) {
+    const auto& assignmentStmtCasted   = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentStmt);
+    const auto& valueOfInitiallyAssignedToSignalPriorToAssignmentIsZero = !isValueOfAssignedToSignalBlockedByDataFlowAnalysis && !symbolTable->tryFetchValueForLiteral(assignmentStmtCasted->lhs).value_or(true);
+    const auto& subExprTraversalHelper = std::make_unique<PostOrderExprTraversalHelper>();
+    subExprTraversalHelper->buildPostOrderQueue(*syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentStmtCasted->op), assignmentStmtCasted->rhs, valueOfInitiallyAssignedToSignalPriorToAssignmentIsZero);
+
+    const auto& assignedToSignal        = assignmentStmtCasted->lhs;
+    const auto& generatedSubAssignments = subExprTraversalHelper->getAll();
+    if (generatedSubAssignments.empty()) {
         return {};
     }
 
-    const auto preconditionStatus = isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(assignStmtCasted->rhs);
-    return preconditionStatus.value_or(false);
+    syrec::Statement::vec generatedAssignments(generatedSubAssignments.size(), nullptr);
+    for (std::size_t i = 0; i < generatedAssignments.size(); ++i) {
+        const auto generatedSubAssignment = generatedSubAssignments.at(i);
+        generatedAssignments.at(i)        = std::make_shared<syrec::AssignStatement>(
+                assignedToSignal,
+                *syrec_operation::tryMapAssignmentOperationEnumToFlag(generatedSubAssignment.assignmentOperation),
+                generatedSubAssignment.assignmentRhsOperand);
+    }
+    if (const auto& firstGeneratedSubAssignment = std::dynamic_pointer_cast<syrec::AssignStatement>(generatedAssignments.front()); valueOfInitiallyAssignedToSignalPriorToAssignmentIsZero && firstGeneratedSubAssignment != nullptr && *syrec_operation::tryMapAssignmentOperationFlagToEnum(firstGeneratedSubAssignment->op) == syrec_operation::operation::AddAssign) {
+        firstGeneratedSubAssignment->op = *syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign);
+    }
+    return generatedAssignments;
 }

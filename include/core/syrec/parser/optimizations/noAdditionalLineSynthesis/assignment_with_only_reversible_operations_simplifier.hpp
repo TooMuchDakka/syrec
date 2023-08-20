@@ -14,7 +14,6 @@ namespace noAdditionalLineSynthesis {
     protected:
         [[nodiscard]] bool                  simplificationPrecondition(const syrec::AssignStatement::ptr& assignmentStmt) override;
         [[nodiscard]] syrec::Statement::vec simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) override;
-        [[nodiscard]] syrec::Statement::vec simplifyWithoutPreconditionCheck(const syrec::BinaryExpression::ptr& expr, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis);
     };
 }
 #endif
