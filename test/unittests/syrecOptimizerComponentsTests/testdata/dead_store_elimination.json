@@ -1,4 +1,38 @@
 {
+  "testRemovalOfAdditionAssignmentWithZeroWhenSignalIsZero": {
+    "circuit": "module main(in a(16), out b(16)) b += 0",
+    "expectedCircuit": "module main(out b(16)) skip"
+  },
+  "testRemovalOfAdditionAssignmentWithZeroWhenSignalIsNotZero": {
+    "circuit": "module main(in a(16), out b(16)) b += 2; b += 0",
+    "expectedCircuit": "module main(out b(16)) b += 2",
+    "optimizations": {
+      "constantPropON": "1"
+    }
+  },
+  "testRemovalOfSubtractionAssignmentWithZeroWhenSignalIsZero": {
+    "circuit": "module main(in a(16), out b(16)) b -= 0",
+    "expectedCircuit": "module main(out b(16)) skip"
+  },
+  "testRemovalOfSubtractionAssignmentWithZeroWhenSignalIsNotZero": {
+    "circuit": "module main(in a(16), out b(16)) b += 10; b -= 0",
+    "expectedCircuit": "module main(out b(16)) b += 10",
+    "optimizations": {
+      "constantPropON": "1"
+    }
+  },
+  "testRemovalOfXorAssignWithZeroWhenSignalIsZero": {
+    "circuit": "module main(in a(16), out b(16)) b ^= 0",
+    "expectedCircuit": "module main(out b(16)) skip"
+  },
+  "testRemovalOfXorAssignWithZeroWhenSignalIsNotZero": {
+    "circuit": "module main(in a(16), out b(16)) b += 10; b ^= 0",
+    "expectedCircuit": "module main(out b(16)) b += 10",
+    "optimizations": {
+      "constantPropON": "1"
+    }
+  },
+
   "assignmentsToLocalSignalsUnusedByAnyOtherNonAssignmentStatementRemoved": {
     "circuit": "module main(in a(4)) wire b(4) b += a; ++= b",
     "expectedCircuit": "module main() skip"

@@ -49,6 +49,20 @@ bool isOperationCombinedWithMultiplicationDistributive(syrec_operation::operatio
     }
 }
 
+std::optional<syrec::expression::ptr> trySimplifyExprIfOneOperandIsIdentityElement(const syrec::expression::ptr& referenceExpr, const std::optional<unsigned int>& constOperandValue, bool isLhsOperandConst, bool isReferenceExprBinaryOne, syrec_operation::operation definedOperationForExpr) {
+    if (referenceExpr == nullptr || !constOperandValue.has_value()) {
+        return std::nullopt;
+    }
+
+    if (isLhsOperandConst && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(definedOperationForExpr, *constOperandValue)) {
+        return std::make_optional(isReferenceExprBinaryOne ? std::static_pointer_cast<syrec::BinaryExpression>(referenceExpr)->rhs : std::make_shared<syrec::NumericExpression>(std::static_pointer_cast<syrec::ShiftExpression>(referenceExpr)->rhs, referenceExpr->bitwidth()));
+    }
+    if (!isLhsOperandConst && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(definedOperationForExpr, *constOperandValue)) {
+        return std::make_optional(isReferenceExprBinaryOne ? std::static_pointer_cast<syrec::BinaryExpression>(referenceExpr)->lhs : std::static_pointer_cast<syrec::ShiftExpression>(referenceExpr)->lhs);
+    }
+    return std::nullopt;
+}
+
 syrec::expression::ptr createExpressionForNumber(const unsigned int number, unsigned int expectedBitWidthOfCreatedExpression) {
     return std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(number), expectedBitWidthOfCreatedExpression);
 }
@@ -121,7 +135,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
         lOperandConstValue = tryGetConstantValueOfExpression(exprAsShiftExpr->lhs);
         const auto& rhsOperandOfShiftExpr = std::make_shared<syrec::NumericExpression>(exprAsShiftExpr->rhs, exprAsShiftExpr->bitwidth());
         rOperandConstValue = tryGetConstantValueOfExpression(rhsOperandOfShiftExpr);
-        mappedFlagToEnum   = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsShiftExpr->op);
+        mappedFlagToEnum   = syrec_operation::tryMapShiftOperationFlagToEnum(exprAsShiftExpr->op);
         if (!mappedFlagToEnum.has_value()) {
             return expr;
         }
@@ -136,6 +150,10 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
 
     const auto binaryOperationOfExpr = mappedFlagToEnum.value();
     if (lOperandConstValue.has_value() || rOperandConstValue.has_value()) {
+        if (const auto& simplifiedExprIfConstOperandIsIdentityElement = trySimplifyExprIfOneOperandIsIdentityElement(expr, lOperandConstValue.has_value() ? lOperandConstValue : rOperandConstValue, lOperandConstValue.has_value(), binaryExpr != nullptr, *mappedFlagToEnum); simplifiedExprIfConstOperandIsIdentityElement.has_value()) {
+            return simplifyBinaryExpression(*simplifiedExprIfConstOperandIsIdentityElement, operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+        }
+
         /*
          * The following preconditions must hold before we attempt to simplify a Multiplication operation of a binary expression
          * I. We need to be able to determine if the defined operation of the expression was the 'Multiplication' operation

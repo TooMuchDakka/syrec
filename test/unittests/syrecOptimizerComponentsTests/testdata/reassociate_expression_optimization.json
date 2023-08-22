@@ -54,7 +54,7 @@
     "circuit": "module main(in a(16), in b(16), out c(16)) c += ((a + b) + 2)",
     "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += ((2 + a) + b)"
   },
-  "expressionWithRhsOperandBeingConstantAndOperationBeingSubtractionTransformedToAddition": {
+  "DISABLED_NegativeIntegersNotAllowedByGrammar_expressionWithRhsOperandBeingConstantAndOperationBeingSubtractionTransformedToAddition": {
     "circuit": "module main(in a(16), in b(16), out c(16)) c += ((a + b) - 2)",
     "expectedCircuit": "module main(in a(16), in b(16), out c(16)) c += ((-2 + a) + b)"
   },
@@ -108,5 +108,49 @@
   },
   "FURTHER": {
     "circuit": "Further tests that check transformation if one operand is identity of used operation"
+  },
+  "identityElementOfAdditionAsLhsOperandSimplifiesToRhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (0 + b)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfAdditionAsRhsOperandSimplifiesToLhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (b + 0)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfSubtractionAsRhsOperandSimplifiesToLhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (b - 0)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfXorAsLhsOperandSimplifiesToRhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (0 ^ b)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfXorAsRhsOperandSimplifiesToLhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (b ^ 0)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfMultiplicationAsLhsOperandSimplifiesToRhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (1 * b)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfMultiplicationAsRhsOperandSimplifiesToLhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (b * 1)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfShiftLeftOperationAsRhsOperandSimplifiesToLhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (b << 0)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfShiftRightOperationAsRhsOperandSimplifiesToLhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (b >> 0)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfDivisionAsRhsOperandSimplifiesToLhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (b / 1)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "identityElementOfModuloOperationAsRhsOperandSimplifiesToLhsOperand": {
+    "circuit": "module main(out a(16), in b(16)) a += (b % 1)",
+    "expectedCircuit": "module main(out a(16), in b(16)) a += b"
   }
 }

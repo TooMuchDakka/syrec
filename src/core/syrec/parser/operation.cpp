@@ -12,8 +12,11 @@ bool syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(operation ope
 
     switch (operation) {
         case operation::Addition:
+        case operation::AddAssign:
         case operation::ShiftLeft:
         case operation::ShiftRight:
+        case operation::BitwiseXor:
+        case operation::XorAssign:
             return operand == 0;
         case operation::Multiplication:
             return operand == 1;
@@ -30,6 +33,8 @@ bool syrec_operation::isOperandUseAsRhsInOperationIdentityElement(const operatio
         case operation::MinusAssign:
         case operation::ShiftLeft:
         case operation::ShiftRight:
+        case operation::BitwiseXor:
+        case operation::XorAssign:
             return operand == 0;
         case operation::Division:
         case operation::Multiplication:
