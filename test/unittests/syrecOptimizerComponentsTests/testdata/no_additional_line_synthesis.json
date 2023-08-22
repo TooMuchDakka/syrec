@@ -13,10 +13,7 @@
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingAdditionCorrectlyHandlesXorInRhsExpr": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a += ((b ^ c) ^ (d ^ e))",
-    "expectedCircuits": [
-      "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) b ^= c; d ^= e; a += (b ^ d); d ^= e; b ^= c",
-      "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a ^= (b ^ c); a ^= (d ^ e)"
-    ]
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a ^= b; a ^= c; a ^= (d ^ e)"
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingAdditionCorrectlyHandlesAdditionInRhsExpr": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a += ((b + c) + (d + e))",
@@ -28,14 +25,11 @@
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingSubtractionCorrectlyHandlesSubtractionInRhsExpr": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a -= ((b - c) - (d - e))",
-    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a -= b; a += c; a += d; a -= e"
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a -= b; a += c; a -= e; a += d"
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingSubtractionCorrectlyHandlesXorInRhsExpr": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a -= ((b ^ c) ^ (d ^ e))",
-    "expectedCircuits": [
-      "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) b ^= c; d ^= e; a -= (b ^ d); d ^= e; b ^= c",
-      "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) b ^= c; b ^= (d ^ e); a -= b; b ^= (d ^ e); b ^= c"
-    ]
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a -= b; a ^= c; a ^= (d ^ e)"
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingSubtractionCorrectlyHandlesAdditionInRhsExpr": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a -= ((b + c) + (d + e))",
@@ -51,11 +45,7 @@
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingXorCorrectlyHandlesXorInRhsExpr": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a ^= ((b ^ c) ^ (d ^ e))",
-    "expectedCircuits": [
-      "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) b ^= c; d ^= e; a ^= (b ^ d); d ^= e; b ^= c",
-      "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) b ^= c; b ^= (d ^ e); a ^= b; b ^= (d ^ e); b ^= c",
-      "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a ^= (b ^ c); a ^= (d ^ e)"
-    ]
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a ^= b; a ^= c; a ^= (d ^ e)"
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingXorCorrectlyHandlesAdditionInRhsExpr": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16)) a ^= ((b + c) + (d + e))",
@@ -71,7 +61,7 @@
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingSubtractionHandlesConstantNumberCorrectly": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16), in f(16)) a -= (((2 - c) + (d - 2)) ^ ((2 + e) - (f + 5)))",
-    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16), in f(16)) a -= 2; a += c; a += d; a -= 2; a ^= ((2 + e) - (f + 5))"
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16), in f(16)) a -= 2; a += c; a -= d; a += 2; a ^= ((2 + e) - (f + 5))"
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingXorHandlesConstantNumberCorrectly": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16), in e(16), in f(16)) a ^= (((2 - c) + (d - 2)) ^ ((2 + e) - (f + 5)))",
@@ -151,7 +141,7 @@
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessHandlesCreatesAssignmentForOperationNodeWithLhsOperandBeingLoopVariableAndNonLeafCreatingAssignmentWithOperationNotBeingCommutative": {
     "circuit": "module main(out a(16), in b(16), in c(16)) for $i = 0 to 2 step 1 do a += ($i - (2 + b)) rof",
-    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) for $i = 0 to 2 step 1 do a += $i; a -= b; a -= 2 rof"
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) for $i = 0 to 2 step 1 do a += $i; a -= 2; a -= b rof"
   },
 
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessWithTwoLeafNodesAndBothLeavesBeingLoopVariablesCreatesExpression": {
@@ -248,18 +238,18 @@
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessHandlesRhsCorrectlyIfRhsCreatesNoAssignmentAndAssignmentOperationIsXorAndTopmostOperationOfRhsIsMinusAndAssignedtoSignalValueIsNotZero": {
     "circuit": "module main(out a(16), in b(16), in c(16)) a += 2; a ^= ((2 - b) - (55 - c))",
-    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) a += 2; a ^= ((2 - b) + (c - 55))"
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) a += 2; a ^= ((2 - b) - (55 - c))"
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessHandlesRhsCorrectlyIfRhsCreatesNoAssignmentAndAssignmentOperationIsXorAndTopmostOperationOfRhsIsXorAndAssignedtoSignalValueIsNotZero": {
     "circuit": "module main(out a(16), in b(16), in c(16)) a += 2; a ^= ((2 - b) ^ (55 - c))"
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessHandlesLhsBeingSignalAccessAndRhsBeingFusedExprWithParentOperationBeingAdditionCorrectly": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16)) a += (d + ((2 - b) - (2 ^ c)))",
-    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16)) a ^= 2; a -= b; a -= 2; a ^= c; a += d"
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16)) a ^= d; a += 2; a -= b; a -= c; a ^= 2"
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessHandlesLhsBeingSignalAccessAndRhsBeingFusedExprWithParentOperationBeingSubtractionCorrectly": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16)) a += (d - ((2 - b) - (2 - c)))",
-    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16)) a ^= d; a += c; a -= 2; a += b; a -= 2"
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16), in d(16)) a ^= d; a += 2; a -= c; a += b; a -= 2"
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessHandlesLhsBeingSignalAccessAndRhsBeingFusedExprWithParentOperationBeingXorCorrectly": {
     "circuit": "module main(out a(16), in b(16), in c(16), in d(16)) a += (d ^ ((2 - b) - (2 - c)))",
@@ -285,7 +275,7 @@
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessHandlesLhsBeingNumberAndRhsBeingFusedExprWithOperationWithAssignmentOperationCounterpartWithCurrentOperationBeingNotCommutativeCorrectly": {
     "circuit": "module main(out a(16), in b(16), in c(16)) a += (2 - ((2 - b) - (2 - c)))",
-    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) a ^= 2; a += c; a -= 2; a += b; a -= 2"
+    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) a ^= 2; a += 2; a -= c; a += b; a -= 2"
   },
   "DISABLED_simplificationWithOnlyReversibleOpsAndUniqueSignalAccessHandlesLhsBeingNumberAndRhsBeingFusedExprWithOperationWithoutAssignmentOperationCounterpartCorrectly": {
 

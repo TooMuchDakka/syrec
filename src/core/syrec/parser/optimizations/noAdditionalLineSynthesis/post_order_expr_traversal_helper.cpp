@@ -3,11 +3,7 @@
 using namespace noAdditionalLineSynthesis;
 
 /*
-    Simplify operations of the form <subExpr> - (op_1 - op 2) to <subExpr> + (b - 2)
-    Reorder commutative operation nodes with two leaf nodes with one being a signal access and the other being a constant or loop variable to (signalAccess op other)
     Could perform split of top most expression at '^' if one operand is constant, i.e. a += (2 ^ <subExpr>) = a ^= <subExpr>; a ^= 2 iff a = 0
-
-    (2 - ((2 - b) - (2 - c))) = (2 - ((c - 2) + (2 - b)))
 */
 std::optional<PostOrderExprTraversalHelper::GeneratedSubAssignment> PostOrderExprTraversalHelper::tryGetNextElement() {
     if (postOrderContainerIdx < queueOfLeafNodesInPostOrder.size()) {
@@ -20,7 +16,7 @@ std::vector<PostOrderExprTraversalHelper::GeneratedSubAssignment> PostOrderExprT
     return queueOfLeafNodesInPostOrder;
 }
 
-void PostOrderExprTraversalHelper::buildPostOrderQueue(syrec_operation::operation assignmentOperation, const syrec::expression::ptr expr, bool isValueOfAssignedToSignalZeroPriorToAssignment) {
+void PostOrderExprTraversalHelper::buildPostOrderQueue(syrec_operation::operation assignmentOperation, const syrec::expression::ptr& expr, bool isValueOfAssignedToSignalZeroPriorToAssignment) {
     if (!canHandleAssignmentOperation(assignmentOperation) || (!isValueOfAssignedToSignalZeroPriorToAssignment && assignmentOperation == syrec_operation::operation::XorAssign)) {
         return;
     }
@@ -28,6 +24,7 @@ void PostOrderExprTraversalHelper::buildPostOrderQueue(syrec_operation::operatio
     resetInternalData();
     nextSubExpressionInitialAssignmentOperation.emplace(assignmentOperation);
     shouldCurrentOperationBeInverted = assignmentOperation == syrec_operation::operation::MinusAssign;
+    isInversionOfAssignmentOperationsNecessary = shouldCurrentOperationBeInverted;
     buildPostOrderTraversalQueueFor(expr);
 }
 
@@ -39,8 +36,8 @@ bool PostOrderExprTraversalHelper::doesExprDefinedVariableAccess(const syrec::ex
     return std::dynamic_pointer_cast<syrec::VariableExpression>(expr) != nullptr;
 }
 
-bool PostOrderExprTraversalHelper::canHandleAssignmentOperation(syrec_operation::operation assignentOperation) {
-    switch (assignentOperation) {
+bool PostOrderExprTraversalHelper::canHandleAssignmentOperation(syrec_operation::operation assignmentOperation) {
+    switch (assignmentOperation) {
         case syrec_operation::operation::AddAssign:
         case syrec_operation::operation::MinusAssign:
         case syrec_operation::operation::XorAssign:
@@ -55,17 +52,6 @@ void PostOrderExprTraversalHelper::trySwitchSignalAccessOperandToLhs(syrec::expr
         return;
     }
     switchOperands(lhsOperand, rhsOperand);
-
-   /* const auto isCurrentOperationCommutative = syrec_operation::isCommutative(operationToBeApplied);
-    if (!isCurrentOperationCommutative && !shouldOperationBeInverted) {
-        return;
-    }
-
-    if (isCurrentOperationCommutative || (!isCurrentOperationCommutative && shouldOperationBeInverted && syrec_operation::isCommutative(*syrec_operation::invert(operationToBeApplied)))) {
-        const auto backOfLhsOperand = lhsOperand;
-        lhsOperand                  = rhsOperand;
-        rhsOperand                  = backOfLhsOperand;
-    }*/
 }
 
 void PostOrderExprTraversalHelper::trySwitchNestedExprOnRhsToLhsIfLatterIsConstantOrLoopVariable(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand) {
@@ -73,17 +59,6 @@ void PostOrderExprTraversalHelper::trySwitchNestedExprOnRhsToLhsIfLatterIsConsta
         return;
     }
     switchOperands(lhsOperand, rhsOperand);
-
-    /*const auto isCurrentOperationCommutative = syrec_operation::isCommutative(operationToBeApplied);
-    if (!isCurrentOperationCommutative && !shouldOperationBeInverted) {
-        return;
-    }
-
-    if (isCurrentOperationCommutative || (!isCurrentOperationCommutative && shouldOperationBeInverted && syrec_operation::isCommutative(*syrec_operation::invert(operationToBeApplied)))) {
-        const auto backOfLhsOperand = lhsOperand;
-        lhsOperand                  = rhsOperand;
-        rhsOperand                  = backOfLhsOperand;
-    }*/
 }
 
 bool PostOrderExprTraversalHelper::trySwitchOperandsForXorOperationIfRhsIsNestedExprWithLhsBeingNotNested(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand) {
@@ -112,6 +87,14 @@ void PostOrderExprTraversalHelper::switchOperands(syrec::expression::ptr& lhsOpe
     rhsOperand                    = backupOfLhsOperand;
 }
 
+syrec_operation::operation PostOrderExprTraversalHelper::determineFinalAssignmentOperation(syrec_operation::operation currentAssignmentOperation) const {
+    if (!isInversionOfAssignmentOperationsNecessary || !processedAnySubExpression) {
+        return currentAssignmentOperation;
+    }
+
+    return *syrec_operation::invert(currentAssignmentOperation);
+}
+
 void PostOrderExprTraversalHelper::buildPostOrderTraversalQueueFor(const syrec::expression::ptr& expr) {
     if (!doesExprDefineNestedExpr(expr)) {
         queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(nextSubExpressionInitialAssignmentOperation.front(), expr));
@@ -128,97 +111,86 @@ void PostOrderExprTraversalHelper::buildPostOrderTraversalQueueForSubExpr(const 
 
     auto&      lhsOperand                             = exprAsBinaryExpr->lhs;
     auto&      rhsOperand                             = exprAsBinaryExpr->rhs;
-    auto       mappedToOperationEnumValue             = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
-    const auto ignoreInversionFlagForCurrentOperation = tryTransformExpressionIfOperationShouldBeInverted(lhsOperand, mappedToOperationEnumValue, rhsOperand, processedAnySubExpression && shouldCurrentOperationBeInverted);
-    auto shouldInversionOfCurrentOperationBeApplied = !ignoreInversionFlagForCurrentOperation ? shouldCurrentOperationBeInverted : false;
+    const auto mappedToOperationEnumValue                   = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+    auto transformedOperationConsideringInversionFlag = processedAnySubExpression && shouldCurrentOperationBeInverted ? *syrec_operation::invert(mappedToOperationEnumValue) : mappedToOperationEnumValue;
 
-    if (processedAnySubExpression && ignoreInversionFlagForCurrentOperation && nextSubExpressionInitialAssignmentOperation.front() == syrec_operation::operation::MinusAssign) {
-        nextSubExpressionInitialAssignmentOperation.back() = *syrec_operation::invert(nextSubExpressionInitialAssignmentOperation.back());
-       /* auto backupOfLhsOperand                            = lhsOperand;
-        lhsOperand                                         = rhsOperand;
-        rhsOperand                                         = backupOfLhsOperand;*/
+    /*
+     * Transform an expression of the form ... - (<subExpr_1> - <subExpr_2>) to ... + (<subExpr_2> - <subExpr_1>)
+     */
+    if (processedAnySubExpression && mappedToOperationEnumValue == syrec_operation::operation::Subtraction && nextSubExpressionInitialAssignmentOperation.front() == syrec_operation::operation::MinusAssign) {
+        nextSubExpressionInitialAssignmentOperation.back() = syrec_operation::operation::AddAssign;
+        transformedOperationConsideringInversionFlag       = syrec_operation::operation::Subtraction;
+        switchOperands(lhsOperand, rhsOperand);
+        shouldCurrentOperationBeInverted = false;
     } else {
         // Perform an operand switch for a bitwise xor operation in case that the rhs operand is a nested expression while the lhs is not (this could lead to a simplification of the rhs expression that would otherwise be lost)
-        if (!trySwitchOperandsForXorOperationIfRhsIsNestedExprWithLhsBeingNotNested(lhsOperand, mappedToOperationEnumValue, rhsOperand)) {
+        if (!trySwitchOperandsForXorOperationIfRhsIsNestedExprWithLhsBeingNotNested(lhsOperand, transformedOperationConsideringInversionFlag, rhsOperand)) {
             // Try perform a switch of the operands if the rhs operand defines a signal access and either the current operation or its inversion (if inversion is required) is commutative
-            trySwitchSignalAccessOperandToLhs(lhsOperand, mappedToOperationEnumValue, rhsOperand);
+            trySwitchSignalAccessOperandToLhs(lhsOperand, transformedOperationConsideringInversionFlag, rhsOperand);
         }
         // Try perform a switch of the operands if the lhs operand does not define a signal access or nested expr while the rhs operand does define a nested expr
-        trySwitchNestedExprOnRhsToLhsIfLatterIsConstantOrLoopVariable(lhsOperand, mappedToOperationEnumValue, rhsOperand);
+        trySwitchNestedExprOnRhsToLhsIfLatterIsConstantOrLoopVariable(lhsOperand, transformedOperationConsideringInversionFlag, rhsOperand);
     }
 
     const bool doesLhsDefinedNestedExpr   = doesExprDefineNestedExpr(lhsOperand);
     const bool doesRhsDefinedNestedExpr   = doesExprDefineNestedExpr(rhsOperand);
 
     if (!doesLhsDefinedNestedExpr && !doesRhsDefinedNestedExpr) {
-        auto firstLeafNodeInPostOrder  = lhsOperand;
-        auto secondLeafNodeInPostOrder = rhsOperand;
-
-        trySwitchSignalAccessOperandToLhs(firstLeafNodeInPostOrder, mappedToOperationEnumValue, secondLeafNodeInPostOrder);
-        queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(nextSubExpressionInitialAssignmentOperation.front(), firstLeafNodeInPostOrder));
+        queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(determineFinalAssignmentOperation(nextSubExpressionInitialAssignmentOperation.front()), lhsOperand));
         nextSubExpressionInitialAssignmentOperation.pop();
         processedAnySubExpression = true;
 
-        const auto  mappedtoAssignmentOperationForCurrentOperation = *syrec_operation::getMatchingAssignmentOperationForOperation(mappedToOperationEnumValue);
-        const auto& assignmentOperationToUseForRhs                 = shouldInversionOfCurrentOperationBeApplied ? *syrec_operation::invert(mappedtoAssignmentOperationForCurrentOperation) : mappedtoAssignmentOperationForCurrentOperation;
-
-        queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(assignmentOperationToUseForRhs, secondLeafNodeInPostOrder));
+        const auto  mappedToAssignmentOperationForCurrentOperation = *syrec_operation::getMatchingAssignmentOperationForOperation(transformedOperationConsideringInversionFlag);
+        queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(determineFinalAssignmentOperation(mappedToAssignmentOperationForCurrentOperation), rhsOperand));
     } else if (doesLhsDefinedNestedExpr && doesRhsDefinedNestedExpr) {
-        auto backupOfCurrentInversionFlagValue = shouldInversionOfCurrentOperationBeApplied;
-        shouldCurrentOperationBeInverted       = shouldInversionOfCurrentOperationBeApplied;
+        auto backupOfCurrentInversionFlagValue = shouldCurrentOperationBeInverted;
         buildPostOrderTraversalQueueForSubExpr(lhsOperand);
         shouldCurrentOperationBeInverted        = backupOfCurrentInversionFlagValue;
-
-        const auto  mappedtoAssignmentOperation = *syrec_operation::getMatchingAssignmentOperationForOperation(mappedToOperationEnumValue);
-        const auto& assignmentOperationToUse    = shouldInversionOfCurrentOperationBeApplied ? *syrec_operation::invert(mappedtoAssignmentOperation) : mappedtoAssignmentOperation;
-
+        
+        const auto& assignmentOperationForRhsOperand = *syrec_operation::getMatchingAssignmentOperationForOperation(transformedOperationConsideringInversionFlag);
         // Operation nodes with the '^' operation and the rhs operand defining a nested expression cannot be further simplified and thus the whole rhs expression will be used in the generated subassignments
-        if (assignmentOperationToUse == syrec_operation::operation::XorAssign && doesExprDefineNestedExpr(exprAsBinaryExpr->rhs)) {
-            queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(assignmentOperationToUse, exprAsBinaryExpr->rhs));
+        if (assignmentOperationForRhsOperand == syrec_operation::operation::XorAssign && doesExprDefineNestedExpr(exprAsBinaryExpr->rhs)) {
+            queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(assignmentOperationForRhsOperand, exprAsBinaryExpr->rhs));
             return;
         }
 
-        backupOfCurrentInversionFlagValue = shouldInversionOfCurrentOperationBeApplied;
-        shouldCurrentOperationBeInverted             = assignmentOperationToUse == syrec_operation::operation::MinusAssign;
-        nextSubExpressionInitialAssignmentOperation.push(assignmentOperationToUse);
+        backupOfCurrentInversionFlagValue = shouldCurrentOperationBeInverted;
+        shouldCurrentOperationBeInverted  = assignmentOperationForRhsOperand == syrec_operation::operation::MinusAssign;
+        nextSubExpressionInitialAssignmentOperation.push(assignmentOperationForRhsOperand);
 
         buildPostOrderTraversalQueueForSubExpr(rhsOperand);
         shouldCurrentOperationBeInverted = backupOfCurrentInversionFlagValue;
     } else {
         /*
-                Handle the two cases:
-                I. (<signalAccess> op <subExpr>)
-                II. (<subExpr> op <signalAccess>)
-            */
-        auto firstOperandInPostOrder  = lhsOperand;
-        auto secondOperandInPostOrder = rhsOperand;
+            Handle the two cases:
+            I. (<signalAccess> op <subExpr>)
+            II. (<subExpr> op <signalAccess>)
+        */
 
-        if (doesExprDefineNestedExpr(firstOperandInPostOrder)) {
-            const auto backupOfCurrentInversionFlagValue = shouldInversionOfCurrentOperationBeApplied;
-            buildPostOrderTraversalQueueForSubExpr(firstOperandInPostOrder);
+        if (doesExprDefineNestedExpr(lhsOperand)) {
+            const auto backupOfCurrentInversionFlagValue = shouldCurrentOperationBeInverted;
+            buildPostOrderTraversalQueueForSubExpr(lhsOperand);
             shouldCurrentOperationBeInverted = backupOfCurrentInversionFlagValue;
 
-            const auto& mappedToAssignmentOperationForCurrentOperation = *syrec_operation::getMatchingAssignmentOperationForOperation(mappedToOperationEnumValue);
-            const auto& assignmentOperationForRhsOperand               = shouldInversionOfCurrentOperationBeApplied ? *syrec_operation::invert(mappedToAssignmentOperationForCurrentOperation) : mappedToAssignmentOperationForCurrentOperation;
-            queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(assignmentOperationForRhsOperand, secondOperandInPostOrder));
+            const auto& mappedToAssignmentOperationForCurrentOperation = *syrec_operation::getMatchingAssignmentOperationForOperation(transformedOperationConsideringInversionFlag);
+            queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(determineFinalAssignmentOperation(mappedToAssignmentOperationForCurrentOperation), rhsOperand));
         } else {
-            queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(nextSubExpressionInitialAssignmentOperation.front(), firstOperandInPostOrder));
+            queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(determineFinalAssignmentOperation(nextSubExpressionInitialAssignmentOperation.front()), lhsOperand));
             nextSubExpressionInitialAssignmentOperation.pop();
             processedAnySubExpression = true;
-
-            const auto& mappedToAssignmentOperationForCurrentOperation = *syrec_operation::getMatchingAssignmentOperationForOperation(mappedToOperationEnumValue);
-            const auto& assignmentOperationForRhsOperand               = shouldInversionOfCurrentOperationBeApplied ? *syrec_operation::invert(mappedToAssignmentOperationForCurrentOperation) : mappedToAssignmentOperationForCurrentOperation;
+            
+            const auto& assignmentOperationForRhsOperand = *syrec_operation::getMatchingAssignmentOperationForOperation(transformedOperationConsideringInversionFlag);
             // Operation nodes with the '^' operation and the rhs operand defining a nested expression cannot be further simplified and thus the whole rhs expression will be used in the generated subassignments
             if (assignmentOperationForRhsOperand == syrec_operation::operation::XorAssign) {
-                queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(assignmentOperationForRhsOperand, secondOperandInPostOrder));
+                queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(assignmentOperationForRhsOperand, rhsOperand));
                 return;
             }
 
-            const auto backupOfCurrentInversionFlagValue = shouldInversionOfCurrentOperationBeApplied;
+            const auto backupOfCurrentInversionFlagValue = shouldCurrentOperationBeInverted;
             shouldCurrentOperationBeInverted             = assignmentOperationForRhsOperand == syrec_operation::operation::MinusAssign;
             nextSubExpressionInitialAssignmentOperation.push(assignmentOperationForRhsOperand);
 
-            buildPostOrderTraversalQueueForSubExpr(secondOperandInPostOrder);
+            buildPostOrderTraversalQueueForSubExpr(rhsOperand);
             shouldCurrentOperationBeInverted = backupOfCurrentInversionFlagValue;
         }
     }
@@ -229,4 +201,5 @@ void PostOrderExprTraversalHelper::resetInternalData() {
     postOrderContainerIdx = 0;
     processedAnySubExpression = false;
     shouldCurrentOperationBeInverted = false;
+    isInversionOfAssignmentOperationsNecessary = false;
 }
