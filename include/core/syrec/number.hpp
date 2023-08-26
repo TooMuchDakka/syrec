@@ -20,21 +20,21 @@ namespace syrec {
         using ptr = std::shared_ptr<Number>;
 
         using loop_variable_mapping = std::map<std::string, unsigned int>;
-
-        enum Operation {
-            Addition,
-            Subtraction,
-            Multiplication,
-            Division
-        };
-
+        
         struct CompileTimeConstantExpression {
+            enum Operation {
+                Addition,
+                Subtraction,
+                Multiplication,
+                Division
+            };
+
             ptr lhsOperand;
             Operation operation;
             ptr     rhsOperand;
 
-            explicit CompileTimeConstantExpression(const ptr& lhsOperand, Operation operation, const ptr& rhsOperand):
-                lhsOperand(lhsOperand), operation(operation), rhsOperand(rhsOperand) {
+            explicit CompileTimeConstantExpression(ptr lhsOperand, Operation operation, ptr rhsOperand):
+                lhsOperand(std::move(lhsOperand)), operation(operation), rhsOperand(std::move(rhsOperand)) {
             }
 
             // TODO: Handling of division by zero

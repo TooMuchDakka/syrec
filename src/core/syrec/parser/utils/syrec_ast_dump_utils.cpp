@@ -335,19 +335,19 @@ inline std::string SyrecASTDumper::stringifyNumber(const syrec::Number::ptr& num
 
         std::string numberStringified = "(" + stringifyNumber(definedExpression.lhsOperand) + " ";
         switch (definedExpression.operation) {
-            case syrec::Number::Operation::Addition: {
+            case syrec::Number::CompileTimeConstantExpression::Operation::Addition: {
                 numberStringified += "+";
                 break;
             }
-            case syrec::Number::Operation::Subtraction: {
+            case syrec::Number::CompileTimeConstantExpression::Operation::Subtraction: {
                 numberStringified += "-";
                 break;
             }
-            case syrec::Number::Operation::Multiplication: {
+            case syrec::Number::CompileTimeConstantExpression::Operation::Multiplication: {
                 numberStringified += "*";
                 break;
             }
-            case syrec::Number::Operation::Division: {
+            case syrec::Number::CompileTimeConstantExpression::Operation::Division: {
                 numberStringified += "/";
                 break;
             }

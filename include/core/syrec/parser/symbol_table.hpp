@@ -41,6 +41,7 @@ namespace parser {
 
         // TODO: CONSTANT_PROPAGATION
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
+        [[nodiscard]] std::optional<unsigned int> tryFetchValueOfLoopVariable(const std::string_view& loopVariableIdent) const;
         void                                      invalidateStoredValuesFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void                                      invalidateStoredValueForLoopVariable(const std::string_view& loopVariableIdent) const;
         void                                      updateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignalParts, unsigned int newValue) const;

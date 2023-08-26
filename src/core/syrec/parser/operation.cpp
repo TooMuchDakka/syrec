@@ -122,6 +122,57 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
     return isValidBinaryOperation ? std::optional(result) : std::nullopt;
 }
 
+std::optional<unsigned int> syrec_operation::apply(const operation operation, const std::optional<unsigned int>& leftOperand, const std::optional<unsigned int>& rightOperand) noexcept {
+    if (leftOperand.has_value() && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(operation, *leftOperand)) {
+        return rightOperand;
+    }
+    if (rightOperand.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(operation, *rightOperand)) {
+        return leftOperand;
+    }
+
+    if (operation == syrec_operation::operation::Subtraction) {
+        if (leftOperand.has_value() ^ rightOperand.has_value()) {
+            return std::nullopt;
+        }
+    }
+
+    if (leftOperand.has_value() && !*leftOperand) {
+        switch (operation) {
+            case syrec_operation::operation::BitwiseAnd:
+            case syrec_operation::operation::Multiplication:
+            case syrec_operation::operation::Division:
+            case syrec_operation::operation::LogicalAnd:
+            case syrec_operation::operation::Modulo:
+            case syrec_operation::operation::UpperBitsMultiplication:
+                return std::make_optional(0);
+            default:
+                break;
+        }
+    }
+
+    if (rightOperand.has_value() && !*rightOperand) {
+        if (!*rightOperand) {
+            switch (operation) {
+                case syrec_operation::operation::BitwiseAnd:
+                case syrec_operation::operation::Multiplication:
+                case syrec_operation::operation::LogicalAnd:
+                case syrec_operation::operation::Modulo:
+                case syrec_operation::operation::UpperBitsMultiplication:
+                    return std::make_optional(0);
+                default:
+                    break;
+            }
+        } else if (*rightOperand == 1 && operation == syrec_operation::operation::Modulo) {
+            return std::make_optional(1);
+        }
+    }
+
+    if (!leftOperand.has_value() && !rightOperand.has_value()) {
+        return std::nullopt;
+    }
+    return syrec_operation::apply(operation, *leftOperand, *rightOperand);
+}
+
 std::optional<unsigned int> syrec_operation::apply(const operation operation, const unsigned int operand) noexcept {
     unsigned int result = 0;
     bool isValidUnaryOperation = true;

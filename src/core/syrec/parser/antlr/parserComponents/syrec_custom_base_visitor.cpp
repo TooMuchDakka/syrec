@@ -310,22 +310,22 @@ std::any SyReCCustomBaseVisitor::visitNumberFromExpression(SyReCParser::NumberFr
      * we skip evaluation and instead create a new expression
      */
     if (!canEvaluateNumber(*lhsOperand) || !canEvaluateNumber(*rhsOperand)) {
-        syrec::Number::Operation mappedOperation;
+        syrec::Number::CompileTimeConstantExpression::Operation mappedOperation;
         switch (*operation) {
             case syrec_operation::operation::Addition: {
-                mappedOperation = syrec::Number::Operation::Addition;
+                mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Addition;
                 break;
             }
             case syrec_operation::operation::Subtraction: {
-                mappedOperation = syrec::Number::Operation::Subtraction;
+                mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Subtraction;
                 break;
             }
             case syrec_operation::operation::Multiplication: {
-                mappedOperation = syrec::Number::Operation::Multiplication;
+                mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Multiplication;
                 break;
             }
             case syrec_operation::operation::Division: {
-                mappedOperation = syrec::Number::Operation::Division;
+                mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Division;
                 break;
             }
             default:
@@ -416,27 +416,34 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateNumber(const syrec::N
 
 
 std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, const TokenPosition& evaluationErrorPositionHelper) {
-    std::optional<unsigned int> evaluationResult;
-
     const auto lhsEvaluated = canEvaluateNumber(compileTimeExpression.lhsOperand) ? tryEvaluateNumber(compileTimeExpression.lhsOperand, evaluationErrorPositionHelper) : std::nullopt;
     const auto rhsEvaluated = (lhsEvaluated.has_value() && canEvaluateNumber(compileTimeExpression.rhsOperand)) ? tryEvaluateNumber(compileTimeExpression.rhsOperand, evaluationErrorPositionHelper) : std::nullopt;
-    if (rhsEvaluated.has_value()) {
-        switch (compileTimeExpression.operation) {
-            case syrec::Number::Addition:
-                evaluationResult.emplace(*lhsEvaluated + *rhsEvaluated);
-            case syrec::Number::Subtraction:
-                evaluationResult.emplace(*lhsEvaluated - *rhsEvaluated);
-            case syrec::Number::Multiplication:
-                evaluationResult.emplace(*lhsEvaluated * *rhsEvaluated);
-            default:
-                if (*rhsEvaluated != 0) {
-                    evaluationResult.emplace(*lhsEvaluated / *rhsEvaluated);
-                } else {
-                    createError(evaluationErrorPositionHelper, DivisionByZero);
-                }
-        }
+    if (rhsEvaluated.has_value() && !*rhsEvaluated && compileTimeExpression.operation == syrec::Number::CompileTimeConstantExpression::Division) {
+        createError(evaluationErrorPositionHelper, DivisionByZero);
+        return std::nullopt;
     }
-    return evaluationResult;
+
+    std::optional<syrec_operation::operation> mappedToBinaryOperation;
+    switch (compileTimeExpression.operation) {
+        case syrec::Number::CompileTimeConstantExpression::Addition:
+            mappedToBinaryOperation.emplace(syrec_operation::operation::Addition);
+            break;
+        case syrec::Number::CompileTimeConstantExpression::Subtraction:
+            mappedToBinaryOperation.emplace(syrec_operation::operation::Subtraction);
+            break;
+        case syrec::Number::CompileTimeConstantExpression::Multiplication:
+            mappedToBinaryOperation.emplace(syrec_operation::operation::Multiplication);
+            break;
+        case syrec::Number::CompileTimeConstantExpression::Division:
+            mappedToBinaryOperation.emplace(syrec_operation::operation::Division);
+            break;
+    }
+
+    if (!mappedToBinaryOperation.has_value()) {
+        createError(evaluationErrorPositionHelper, fmt::format(NoMappingForNumberOperation, stringifyCompileTimeConstantExpressionOperation(compileTimeExpression.operation)));
+        return std::nullopt;
+    }
+    return syrec_operation::apply(*mappedToBinaryOperation, lhsEvaluated, rhsEvaluated);
 }
 
 std::optional<unsigned> SyReCCustomBaseVisitor::applyBinaryOperation(syrec_operation::operation operation, unsigned leftOperand, unsigned rightOperand, const TokenPosition& potentialErrorPosition) {
@@ -668,4 +675,19 @@ void SyReCCustomBaseVisitor::decrementReferenceCountOfSignal(const std::string_v
     }
 
     sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(signalIdent);
+}
+
+std::string SyReCCustomBaseVisitor::stringifyCompileTimeConstantExpressionOperation(syrec::Number::CompileTimeConstantExpression::Operation ctcOperation) {
+    switch (ctcOperation) {
+        case syrec::Number::CompileTimeConstantExpression::Operation::Addition:
+            return "+";
+        case syrec::Number::CompileTimeConstantExpression::Operation::Subtraction:
+            return "-";
+        case syrec::Number::CompileTimeConstantExpression::Operation::Multiplication:
+            return "*";
+        case syrec::Number::CompileTimeConstantExpression::Operation::Division:
+            return "/";
+        default:
+            return "<unknown>";
+    }
 }

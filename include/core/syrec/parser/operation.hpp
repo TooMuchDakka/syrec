@@ -43,6 +43,7 @@ namespace syrec_operation {
     [[nodiscard]] bool                        isOperandUsedAsLhsInOperationIdentityElement(operation operation, unsigned int operand) noexcept;
     [[nodiscard]] bool                        isOperandUseAsRhsInOperationIdentityElement(operation operation, unsigned int operand) noexcept;
     [[nodiscard]] std::optional<unsigned int> apply(operation operation, unsigned int leftOperand, unsigned int rightOperand) noexcept;
+    [[nodiscard]] std::optional<unsigned int> apply(operation operation, const std::optional<unsigned int>& leftOperand, const std::optional<unsigned int>& rightOperand) noexcept;
     [[nodiscard]] std::optional<unsigned int> apply(operation operation, unsigned int operand) noexcept;
     [[nodiscard]] bool                        isCommutative(operation operation) noexcept;
     [[nodiscard]] std::optional<operation>    invert(operation operation) noexcept;

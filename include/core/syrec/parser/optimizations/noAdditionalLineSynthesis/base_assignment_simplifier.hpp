@@ -19,31 +19,48 @@ namespace noAdditionalLineSynthesis {
         virtual ~BaseAssignmentSimplifier() = 0;
     protected:
         using RestrictionMap = std::map<std::string, std::vector<syrec::VariableAccess::ptr>>;
+        /*
+         * TODO: Use this additional data structure to check whether the value of a signal is zero (beside the symbol table lookup) to enable optimizations for subexpressions that are currently not possible
+         * due to the assumption that signals are not zero inside any of the subexpressions (this lookup map should also only store signals that were actually zero before any assignment) to reduce the amount of required storage
+         * and prevent the need to actually modify the entries in the symbol table for these checks
+         */
+        using LocallyDisabledSignalMap = std::map<std::string, std::vector<syrec::VariableAccess::ptr>>;
+        using LocallyDisabledSignalMapReference = std::unique_ptr<LocallyDisabledSignalMap>;
         const parser::SymbolTable::ptr symbolTable;
+        LocallyDisabledSignalMapReference locallyDisabledSignalWithValueOfZeroMap;
 
         [[nodiscard]] static bool                        isExprConstantNumber(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                        doesExprDefineVariableAccess(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                        doesExprDefineNestedExpr(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                        doesExprOnlyContainReversibleOperations(const syrec::expression::ptr& expr);
-        [[nodiscard]] static std::optional<unsigned int> tryFetchValueOfNumber(const syrec::Number::ptr& number);
-        [[nodiscard]] static std::optional<unsigned int> tryFetchValueOfExpr(const syrec::expression::ptr& expr);
+        /*[[nodiscard]] static std::optional<unsigned int> tryFetchValueOfNumber(const syrec::Number::ptr& number);
+        [[nodiscard]] static std::optional<unsigned int> tryFetchValueOfExpr(const syrec::expression::ptr& expr);*/
         [[nodiscard]] static syrec::Statement::vec       invertAssignmentsButIgnoreSome(const syrec::Statement::vec& assignmentsToInvert, std::size_t numStatementsToIgnoreStartingFromLastOne);
 
-        [[nodiscard]] bool                                                                    doAccessedBitRangesOverlap(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::VariableAccess::ptr& potentiallyEnclosingSignalAccess, bool shouldAccessedBitRangeBeFullyEnclosed) const;
-        [[nodiscard]] bool                                                                    doAccessedSignalPartsOverlap(const syrec::VariableAccess::ptr& accessedSignalPartsOfLhs, const syrec::VariableAccess::ptr& accessedSignalPartsOfRhs) const;
+        /*[[nodiscard]] bool                                                                    doAccessedBitRangesOverlap(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::VariableAccess::ptr& potentiallyEnclosingSignalAccess, bool shouldAccessedBitRangeBeFullyEnclosed) const;
+        [[nodiscard]] bool                                                                    doAccessedSignalPartsOverlap(const syrec::VariableAccess::ptr& accessedSignalPartsOfLhs, const syrec::VariableAccess::ptr& accessedSignalPartsOfRhs) const;*/
         [[nodiscard]] bool                                                                    wasAccessOnSignalAlreadyDefined(const syrec::VariableAccess::ptr& accessedSignalParts, const RestrictionMap& notUsableSignals) const;
+        //[[nodiscard]] bool                                                                    areSignalAccessesEqual(const syrec::VariableAccess::ptr& thisSignalAccess, const syrec::VariableAccess::ptr& thatSignalAccess) const;
         [[nodiscard]] bool                                                                    wasAnyAccessedSignalPartPreviouslyNotAccessed(const syrec::VariableAccess::ptr& accessedSignalParts, const RestrictionMap& previouslyAccessedSignalPartsLookup) const;
-        [[nodiscard]] std::optional<unsigned int>                                             fetchBitWidthOfSignal(const std::string_view& signalIdent) const;
-        [[nodiscard]] std::optional<syrec::Variable::ptr>                                     fetchSymbolTableEntryForSignalAccess(const std::string_view& signalIdent) const;
-        [[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> transformUserDefinedBitRangeAccess(const syrec::VariableAccess::ptr& accessedSignalParts) const;
+        /*[[nodiscard]] std::optional<unsigned int>                                             fetchBitWidthOfSignal(const std::string_view& signalIdent) const;
+        [[nodiscard]] std::optional<syrec::Variable::ptr>                                     fetchSymbolTableEntryForSignalAccess(const std::string_view& signalIdent) const;*/
 
+        // TODO: These two functions should probably be renamed to doesExprOnlyContainUniqueSignalAccesses
         /** @brief Check that every lhs Operand of any binary expression is only defined once on every level of the ast. <br>
         * Additionally perform required transformations of the form (2 + a) <=> (a + 2) if possible
         * @returns Whether the given condition was true, is std::nullopt is returned the given binary expression cannot be simplified
         */
         [[nodiscard]] std::optional<bool> isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(const syrec::BinaryExpression::ptr& rootExpr) const;
-        [[nodiscard]] std::optional<bool> isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(const syrec::BinaryExpression::ptr& expr, bool isRootExpr, RestrictionMap& notUsableSignals) const;
+        [[nodiscard]] std::optional<bool> isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(const syrec::BinaryExpression::ptr& exprToCheck, bool isRootExpr, RestrictionMap& notUsableSignals) const;
+        [[nodiscard]] std::optional<bool> doesExprOnlyContainUniqueSignalAccesses(const syrec::expression::ptr&, RestrictionMap& alreadyDefinedSignalAccesses);
+
+        // TODO: Define new function that every lhs operand of any binary expr is defined once on every lhs of any expr (how do we deal with switches correctly ?)
+
+        [[nodiscard]] std::optional<bool> isValueOfAssignedToSignalZero(const syrec::VariableAccess::ptr& assignedToSignal) const;
+        void                              invalidateSignalWithPreviousValueOfZero(const syrec::VariableAccess::ptr& assignedToSignal) const;
         void                              markSignalAccessAsNotUsableInExpr(const syrec::VariableAccess::ptr& accessedSignalParts, RestrictionMap& notUsableSignals) const;
+
+
 
         [[nodiscard]] virtual syrec::Statement::vec simplifyWithoutPreconditionCheck(const syrec::AssignStatement::ptr& assignmentStmt, bool isValueOfAssignedToSignalBlockedByDataFlowAnalysis) = 0;
         [[nodiscard]] virtual bool                  simplificationPrecondition(const syrec::AssignStatement::ptr& assignmentStmt)       = 0;

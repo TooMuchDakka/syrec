@@ -44,6 +44,10 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
         return {};
     }
 
+    if (const auto& reorderResultOfPotentialSubtractionOperations = tryPerformReorderingOfSubtractionOperationsWithNestedSubexpressions(assignmentStmtCasted->rhs); reorderResultOfPotentialSubtractionOperations.has_value()) {
+        assignmentStmtCasted->rhs = *reorderResultOfPotentialSubtractionOperations;
+    }
+
     /*
      * Apply rule R2
      */
@@ -354,13 +358,13 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
 
 std::optional<syrec_operation::operation> MainAdditionalLineForAssignmentSimplifier::tryMapCompileTimeConstantOperation(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression) {
     switch (compileTimeConstantExpression.operation) {
-        case syrec::Number::Operation::Addition:
+        case syrec::Number::CompileTimeConstantExpression::Operation::Addition:
             return std::make_optional(syrec_operation::operation::Addition);
-        case syrec::Number::Operation::Subtraction:
+        case syrec::Number::CompileTimeConstantExpression::Operation::Subtraction:
             return std::make_optional(syrec_operation::operation::Subtraction);
-        case syrec::Number::Operation::Multiplication:
+        case syrec::Number::CompileTimeConstantExpression::Operation::Multiplication:
             return std::make_optional(syrec_operation::operation::Multiplication);
-        case syrec::Number::Operation::Division:
+        case syrec::Number::CompileTimeConstantExpression::Operation::Division:
             return std::make_optional(syrec_operation::operation::Division);
         default:
             return std::nullopt;
@@ -421,6 +425,43 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
     return std::make_optional(expr);
 }
 
+std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryPerformReorderingOfSubtractionOperationsWithNestedSubexpressions(const syrec::expression::ptr& expr) {
+    const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
+    
+    if (exprAsBinaryExpr == nullptr) {
+        if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
+            if (const auto& reorderingResultOfLhsOperand = tryPerformReorderingOfSubtractionOperationsWithNestedSubexpressions(exprAsShiftExpr->lhs); reorderingResultOfLhsOperand.has_value()) {
+                return std::make_optional(std::make_shared<syrec::ShiftExpression>(
+                    *reorderingResultOfLhsOperand,
+                    exprAsShiftExpr->op,
+                    exprAsShiftExpr->rhs
+                ));
+            }
+        }
+        return std::nullopt;
+    }
+    const auto& mappedToBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+    if (!mappedToBinaryOperation.has_value() || *mappedToBinaryOperation != syrec_operation::operation::Subtraction) {
+        return std::nullopt;
+    }
+
+    if (const auto& rhsOperandAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprAsBinaryExpr->rhs); rhsOperandAsBinaryExpr != nullptr) {
+        if (const auto& mappedToOperationOfRhsSubExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(rhsOperandAsBinaryExpr->op); mappedToOperationOfRhsSubExpr.has_value() && *mappedToOperationOfRhsSubExpr == syrec_operation::operation::Subtraction) {
+            const auto& transformedSubExpr = std::make_shared<syrec::BinaryExpression>(
+                    rhsOperandAsBinaryExpr->rhs,
+                    *syrec_operation::tryMapBinaryOperationEnumToFlag(syrec_operation::operation::Subtraction),
+                    rhsOperandAsBinaryExpr->lhs);
+
+            const auto& modifiedParentBinaryExpr = std::make_shared<syrec::BinaryExpression>(
+                exprAsBinaryExpr->lhs,
+                *syrec_operation::tryMapBinaryOperationEnumToFlag(syrec_operation::operation::Addition),
+                transformedSubExpr
+            );
+            return tryPerformReorderingOfSubtractionOperationsWithNestedSubexpressions(modifiedParentBinaryExpr);
+        }
+    }
+    return std::nullopt;
+}
 
 std::shared_ptr<MainAdditionalLineForAssignmentSimplifier::VariableAccessCountLookup> MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered) const {
     auto buildLookup = std::make_shared<VariableAccessCountLookup>();

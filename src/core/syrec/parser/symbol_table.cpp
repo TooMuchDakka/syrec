@@ -192,6 +192,16 @@ std::optional<unsigned int> SymbolTable::tryFetchValueForLiteral(const syrec::Va
     return signalValueLookup->tryFetchValueFor(transformedDimensionAccess, transformedBitRange);
 }
 
+std::optional<unsigned> SymbolTable::tryFetchValueOfLoopVariable(const std::string_view& loopVariableIdent) const {
+    const auto& symbolTableEntryForVariable = getEntryForVariable(loopVariableIdent);
+    if (symbolTableEntryForVariable == nullptr || !symbolTableEntryForVariable->optionalValueLookup.has_value() || !std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation)) {
+        return std::nullopt;
+    }
+    const auto& signalValueLookup = *symbolTableEntryForVariable->optionalValueLookup;
+    return signalValueLookup->tryFetchValueFor({}, std::nullopt);
+}
+
+
 void SymbolTable::invalidateStoredValuesFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const {
     const auto& symbolTableEntryForVariable = getEntryForVariable(assignedToSignalParts->var->name);
     if (symbolTableEntryForVariable == nullptr || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {

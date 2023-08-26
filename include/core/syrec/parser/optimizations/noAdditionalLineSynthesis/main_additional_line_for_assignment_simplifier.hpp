@@ -68,6 +68,13 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static std::optional<syrec_operation::operation> tryMapCompileTimeConstantOperation(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression);
         [[nodiscard]] static std::optional<syrec::expression::ptr>     tryMapNumberToExpression(const syrec::Number::ptr& number, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable);
         [[nodiscard]] static std::optional<syrec::expression::ptr>     tryPerformReorderingOfSubexpressions(const syrec::expression::ptr& expr);
+        /**
+         * \brief Performs the transformation (<subExpr_1> - (<subExpr_2> - <subExpr_3>)) to (<subExpr_1> + (<subExpr_3> - <subExpr_2>)) <br>
+         * <b>IMPORTANT:</b> This transformation is a speculative heuristic and could lead to a worse result when trying to optimize the transformed expression.
+         * \param expr The expression of which the transformation shall be applied
+         * \return The transformed expression if such a transformation took place otherwise nothing
+         */
+        [[nodiscard]] static std::optional<syrec::expression::ptr>     tryPerformReorderingOfSubtractionOperationsWithNestedSubexpressions(const syrec::expression::ptr& expr);
 
         struct VariableAccessCountPair {
             std::size_t                accessCount;
