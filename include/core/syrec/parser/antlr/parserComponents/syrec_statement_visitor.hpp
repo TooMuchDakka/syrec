@@ -52,7 +52,7 @@ namespace parser {
         bool                                                         doArgumentsBetweenCallAndUncallMatch(const TokenPosition& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments);
         [[nodiscard]] std::optional<ExpressionEvaluationResult::ptr> getUnoptimizedExpression(SyReCParser::ExpressionContext* context);
         [[nodiscard]] static bool                                    areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr);
-        void                                                         decrementReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression);
+        void                                                         decrementReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression) const;
         [[nodiscard]] SymbolTableBackupHelper::ptr                   createCopiesOfCurrentValuesOfChangedSignalsAndResetToOriginal(const SymbolTableBackupHelper::ptr& backupOfOriginalValues) const;
         void                                                         mergeChangesFromBranchesAndUpdateSymbolTable(const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInTrueBranch, const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInFalseBranch, bool canAnyBranchBeOmitted, bool canTrueBranchBeOmitted) const;
         void                                                         createAndStoreBackupForAssignedToSignal(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
@@ -61,7 +61,7 @@ namespace parser {
 
         [[nodiscard]] std::optional<syrec::ForStatement::ptr> visitForStatementInReadonlyMode(SyReCParser::ForStatementContext* context);
         void                                                  visitForStatementWithOptimizationsEnabled(SyReCParser::ForStatementContext* context);
-        void                                                  unrollAndProcessLoopBody(SyReCParser::ForStatementContext* context, const std::shared_ptr<syrec::ForStatement>& loopStatement, const optimizations::LoopOptimizationConfig& loopUnrollConfigToUse);
+        void                                                  unrollAndProcessLoopBody(SyReCParser::ForStatementContext* context, const std::shared_ptr<syrec::ForStatement>& loopStatement, const optimizations::LoopOptimizationConfig& loopUnrollConfigToUse, const std::vector<syrec::VariableAccess::ptr>& assignmentsInNonNestedLoops);
 
     private:
         std::any visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext* context) override {
@@ -142,6 +142,19 @@ namespace parser {
         void                                                       decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(const syrec::Module::ptr& calledModule, const std::vector<std::string>& filteredCalleeArguments) const;
         void                                                       performAssignmentRhsExprSimplification(syrec::expression::ptr& assignmentRhsExpr) const;
         void                                                       performAssignmentOperation(const syrec::AssignStatement::ptr& assignmentStmt) const;
+
+
+        struct IfConditionBranchEvaluationResult {
+            std::optional<syrec::Statement::vec> parsedStatements;
+            std::optional<SymbolTableBackupHelper::ptr> optionalBackupOfValuesAtEndOfBranch;
+
+            explicit IfConditionBranchEvaluationResult(std::optional<syrec::Statement::vec> parsedStatements, std::optional<SymbolTableBackupHelper::ptr> optionalBackupOfValuesAtEndOfBranch):
+                parsedStatements(std::move(parsedStatements)), optionalBackupOfValuesAtEndOfBranch(std::move(optionalBackupOfValuesAtEndOfBranch)) {}
+
+        };
+
+        [[nodiscard]] IfConditionBranchEvaluationResult parseIfConditionBranch(parser::SyReCParser::StatementListContext* ifBranchStmtsContext, bool shouldBeParsedAsReadonly, bool canBranchBeOmittedBasedOnGuardConditionEvaluation);
+        void                                            invalidateAssignmentsOfNonNestedLoops(const std::vector<syrec::VariableAccess::ptr>& assignmentsOfNonNestedLoop) const;
     };
 } // namespace parser
 #endif

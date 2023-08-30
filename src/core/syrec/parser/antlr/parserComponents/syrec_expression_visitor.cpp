@@ -144,7 +144,9 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
                 }
 
                 if (sharedData->parserConfig->reassociateExpressionsEnabled) {
-                    createdBinaryExpr = optimizations::simplifyBinaryExpression(createdBinaryExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier);
+                    std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
+                    createdBinaryExpr = optimizations::simplifyBinaryExpression(createdBinaryExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses);
+                    decrementReferenceCountsOfOptimizedAwaySignalAccesses(optimizedAwaySignalAccesses);
                 } 
 
                 // TODO: Handling of binary expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
@@ -229,7 +231,9 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     // TODO: Handling of shift expression bitwidth, i.e. both operands will be "promoted" to a bitwidth of the larger expression
     syrec::expression::ptr createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *syrec_operation::tryMapShiftOperationEnumToFlag(*definedShiftOperation), *shiftAmount);
     if (sharedData->parserConfig->reassociateExpressionsEnabled) {
-        createdShiftExpression = optimizations::simplifyBinaryExpression(createdShiftExpression, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier);
+        std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
+        createdShiftExpression = optimizations::simplifyBinaryExpression(createdShiftExpression, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses);
+        decrementReferenceCountsOfOptimizedAwaySignalAccesses(optimizedAwaySignalAccesses);
     }
     return std::make_optional(ExpressionEvaluationResult::createFromExpression(createdShiftExpression, numValuesPerDimensionOfExpressiontoShift));
 }
@@ -256,5 +260,11 @@ bool SyReCExpressionVisitor::isValidBinaryOperation(syrec_operation::operation u
             return true;
         default:
             return false;
+    }
+}
+
+void SyReCExpressionVisitor::decrementReferenceCountsOfOptimizedAwaySignalAccesses(const std::vector<syrec::VariableAccess::ptr>& optimizedAwaySignalAccesses) const {
+    for (const auto& signalAccess : optimizedAwaySignalAccesses) {
+        decrementReferenceCountOfSignal(signalAccess->var->name);
     }
 }

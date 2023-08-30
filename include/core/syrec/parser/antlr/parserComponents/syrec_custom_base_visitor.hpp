@@ -118,6 +118,9 @@ namespace parser {
         [[nodiscard]] bool                                                             validateBitOrRangeAccessOnSignal(const antlr4::Token* bitOrRangeStartToken, const syrec::Variable::ptr& accessedVariable, const std::pair<syrec::Number::ptr, syrec::Number::ptr>& bitOrRangeAccess);
         [[nodiscard]] bool                                                             isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const TokenPosition& optionalEvaluationErrorPosition) const;
         [[nodiscard]] static std::string                                               stringifyCompileTimeConstantExpressionOperation(syrec::Number::CompileTimeConstantExpression::Operation ctcOperation);
+        [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr>               tryConvertCompileTimeConstantExpressionToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression, const parser::SymbolTable::ptr& symbolTable);
+        [[nodiscard]] static std::optional<syrec::Number::ptr>                         tryConvertExpressionToCompileTimeConstantOne(const syrec::expression::ptr& expr);
+        [[nodiscard]] static std::optional<syrec::expression::ptr>                     tryConvertNumberToExpr(const syrec::Number::ptr& number, const parser::SymbolTable::ptr& symbolTable);
     };
 }
 #endif

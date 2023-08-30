@@ -1,10 +1,42 @@
 #include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/optimizations/operation_strength_reduction.hpp"
+#include "core/syrec/parser/utils/signal_access_utils.hpp"
 
 using namespace optimizations;
 
-static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExpr(const std::variant<std::shared_ptr<syrec::ShiftExpression>, std::shared_ptr<syrec::BinaryExpression>>& exprToOptimize, bool onlyTopLevelExpr, bool shouldPerformOperationStrengthReduction) {
+static void addOptimizedAwaySignalAccessToContainerIfNoExactMatchExists(const syrec::VariableAccess::ptr& optimizedAwaySignalAccess, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses, const parser::SymbolTable::ptr& symbolTable) {
+    const auto wasSignalAccessAlreadyDefined = std::any_of(
+            droppedSignalAccesses.cbegin(),
+            droppedSignalAccesses.cend(),
+            [&optimizedAwaySignalAccess, &symbolTable](const syrec::VariableAccess::ptr& alreadyDefinedSignalAccess) {
+                const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(
+                    optimizedAwaySignalAccess,
+                    alreadyDefinedSignalAccess,
+                    SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Equal,
+                    SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Equal,
+                    symbolTable
+                );
+                return signalAccessEquivalenceResult.isResultCertain && signalAccessEquivalenceResult.equality == SignalAccessUtils::SignalAccessEquivalenceResult::Equal;
+            });
+    if (wasSignalAccessAlreadyDefined) {
+        return;
+    }
+    droppedSignalAccesses.emplace_back(optimizedAwaySignalAccess);
+}
+
+static void addOptimizedAwaySignalAccessesToContainer(const syrec::expression::ptr& optimizedAwayExpr, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses, const parser::SymbolTable::ptr& symbolTable) {
+    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(optimizedAwayExpr); exprAsBinaryExpr != nullptr) {
+        addOptimizedAwaySignalAccessesToContainer(exprAsBinaryExpr->lhs, droppedSignalAccesses, symbolTable);
+        addOptimizedAwaySignalAccessesToContainer(exprAsBinaryExpr->rhs, droppedSignalAccesses, symbolTable);
+    } else if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(optimizedAwayExpr); exprAsShiftExpr != nullptr) {
+        addOptimizedAwaySignalAccessesToContainer(exprAsShiftExpr->lhs, droppedSignalAccesses, symbolTable);
+    } else if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(optimizedAwayExpr); exprAsVariableExpr != nullptr) {
+        addOptimizedAwaySignalAccessToContainerIfNoExactMatchExists(exprAsVariableExpr->var, droppedSignalAccesses, symbolTable);
+    }
+}
+
+static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExpr(const std::variant<std::shared_ptr<syrec::ShiftExpression>, std::shared_ptr<syrec::BinaryExpression>>& exprToOptimize, bool onlyTopLevelExpr, bool shouldPerformOperationStrengthReduction, const parser::SymbolTable::ptr& symbolTable, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses) {
     const auto&            isExprBinaryOne = std::holds_alternative<std::shared_ptr<syrec::BinaryExpression>>(exprToOptimize);
 
     syrec::expression::ptr referenceExpression;
@@ -58,14 +90,14 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
             if (onlyTopLevelExpr) {
                 return BinaryExpressionSimplificationResult(true, exprRhsOperand);
             }
-            const auto& simplificationResultOfRhs = trySimplify(exprRhsOperand, shouldPerformOperationStrengthReduction);
+            const auto& simplificationResultOfRhs = trySimplify(exprRhsOperand, shouldPerformOperationStrengthReduction, symbolTable, droppedSignalAccesses);
             return BinaryExpressionSimplificationResult(true, simplificationResultOfRhs.simplifiedExpression);   
         }
         if (!isLeftOperandConstant && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedFlagToEnum, *rExprAsConstantValue)) {
             if (onlyTopLevelExpr) {
                 return BinaryExpressionSimplificationResult(true, exprLhsOperand);
             }
-            const auto& simplificationResultOfLhs = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction);
+            const auto& simplificationResultOfLhs = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction, symbolTable, droppedSignalAccesses);
             return BinaryExpressionSimplificationResult(true, simplificationResultOfLhs.simplifiedExpression);   
         }
 
@@ -74,6 +106,7 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
             case syrec_operation::operation::Division:
                 if (isLeftOperandConstant && *lExprAsConstantValue == 0) {
                     operationSpecificSimplificationResult.emplace(0);
+                    addOptimizedAwaySignalAccessesToContainer(exprRhsOperand, droppedSignalAccesses, symbolTable);
                 }
                 break;
             case syrec_operation::operation::BitwiseAnd:
@@ -82,16 +115,18 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
                 if ((isLeftOperandConstant && *lExprAsConstantValue == 0) 
                     || (!isLeftOperandConstant && *rExprAsConstantValue == 0)) {
                     operationSpecificSimplificationResult.emplace(0);
+                    addOptimizedAwaySignalAccessesToContainer(isLeftOperandConstant ? exprRhsOperand : exprLhsOperand, droppedSignalAccesses, symbolTable);
                 }
                 break;
             case syrec_operation::operation::ShiftLeft:
             case syrec_operation::operation::ShiftRight:
                 if (!isLeftOperandConstant && *rExprAsConstantValue == 0) {
-                    const auto& simplificationResultOfNonConstantOperand = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction);
+                    const auto& simplificationResultOfNonConstantOperand = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction, symbolTable, droppedSignalAccesses);
                     return BinaryExpressionSimplificationResult(true, simplificationResultOfNonConstantOperand.simplifiedExpression);
                 }
                 if (isLeftOperandConstant && *lExprAsConstantValue == 0) {
                     operationSpecificSimplificationResult.emplace(0);
+                    addOptimizedAwaySignalAccessesToContainer(exprRhsOperand, droppedSignalAccesses, symbolTable);
                 }
                 break;
             default:
@@ -120,8 +155,8 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
         return BinaryExpressionSimplificationResult(false, referenceExpression);
     }
 
-    const auto& simplificationResultOfLhs = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction);
-    const auto& simplificationResultOfRhs = trySimplify(exprRhsOperand, shouldPerformOperationStrengthReduction);
+    const auto& simplificationResultOfLhs = trySimplify(exprLhsOperand, shouldPerformOperationStrengthReduction, symbolTable, droppedSignalAccesses);
+    const auto& simplificationResultOfRhs = trySimplify(exprRhsOperand, shouldPerformOperationStrengthReduction, symbolTable, droppedSignalAccesses);
 
     if (simplificationResultOfLhs.couldSimplify || simplificationResultOfRhs.couldSimplify) {
         const auto& newBinaryExpr = std::make_shared<syrec::BinaryExpression>(
@@ -129,22 +164,22 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
                 *syrec_operation::tryMapBinaryOperationEnumToFlag(*mappedFlagToEnum),
                 simplificationResultOfRhs.simplifiedExpression);
 
-        const auto& simplificationResultOfNewTopLevelBinaryExpr = trySimplifyOptionallyOnlyTopLevelExpr(newBinaryExpr, true, shouldPerformOperationStrengthReduction);
+        const auto& simplificationResultOfNewTopLevelBinaryExpr = trySimplifyOptionallyOnlyTopLevelExpr(newBinaryExpr, true, shouldPerformOperationStrengthReduction, symbolTable, droppedSignalAccesses);
         return BinaryExpressionSimplificationResult(true, simplificationResultOfNewTopLevelBinaryExpr.simplifiedExpression);
     }
     return BinaryExpressionSimplificationResult(false, referenceExpression);
 
 }
 
-BinaryExpressionSimplificationResult optimizations::trySimplify(const syrec::expression::ptr& expr, bool shouldPerformOperationStrengthReduction) {
+BinaryExpressionSimplificationResult optimizations::trySimplify(const syrec::expression::ptr& expr, bool shouldPerformOperationStrengthReduction, const parser::SymbolTable::ptr& symbolTable, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses) {
     const std::shared_ptr<syrec::BinaryExpression> exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     const std::shared_ptr<syrec::ShiftExpression> exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr);
     
     if (exprAsBinaryExpr != nullptr) {
-        return trySimplifyOptionallyOnlyTopLevelExpr(exprAsBinaryExpr, false, shouldPerformOperationStrengthReduction);
+        return trySimplifyOptionallyOnlyTopLevelExpr(exprAsBinaryExpr, false, shouldPerformOperationStrengthReduction, symbolTable, droppedSignalAccesses);
     }
     if (exprAsShiftExpr != nullptr) {
-        return trySimplifyOptionallyOnlyTopLevelExpr(exprAsShiftExpr, false, shouldPerformOperationStrengthReduction);
+        return trySimplifyOptionallyOnlyTopLevelExpr(exprAsShiftExpr, false, shouldPerformOperationStrengthReduction, symbolTable, droppedSignalAccesses);
     }
     return BinaryExpressionSimplificationResult(false, expr);
 }

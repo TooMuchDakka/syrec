@@ -30,6 +30,7 @@ namespace parser {
         bool                                                                              performingReadOnlyParsingOfLoopBody;
         std::stack<SymbolTableBackupHelper::ptr>                                          localSignalValuesBackup;
         std::stack<std::shared_ptr<optimizations::LoopBodyValuePropagationBlocker>>       loopBodyValuePropagationBlockers;
+        bool                                                                              areValueUpdatesBlockedByGeneralOptimizationOfLoopBody;
         bool                                                                              performPotentialValueLookupForCurrentlyAccessedSignal;
         const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>> optionalMultiplicationSimplifier;
         const std::optional<std::shared_ptr<deadStoreElimination::DeadStoreEliminator>>   optionalDeadStoreEliminator;
@@ -50,6 +51,7 @@ namespace parser {
             currentlyParsingAssignmentStmtRhs(false),
             modificationsOfReferenceCountsDisabled(false),
             performingReadOnlyParsingOfLoopBody(false),
+            areValueUpdatesBlockedByGeneralOptimizationOfLoopBody(false),
             performPotentialValueLookupForCurrentlyAccessedSignal(true),
             optionalMultiplicationSimplifier(createMultiplicationSimplifier(parserConfig.multiplicationSimplificationMethod)),
             optionalDeadStoreEliminator(createDeadStoreEliminator(parserConfig.deadStoreEliminationEnabled)),

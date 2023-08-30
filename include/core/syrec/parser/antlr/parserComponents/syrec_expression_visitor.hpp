@@ -22,6 +22,7 @@ namespace parser {
 
     protected:
         [[nodiscard]] static bool isValidBinaryOperation(syrec_operation::operation userDefinedOperation);
+        void                      decrementReferenceCountsOfOptimizedAwaySignalAccesses(const std::vector<syrec::VariableAccess::ptr>& optimizedAwaySignalAccesses) const;
     };
 } // namespace parser
 #endif

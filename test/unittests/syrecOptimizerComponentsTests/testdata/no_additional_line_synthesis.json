@@ -150,7 +150,10 @@
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessWithTwoLeafNodesAndLhsOperandBeingLoopVariableAndRhsOperandBeingNumberCreatesExpression": {
     "circuit": "module main(out a(16), in b(16), in c(16)) for $i = 0 to 2 step 1 do a += (b - ($i + 2)) rof",
-    "expectedCircuit": "module main(out a(16), in b(16), in c(16)) for $i = 0 to 2 step 1 do a += b; a -= $i; a -= 2 rof"
+    "expectedCircuits": [
+      "module main(out a(16), in b(16), in c(16)) for $i = 0 to 2 step 1 do a += b; a -= $i; a -= 2 rof",
+      "module main(out a(16), in b(16), in c(16)) for $i = 0 to 2 step 1 do a += b; a -= 2; a -= $i rof"
+    ]
   },
   "simplificationWithOnlyReversibleOpsAndUniqueSignalAccessWithTwoLeafNodesAndLhsOperandBeingNumberAndRhsOperandBeingLoopVariableCreatesExpression": {
     "circuit": "module main(out a(16), in b(16), in c(16)) for $i = 0 to 2 step 1 do a += (b - (2 + $i)) rof",
@@ -517,7 +520,11 @@
   },
 
   "simplifyWithNoneReversibleOperationWithOperationNodeWithTwoLeavesCreatesExpressionIfLhsIsLoopVariableAndRhsIsNotSignalAccess": {
-    "circuit": "module main(out a(16), in b(16)) for $i = 0 to 2 step 1 do a += (b / ($i + 2)) rof"
+    "circuit": "module main(out a(16), in b(16)) for $i = 0 to 2 step 1 do a += (b / ($i + 2)) rof",
+    "expectedCircuits": [
+      "module main(out a(16), in b(16)) for $i = 0 to 2 step 1 do a += (b / ($i + 2)) rof",
+      "module main(out a(16), in b(16)) for $i = 0 to 2 step 1 do a += (b / (2 + $i)) rof"
+    ]
   },
   "simplifyWithNoneReversibleOperationWithOperationNodeWithTwoLeavesCreatesExpressionIfLhsIsNumberAndRhsIsNotSignalAccess": {
     "circuit": "module main(out a(16), in b(16)) for $i = 0 to 2 step 1 do a += (b / (2 + $i)) rof"

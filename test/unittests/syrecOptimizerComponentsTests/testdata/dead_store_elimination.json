@@ -1,7 +1,7 @@
 {
   "testRemovalOfAdditionAssignmentWithZeroWhenSignalIsZero": {
     "circuit": "module main(in a(16), out b(16)) b += 0",
-    "expectedCircuit": "module main(out b(16)) skip"
+    "expectedCircuit": "module main() skip"
   },
   "testRemovalOfAdditionAssignmentWithZeroWhenSignalIsNotZero": {
     "circuit": "module main(in a(16), out b(16)) b += 2; b += 0",
@@ -12,7 +12,7 @@
   },
   "testRemovalOfSubtractionAssignmentWithZeroWhenSignalIsZero": {
     "circuit": "module main(in a(16), out b(16)) b -= 0",
-    "expectedCircuit": "module main(out b(16)) skip"
+    "expectedCircuit": "module main() skip"
   },
   "testRemovalOfSubtractionAssignmentWithZeroWhenSignalIsNotZero": {
     "circuit": "module main(in a(16), out b(16)) b += 10; b -= 0",
@@ -23,7 +23,7 @@
   },
   "testRemovalOfXorAssignWithZeroWhenSignalIsZero": {
     "circuit": "module main(in a(16), out b(16)) b ^= 0",
-    "expectedCircuit": "module main(out b(16)) skip"
+    "expectedCircuit": "module main() skip"
   },
   "testRemovalOfXorAssignWithZeroWhenSignalIsNotZero": {
     "circuit": "module main(in a(16), out b(16)) b += 10; b ^= 0",

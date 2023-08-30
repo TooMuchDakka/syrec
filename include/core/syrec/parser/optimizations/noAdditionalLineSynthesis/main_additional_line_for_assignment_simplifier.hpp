@@ -59,7 +59,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                                      doesExpressionOnlyContainReversibleOperations(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                                      doesExpressionDefineSignalAccess(const syrec::expression::ptr& expr);
         [[nodiscard]] static bool                                      isExpressionConstantNumber(const syrec::expression::ptr& expr);
-        [[nodiscard]] static bool                                      doVariableAccessesOverlap(const syrec::VariableAccess::ptr& signalPartsToCheck, const syrec::VariableAccess::ptr& signalPartsToBeCheckedForOverlap);
+        [[nodiscard]] static bool                                      doVariableAccessesOverlap(const syrec::VariableAccess::ptr& signalPartsToCheck, const syrec::VariableAccess::ptr& signalPartsToBeCheckedForOverlap, const parser::SymbolTable::ptr& symbolTable);
         [[nodiscard]] static syrec::Statement::vec                     invertAssignments(const syrec::AssignStatement::vec& assignments);
         [[nodiscard]] static std::optional<unsigned int>               tryEvaluateNumberAsConstant(const syrec::Number::ptr& number);
         [[nodiscard]] static bool                                      doBitRangesOverlap(const optimizations::BitRangeAccessRestriction::BitRangeAccess& thisBitRange, const optimizations::BitRangeAccessRestriction::BitRangeAccess& thatBitRange);
@@ -109,8 +109,8 @@ namespace noAdditionalLineSynthesis {
             }
         };
         
-        [[nodiscard]] std::shared_ptr<VariableAccessCountLookup> buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered) const;
-        void                                                     buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, std::shared_ptr<VariableAccessCountLookup>& lookupToFill, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered) const;
+        [[nodiscard]] std::shared_ptr<VariableAccessCountLookup> buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const;
+        void                                                     buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, std::shared_ptr<VariableAccessCountLookup>& lookupToFill, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const;
         [[nodiscard]] bool                                       doesSignalAccessMatchExpectedSize(const syrec::VariableAccess::ptr& signalAccessToCheck, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered) const;
         [[nodiscard]] EstimatedSignalAccessSize                  getSizeOfSignalAccess(const syrec::VariableAccess::ptr& signalAccess) const;
 
@@ -135,17 +135,14 @@ namespace noAdditionalLineSynthesis {
         //[[nodiscard]] static bool                                  areAccessedSignalPartsOnlyAccessedOnce(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::expression::ptr& expr);
 
         [[nodiscard]] std::optional<syrec::expression::ptr>      findExpressionContainingSignalAccessDefinedOnlyOnceInAssignmentRhs(const syrec::BinaryExpression::ptr& assignmentStatement, bool& isLhsRelevantSignalAccess);
-
-        [[nodiscard]] std::vector<unsigned int>                                               transformDimensionAccess(const syrec::VariableAccess::ptr& accessedSignalParts) const;
-        [[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> transformBitRangeAccess(unsigned int bitWidthOfAccessedSignal, const syrec::VariableAccess::ptr& accessedSignalParts) const;
-
+        
         /**
          * \brief Create a lookup of signal accesses which cannot be used as a replacement for another signal of the same size
          * \param expr The expression for which the lookup should be created
          * \return The created lookup containing the currently existing assignments as well as all non overlapping signal accesses of the expression
          */
-        [[nodiscard]] LookupOfExcludedSignalsForReplacement     createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr) const;
-        void                                                    createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, LookupOfExcludedSignalsForReplacement& lookupToFill) const;
+        [[nodiscard]] LookupOfExcludedSignalsForReplacement     createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable) const;
+        void                                                    createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, LookupOfExcludedSignalsForReplacement& lookupToFill, const parser::SymbolTable::ptr& symbolTable) const;
         [[nodiscard]] bool                                      doesAssignmentToAccessedSignalPartsAlreadyExists(const syrec::VariableAccess::ptr& accessedSignalParts) const;
         [[nodiscard]] std::optional<syrec::VariableAccess::ptr> tryCreateSubstituteForExpr(const syrec::expression::ptr& expr, const LookupOfExcludedSignalsForReplacement& signalPartsToExcludeAsPotentialReplacements);
 

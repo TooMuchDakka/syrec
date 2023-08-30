@@ -3,6 +3,7 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_none_reversible_operations_and_unique_signal_occurrences_simplifier.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_only_reversible_operations_simplifier.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_reversible_ops_and_multilevel_signal_occurrence_simplifier.hpp"
+#include "core/syrec/parser/utils/signal_access_utils.hpp"
 
 
 // TODO: Determine whether there is a difference in the gate cost between the statements a += (b - c) and a += b; a -= c (or in other words whether the split of a binary expression into unary assignments make sense)
@@ -274,9 +275,9 @@ bool MainAdditionalLineForAssignmentSimplifier::isExpressionConstantNumber(const
     return false;
 }
 
-// TODO: Implement me
-bool MainAdditionalLineForAssignmentSimplifier::doVariableAccessesOverlap(const syrec::VariableAccess::ptr& signalPartsToCheck, const syrec::VariableAccess::ptr& signalPartsToBeCheckedForOverlap) {
-    return false;
+bool MainAdditionalLineForAssignmentSimplifier::doVariableAccessesOverlap(const syrec::VariableAccess::ptr& signalPartsToCheck, const syrec::VariableAccess::ptr& signalPartsToBeCheckedForOverlap, const parser::SymbolTable::ptr& symbolTable) {
+    const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(signalPartsToCheck, signalPartsToBeCheckedForOverlap, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, symbolTable);
+    return signalAccessEquivalenceResult.equality != SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual;
 }
 
 syrec::Statement::vec MainAdditionalLineForAssignmentSimplifier::invertAssignments(const syrec::AssignStatement::vec& assignments) {
@@ -463,18 +464,18 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
     return std::nullopt;
 }
 
-std::shared_ptr<MainAdditionalLineForAssignmentSimplifier::VariableAccessCountLookup> MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered) const {
+std::shared_ptr<MainAdditionalLineForAssignmentSimplifier::VariableAccessCountLookup> MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const {
     auto buildLookup = std::make_shared<VariableAccessCountLookup>();
-    buildVariableAccessCountsForExpr(expr, buildLookup, requiredSizeForSignalAccessToBeConsidered);
+    buildVariableAccessCountsForExpr(expr, buildLookup, requiredSizeForSignalAccessToBeConsidered, symbolTable);
     return buildLookup;
 }
 
-void MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, std::shared_ptr<VariableAccessCountLookup>& lookupToFill, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered) const {
+void MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, std::shared_ptr<VariableAccessCountLookup>& lookupToFill, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
-        buildVariableAccessCountsForExpr(exprAsBinaryExpr->lhs, lookupToFill, requiredSizeForSignalAccessToBeConsidered);
-        buildVariableAccessCountsForExpr(exprAsBinaryExpr->rhs, lookupToFill, requiredSizeForSignalAccessToBeConsidered);
+        buildVariableAccessCountsForExpr(exprAsBinaryExpr->lhs, lookupToFill, requiredSizeForSignalAccessToBeConsidered, symbolTable);
+        buildVariableAccessCountsForExpr(exprAsBinaryExpr->rhs, lookupToFill, requiredSizeForSignalAccessToBeConsidered, symbolTable);
     } else if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
-        buildVariableAccessCountsForExpr(exprAsShiftExpr->lhs, lookupToFill, requiredSizeForSignalAccessToBeConsidered);
+        buildVariableAccessCountsForExpr(exprAsShiftExpr->lhs, lookupToFill, requiredSizeForSignalAccessToBeConsidered, symbolTable);
     } else if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableExpr != nullptr) {
         if (doesSignalAccessMatchExpectedSize(exprAsVariableExpr->var, requiredSizeForSignalAccessToBeConsidered)) {
             auto& variableAccessCountsLookup = lookupToFill->lookup;
@@ -489,8 +490,8 @@ void MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr
                 const auto& findExistingOverlappingVariableAccess               = std::find_if(
               alreadyFoundMatchingSignalAccessesForAccessedSignal.begin(),
               alreadyFoundMatchingSignalAccessesForAccessedSignal.end(),
-              [&exprAsVariableExpr](const VariableAccessCountPair& signalAccess) {
-                        return doVariableAccessesOverlap(signalAccess.accessedSignalParts, exprAsVariableExpr->var);
+              [&exprAsVariableExpr, &symbolTable](const VariableAccessCountPair& signalAccess) {
+                        return doVariableAccessesOverlap(signalAccess.accessedSignalParts, exprAsVariableExpr->var, symbolTable);
                     });
 
                 if (findExistingOverlappingVariableAccess == alreadyFoundMatchingSignalAccessesForAccessedSignal.end()) {
@@ -563,21 +564,21 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
     return std::nullopt;
 }
 
-MainAdditionalLineForAssignmentSimplifier::LookupOfExcludedSignalsForReplacement MainAdditionalLineForAssignmentSimplifier::createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr) const {
+MainAdditionalLineForAssignmentSimplifier::LookupOfExcludedSignalsForReplacement MainAdditionalLineForAssignmentSimplifier::createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable) const {
     LookupOfExcludedSignalsForReplacement createdLookup = std::make_unique<std::map<std::string_view, std::vector<NotUsableAsReplacementSignalParts>>>();
     for (const auto& [signalIdent, existingAssignmentsForSignal] : activeAssignments) {
         createdLookup->insert(std::make_pair(signalIdent, existingAssignmentsForSignal));
     }
-    createLookupForSignalsNotUsableAsReplacementsFor(expr, createdLookup);
+    createLookupForSignalsNotUsableAsReplacementsFor(expr, createdLookup, symbolTable);
     return createdLookup;
 }
 
-void MainAdditionalLineForAssignmentSimplifier::createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, LookupOfExcludedSignalsForReplacement& lookupToFill) const {
+void MainAdditionalLineForAssignmentSimplifier::createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, LookupOfExcludedSignalsForReplacement& lookupToFill, const parser::SymbolTable::ptr& symbolTable) const {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
-        createLookupForSignalsNotUsableAsReplacementsFor(exprAsBinaryExpr->lhs, lookupToFill);
-        createLookupForSignalsNotUsableAsReplacementsFor(exprAsBinaryExpr->rhs, lookupToFill);
+        createLookupForSignalsNotUsableAsReplacementsFor(exprAsBinaryExpr->lhs, lookupToFill, symbolTable);
+        createLookupForSignalsNotUsableAsReplacementsFor(exprAsBinaryExpr->rhs, lookupToFill, symbolTable);
     } else if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
-        createLookupForSignalsNotUsableAsReplacementsFor(exprAsShiftExpr->lhs, lookupToFill);
+        createLookupForSignalsNotUsableAsReplacementsFor(exprAsShiftExpr->lhs, lookupToFill, symbolTable);
     } else if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableExpr != nullptr) {
         if (!doesAssignmentToAccessedSignalPartsAlreadyExists(exprAsVariableExpr->var)) {
             const auto& accessedSignalIdent = exprAsVariableExpr->var->var->name;
@@ -588,8 +589,8 @@ void MainAdditionalLineForAssignmentSimplifier::createLookupForSignalsNotUsableA
                 const auto existingEntryMatchingAccessedParts = std::find_if(
                 blockedSignalParts.cbegin(),
                 blockedSignalParts.cend(),
-                [&exprAsVariableExpr](const NotUsableAsReplacementSignalParts& existingEntry) {
-                    return doVariableAccessesOverlap(existingEntry.blockedSignalParts, exprAsVariableExpr->var);
+                [&exprAsVariableExpr, &symbolTable](const NotUsableAsReplacementSignalParts& existingEntry) {
+                    return doVariableAccessesOverlap(existingEntry.blockedSignalParts, exprAsVariableExpr->var, symbolTable);
                 });
 
                 if (existingEntryMatchingAccessedParts == blockedSignalParts.cend()) {

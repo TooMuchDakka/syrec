@@ -6,6 +6,9 @@
 
 using namespace optimizations;
 
+// TODO: Would the transformation (<subExpr_1> - (<subExpr_2> - <subExpr_3>)) to (<subExpr_1> + (<subExpr_3> - <subExpr_2>)) lead to better results ?
+// TODO: If we introduce additional signal accesses, reference counts of newly added signal accesses need to be incremented
+
 inline std::optional<std::shared_ptr<syrec::BinaryExpression>> tryConvertExpressionToBinaryOne(const syrec::expression::ptr& expr) {
     if (const auto& exprAsBinaryExpression = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpression != nullptr) {
         return std::make_optional(exprAsBinaryExpression);
@@ -17,13 +20,13 @@ inline syrec::expression::ptr createBinaryExpression(const syrec::expression::pt
     return std::make_shared<syrec::BinaryExpression>(lhsOperand, binaryOperation, rhsOperand);
 }
 
-inline syrec::expression::ptr simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr, bool operationStrengthReductionEnabled, const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>>& optionalMultiplicationSimplifier) {
-    const auto simplificationResultOfLhsOperand = simplifyBinaryExpression(binaryExpr->lhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
-    const auto simplificationResultOfRhsOperand = simplifyBinaryExpression(binaryExpr->rhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+inline syrec::expression::ptr simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr, bool operationStrengthReductionEnabled, const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>>& optionalMultiplicationSimplifier, const parser::SymbolTable::ptr& symbolTable, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses) {
+    const auto simplificationResultOfLhsOperand = simplifyBinaryExpression(binaryExpr->lhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
+    const auto simplificationResultOfRhsOperand = simplifyBinaryExpression(binaryExpr->rhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
     if (simplificationResultOfLhsOperand == binaryExpr->lhs && simplificationResultOfRhsOperand == binaryExpr->rhs) {
         return binaryExpr;
     }
-    return simplifyBinaryExpression(createBinaryExpression(simplificationResultOfLhsOperand, binaryExpr->op, simplificationResultOfRhsOperand), operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+    return simplifyBinaryExpression(createBinaryExpression(simplificationResultOfLhsOperand, binaryExpr->op, simplificationResultOfRhsOperand), operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
 }
 
 inline bool isArithmeticOperation(syrec_operation::operation operation) {
@@ -112,7 +115,7 @@ std::optional<syrec::expression::ptr> trySimplifyMultiplicationOfBinaryExpressio
  *          which in turn is a contradiction (for reversivel circuits)
  * TODO: There is room for further optimizations where one would 'accumulate' signals (i.e. a + (2 + a) => (2 * a) + 2)
  */
-syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expression::ptr& expr, bool operationStrengthReductionEnabled, const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>>& optionalMultiplicationSimplifier) {
+syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expression::ptr& expr, bool operationStrengthReductionEnabled, const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>>& optionalMultiplicationSimplifier, const parser::SymbolTable::ptr& symbolTable, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses) {
     const auto exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr);
     const auto binaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     if (binaryExpr == nullptr && exprAsShiftExpr == nullptr) {
@@ -151,7 +154,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
     const auto binaryOperationOfExpr = mappedFlagToEnum.value();
     if (lOperandConstValue.has_value() || rOperandConstValue.has_value()) {
         if (const auto& simplifiedExprIfConstOperandIsIdentityElement = trySimplifyExprIfOneOperandIsIdentityElement(expr, lOperandConstValue.has_value() ? lOperandConstValue : rOperandConstValue, lOperandConstValue.has_value(), binaryExpr != nullptr, *mappedFlagToEnum); simplifiedExprIfConstOperandIsIdentityElement.has_value()) {
-            return simplifyBinaryExpression(*simplifiedExprIfConstOperandIsIdentityElement, operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+            return simplifyBinaryExpression(*simplifiedExprIfConstOperandIsIdentityElement, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
         }
 
         /*
@@ -166,20 +169,20 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
             && mappedFlagToEnum == syrec_operation::operation::Multiplication 
             && (!lOperandConstValue || !rOperandConstValue)) {
             if (const auto& exprWithSimplifiedBinaryExpr = trySimplifyMultiplicationOfBinaryExpression(binaryExpr, optionalMultiplicationSimplifier); exprWithSimplifiedBinaryExpr.has_value()) {
-                return simplifyBinaryExpression(*exprWithSimplifiedBinaryExpr, operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+                return simplifyBinaryExpression(*exprWithSimplifiedBinaryExpr, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
             }
         }
 
-        const auto& simplificationResult = trySimplify(expr, operationStrengthReductionEnabled);
+        const auto& simplificationResult = trySimplify(expr, operationStrengthReductionEnabled, symbolTable, droppedSignalAccesses);
         if (simplificationResult.couldSimplify) {
-            return simplifyBinaryExpression(simplificationResult.simplifiedExpression, operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+            return simplifyBinaryExpression(simplificationResult.simplifiedExpression, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
         }
         /*
          * If we could not simplify the given shift expression we can only try and simplify the lhs operand of the shift operations
          * because the rhs can only be a number (with the curretn version of the specification [12.02.2023])
          */
         if (exprAsShiftExpr != nullptr) {
-            const auto& lhsOperandSimplified = simplifyBinaryExpression(exprAsShiftExpr->lhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+            const auto& lhsOperandSimplified = simplifyBinaryExpression(exprAsShiftExpr->lhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
             if (lhsOperandSimplified != exprAsShiftExpr->lhs) {
                 return std::make_shared<syrec::ShiftExpression>(
                         lhsOperandSimplified,
@@ -221,7 +224,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
                 }
             }
         }
-        return simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(binaryExpr, operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+        return simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(binaryExpr, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
     }
 
     std::optional<syrec::expression::ptr> nonNestedExpressionOperandOfParentExpr;
@@ -236,7 +239,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
 
     // Both operands of expression are expressions themselves so we recursively apply the simplification operation on both operands
     if (!nonNestedExpressionOperandOfParentExpr.has_value()) {
-        return createBinaryExpression(simplifyBinaryExpression(binaryExpr->lhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier), binaryExpr->op, simplifyBinaryExpression(binaryExpr->rhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier));
+        return createBinaryExpression(simplifyBinaryExpression(binaryExpr->lhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses), binaryExpr->op, simplifyBinaryExpression(binaryExpr->rhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses));
     }
 
     std::optional<std::shared_ptr<syrec::BinaryExpression>> childBinaryExpression;
@@ -254,10 +257,10 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
          * c op t and retry our simplification
          */ 
         if (rOperandConstValue.has_value()) {
-            return simplifyBinaryExpression(createBinaryExpression(binaryExpr->rhs, binaryExpr->op, binaryExpr->lhs), operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+            return simplifyBinaryExpression(createBinaryExpression(binaryExpr->rhs, binaryExpr->op, binaryExpr->lhs), operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
         }
         
-        return simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(binaryExpr, operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+        return simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(binaryExpr, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
     }
 
     const auto splitOfChildBinaryExpr        = trySplitExpressionIntoConstantAndNonExprOperand(*childBinaryExpression);
@@ -303,7 +306,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
                                     *nonNestedExpressionOperandOfParentExpr,
                                     syrec::BinaryExpression::Multiply,
                                     std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr)), 
-                        operationStrengthReductionEnabled, optionalMultiplicationSimplifier));
+                        operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses));
         }
 
         if (*childBinaryExprOperation == syrec_operation::operation::Multiplication) {
@@ -317,7 +320,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
                                         binaryExpr->lhs,
                                         syrec::BinaryExpression::Multiply,
                                         (*childBinaryExpression)->lhs),
-                            operationStrengthReductionEnabled, optionalMultiplicationSimplifier),
+                                operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses),
                         syrec::BinaryExpression::Multiply,
                         (*childBinaryExpression)->rhs);
             }
@@ -336,14 +339,14 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
                                     *nonNestedExpressionOperandOfParentExpr,
                                     syrec::BinaryExpression::Multiply,
                                     (*childBinaryExpression)->lhs),
-                        operationStrengthReductionEnabled, optionalMultiplicationSimplifier),
+                            operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses),
                     (*childBinaryExpression)->op,
                     simplifyBinaryExpression(
                             createBinaryExpression(
                                     *nonNestedExpressionOperandOfParentExpr,
                                     syrec::BinaryExpression::Multiply,
                                     (*childBinaryExpression)->rhs), 
-                        operationStrengthReductionEnabled, optionalMultiplicationSimplifier));
+                        operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses));
         }
     }
 
@@ -368,7 +371,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
                             createExpressionForNumber(*sumOfParentAndChildConstOperand, std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr)->bitwidth()),
                             syrec::BinaryExpression::Add,
                             std::get<syrec::expression::ptr>(*splitOfChildBinaryExpr)), 
-                operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+                operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
         }
 
         /*
@@ -376,7 +379,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
          */
         if (*childBinaryExpression == binaryExpr->rhs) {
             return createBinaryExpression(
-                    simplifyBinaryExpression(createBinaryExpression(binaryExpr->lhs, syrec::BinaryExpression::Add, (*childBinaryExpression)->lhs), operationStrengthReductionEnabled, optionalMultiplicationSimplifier),
+                    simplifyBinaryExpression(createBinaryExpression(binaryExpr->lhs, syrec::BinaryExpression::Add, (*childBinaryExpression)->lhs), operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses),
                     syrec::BinaryExpression::Add,
                     (*childBinaryExpression)->rhs);    
         }
@@ -387,7 +390,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
      * c op t and retry our simplification
      */
     if (rOperandConstValue.has_value()) {
-        return simplifyBinaryExpression(createBinaryExpression(binaryExpr->rhs, binaryExpr->op, binaryExpr->lhs), operationStrengthReductionEnabled, optionalMultiplicationSimplifier);
+        return simplifyBinaryExpression(createBinaryExpression(binaryExpr->rhs, binaryExpr->op, binaryExpr->lhs), operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
     }
 
     return binaryExpr;

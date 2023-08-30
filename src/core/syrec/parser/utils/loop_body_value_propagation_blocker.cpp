@@ -1,5 +1,7 @@
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
 
+#include "core/syrec/parser/utils/signal_access_utils.hpp"
+
 
 optimizations::LoopBodyValuePropagationBlocker::LoopBodyValuePropagationBlocker(const syrec::Statement::vec& stmtBlock, const parser::SymbolTable::ptr& symbolTable, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions):
     symbolTableReference(symbolTable) {
@@ -28,6 +30,32 @@ bool optimizations::LoopBodyValuePropagationBlocker::isAccessBlockedFor(const sy
 bool optimizations::LoopBodyValuePropagationBlocker::areAnyAssignmentsPerformed() const {
     return !assignedToSignalsInLoopBody.empty();
 }
+
+std::vector<syrec::VariableAccess::ptr> optimizations::LoopBodyValuePropagationBlocker::getDefinedAssignmentsInNotNestedLoops(const syrec::Statement::vec& stmtBlock, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions) {
+    if (stmtBlock.empty()) {
+        return {};
+    }
+
+    std::vector<syrec::VariableAccess::ptr> containerOfDefinedAssignments;
+    for (const auto& stmt : stmtBlock) {
+        if (const auto& stmtAsAssignmentStmt = std::dynamic_pointer_cast<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
+            storeAssignmentIfNoOverlappingOneExistsIn(stmtAsAssignmentStmt->lhs, containerOfDefinedAssignments, symbolTableReference, aggregateOfExistingLoopBodyValueRestrictions);
+        }
+        else if (const auto& stmtAsIfStmt = std::dynamic_pointer_cast<syrec::IfStatement>(stmt); stmtAsIfStmt != nullptr) {
+            for (const auto& foundAssignment : getDefinedAssignmentsInNotNestedLoops(stmtAsIfStmt->thenStatements, aggregateOfExistingLoopBodyValueRestrictions)) {
+                storeAssignmentIfNoOverlappingOneExistsIn(foundAssignment, containerOfDefinedAssignments, symbolTableReference, aggregateOfExistingLoopBodyValueRestrictions);
+            }
+            for (const auto& foundAssignment : getDefinedAssignmentsInNotNestedLoops(stmtAsIfStmt->elseStatements, aggregateOfExistingLoopBodyValueRestrictions)) {
+                storeAssignmentIfNoOverlappingOneExistsIn(foundAssignment, containerOfDefinedAssignments, symbolTableReference, aggregateOfExistingLoopBodyValueRestrictions);
+            }
+        }
+        else if (const auto& stmtAsUnaryAssignmentStmt = std::dynamic_pointer_cast<syrec::UnaryStatement>(stmt); stmtAsUnaryAssignmentStmt != nullptr) {
+            storeAssignmentIfNoOverlappingOneExistsIn(stmtAsUnaryAssignmentStmt->var, containerOfDefinedAssignments, symbolTableReference, aggregateOfExistingLoopBodyValueRestrictions);
+        }
+    }
+    return containerOfDefinedAssignments;
+}
+
 
 void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec::Statement::ptr& stmt) {
     if (const auto& stmtAsAssignmentStmt = tryConvertStmtToStmtOfOtherType<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
@@ -133,3 +161,27 @@ std::vector<std::optional<unsigned>> optimizations::LoopBodyValuePropagationBloc
     });
     return transformedDimensionAccessContainer;
 }
+
+void optimizations::LoopBodyValuePropagationBlocker::storeAssignmentIfNoOverlappingOneExistsIn(const syrec::VariableAccess::ptr& assignedToSignal, std::vector<syrec::VariableAccess::ptr>& alreadyDefinedAssignments, const parser::SymbolTable::ptr& symbolTable, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions) {
+    if (aggregateOfExistingLoopBodyValueRestrictions.has_value() && aggregateOfExistingLoopBodyValueRestrictions.value()->isAccessBlockedFor(assignedToSignal)) {
+        return;
+    }
+
+    const auto wasAssignmentAlreadyDefined = !std::all_of(
+            alreadyDefinedAssignments.cbegin(),
+            alreadyDefinedAssignments.cend(),
+            [&assignedToSignal, &symbolTable](const syrec::VariableAccess::ptr& alreadyAssignedToSignal) {
+                const auto signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(
+                        assignedToSignal,
+                        alreadyAssignedToSignal,
+                        SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping,
+                        SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping,
+                        symbolTable);
+                return signalAccessEquivalenceResult.isResultCertain && signalAccessEquivalenceResult.equality == SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual;
+            });
+    if (wasAssignmentAlreadyDefined) {
+        return;
+    }
+    alreadyDefinedAssignments.emplace_back(assignedToSignal);
+}
+

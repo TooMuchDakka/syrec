@@ -518,8 +518,10 @@ void DeadStoreEliminator::decrementReferenceCountOfUsedSignalsInStatement(const 
      * only constants or signal widths, which are already transformed to constants, can be used for which no reference counting is required
      */
     if (const auto& statementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(statement); statementAsIfStatement != nullptr) {
+        /*
+         * Since reference counts will only be updated for the defined signal accesses in the guard condition, we also only need to decrement them for the guard expression when removing an if statement
+         */
         decrementReferenceCountsOfUsedSignalsInExpression(statementAsIfStatement->condition);
-        decrementReferenceCountsOfUsedSignalsInExpression(statementAsIfStatement->fiCondition);
     } else if (const auto& statementAsAssignmentStatement = std::dynamic_pointer_cast<syrec::AssignStatement>(statement); statementAsAssignmentStatement != nullptr) {
         decrementReferenceCountForAccessedSignal(statementAsAssignmentStatement->lhs);
         decrementReferenceCountsOfUsedSignalsInExpression(statementAsAssignmentStatement->rhs);

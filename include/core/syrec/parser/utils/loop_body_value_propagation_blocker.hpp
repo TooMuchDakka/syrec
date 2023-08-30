@@ -12,6 +12,7 @@ namespace optimizations {
         explicit           LoopBodyValuePropagationBlocker(const syrec::Statement::vec& stmtBlock, const parser::SymbolTable::ptr& symbolTable, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions);
         [[nodiscard]] bool isAccessBlockedFor(const syrec::VariableAccess::ptr& accessedPartsOfSignal) const;
         [[nodiscard]] bool areAnyAssignmentsPerformed() const;
+        [[nodiscard]] std::vector<syrec::VariableAccess::ptr> getDefinedAssignmentsInNotNestedLoops(const syrec::Statement::vec& stmtBlock, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions);
 
     private:
         std::map<std::string, valueLookup::SignalValueLookup::ptr> assignedToSignalsInLoopBody;
@@ -28,6 +29,8 @@ namespace optimizations {
         [[nodiscard]] std::shared_ptr<T> tryConvertStmtToStmtOfOtherType(const syrec::Statement::ptr& stmt) {
             return std::dynamic_pointer_cast<T>(stmt);
         }
+
+        static void storeAssignmentIfNoOverlappingOneExistsIn(const syrec::VariableAccess::ptr& assignedToSignal, std::vector<syrec::VariableAccess::ptr>& alreadyDefinedAssignments, const parser::SymbolTable::ptr& symbolTable, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions);
     };
 }
 #endif

@@ -9,6 +9,9 @@
 #include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/value_broadcaster.hpp"
+#include "core/syrec/parser/optimizations/reassociate_expression.hpp"
+#include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
+#include "core/syrec/parser/utils/signal_access_utils.hpp"
 
 using namespace parser;
 
@@ -244,6 +247,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
                 if (!optionalExternalRestrictionInsideOfLoopBody.has_value() || !(*optionalExternalRestrictionInsideOfLoopBody)->isAccessBlockedFor(*accessedSignal)) {
                     const auto& fetchedValueForSignal = sharedData->currentSymbolTableScope->tryFetchValueForLiteral(*accessedSignal);
                     if (fetchedValueForSignal.has_value()) {
+                        decrementReferenceCountOfSignal(accessedSignal.value()->var->name);
                         return std::make_optional(std::make_shared<SignalEvaluationResult>(std::make_shared<syrec::Number>(*fetchedValueForSignal)));
                     }                    
                 }
@@ -309,30 +313,55 @@ std::any SyReCCustomBaseVisitor::visitNumberFromExpression(SyReCParser::NumberFr
      * or is a compile time expression that can also not be evaluated because the condition above holds for one of its operands,
      * we skip evaluation and instead create a new expression
      */
-    if (!canEvaluateNumber(*lhsOperand) || !canEvaluateNumber(*rhsOperand)) {
-        syrec::Number::CompileTimeConstantExpression::Operation mappedOperation;
-        switch (*operation) {
-            case syrec_operation::operation::Addition: {
-                mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Addition;
-                break;
-            }
-            case syrec_operation::operation::Subtraction: {
-                mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Subtraction;
-                break;
-            }
-            case syrec_operation::operation::Multiplication: {
-                mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Multiplication;
-                break;
-            }
-            case syrec_operation::operation::Division: {
-                mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Division;
-                break;
-            }
-            default:
-                createError(mapAntlrTokenPosition(context->op), fmt::format(NoMappingForNumberOperation, context->op->getText()));
-                return std::nullopt;
+    syrec::Number::CompileTimeConstantExpression::Operation mappedOperation;
+    switch (*operation) {
+        case syrec_operation::operation::Addition: {
+            mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Addition;
+            break;
         }
-        return std::make_optional(std::make_shared<syrec::Number>(syrec::Number::CompileTimeConstantExpression(*lhsOperand, mappedOperation, *rhsOperand)));
+        case syrec_operation::operation::Subtraction: {
+            mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Subtraction;
+            break;
+        }
+        case syrec_operation::operation::Multiplication: {
+            mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Multiplication;
+            break;
+        }
+        case syrec_operation::operation::Division: {
+            mappedOperation = syrec::Number::CompileTimeConstantExpression::Operation::Division;
+            break;
+        }
+        default:
+            createError(mapAntlrTokenPosition(context->op), fmt::format(NoMappingForNumberOperation, context->op->getText()));
+            return std::nullopt;
+    }
+
+    if (!canEvaluateNumber(*lhsOperand) ||!canEvaluateNumber(*rhsOperand)) {
+        const auto compileTimeConstantExpression = syrec::Number::CompileTimeConstantExpression(*lhsOperand, mappedOperation, *rhsOperand);
+        if (sharedData->performingReadOnlyParsingOfLoopBody) {
+            return std::make_optional(std::make_shared<syrec::Number>(compileTimeConstantExpression));
+        }
+
+        syrec::expression::ptr simplifiedToExpr;
+        if (const auto& compileTimeConstantExprAsBinaryOne = tryConvertCompileTimeConstantExpressionToBinaryExpr(compileTimeConstantExpression, sharedData->currentSymbolTableScope); compileTimeConstantExprAsBinaryOne.has_value()) {
+            std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
+            if (const auto& simplificationResultOfBinaryExpr = optimizations::simplifyBinaryExpression(*compileTimeConstantExprAsBinaryOne, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses); simplificationResultOfBinaryExpr != nullptr) {
+                simplifiedToExpr = simplificationResultOfBinaryExpr;
+            } else if (const auto& basicSimplificationResultOfBinaryExpr = optimizations::trySimplify(*compileTimeConstantExprAsBinaryOne, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses); basicSimplificationResultOfBinaryExpr.couldSimplify) {
+                simplifiedToExpr = basicSimplificationResultOfBinaryExpr.simplifiedExpression;
+            }
+            
+            if (!optimizedAwaySignalAccesses.empty()) {
+                for (const auto& optimizedAwaySignalAccess : optimizedAwaySignalAccesses) {
+                    decrementReferenceCountOfSignal(optimizedAwaySignalAccess->var->name);
+                }
+            }
+        }
+
+        if (const auto& reverseMappingFromBinaryExprToCompileTimeConstant = tryConvertExpressionToCompileTimeConstantOne(simplifiedToExpr); reverseMappingFromBinaryExprToCompileTimeConstant.has_value()) {
+            return reverseMappingFromBinaryExprToCompileTimeConstant;
+        }
+        return std::make_optional(std::make_shared<syrec::Number>(compileTimeConstantExpression));
     }
 
     const auto lhsOperandEvaluated = tryEvaluateNumber(*lhsOperand, determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand));
@@ -690,4 +719,90 @@ std::string SyReCCustomBaseVisitor::stringifyCompileTimeConstantExpressionOperat
         default:
             return "<unknown>";
     }
+}
+
+std::optional<syrec::BinaryExpression::ptr> SyReCCustomBaseVisitor::tryConvertCompileTimeConstantExpressionToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression, const parser::SymbolTable::ptr& symbolTable) {
+    const auto& lhsOperandConverted = tryConvertNumberToExpr(compileTimeConstantExpression.lhsOperand, symbolTable);
+    std::optional<syrec_operation::operation> mappedToBinaryOperation;
+    switch (compileTimeConstantExpression.operation) {
+        case syrec::Number::CompileTimeConstantExpression::Addition:
+            mappedToBinaryOperation.emplace(syrec_operation::operation::Addition);
+            break;
+        case syrec::Number::CompileTimeConstantExpression::Subtraction:
+            mappedToBinaryOperation.emplace(syrec_operation::operation::Subtraction);
+            break;
+        case syrec::Number::CompileTimeConstantExpression::Multiplication:
+            mappedToBinaryOperation.emplace(syrec_operation::operation::Multiplication);
+            break;
+        case syrec::Number::CompileTimeConstantExpression::Division:
+            mappedToBinaryOperation.emplace(syrec_operation::operation::Division);
+            break;
+    }
+    const auto& rhsOperandConverted = tryConvertNumberToExpr(compileTimeConstantExpression.rhsOperand,symbolTable);
+    if (lhsOperandConverted.has_value() && mappedToBinaryOperation.has_value() && rhsOperandConverted.has_value()) {
+        return std::make_optional(
+            std::make_shared<syrec::BinaryExpression>(*lhsOperandConverted, *syrec_operation::tryMapBinaryOperationEnumToFlag(*mappedToBinaryOperation), *rhsOperandConverted)
+        );
+    }
+    return std::nullopt;
+}
+
+std::optional<syrec::Number::ptr> SyReCCustomBaseVisitor::tryConvertExpressionToCompileTimeConstantOne(const syrec::expression::ptr& expr) {
+    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
+        const auto& convertedLhsOperand = tryConvertExpressionToCompileTimeConstantOne(exprAsBinaryExpr->lhs);
+        const auto& convertedBinaryExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+        const auto& convertedRhsOperand = tryConvertExpressionToCompileTimeConstantOne(exprAsBinaryExpr->rhs);
+
+        if (!convertedLhsOperand.has_value() || !convertedBinaryExpr.has_value() || !convertedRhsOperand.has_value()) {
+            return std::nullopt;
+        }
+
+        syrec::Number::CompileTimeConstantExpression::Operation compileTimeConstantExpressionOperation;
+        switch (*convertedBinaryExpr) {
+            case syrec_operation::operation::Addition:
+                compileTimeConstantExpressionOperation = syrec::Number::CompileTimeConstantExpression::Operation::Addition;
+                break;
+            case syrec_operation::operation::Subtraction:
+                compileTimeConstantExpressionOperation = syrec::Number::CompileTimeConstantExpression::Operation::Subtraction;
+                break;
+            case syrec_operation::operation::Multiplication:
+                compileTimeConstantExpressionOperation = syrec::Number::CompileTimeConstantExpression::Operation::Multiplication;
+                break;
+            case syrec_operation::operation::Division:
+                compileTimeConstantExpressionOperation = syrec::Number::CompileTimeConstantExpression::Operation::Division;
+                break;
+            default:
+                return std::nullopt;
+        }
+        return std::make_optional(std::make_shared<syrec::Number>(syrec::Number::CompileTimeConstantExpression(
+                *convertedLhsOperand,
+                compileTimeConstantExpressionOperation,
+                *convertedRhsOperand)));
+    }
+    if (const auto& exprAsVariableExpr =std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableExpr != nullptr) {
+        if (exprAsVariableExpr->var->indexes.empty() && !exprAsVariableExpr->var->range.has_value()) {
+            return std::make_optional(std::make_shared<syrec::Number>(exprAsVariableExpr->var->getVar()->name));
+        }
+    }
+    if (const auto& exprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expr); exprAsNumericExpr != nullptr) {
+        return std::make_optional(exprAsNumericExpr->value);
+    }
+    return std::nullopt;
+}
+
+std::optional<syrec::expression::ptr> SyReCCustomBaseVisitor::tryConvertNumberToExpr(const syrec::Number::ptr& number, const parser::SymbolTable::ptr& symbolTable) {
+    if (number->isConstant()) {
+        if (const auto& constantValueOfNumber = SignalAccessUtils::tryEvaluateNumber(number, symbolTable); constantValueOfNumber.has_value()) {
+            return std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(*constantValueOfNumber), BitHelpers::getRequiredBitsToStoreValue(*constantValueOfNumber));
+        }
+        return std::nullopt;
+    }
+    if (number->isLoopVariable()) {
+        // TODO: Is it ok to assume a bitwidth of 1 for the given loop variable
+        return std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(number->variableName()), 1);
+    }
+    if (number->isCompileTimeConstantExpression()) {
+        return tryConvertCompileTimeConstantExpressionToBinaryExpr(number->getExpression(), symbolTable);
+    }
+    return std::nullopt;
 }
