@@ -12,17 +12,18 @@
 
 #include "core/syrec/parser/antlr/parserComponents/syrec_module_visitor.hpp"
 #include "core/syrec/module.hpp"
+#include <core/syrec/parser/utils/message_utils.hpp>
 
 namespace parser {
     class SyrecParserInterface {
     public:
         struct ParsingResult {
             bool                     wasParsingSuccessful;
-            std::vector<std::string> errors;
-            std::vector<std::string> warnings;
+            std::vector<messageUtils::Message> errors;
+            std::vector<messageUtils::Message> warnings;
             syrec::Module::vec       foundModules;
 
-            explicit ParsingResult(std::vector<std::string> errors, std::vector<std::string> warnings):
+            explicit ParsingResult(std::vector<messageUtils::Message> errors, std::vector<messageUtils::Message> warnings):
                 wasParsingSuccessful(false), errors(std::move(errors)), warnings(std::move(warnings)), foundModules({}) {}
 
             explicit ParsingResult(syrec::Module::vec foundModules):

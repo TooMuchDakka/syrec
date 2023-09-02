@@ -9,11 +9,11 @@
 
 using namespace parser;
 
-std::vector<std::string> SyReCModuleVisitor::getErrors() const {
+std::vector<messageUtils::Message> SyReCModuleVisitor::getErrors() const {
     return sharedData->errors;
 }
 
-std::vector<std::string> SyReCModuleVisitor::getWarnings() const {
+std::vector<messageUtils::Message> SyReCModuleVisitor::getWarnings() const {
     return sharedData->warnings;
 }
 
@@ -37,7 +37,7 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
 
         if (moduleParseResult.has_value()) {
             if (sharedData->currentSymbolTableScope->contains(*moduleParseResult)) {
-                createError(mapAntlrTokenPosition(module->IDENT()->getSymbol()), fmt::format(DuplicateModuleIdentDeclaration, (*moduleParseResult)->name));
+                createMessage(mapAntlrTokenPosition(module->IDENT()->getSymbol()), messageUtils::Message::Severity::Error, DuplicateModuleIdentDeclaration, (*moduleParseResult)->name);
             } else {
                 const auto& unoptimizedModuleVersion       = *moduleParseResult;
                 auto        optimizedModuleVersion         = unoptimizedModuleVersion;
@@ -145,7 +145,7 @@ std::any SyReCModuleVisitor::visitParameterList(SyReCParser::ParameterListContex
 std::any SyReCModuleVisitor::visitParameter(SyReCParser::ParameterContext* context) {
     const auto parameterType = getParameterType(context->start);
     if (!parameterType.has_value()) {
-        createError(mapAntlrTokenPosition(context->start), InvalidParameterType);
+        createMessage(mapAntlrTokenPosition(context->start), messageUtils::Message::Severity::Error, InvalidParameterType);
     }
 
     auto declaredParameter = tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(context->signalDeclaration());
@@ -162,7 +162,7 @@ std::any SyReCModuleVisitor::visitSignalList(SyReCParser::SignalListContext* con
     const auto declaredSignalsType          = getSignalType(context->start);
     bool       isValidSignalListDeclaration = true;
     if (!declaredSignalsType.has_value()) {
-        createError(mapAntlrTokenPosition(context->start), InvalidLocalType);
+        createMessage(mapAntlrTokenPosition(context->start), messageUtils::Message::Severity::Error, InvalidLocalType);
         isValidSignalListDeclaration = false;
     }
 
@@ -190,12 +190,12 @@ std::any SyReCModuleVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
     const std::string signalIdent = context->IDENT()->getText();
     if (sharedData->currentSymbolTableScope->contains(signalIdent)) {
         isValidSignalDeclaration = false;
-        createError(mapAntlrTokenPosition(context->IDENT()->getSymbol()), fmt::format(DuplicateDeclarationOfIdent, signalIdent));
+        createMessage(mapAntlrTokenPosition(context->IDENT()->getSymbol()), messageUtils::Message::Severity::Error, DuplicateDeclarationOfIdent, signalIdent);
     }
     
     for (const auto& dimensionToken : context->dimensionTokens) {
         const auto dimensionTokenValueAsNumber = dimensionToken != nullptr
-            ? ParserUtilities::convertToNumber(dimensionToken->getText())
+            ? convertToNumber(dimensionToken->getText())
             : std::nullopt;
 
         isValidSignalDeclaration = dimensionTokenValueAsNumber.has_value();
@@ -209,7 +209,7 @@ std::any SyReCModuleVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarati
     }
 
     if (context->signalWidthToken != nullptr) {
-        const std::optional<unsigned int> customSignalWidth = ParserUtilities::convertToNumber(context->signalWidthToken->getText());
+        const std::optional<unsigned int> customSignalWidth = convertToNumber(context->signalWidthToken->getText());
         if (customSignalWidth.has_value()) {
             signalWidth = (*customSignalWidth);
         } else {

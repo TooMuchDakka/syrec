@@ -15,10 +15,10 @@
 
 using namespace parser;
 
-bool SyReCCustomBaseVisitor::checkIfSignalWasDeclaredOrLogError(const std::string& signalIdent, const bool isLoopVariable, const TokenPosition& signalIdentTokenPosition) {
+bool SyReCCustomBaseVisitor::checkIfSignalWasDeclaredOrLogError(const std::string& signalIdent, const bool isLoopVariable, const messageUtils::Message::Position& signalIdentTokenPosition) {
     const std::string signalIdentTransformed = isLoopVariable ? "$" + signalIdent : signalIdent;
     if (!sharedData->currentSymbolTableScope->contains(signalIdentTransformed)) {
-        createError(signalIdentTokenPosition, fmt::format(UndeclaredIdent, signalIdentTransformed));
+        createMessage(signalIdentTokenPosition, messageUtils::Message::Severity::Error, UndeclaredIdent, signalIdentTransformed);
         return false;
     }
     return true;
@@ -27,22 +27,14 @@ bool SyReCCustomBaseVisitor::checkIfSignalWasDeclaredOrLogError(const std::strin
 bool SyReCCustomBaseVisitor::isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable) {
     if (syrec::Variable::Types::In == assignedToVariable->getVar()->type) {
         // TODO: Error position
-        createError(mapAntlrTokenPosition(signalIdentToken), fmt::format(AssignmentToReadonlyVariable, assignedToVariable->getVar()->name));
+        createMessage(mapAntlrTokenPosition(signalIdentToken), messageUtils::Message::Severity::Error, AssignmentToReadonlyVariable, assignedToVariable->getVar()->name);
         return false;
     }
     return true;
 }
 
-inline void SyReCCustomBaseVisitor::createError(const TokenPosition& tokenPosition, const std::string& errorMessage) {
-    sharedData->errors.emplace_back(ParserUtilities::createError(tokenPosition.line, tokenPosition.column, errorMessage));
-}
-
-inline void SyReCCustomBaseVisitor::createWarning(const TokenPosition& tokenPosition, const std::string& warningMessage) {
-    sharedData->warnings.emplace_back(ParserUtilities::createWarning(tokenPosition.line, tokenPosition.column, warningMessage));
-}
-
-inline SyReCCustomBaseVisitor::TokenPosition SyReCCustomBaseVisitor::determineContextStartTokenPositionOrUseDefaultOne(const antlr4::ParserRuleContext* context) {
-    return context == nullptr ? TokenPosition(fallbackErrorLinePosition, fallbackErrorColumnPosition) : mapAntlrTokenPosition(context->start);
+inline messageUtils::Message::Position SyReCCustomBaseVisitor::determineContextStartTokenPositionOrUseDefaultOne(const antlr4::ParserRuleContext* context) {
+    return context == nullptr ? messageUtils::Message::Position(SharedVisitorData::fallbackErrorLinePosition, SharedVisitorData::fallbackErrorColumnPosition) : mapAntlrTokenPosition(context->start);
 }
 
 std::optional<syrec_operation::operation> SyReCCustomBaseVisitor::getDefinedOperation(const antlr4::Token* definedOperationToken) {
@@ -135,23 +127,23 @@ std::optional<syrec_operation::operation> SyReCCustomBaseVisitor::getDefinedOper
             break;
         default:
             // TODO: Error position
-            createError(mapAntlrTokenPosition(definedOperationToken), "TODO: No mapping for operation");
+            createMessage(mapAntlrTokenPosition(definedOperationToken), messageUtils::Message::Severity::Error , "TODO: No mapping for operation");
             break;
     }
     return definedOperation;
 }
 
-inline SyReCCustomBaseVisitor::TokenPosition SyReCCustomBaseVisitor::mapAntlrTokenPosition(const antlr4::Token* token) {
+inline messageUtils::Message::Position SyReCCustomBaseVisitor::mapAntlrTokenPosition(const antlr4::Token* token) {
     if (token == nullptr) {
-        return TokenPosition(fallbackErrorLinePosition, fallbackErrorColumnPosition);
+        return messageUtils::Message::Position(SharedVisitorData::fallbackErrorLinePosition, SharedVisitorData::fallbackErrorColumnPosition);
     }
-    return TokenPosition(token->getLine(), token->getCharPositionInLine());
+    return messageUtils::Message::Position(token->getLine(), token->getCharPositionInLine());
 }
 
 std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context) {
     std::string                               signalIdent;
     std::optional<syrec::VariableAccess::ptr> accessedSignal;
-    bool                                      isValidSignalAccess = context->IDENT() != nullptr && checkIfSignalWasDeclaredOrLogError(context->IDENT()->getText(), false, TokenPosition(context->IDENT()->getSymbol()->getLine(), context->IDENT()->getSymbol()->getCharPositionInLine()));
+    bool                                      isValidSignalAccess = context->IDENT() != nullptr && checkIfSignalWasDeclaredOrLogError(context->IDENT()->getText(), false, messageUtils::Message::Position(context->IDENT()->getSymbol()->getLine(), context->IDENT()->getSymbol()->getCharPositionInLine()));
 
     if (isValidSignalAccess) {
         signalIdent                  = context->IDENT()->getText();
@@ -195,7 +187,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
 
         isValidSignalAccess &= numUserDefinedDimensions <= numElementsWithinRange;
         for (size_t dimensionOutOfRangeIdx = numElementsWithinRange; dimensionOutOfRangeIdx < numUserDefinedDimensions; ++dimensionOutOfRangeIdx) {
-            createError(determineContextStartTokenPositionOrUseDefaultOne(context->accessedDimensions.at(dimensionOutOfRangeIdx)), fmt::format(DimensionOutOfRange, dimensionOutOfRangeIdx, signalIdent, numDimensionsOfAccessSignal));
+            createMessage(determineContextStartTokenPositionOrUseDefaultOne(context->accessedDimensions.at(dimensionOutOfRangeIdx)), messageUtils::Message::Severity::Error, DimensionOutOfRange, dimensionOutOfRangeIdx, signalIdent, numDimensionsOfAccessSignal);
         }
     }
 
@@ -236,7 +228,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
         if (!sharedData->shouldSkipSignalAccessRestrictionCheck && isAccessToAccessedSignalPartRestricted(*accessedSignal, restrictionErrorPosition)) {
             // TODO: GEN_ERROR
             // TODO: Create correct error message
-            createError(restrictionErrorPosition, fmt::format(AccessingRestrictedPartOfSignal, signalIdent));
+            createMessage(restrictionErrorPosition, messageUtils::Message::Severity::Error, AccessingRestrictedPartOfSignal, signalIdent);
         } else {
             if (const auto& fetchedValueByConstantPropagation = tryPerformConstantPropagationForSignalAccess(*accessedSignal); fetchedValueByConstantPropagation.has_value()) {
                 updateReferenceCountOfSignal(accessedSignal.value()->var->name, Decrement);
@@ -254,7 +246,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromConstant(SyReCParser::NumberFrom
         return std::nullopt;
     }
 
-    return std::make_optional(std::make_shared<syrec::Number>(ParserUtilities::convertToNumber(context->INT()->getText()).value()));
+    return std::make_optional(std::make_shared<syrec::Number>(convertToNumber(context->INT()->getText()).value()));
 }
 
 std::any SyReCCustomBaseVisitor::visitNumberFromSignalwidth(SyReCParser::NumberFromSignalwidthContext* context) {
@@ -266,7 +258,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromSignalwidth(SyReCParser::NumberF
     if (!checkIfSignalWasDeclaredOrLogError(
         context->IDENT()->getText(),
         false,
-        TokenPosition(context->IDENT()->getSymbol()->getLine(), context->IDENT()->getSymbol()->getCharPositionInLine()))) {
+        messageUtils::Message::Position(context->IDENT()->getSymbol()->getLine(), context->IDENT()->getSymbol()->getCharPositionInLine()))) {
         return std::nullopt;
     }
 
@@ -277,7 +269,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromSignalwidth(SyReCParser::NumberF
     } else {
         // TODO: GEN_ERROR, this should not happen
         // TODO: Error position
-        createError(TokenPosition::createFallbackPosition(), "TODO");
+        createMessageAtUnknownPosition(messageUtils::Message::Severity::Error, "TODO");
     }
 
     return signalWidthOfSignal;
@@ -290,7 +282,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromExpression(SyReCParser::NumberFr
     const auto operation = getDefinedOperation(context->op);
     if (!operation.has_value()) {
         // TODO: Error position
-        createError(mapAntlrTokenPosition(context->op), InvalidOrMissingNumberExpressionOperation);
+        createMessage(mapAntlrTokenPosition(context->op), messageUtils::Message::Severity::Error, InvalidOrMissingNumberExpressionOperation);
     }
 
     const auto rhsOperand = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->rhsOperand);
@@ -322,7 +314,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromExpression(SyReCParser::NumberFr
             break;
         }
         default:
-            createError(mapAntlrTokenPosition(context->op), fmt::format(NoMappingForNumberOperation, context->op->getText()));
+            createMessage(mapAntlrTokenPosition(context->op), messageUtils::Message::Severity::Error, NoMappingForNumberOperation, context->op->getText());
             return std::nullopt;
     }
 
@@ -378,12 +370,12 @@ std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::Number
     if (!checkIfSignalWasDeclaredOrLogError(
                 context->IDENT()->getText(),
                 true,
-                TokenPosition(context->IDENT()->getSymbol()->getLine(), context->IDENT()->getSymbol()->getCharPositionInLine()))) {
+                messageUtils::Message::Position(context->IDENT()->getSymbol()->getLine(), context->IDENT()->getSymbol()->getCharPositionInLine()))) {
         return std::nullopt;
     }
     updateReferenceCountOfSignal(signalIdent, Increment);
     if (sharedData->lastDeclaredLoopVariable.has_value() && *sharedData->lastDeclaredLoopVariable == signalIdent) {
-        createError(mapAntlrTokenPosition(context->IDENT()->getSymbol()), fmt::format(CannotReferenceLoopVariableInInitalValueDefinition, signalIdent));
+        createMessage(mapAntlrTokenPosition(context->IDENT()->getSymbol()), messageUtils::Message::Severity::Error, CannotReferenceLoopVariableInInitalValueDefinition, signalIdent);
         return std::nullopt;
     }
 
@@ -400,7 +392,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::Number
     } else {
         // TODO: GEN_ERROR, this should not happen but check anyways
         // TODO: Error position
-        createError(TokenPosition::createFallbackPosition(), "TODO");
+        createMessageAtUnknownPosition(messageUtils::Message::Severity::Error , "TODO");
     }
 
     return valueOfLoopVariable;
@@ -424,7 +416,7 @@ inline bool SyReCCustomBaseVisitor::canEvaluateCompileTimeExpression(const syrec
 }
 
 // TODO: CONSTANT_PROPAGATION: Only use symbol table as source for value of loop variables
-std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateNumber(const syrec::Number::ptr& numberContainer, const TokenPosition& evaluationErrorPositionHelper) {
+std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateNumber(const syrec::Number::ptr& numberContainer, const messageUtils::Message::Position& evaluationErrorPositionHelper) {
     if (numberContainer->isLoopVariable() && !canEvaluateNumber(numberContainer)) {
         return std::nullopt;
     }
@@ -436,11 +428,11 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateNumber(const syrec::N
 }
 
 
-std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, const TokenPosition& evaluationErrorPositionHelper) {
+std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, const messageUtils::Message::Position& evaluationErrorPositionHelper) {
     const auto lhsEvaluated = canEvaluateNumber(compileTimeExpression.lhsOperand) ? tryEvaluateNumber(compileTimeExpression.lhsOperand, evaluationErrorPositionHelper) : std::nullopt;
     const auto rhsEvaluated = (lhsEvaluated.has_value() && canEvaluateNumber(compileTimeExpression.rhsOperand)) ? tryEvaluateNumber(compileTimeExpression.rhsOperand, evaluationErrorPositionHelper) : std::nullopt;
     if (rhsEvaluated.has_value() && !*rhsEvaluated && compileTimeExpression.operation == syrec::Number::CompileTimeConstantExpression::Division) {
-        createError(evaluationErrorPositionHelper, DivisionByZero);
+        createMessage(evaluationErrorPositionHelper, messageUtils::Message::Severity::Error, DivisionByZero);
         return std::nullopt;
     }
 
@@ -461,17 +453,17 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateCompileTimeExpression
     }
 
     if (!mappedToBinaryOperation.has_value()) {
-        createError(evaluationErrorPositionHelper, fmt::format(NoMappingForNumberOperation, stringifyCompileTimeConstantExpressionOperation(compileTimeExpression.operation)));
+        createMessage(evaluationErrorPositionHelper, messageUtils::Message::Severity::Error, NoMappingForNumberOperation, stringifyCompileTimeConstantExpressionOperation(compileTimeExpression.operation));
         return std::nullopt;
     }
     return syrec_operation::apply(*mappedToBinaryOperation, lhsEvaluated, rhsEvaluated);
 }
 
-std::optional<unsigned> SyReCCustomBaseVisitor::applyBinaryOperation(syrec_operation::operation operation, unsigned leftOperand, unsigned rightOperand, const TokenPosition& potentialErrorPosition) {
+std::optional<unsigned> SyReCCustomBaseVisitor::applyBinaryOperation(syrec_operation::operation operation, unsigned leftOperand, unsigned rightOperand, const messageUtils::Message::Position& potentialErrorPosition) {
     if (operation == syrec_operation::operation::Division && rightOperand == 0) {
         // TODO: GEN_ERROR
         // TODO: Error position
-        createError(potentialErrorPosition, DivisionByZero);
+        createMessage(potentialErrorPosition, messageUtils::Message::Severity::Error, DivisionByZero);
         return std::nullopt;
     }
 
@@ -484,7 +476,7 @@ void SyReCCustomBaseVisitor::insertSkipStatementIfStatementListIsEmpty(syrec::St
     }
 }
 
-std::optional<SignalAccessRestriction::SignalAccess> SyReCCustomBaseVisitor::tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const TokenPosition& optionalEvaluationErrorPosition) {
+std::optional<SignalAccessRestriction::SignalAccess> SyReCCustomBaseVisitor::tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const messageUtils::Message::Position& optionalEvaluationErrorPosition) {
     if (!canEvaluateNumber(accessedBits.first) || !canEvaluateNumber(accessedBits.second)) {
         return std::nullopt;
     }
@@ -500,7 +492,7 @@ std::optional<SignalAccessRestriction::SignalAccess> SyReCCustomBaseVisitor::try
     return SignalAccessRestriction::SignalAccess(*bitRangeStartEvaluated, *bitRangeEndEvaluated);
 }
 
-std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, const TokenPosition& evaluationErrorPositionHelper) {
+std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, const messageUtils::Message::Position& evaluationErrorPositionHelper) {
     std::optional<unsigned int> bitWidthAfterVariableAccess = std::make_optional(variableAccess->getVar()->bitwidth);
 
     if (!variableAccess->range.has_value()) {
@@ -526,7 +518,7 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineBitwidthAfterVariabl
     return bitWidthAfterVariableAccess;
 }
 
-std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(const syrec::expression::ptr& expression, const TokenPosition& evaluationErrorPosition) {
+std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(const syrec::expression::ptr& expression, const messageUtils::Message::Position& evaluationErrorPosition) {
     if (auto const* numericExpression = dynamic_cast<syrec::NumericExpression*>(expression.get())) {
         if (canEvaluateNumber(numericExpression->value)) {
             return tryEvaluateNumber(numericExpression->value, evaluationErrorPosition);
@@ -585,11 +577,11 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(c
         return variableExpression->var->bitwidth();
     }
 
-    createError(evaluationErrorPosition, "Could not determine bitwidth for unknown type of expression");
+    createMessage(evaluationErrorPosition, messageUtils::Message::Severity::Error, "Could not determine bitwidth for unknown type of expression");
     return std::nullopt;
 }
 
-bool SyReCCustomBaseVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(const TokenPosition& positionOfOptionalError, const std::vector<unsigned>& lhsOperandNumValuesPerDimension, const std::vector<unsigned>& rhsOperandNumValuesPerDimension) {
+bool SyReCCustomBaseVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(const messageUtils::Message::Position& positionOfOptionalError, const std::vector<unsigned>& lhsOperandNumValuesPerDimension, const std::vector<unsigned>& rhsOperandNumValuesPerDimension) {
     if (const auto dimensionsWithMissmatchedNumValues = getDimensionsWithMissmatchedNumberOfValues(lhsOperandNumValuesPerDimension, rhsOperandNumValuesPerDimension); !dimensionsWithMissmatchedNumValues.empty()) {
         std::vector<std::string> perDimensionErrorBuffer;
         for (const auto& dimensionValueMissmatch: dimensionsWithMissmatchedNumValues) {
@@ -598,7 +590,7 @@ bool SyReCCustomBaseVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(co
 
         std::ostringstream errorsConcatinatedBuffer;
         std::copy(perDimensionErrorBuffer.cbegin(), perDimensionErrorBuffer.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, ","));
-        createError(positionOfOptionalError, fmt::format(MissmatchedNumberOfValuesForDimensionsBetweenOperands, errorsConcatinatedBuffer.str()));
+        createMessage(positionOfOptionalError, messageUtils::Message::Severity::Error, MissmatchedNumberOfValuesForDimensionsBetweenOperands, errorsConcatinatedBuffer.str());
         return false;
     }
     return true;
@@ -625,18 +617,18 @@ bool SyReCCustomBaseVisitor::validateBitOrRangeAccessOnSignal(const antlr4::Toke
             isValidSignalAccess                                      = false;
             const IndexAccessRangeConstraint constraintsForBitAccess = getConstraintsForValidBitAccess(accessedVariable, true);
             // TODO: GEN_ERROR: Bit access out of range
-            createError(mapAntlrTokenPosition(bitOrRangeStartToken), fmt::format(BitAccessOutOfRange, bitOrRangeAccessPairEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue));
+            createMessage(mapAntlrTokenPosition(bitOrRangeStartToken), messageUtils::Message::Severity::Error, BitAccessOutOfRange, bitOrRangeAccessPairEvaluated.first, signalIdent, constraintsForBitAccess.minimumValidValue, constraintsForBitAccess.maximumValidValue);
         }
     } else {
         if (bitOrRangeAccessPairEvaluated.first > bitOrRangeAccessPairEvaluated.second) {
             isValidSignalAccess = false;
             // TODO: GEN_ERROR: Bit range start larger than end
-            createError(mapAntlrTokenPosition(bitOrRangeStartToken), fmt::format(BitRangeStartLargerThanEnd, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second));
+            createMessage(mapAntlrTokenPosition(bitOrRangeStartToken), messageUtils::Message::Severity::Error,BitRangeStartLargerThanEnd, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second);
         } else if (!isValidBitRangeAccess(accessedVariable, bitOrRangeAccessPairEvaluated, true)) {
             isValidSignalAccess                                           = false;
             const IndexAccessRangeConstraint constraintsForBitRangeAccess = getConstraintsForValidBitAccess(accessedVariable, true);
             // TODO: GEN_ERROR: Bit range out of range
-            createError(mapAntlrTokenPosition(bitOrRangeStartToken), fmt::format(BitRangeOutOfRange, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue));
+            createMessage(mapAntlrTokenPosition(bitOrRangeStartToken), messageUtils::Message::Severity::Error, BitRangeOutOfRange, bitOrRangeAccessPairEvaluated.first, bitOrRangeAccessPairEvaluated.second, signalIdent, constraintsForBitRangeAccess.minimumValidValue, constraintsForBitRangeAccess.maximumValidValue);
         }
     }
     return isValidSignalAccess;
@@ -659,20 +651,21 @@ bool SyReCCustomBaseVisitor::validateSemanticChecksIfDimensionExpressionIsConsta
 
         // TODO: GEN_ERROR: Index out of range for dimension i
         // TODO: Error position
-        createError(mapAntlrTokenPosition(dimensionToken),
-                    fmt::format(
-                            DimensionValueOutOfRange,
-                            expressionResultAsConstant,
-                            accessedDimensionIdx,
-                            accessedSignal->name,
-                            constraintForCurrentDimension.minimumValidValue, constraintForCurrentDimension.maximumValidValue));
+        createMessage(mapAntlrTokenPosition(dimensionToken),
+                      messageUtils::Message::Severity::Error,
+
+                      DimensionValueOutOfRange,
+                      expressionResultAsConstant,
+                      accessedDimensionIdx,
+                      accessedSignal->name,
+                      constraintForCurrentDimension.minimumValidValue, constraintForCurrentDimension.maximumValidValue);
     }
 
     return accessOnCurrentDimensionOk;
 }
 
 // TODO: Handling of partial bit ranges (i.e. .2:$i) when evaluating bit range !!!
-bool SyReCCustomBaseVisitor::isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const TokenPosition& optionalEvaluationErrorPosition) const {
+bool SyReCCustomBaseVisitor::isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const messageUtils::Message::Position& optionalEvaluationErrorPosition) const {
     const auto& existingSignalAccessRestriction = sharedData->getSignalAccessRestriction();
     return existingSignalAccessRestriction.has_value()
         ? (*existingSignalAccessRestriction)->isAccessRestrictedTo(accessedSignalPart)
@@ -813,3 +806,14 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryPerformConstantPropagationFor
 
     return sharedData->currentSymbolTableScope->tryFetchValueForLiteral(accessedSignal);
 }
+
+std::optional<unsigned> SyReCCustomBaseVisitor::convertToNumber(const std::string& text) {
+    try {
+        return std::stoul(text) & UINT_MAX;
+    } catch (std::invalid_argument&) {
+        return std::nullopt;
+    } catch (std::out_of_range&) {
+        return std::nullopt;
+    }
+}
+

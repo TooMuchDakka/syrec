@@ -81,7 +81,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
     const auto lhsOperand           = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->lhsOperand);
     const auto userDefinedOperation = getDefinedOperation(context->binaryOperation);
     if (!userDefinedOperation.has_value() || !isValidBinaryOperation(userDefinedOperation.value())) {
-        createError(mapAntlrTokenPosition(context->binaryOperation), InvalidBinaryOperation);
+        createMessage(mapAntlrTokenPosition(context->binaryOperation), messageUtils::Message::Severity::Error, InvalidBinaryOperation);
     }
 
     // TODO:
@@ -110,9 +110,10 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
             if (binaryExpressionEvaluated.has_value()) {
                 result.emplace(ExpressionEvaluationResult::createFromConstantValue(*binaryExpressionEvaluated, (*(*lhsOperand)->getAsExpression())->bitwidth()));
             } else {
+                createMessageAtUnknownPosition(messageUtils::Message::Severity::Error, "TODO: Calculation of binary expression for constant values failed");
                 // TODO: Error creation
                 // TODO: Error position
-                createError(TokenPosition::createFallbackPosition(), "TODO: Calculation of binary expression for constant values failed");
+                //createError(Position::createFallbackPosition(), "TODO: Calculation of binary expression for constant values failed");
             }
         } else {
             const auto lhsOperandNumValuesPerDimension = (*lhsOperand)->numValuesPerDimension;
@@ -122,9 +123,9 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
             // TODO: Handling of broadcasting
             if (requiresBroadcasting(lhsOperandNumValuesPerDimension, rhsOperandNumValuesPerDimension)) {
                 if (!sharedData->parserConfig->supportBroadcastingExpressionOperands) {
-                    createError(determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand), fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandNumValuesPerDimension.size(), rhsOperandNumValuesPerDimension.size()));
+                    createMessage(determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand), messageUtils::Message::Severity::Error, MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandNumValuesPerDimension.size(), rhsOperandNumValuesPerDimension.size());
                 } else {
-                    createError(determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand), "Broadcasting of operands is currently not supported");
+                    createMessage(determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand), messageUtils::Message::Severity::Error , "Broadcasting of operands is currently not supported");
                 }
             } else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(
                                determineContextStartTokenPositionOrUseDefaultOne(context->lhsOperand),
@@ -166,7 +167,7 @@ std::any SyReCExpressionVisitor::visitUnaryExpression(SyReCParser::UnaryExpressi
 {
     const auto userDefinedOperation = getDefinedOperation(context->unaryOperation);
     if (!userDefinedOperation.has_value() || (*userDefinedOperation != syrec_operation::operation::BitwiseNegation && *userDefinedOperation != syrec_operation::operation::LogicalNegation)) {
-        createError(mapAntlrTokenPosition(context->unaryOperation), InvalidUnaryOperation);
+        createMessage(mapAntlrTokenPosition(context->unaryOperation), messageUtils::Message::Severity::Error, InvalidUnaryOperation);
     }
 
     const auto userDefinedExpression = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult>(context->expression());
@@ -180,7 +181,7 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     const auto definedShiftOperation = context->shiftOperation != nullptr ? getDefinedOperation(context->shiftOperation) : std::nullopt;
 
     if (!definedShiftOperation.has_value() || (*definedShiftOperation != syrec_operation::operation::ShiftLeft && *definedShiftOperation != syrec_operation::operation::ShiftRight)) {
-        createError(mapAntlrTokenPosition(context->shiftOperation), InvalidShiftOperation);
+        createMessage(mapAntlrTokenPosition(context->shiftOperation), messageUtils::Message::Severity::Error, InvalidShiftOperation);
     }
 
     const auto shiftAmount = tryVisitAndConvertProductionReturnValue<syrec::Number::ptr>(context->number());
@@ -193,9 +194,9 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     // TODO: Handling of broadcasting
     if (requiresBroadcasting(numValuesPerDimensionOfExpressiontoShift, {1})) {
         if (!sharedData->parserConfig->supportBroadcastingExpressionOperands) {
-            createError(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, numValuesPerDimensionOfExpressiontoShift.size(), 1));
+            createMessage(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), messageUtils::Message::Severity::Error, MissmatchedNumberOfDimensionsBetweenOperands, numValuesPerDimensionOfExpressiontoShift.size(), 1);
         } else {
-            createError(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), "Broadcasting of operands is currently not supported");
+            createMessage(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), messageUtils::Message::Severity::Error, "Broadcasting of operands is currently not supported");
         }
         return std::nullopt;
     }
@@ -216,7 +217,7 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
 
         // TODO: GEN_ERROR
         // TODO: Error position
-        createError(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), "TODO: SHIFT CALC ERROR");
+        createMessage(determineContextStartTokenPositionOrUseDefaultOne(context->expression()), messageUtils::Message::Severity::Error, "TODO: SHIFT CALC ERROR");
         return std::nullopt;
     }
 

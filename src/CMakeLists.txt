@@ -60,6 +60,7 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/loop_optimizer.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/no_additional_line_assignment.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operation_strength_reduction.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/optimizer.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/reassociate_expression.cpp
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/constantPropagation/bit_range_access_restriction.cpp
@@ -89,6 +90,7 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/binary_expression_simplifier.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/loop_body_value_propagation_blocker.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/loop_range_utils.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/message_utils.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/signal_access_utils.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/syrec_ast_dump_utils.cpp
 
@@ -120,6 +122,7 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/loop_optimizer.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/no_additional_line_assignment.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operation_strength_reduction.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/optimizer.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/reassociate_expression.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/bit_range_access_restriction.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/dimension_propagation_blocker.hpp
@@ -151,6 +154,7 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/binary_expression_simplifier.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/loop_range_utils.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/message_utils.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/signal_access_utils.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/syrec_ast_dump_utils.hpp
 

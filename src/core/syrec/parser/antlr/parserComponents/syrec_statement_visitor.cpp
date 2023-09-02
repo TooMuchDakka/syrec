@@ -61,7 +61,7 @@ std::any SyReCStatementVisitor::visitStatementList(SyReCParser::StatementListCon
 
         const size_t moduleIdentLinePosition   = notUncalledModule->moduleIdentPosition.first;
         const size_t moduleIdentColumnPosition = notUncalledModule->moduleIdentPosition.second;
-        createError(TokenPosition(moduleIdentLinePosition, moduleIdentColumnPosition), fmt::format(MissingUncall, notUncalledModule->moduleIdent, bufferForStringifiedParametersOfNotUncalledModule.str()));
+        createMessage(messageUtils::Message::Position(moduleIdentLinePosition, moduleIdentColumnPosition), messageUtils::Message::Severity::Error, MissingUncall, notUncalledModule->moduleIdent, bufferForStringifiedParametersOfNotUncalledModule.str());
     }
     sharedData->currentModuleCallNestingLevel--;
 
@@ -97,7 +97,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
     const auto definedAssignmentOperation = getDefinedOperation(context->assignmentOp);
     if (!definedAssignmentOperation.has_value() || (syrec_operation::operation::XorAssign != *definedAssignmentOperation && syrec_operation::operation::AddAssign != *definedAssignmentOperation && syrec_operation::operation::MinusAssign != *definedAssignmentOperation)) {
         // TODO: Error position
-        createError(mapAntlrTokenPosition(context->assignmentOp), InvalidAssignOperation);
+        createMessage(mapAntlrTokenPosition(context->assignmentOp), messageUtils::Message::Severity::Error, InvalidAssignOperation);
         allSemanticChecksOk = false;
     }
 
@@ -115,10 +115,10 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
         const auto rhsOperandNumValuesPerAccessedDimension           = (*assignmentOpRhsOperand)->numValuesPerDimension;
         if (requiresBroadcasting(lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
             if (!sharedData->parserConfig->supportBroadcastingExpressionOperands) {
-                createError(determineContextStartTokenPositionOrUseDefaultOne(context->signal()), fmt::format(MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandAccessedDimensionsNumValuesPerDimension.size(), rhsOperandNumValuesPerAccessedDimension.size()));
+                createMessage(determineContextStartTokenPositionOrUseDefaultOne(context->signal()), messageUtils::Message::Severity::Error, MissmatchedNumberOfDimensionsBetweenOperands, lhsOperandAccessedDimensionsNumValuesPerDimension.size(), rhsOperandNumValuesPerAccessedDimension.size());
                 invalidateStoredValueFor(lhsOperandVariableAccess);
             } else {
-                createError(determineContextStartTokenPositionOrUseDefaultOne(context->signal()), "Broadcasting of operands is currently not supported");
+                createMessage(determineContextStartTokenPositionOrUseDefaultOne(context->signal()), messageUtils::Message::Severity::Error, "Broadcasting of operands is currently not supported");
                 invalidateStoredValueFor(lhsOperandVariableAccess);
             }
         } else if (checkIfNumberOfValuesPerDimensionMatchOrLogError(mapAntlrTokenPosition(context->signal()->start), lhsOperandAccessedDimensionsNumValuesPerDimension, rhsOperandNumValuesPerAccessedDimension)) {
@@ -176,18 +176,18 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
     std::optional<std::string>          moduleIdent;
     bool                                existsModuleForIdent = false;
     std::optional<ModuleCallGuess::ptr> potentialModulesToCall;
-    TokenPosition                       moduleIdentPosition = TokenPosition::createFallbackPosition();
+    auto                       moduleIdentPosition = messageUtils::Message::Position(sharedData->fallbackErrorLinePosition, sharedData->fallbackErrorColumnPosition);
 
     if (context->moduleIdent != nullptr) {
         moduleIdent.emplace(context->moduleIdent->getText());
-        moduleIdentPosition  = TokenPosition(context->moduleIdent->getLine(), context->moduleIdent->getCharPositionInLine());
+        moduleIdentPosition  = messageUtils::Message::Position(context->moduleIdent->getLine(), context->moduleIdent->getCharPositionInLine());
         existsModuleForIdent = checkIfSignalWasDeclaredOrLogError(*moduleIdent, false, moduleIdentPosition);
         if (existsModuleForIdent) {
             potentialModulesToCall = ModuleCallGuess::fetchPotentialMatchesForMethodIdent(sharedData->currentSymbolTableScope, *moduleIdent);
         }
         isValidCallOperationDefined &= existsModuleForIdent;
     } else {
-        moduleIdentPosition         = TokenPosition(context->start->getLine(), context->start->getCharPositionInLine());
+        moduleIdentPosition         = messageUtils::Message::Position(context->start->getLine(), context->start->getCharPositionInLine());
         isValidCallOperationDefined = false;
     }
 
@@ -202,7 +202,7 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
         }
 
         calleeArguments.emplace_back(userDefinedCallArgument->getText());
-        const auto callArgumentTokenPosition = TokenPosition(userDefinedCallArgument->getLine(), userDefinedCallArgument->getCharPositionInLine());
+        const auto callArgumentTokenPosition = messageUtils::Message::Position(userDefinedCallArgument->getLine(), userDefinedCallArgument->getCharPositionInLine());
         if (checkIfSignalWasDeclaredOrLogError(userDefinedCallArgument->getText(), false, callArgumentTokenPosition) && potentialModulesToCall.has_value()) {
             const auto symTabEntryForCalleeArgument = *sharedData->currentSymbolTableScope->getVariable(userDefinedCallArgument->getText());
             if (std::holds_alternative<syrec::Variable::ptr>(symTabEntryForCalleeArgument)) {
@@ -238,20 +238,20 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
     }
 
     if (!potentialModulesToCall.has_value()) {
-        createError(mapAntlrTokenPosition(context->moduleIdent), fmt::format(NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size()));
+        createMessage(mapAntlrTokenPosition(context->moduleIdent), messageUtils::Message::Severity::Error, NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size());
         return 0;
     }
 
     (*potentialModulesToCall)->discardGuessesWithMoreThanNParameters(calleeArguments.size());
     if (!(*potentialModulesToCall)->hasSomeMatches()) {
-        createError(mapAntlrTokenPosition(context->moduleIdent), fmt::format(NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size()));
+        createMessage(mapAntlrTokenPosition(context->moduleIdent), messageUtils::Message::Severity::Error, NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size());
         return 0;
     }
 
     if ((*potentialModulesToCall)->getMatchesForGuess().size() > 1) {
         // TODO: GEN_ERROR Ambigous call, more than one match for given arguments
         // TODO: Error position
-        createError(mapAntlrTokenPosition(context->moduleIdent), fmt::format(AmbigousCall, *moduleIdent));
+        createMessage(mapAntlrTokenPosition(context->moduleIdent), messageUtils::Message::Severity::Error, AmbigousCall, *moduleIdent);
 
 
         if (!sharedData->modificationsOfReferenceCountsDisabled) {
@@ -496,7 +496,7 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
     // TODO: If dead code elimination is enabled and we can drop either of the branches we should also update the reference count for the used variables in both the guard as well as the closing expression
     // TODO: Error position
     if (!areExpressionsEqual(unoptimizedGuardExpr, unoptimizedClosingExpr)) {
-        createError(mapAntlrTokenPosition(context->getStart()), IfAndFiConditionMissmatch);
+        createMessage(mapAntlrTokenPosition(context->getStart()), messageUtils::Message::Severity::Error, IfAndFiConditionMissmatch);
         return 0;
     }
 
@@ -600,7 +600,7 @@ std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementCon
 
     if (lhsNumAffectedDimensions != rhsNumAffectedDimensions) {
         // TODO: Error position
-        createError(mapAntlrTokenPosition(context->start), fmt::format(InvalidSwapNumDimensionsMissmatch, lhsNumAffectedDimensions, rhsNumAffectedDimensions));
+        createMessage(mapAntlrTokenPosition(context->start), messageUtils::Message::Severity::Error, InvalidSwapNumDimensionsMissmatch, lhsNumAffectedDimensions, rhsNumAffectedDimensions);
         invalidateStoredValueFor(lhsAccessedSignal);
         invalidateStoredValueFor(rhsAccessedSignal);
         allSemanticChecksOk = false;
@@ -613,7 +613,7 @@ std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementCon
             continueCheck = lhsSignalDimensions.at(dimensionIdx) == rhsSignalDimensions.at(dimensionIdx);
             if (!continueCheck) {
                 // TODO: Error position
-                createError(mapAntlrTokenPosition(context->start), fmt::format(InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsSignalDimensions.at(dimensionIdx), rhsSignalDimensions.at(dimensionIdx)));
+                createMessage(mapAntlrTokenPosition(context->start), messageUtils::Message::Severity::Error, InvalidSwapValueForDimensionMissmatch, dimensionIdx, lhsSignalDimensions.at(dimensionIdx), rhsSignalDimensions.at(dimensionIdx));
                 invalidateStoredValueFor(lhsAccessedSignal);
                 invalidateStoredValueFor(rhsAccessedSignal);
                 allSemanticChecksOk = false;
@@ -632,7 +632,7 @@ std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementCon
     createAndStoreBackupForAssignedToSignal(rhsAccessedSignal);
     if (lhsAccessedSignalWidthEvaluated.has_value() && rhsAccessedSignalWidthEvaluated.has_value() && *lhsAccessedSignalWidthEvaluated != *rhsAccessedSignalWidthEvaluated) {
         // TODO: Error position
-        createError(mapAntlrTokenPosition(context->start), fmt::format(InvalidSwapSignalWidthMissmatch, *lhsAccessedSignalWidthEvaluated, *rhsAccessedSignalWidthEvaluated));
+        createMessage(mapAntlrTokenPosition(context->start), messageUtils::Message::Severity::Error, InvalidSwapSignalWidthMissmatch, *lhsAccessedSignalWidthEvaluated, *rhsAccessedSignalWidthEvaluated);
         invalidateStoredValueFor(lhsAccessedSignal);
         invalidateStoredValueFor(rhsAccessedSignal);
         return 0;
@@ -662,7 +662,7 @@ std::any SyReCStatementVisitor::visitUnaryStatement(SyReCParser::UnaryStatementC
     if (!unaryOperation.has_value() || (syrec_operation::operation::InvertAssign != *unaryOperation && syrec_operation::operation::IncrementAssign != *unaryOperation && syrec_operation::operation::DecrementAssign != *unaryOperation)) {
         allSemanticChecksOk = false;
         // TODO: Error position
-        createError(mapAntlrTokenPosition(context->unaryOp), InvalidUnaryOperation);
+        createMessage(mapAntlrTokenPosition(context->unaryOp), messageUtils::Message::Severity::Error, InvalidUnaryOperation);
     }
 
     sharedData->performPotentialValueLookupForCurrentlyAccessedSignal = false;
@@ -699,15 +699,15 @@ void SyReCStatementVisitor::addStatementToOpenContainer(const syrec::Statement::
     statementListContainerStack.top().emplace_back(statement);
 }
 
-bool SyReCStatementVisitor::areSemanticChecksForCallOrUncallDependingOnNameValid(bool isCallOperation, const TokenPosition& moduleIdentTokenPosition, const std::optional<std::string>& moduleIdent) {
+bool SyReCStatementVisitor::areSemanticChecksForCallOrUncallDependingOnNameValid(bool isCallOperation, const messageUtils::Message::Position& moduleIdentTokenPosition, const std::optional<std::string>& moduleIdent) {
     if (isCallOperation) {
         if (moduleCallStack->containsAnyUncalledModulesForNestingLevel(sharedData->currentModuleCallNestingLevel)) {
-            createError(moduleIdentTokenPosition, PreviousCallWasNotUncalled);
+            createMessage(moduleIdentTokenPosition, messageUtils::Message::Severity::Error, PreviousCallWasNotUncalled);
             return false;
         }
     } else {
         if (!moduleCallStack->containsAnyUncalledModulesForNestingLevel(sharedData->currentModuleCallNestingLevel)) {
-            createError(moduleIdentTokenPosition, UncallWithoutPreviousCall);
+            createMessage(moduleIdentTokenPosition, messageUtils::Message::Severity::Error, UncallWithoutPreviousCall);
             return false;
         }
 
@@ -717,14 +717,14 @@ bool SyReCStatementVisitor::areSemanticChecksForCallOrUncallDependingOnNameValid
 
         const auto& lastCalledModule = *moduleCallStack->getLastCalledModuleForNestingLevel(sharedData->currentModuleCallNestingLevel);
         if (lastCalledModule->moduleIdent != *moduleIdent) {
-            createError(moduleIdentTokenPosition, fmt::format(MissmatchOfModuleIdentBetweenCalledAndUncall, lastCalledModule->moduleIdent, *moduleIdent));
+            createMessage(moduleIdentTokenPosition, messageUtils::Message::Severity::Error, MissmatchOfModuleIdentBetweenCalledAndUncall, lastCalledModule->moduleIdent, *moduleIdent);
             return false;
         }
     }
     return true;
 }
 
-bool SyReCStatementVisitor::doArgumentsBetweenCallAndUncallMatch(const TokenPosition& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments) {
+bool SyReCStatementVisitor::doArgumentsBetweenCallAndUncallMatch(const messageUtils::Message::Position& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments) {
     const auto lastCalledModule = *moduleCallStack->getLastCalledModuleForNestingLevel(sharedData->currentModuleCallNestingLevel);
     if (lastCalledModule->moduleIdent != uncalledModuleIdent) {
         return false;
@@ -735,7 +735,7 @@ bool SyReCStatementVisitor::doArgumentsBetweenCallAndUncallMatch(const TokenPosi
     size_t      numCalleeArgumentsToCheck = calleeArguments.size();
 
     if (numCalleeArgumentsToCheck != argumentsOfCall.size()) {
-        createError(positionOfPotentialError, fmt::format(NumberOfParametersMissmatchBetweenCallAndUncall, uncalledModuleIdent, argumentsOfCall.size(), calleeArguments.size()));
+        createMessage(positionOfPotentialError, messageUtils::Message::Severity::Error, NumberOfParametersMissmatchBetweenCallAndUncall, uncalledModuleIdent, argumentsOfCall.size(), calleeArguments.size());
         numCalleeArgumentsToCheck = std::min(numCalleeArgumentsToCheck, argumentsOfCall.size());
         argumentsMatched          = false;
     }
@@ -754,7 +754,7 @@ bool SyReCStatementVisitor::doArgumentsBetweenCallAndUncallMatch(const TokenPosi
     if (!missmatchedParameterValues.empty()) {
         std::ostringstream missmatchedParameterErrorsBuffer;
         std::copy(missmatchedParameterValues.cbegin(), missmatchedParameterValues.cend(), infix_ostream_iterator<std::string>(missmatchedParameterErrorsBuffer, ","));
-        createError(positionOfPotentialError, fmt::format(CallAndUncallArgumentsMissmatch, uncalledModuleIdent, missmatchedParameterErrorsBuffer.str()));
+        createMessage(positionOfPotentialError, messageUtils::Message::Severity::Error, CallAndUncallArgumentsMissmatch, uncalledModuleIdent, missmatchedParameterErrorsBuffer.str());
     }
 
     return argumentsMatched;
@@ -1053,7 +1053,7 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
     if (loopVariableIdent.has_value()) {
         if (sharedData->performingReadOnlyParsingOfLoopBody) {
             if (sharedData->currentSymbolTableScope->contains(*loopVariableIdent)) {
-                createError(mapAntlrTokenPosition(context->loopVariableDefinition()->variableIdent), fmt::format(DuplicateDeclarationOfIdent, *loopVariableIdent));
+                createMessage(mapAntlrTokenPosition(context->loopVariableDefinition()->variableIdent), messageUtils::Message::Severity::Error, DuplicateDeclarationOfIdent, *loopVariableIdent);
                 loopHeaderValid = false;
             } else {
                 SymbolTable::openScope(sharedData->currentSymbolTableScope);
@@ -1125,10 +1125,10 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
             if (loopHeaderValid) {
                 unsigned int numIterations = 0;
                 if (negativeStepSizeDefined && *iterationRangeStartValueEvaluated < *iterationRangeEndValueEvaluated) {
-                    createError(mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart), fmt::format(InvalidLoopVariableValueRangeWithNegativeStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
+                    createMessage(mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart), messageUtils::Message::Severity::Error, InvalidLoopVariableValueRangeWithNegativeStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated);
                     loopHeaderValid = false;
                 } else if (!negativeStepSizeDefined && *iterationRangeStartValueEvaluated > *iterationRangeEndValueEvaluated) {
-                    createError(mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart), fmt::format(InvalidLoopVariableValueRangeWithPositiveStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
+                    createMessage(mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart), messageUtils::Message::Severity::Error, InvalidLoopVariableValueRangeWithPositiveStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated);
                     loopHeaderValid = false;
                 } else if (*stepSizeEvaluated != 0) {
                     const auto& iterationRangeStartValueConsideringStepSizeSign = negativeStepSizeDefined ? *iterationRangeStartValueEvaluated: *iterationRangeEndValueEvaluated;
@@ -1137,7 +1137,7 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
                 }
                 else if (*stepSizeEvaluated == 0) {
                     if (*iterationRangeStartValueEvaluated != *iterationRangeEndValueEvaluated) {
-                        createError(mapAntlrTokenPosition(context->loopStepsizeDefinition()->number()->start), fmt::format(InvalidLoopIterationRangeStepSizeCannotBeZeroWhenStartAndEndValueDiffer, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated));
+                        createMessage(mapAntlrTokenPosition(context->loopStepsizeDefinition()->number()->start), messageUtils::Message::Severity::Error, InvalidLoopIterationRangeStepSizeCannotBeZeroWhenStartAndEndValueDiffer, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated);
                         loopHeaderValid = false;
                     }
                 }
@@ -1355,12 +1355,12 @@ void SyReCStatementVisitor::visitForStatementWithOptimizationsEnabled(SyReCParse
          * TODO: If we invalidate the values of the assignments in the non nested loops when parsing a nested loop we destroy values that could be made available when unrolling the parent loop
          */
         if (std::holds_alternative<optimizations::LoopUnroller::NotModifiedLoopInformation>(unrolledLoopInformation.data)) {
-            if (sharedData->loopNestingLevel > 1) {
+            /*if (sharedData->loopNestingLevel > 1) {
                 addStatementToOpenContainer(loopStatement);
             }
             else {
                 incrementReferenceCountsOfVariablesUsedInStatementsAndInvalidateAssignedToSignals(loopStatement->statements);
-            }
+            }*/
         }
         else {
             if (doesLoopOnlyPerformOneIterationInTotal) {
@@ -1374,15 +1374,15 @@ void SyReCStatementVisitor::visitForStatementWithOptimizationsEnabled(SyReCParse
         }
     }
     else {
-        if (sharedData->loopNestingLevel > 1) {
-            addStatementToOpenContainer(loopStatement);
-        } else {
-            /*
-             *
-             */
+        //if (sharedData->loopNestingLevel > 1) {
+        //    addStatementToOpenContainer(loopStatement);
+        //} else {
+        //    /*
+        //     *
+        //     */
 
-            incrementReferenceCountsOfVariablesUsedInStatementsAndInvalidateAssignedToSignals(loopStatement->statements);
-        }
+        //    incrementReferenceCountsOfVariablesUsedInStatementsAndInvalidateAssignedToSignals(loopStatement->statements);
+        //}
     }
 
      // TODO: Instead of opening and closing a new scope simply insert and remove the entry from the symbol table

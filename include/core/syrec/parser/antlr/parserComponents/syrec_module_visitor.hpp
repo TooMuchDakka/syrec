@@ -18,8 +18,8 @@ namespace parser {
 
         std::any visitProgram(SyReCParser::ProgramContext* context) override;
 
-        [[nodiscard]] std::vector<std::string> getErrors() const;
-        [[nodiscard]] std::vector<std::string> getWarnings() const;
+        [[nodiscard]] std::vector<messageUtils::Message> getErrors() const;
+        [[nodiscard]] std::vector<messageUtils::Message> getWarnings() const;
         [[nodiscard]] syrec::Module::vec       getFoundModules() const;
 
     private:

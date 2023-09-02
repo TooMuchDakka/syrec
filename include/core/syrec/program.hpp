@@ -114,6 +114,8 @@ namespace syrec {
         bool readFile(const std::string& filename, ReadProgramSettings settings, std::string* error = nullptr);
         std::string    parseBufferContent(const unsigned char* buffer, int bufferSizeInBytes, const ReadProgramSettings& config);
         unsigned char* readAndBufferFileContent(const std::string& filename, std::size_t* fileContentLength);
+        [[nodiscard]] static std::vector<std::reference_wrapper<syrec::Module>> prepareParsingResultForOptimizations(const syrec::Module::vec& foundModules);
+        [[nodiscard]] static syrec::Module::vec                                 transformProgramOptimizationResult(std::vector<std::unique_ptr<syrec::Module>>&& optimizedProgram);
     };
 
 } // namespace syrec

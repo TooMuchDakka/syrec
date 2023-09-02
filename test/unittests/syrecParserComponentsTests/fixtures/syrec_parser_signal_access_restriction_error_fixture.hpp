@@ -10,6 +10,7 @@
 
 #include "syrec_signal_operand_builder.hpp"
 #include "syrec_signal_operand_builder_utilities.hpp"
+#include "core/syrec/parser/utils/message_utils.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -32,7 +33,7 @@ namespace SignalAccessRestrictionParserTests {
             line(line), column(column), expectedErrorMessage(expectedErrorMessage) {}
 
         [[nodiscard]] std::string stringifiy() const {
-            return parser::ParserUtilities::createError(line, column, expectedErrorMessage);
+            return *messageUtils::tryStringifyMessage(messageUtils::Message({messageUtils::Message::Position(line, column), messageUtils::Message::Severity::Error, expectedErrorMessage}));
         }
     };
 
@@ -103,7 +104,7 @@ class SyrecParserSignalAccessRestrictionErrorFixture:
                 return {};
             }
 
-            std::vector<std::string> parsingErrorsSplit = parser::ParserUtilities::splitCombinedErrors(parsingErrorsConcatinated);
+            std::vector<std::string> parsingErrorsSplit = messageUtils::tryDeserializeStringifiedMessagesFromString(parsingErrorsConcatinated);
             parsingErrorsSplit.erase(
                     std::remove_if(
                             parsingErrorsSplit.begin(),

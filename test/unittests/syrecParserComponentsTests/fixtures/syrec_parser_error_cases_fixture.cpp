@@ -1,6 +1,7 @@
 #include "core/syrec/program.hpp"
 #include "core/syrec/parser/infix_iterator.hpp"
 #include "core/syrec/parser/parser_utilities.hpp"
+#include "core/syrec/parser/utils/message_utils.hpp"
 
 #include <fmt/core.h>
 #include "gtest/gtest.h"
@@ -362,5 +363,6 @@ TEST_P(SyrecParserErrorCasesFixture, GenericSyrecParserErrorTest) {
     ASSERT_NO_THROW(actualErrorsConcatinated = parserPublicInterface.readFromString(this->circuitDefinition, syrec::ReadProgramSettings{})) << "Error while parsing circuit";
     ASSERT_TRUE(this->parserPublicInterface.modules().empty()) << "Expected no valid modules but actually found " << this->parserPublicInterface.modules().size() << " valid modules";
     ASSERT_FALSE(actualErrorsConcatinated.empty()) << "Expected at least one error";
-    ASSERT_NO_THROW(compareExpectedAndActualErrors(this->expectedErrors, parser::ParserUtilities::splitCombinedErrors(actualErrorsConcatinated))) << "Missmatch between expected and actual errors";
+    
+    ASSERT_NO_THROW(compareExpectedAndActualErrors(this->expectedErrors, messageUtils::tryDeserializeStringifiedMessagesFromString(actualErrorsConcatinated))) << "Missmatch between expected and actual errors";
 }

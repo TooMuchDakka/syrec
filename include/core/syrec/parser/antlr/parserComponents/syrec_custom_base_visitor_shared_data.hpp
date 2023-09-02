@@ -10,14 +10,18 @@
 #include "core/syrec/parser/optimizations/operationSimplification/binary_factoring_multiplication_simplifier.hpp"
 #include "core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
+#include "core/syrec/parser/utils/message_utils.hpp"
 
 #include <optional>
 
 namespace parser {
     class SharedVisitorData {
     public:
-        std::vector<std::string>                                                          errors;
-        std::vector<std::string>                                                          warnings;
+        static constexpr std::size_t fallbackErrorLinePosition = 0;
+        static constexpr std::size_t fallbackErrorColumnPosition = 0;
+
+        std::vector<messageUtils::Message>                                                errors;
+        std::vector<messageUtils::Message>                                                warnings;
         const std::unique_ptr<ParserConfig>                                               parserConfig;
         std::shared_ptr<SymbolTable>                                                      currentSymbolTableScope;
         std::size_t                                                                       currentModuleCallNestingLevel;
@@ -34,6 +38,7 @@ namespace parser {
         bool                                                                              performPotentialValueLookupForCurrentlyAccessedSignal;
         const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>> optionalMultiplicationSimplifier;
         const std::optional<std::shared_ptr<deadStoreElimination::DeadStoreEliminator>>   optionalDeadStoreEliminator;
+        messageUtils::MessageFactory                                                      messageFactory;
 
         struct LoopVariableUnrollModification {
             std::string loopVariableIdent;
@@ -55,6 +60,7 @@ namespace parser {
             performPotentialValueLookupForCurrentlyAccessedSignal(true),
             optionalMultiplicationSimplifier(createMultiplicationSimplifier(parserConfig.multiplicationSimplificationMethod)),
             optionalDeadStoreEliminator(createDeadStoreEliminator(parserConfig.deadStoreEliminationEnabled)),
+            messageFactory(fallbackErrorLinePosition, fallbackErrorColumnPosition),
             loopVariableModificationsDueToUnroll({}),
             loopNestingLevel(0)
         {}
