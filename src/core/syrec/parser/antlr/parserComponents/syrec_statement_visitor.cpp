@@ -57,7 +57,7 @@ std::any SyReCStatementVisitor::visitStatementList(SyReCParser::StatementListCon
     // Remove all uncalled modules from the call stack since there is no other possibility after this statement block to uncall them
     for (const auto& notUncalledModule: moduleCallStack->popAllForCurrentNestingLevel(sharedData->currentModuleCallNestingLevel)) {
         std::ostringstream bufferForStringifiedParametersOfNotUncalledModule;
-        std::copy(notUncalledModule->calleeArguments.cbegin(), notUncalledModule->calleeArguments.cend(), infix_ostream_iterator<std::string>(bufferForStringifiedParametersOfNotUncalledModule, ","));
+        std::copy(notUncalledModule->calleeArguments.cbegin(), notUncalledModule->calleeArguments.cend(), InfixIterator<std::string>(bufferForStringifiedParametersOfNotUncalledModule, ","));
 
         const size_t moduleIdentLinePosition   = notUncalledModule->moduleIdentPosition.first;
         const size_t moduleIdentColumnPosition = notUncalledModule->moduleIdentPosition.second;
@@ -753,7 +753,7 @@ bool SyReCStatementVisitor::doArgumentsBetweenCallAndUncallMatch(const messageUt
 
     if (!missmatchedParameterValues.empty()) {
         std::ostringstream missmatchedParameterErrorsBuffer;
-        std::copy(missmatchedParameterValues.cbegin(), missmatchedParameterValues.cend(), infix_ostream_iterator<std::string>(missmatchedParameterErrorsBuffer, ","));
+        std::copy(missmatchedParameterValues.cbegin(), missmatchedParameterValues.cend(), InfixIterator<std::string>(missmatchedParameterErrorsBuffer, ","));
         createMessage(positionOfPotentialError, messageUtils::Message::Severity::Error, CallAndUncallArgumentsMissmatch, uncalledModuleIdent, missmatchedParameterErrorsBuffer.str());
     }
 
@@ -1133,7 +1133,7 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
                 } else if (*stepSizeEvaluated != 0) {
                     const auto& iterationRangeStartValueConsideringStepSizeSign = negativeStepSizeDefined ? *iterationRangeStartValueEvaluated: *iterationRangeEndValueEvaluated;
                     const auto& iterationRangeEndValueConsideringStepSizeSign = negativeStepSizeDefined ? *iterationRangeEndValueEvaluated : *iterationRangeStartValueEvaluated;
-                    numIterations                                               = *utils::determineNumberOfLoopIterations(iterationRangeStartValueConsideringStepSizeSign, iterationRangeEndValueConsideringStepSizeSign, *stepSizeEvaluated);
+                    const auto  _                                               = *utils::determineNumberOfLoopIterations(iterationRangeStartValueConsideringStepSizeSign, iterationRangeEndValueConsideringStepSizeSign, *stepSizeEvaluated);
                 }
                 else if (*stepSizeEvaluated == 0) {
                     if (*iterationRangeStartValueEvaluated != *iterationRangeEndValueEvaluated) {

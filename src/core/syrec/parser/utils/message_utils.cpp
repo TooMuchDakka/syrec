@@ -31,7 +31,7 @@ std::optional<std::string> messageUtils::tryStringifyMessages(const std::vector<
     }
 
     std::ostringstream errorsConcatinatedBuffer;
-    std::copy(stringifiedMessages.cbegin(), stringifiedMessages.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, messageDelimiter));
+    std::copy(stringifiedMessages.cbegin(), stringifiedMessages.cend(), InfixIterator<std::string>(errorsConcatinatedBuffer, messageDelimiter));
     return errorsConcatinatedBuffer.str();
 }
 

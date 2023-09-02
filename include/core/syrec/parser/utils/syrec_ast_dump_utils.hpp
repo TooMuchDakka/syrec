@@ -24,7 +24,7 @@ namespace syrecAstDumpUtils {
                 std::back_inserter(stringifiedElements),
                 [stringifyFunc](const T& elem) { return stringifyFunc(elem); });
         
-        std::copy(stringifiedElements.cbegin(), stringifiedElements.cend(), infix_ostream_iterator<std::string>(resultBuffer, delimiter));
+        std::copy(stringifiedElements.cbegin(), stringifiedElements.cend(), InfixIterator<std::string>(resultBuffer, delimiter));
         return resultBuffer.str();
     }
 

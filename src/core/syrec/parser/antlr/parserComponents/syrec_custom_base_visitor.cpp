@@ -589,7 +589,7 @@ bool SyReCCustomBaseVisitor::checkIfNumberOfValuesPerDimensionMatchOrLogError(co
         }
 
         std::ostringstream errorsConcatinatedBuffer;
-        std::copy(perDimensionErrorBuffer.cbegin(), perDimensionErrorBuffer.cend(), infix_ostream_iterator<std::string>(errorsConcatinatedBuffer, ","));
+        std::copy(perDimensionErrorBuffer.cbegin(), perDimensionErrorBuffer.cend(), InfixIterator<std::string>(errorsConcatinatedBuffer, ","));
         createMessage(positionOfOptionalError, messageUtils::Message::Severity::Error, MissmatchedNumberOfValuesForDimensionsBetweenOperands, errorsConcatinatedBuffer.str());
         return false;
     }

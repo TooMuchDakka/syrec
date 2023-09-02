@@ -89,8 +89,8 @@ protected:
             std::ostringstream expectedErrorsBuffer;
             std::ostringstream actualErrorsBuffer;
 
-            std::copy(expectedErrors.cbegin(), expectedErrors.cend(), infix_ostream_iterator<std::string>(expectedErrorsBuffer, "\n"));
-            std::copy(actualErrorsInUnifiedFormat.cbegin(), actualErrorsInUnifiedFormat.cend(), infix_ostream_iterator<std::string>(actualErrorsBuffer, "\n"));
+            std::copy(expectedErrors.cbegin(), expectedErrors.cend(), InfixIterator<std::string>(expectedErrorsBuffer, "\n"));
+            std::copy(actualErrorsInUnifiedFormat.cbegin(), actualErrorsInUnifiedFormat.cend(), InfixIterator<std::string>(actualErrorsBuffer, "\n"));
 
             FAIL() << "Expected " << expectedErrors.size() << " errors but only " << actualErrorsInUnifiedFormat.size() << " were found!\nExpected: " << expectedErrorsBuffer.str() << "\nActual: " << actualErrorsBuffer.str();
         }

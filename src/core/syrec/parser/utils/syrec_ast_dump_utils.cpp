@@ -11,7 +11,7 @@ std::string SyrecASTDumper::stringifyModules(const syrec::Module::vec& modules) 
     }
 
     std::ostringstream resultBuffer{};
-    std::copy(stringifiedModules.cbegin(), stringifiedModules.cend(), infix_ostream_iterator<std::string>(resultBuffer, this->dumpConfig.newlineSequence.c_str()));
+    std::copy(stringifiedModules.cbegin(), stringifiedModules.cend(), InfixIterator<std::string>(resultBuffer, this->dumpConfig.newlineSequence.c_str()));
     return resultBuffer.str();
 }
 
@@ -55,7 +55,7 @@ inline std::string SyrecASTDumper::stringifyStatements(const syrec::Statement::v
     }
 
     std::ostringstream resultBuffer{};
-    std::copy(stringifiedStmts.cbegin(), stringifiedStmts.cend(), infix_ostream_iterator<std::string>(resultBuffer,  this->dumpConfig.stmtDelimiter.c_str()));
+    std::copy(stringifiedStmts.cbegin(), stringifiedStmts.cend(), InfixIterator<std::string>(resultBuffer,  this->dumpConfig.stmtDelimiter.c_str()));
     return resultBuffer.str();
 }
 
@@ -380,6 +380,6 @@ inline std::string SyrecASTDumper::repeatNTimes(const std::string& str, const si
 
     const std::vector repeatContainer(numRepetitions, str);
     std::ostringstream       resultBuffer{};
-    std::copy(repeatContainer.cbegin(), repeatContainer.cend(), infix_ostream_iterator<std::string>(resultBuffer, ""));
+    std::copy(repeatContainer.cbegin(), repeatContainer.cend(), InfixIterator<std::string>(resultBuffer, ""));
     return resultBuffer.str();
 }

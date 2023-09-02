@@ -6,7 +6,7 @@
 
 template<typename T>
 struct LayerData {
-    typedef std::shared_ptr<LayerData> ptr;
+    typedef std::shared_ptr<LayerData<T>> ptr;
 
     T                           layerData;
     std::vector<LayerData::ptr> nextLayerLinks;

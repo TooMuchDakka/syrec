@@ -100,7 +100,7 @@ void BaseValueLookup<Vt>::invalidateStoredValueFor(const std::vector<std::option
     valueLookup->applyOnLastAccessedDimension(
             0,
             accessedDimensions,
-            [](std::map<unsigned int, std::optional<Vt>>& layerValueLookup, const std::vector<LayerData<std::map<unsigned int, std::optional<Vt>>>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
+            [](std::map<unsigned int, std::optional<Vt>>& layerValueLookup, const std::vector<typename LayerData<std::map<unsigned int, std::optional<Vt>>>::ptr>& nextLayerLinks, const std::optional<unsigned int>& valueOfLastAccessedDimension, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange) {
                 if (valueOfLastAccessedDimension.has_value()) {
                     if (layerValueLookup.count(*valueOfLastAccessedDimension) > 0) {
                         layerValueLookup.erase(*valueOfLastAccessedDimension);
@@ -750,7 +750,7 @@ template<typename Vt>
 template<typename Fn>
 void BaseValueLookup<Vt>::applyToLastLayerBitsWithRelativeDimensionAccessInformation(std::size_t currentDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, std::size_t numAccessedBits, std::vector<unsigned int>& relativeDimensionAccess, Fn&& applyLambda) {
     if (currentDimension == accessedDimensions.size()) {
-        for (auto i = 0; i < numAccessedBits; ++i) {
+        for (unsigned int i = 0; i < numAccessedBits; ++i) {
             applyLambda(relativeDimensionAccess, i);   
         }
         return;
@@ -764,7 +764,7 @@ void BaseValueLookup<Vt>::applyToLastLayerBitsWithRelativeDimensionAccessInforma
         relativeDimensionAccess.at(currentDimension) = 0;
         applyToLastLayerBitsWithRelativeDimensionAccessInformation(currentDimension + 1, accessedDimensions, numAccessedBits, relativeDimensionAccess, applyLambda);
     } else {
-        for (auto i = 0; i < signalInformation.valuesPerDimension.at(currentDimension); ++i) {
+        for (unsigned int i = 0; i < signalInformation.valuesPerDimension.at(currentDimension); ++i) {
             relativeDimensionAccess.at(currentDimension) = i;
             applyToLastLayerBitsWithRelativeDimensionAccessInformation(currentDimension + 1, accessedDimensions, numAccessedBits, relativeDimensionAccess, applyLambda);
         }
@@ -878,7 +878,7 @@ void BaseValueLookup<Vt>::applyToBitsOfLastLayerWithRelativeDimensionAccessInfor
             applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(dimensionToStartFrom, currentDimension + 1, accessedDimensions, numAccessedBits, relativeDimensionAccess, applyLambda);
         }
         else {
-            for (auto i = 0; i < signalInformation.valuesPerDimension.at(currentDimension); ++i) {
+            for (unsigned int i = 0; i < signalInformation.valuesPerDimension.at(currentDimension); ++i) {
                 relativeDimensionAccess.at(relativeDimensionIdx) = i;
                 applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(dimensionToStartFrom, currentDimension + 1, accessedDimensions, numAccessedBits, relativeDimensionAccess, applyLambda);
             }   
