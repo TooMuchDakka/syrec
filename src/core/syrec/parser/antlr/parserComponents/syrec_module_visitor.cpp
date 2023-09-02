@@ -2,7 +2,6 @@
 
 #include "core/syrec/variable.hpp"
 #include "core/syrec/parser/custom_semantic_errors.hpp"
-#include "core/syrec/parser/parser_utilities.hpp"
 #include "core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp"
 
 #include <fmt/format.h>

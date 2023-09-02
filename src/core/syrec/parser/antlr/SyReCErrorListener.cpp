@@ -1,6 +1,5 @@
 #include "SyReCErrorListener.h"
 
-#include "core/syrec/parser/parser_utilities.hpp"
 #include "core/syrec/parser/utils/message_utils.hpp"
 
 void parser::SyReCErrorListener::syntaxError(antlr4::Recognizer* /*recognizer*/, antlr4::Token* /*offendingSymbol*/, size_t line,

@@ -6,7 +6,6 @@
 #include "gtest/gtest.h"
 
 #include "core/syrec/program.hpp"
-#include "core/syrec/parser/parser_utilities.hpp"
 
 #include "syrec_signal_operand_builder.hpp"
 #include "syrec_signal_operand_builder_utilities.hpp"

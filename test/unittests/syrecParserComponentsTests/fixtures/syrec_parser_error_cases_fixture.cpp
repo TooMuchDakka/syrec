@@ -1,6 +1,5 @@
 #include "core/syrec/program.hpp"
 #include "core/syrec/parser/infix_iterator.hpp"
-#include "core/syrec/parser/parser_utilities.hpp"
 #include "core/syrec/parser/utils/message_utils.hpp"
 
 #include <fmt/core.h>

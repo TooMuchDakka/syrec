@@ -1,6 +1,5 @@
 #include "core/syrec/program.hpp"
 
-#include "core/syrec/parser/parser_utilities.hpp"
 #include "core/syrec/parser/antlr/parserComponents/syrec_parser_interface.hpp"
 #include "core/syrec/parser/optimizations/optimizer.hpp"
 

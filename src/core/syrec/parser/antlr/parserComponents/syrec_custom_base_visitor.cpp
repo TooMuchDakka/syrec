@@ -5,7 +5,6 @@
 #include "core/syrec/parser/expression_evaluation_result.hpp"
 #include "core/syrec/parser/infix_iterator.hpp"
 #include "core/syrec/parser/operation.hpp"
-#include "core/syrec/parser/parser_utilities.hpp"
 #include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/signal_evaluation_result.hpp"
 #include "core/syrec/parser/value_broadcaster.hpp"
