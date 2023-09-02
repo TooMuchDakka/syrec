@@ -162,7 +162,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
             const syrec::VariableAccess::ptr container = std::make_shared<syrec::VariableAccess>();
             container->setVar(std::get<syrec::Variable::ptr>(*signalSymTabEntry));
             accessedSignal.emplace(container);
-            incrementReferenceCountOfSignal(signalIdent);
+            updateReferenceCountOfSignal(signalIdent, Increment);
         }
     }
 
@@ -238,21 +238,11 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
             // TODO: Create correct error message
             createError(restrictionErrorPosition, fmt::format(AccessingRestrictedPartOfSignal, signalIdent));
         } else {
-            /*
-             * In addition to the user defined flag for the constant propagation optimization we also use the internal flag indicating
-             * whether we are currently parsing a signal access for which no signal value lookup should be done (i.e. for the operands of a swap or unary assignment statement)
-             */
-            if (sharedData->performPotentialValueLookupForCurrentlyAccessedSignal && sharedData->parserConfig->performConstantPropagation) {
-                const auto& optionalExternalRestrictionInsideOfLoopBody = sharedData->loopBodyValuePropagationBlockers.empty() ? std::nullopt : std::make_optional(sharedData->loopBodyValuePropagationBlockers.top());
-                if (!optionalExternalRestrictionInsideOfLoopBody.has_value() || !(*optionalExternalRestrictionInsideOfLoopBody)->isAccessBlockedFor(*accessedSignal)) {
-                    const auto& fetchedValueForSignal = sharedData->currentSymbolTableScope->tryFetchValueForLiteral(*accessedSignal);
-                    if (fetchedValueForSignal.has_value()) {
-                        decrementReferenceCountOfSignal(accessedSignal.value()->var->name);
-                        return std::make_optional(std::make_shared<SignalEvaluationResult>(std::make_shared<syrec::Number>(*fetchedValueForSignal)));
-                    }                    
-                }
+            if (const auto& fetchedValueByConstantPropagation = tryPerformConstantPropagationForSignalAccess(*accessedSignal); fetchedValueByConstantPropagation.has_value()) {
+                updateReferenceCountOfSignal(accessedSignal.value()->var->name, Decrement);
+                return std::make_optional(std::make_shared<SignalEvaluationResult>(std::make_shared<syrec::Number>(*fetchedValueByConstantPropagation)));
             }
-            return std::make_optional(std::make_shared<SignalEvaluationResult>(*accessedSignal));                
+            return std::make_optional(std::make_shared<SignalEvaluationResult>(*accessedSignal));
         }
     }
     return std::nullopt;
@@ -353,7 +343,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromExpression(SyReCParser::NumberFr
             
             if (!optimizedAwaySignalAccesses.empty()) {
                 for (const auto& optimizedAwaySignalAccess : optimizedAwaySignalAccesses) {
-                    decrementReferenceCountOfSignal(optimizedAwaySignalAccess->var->name);
+                    updateReferenceCountOfSignal(optimizedAwaySignalAccess->var->name, Decrement);
                 }
             }
         }
@@ -391,7 +381,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::Number
                 TokenPosition(context->IDENT()->getSymbol()->getLine(), context->IDENT()->getSymbol()->getCharPositionInLine()))) {
         return std::nullopt;
     }
-    incrementReferenceCountOfSignal(signalIdent);
+    updateReferenceCountOfSignal(signalIdent, Increment);
     if (sharedData->lastDeclaredLoopVariable.has_value() && *sharedData->lastDeclaredLoopVariable == signalIdent) {
         createError(mapAntlrTokenPosition(context->IDENT()->getSymbol()), fmt::format(CannotReferenceLoopVariableInInitalValueDefinition, signalIdent));
         return std::nullopt;
@@ -401,8 +391,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::Number
     const auto&                       symTableEntryForSignal = sharedData->currentSymbolTableScope->getVariable(signalIdent);
     if (symTableEntryForSignal.has_value() && std::holds_alternative<syrec::Number::ptr>(symTableEntryForSignal.value())) {
         const auto& symTableValueContainerOfLoopVariable = std::get<syrec::Number::ptr>(symTableEntryForSignal.value());
-        if (const auto& evaluatedLoopVariableValue = tryEvaluateNumber(symTableValueContainerOfLoopVariable, determineContextStartTokenPositionOrUseDefaultOne(nullptr));
-            sharedData->parserConfig->performConstantPropagation && evaluatedLoopVariableValue.has_value()) {
+        if (const auto& evaluatedLoopVariableValue = tryEvaluateNumber(symTableValueContainerOfLoopVariable, determineContextStartTokenPositionOrUseDefaultOne(nullptr)); evaluatedLoopVariableValue.has_value()) {
             valueOfLoopVariable.emplace(std::make_shared<syrec::Number>(*evaluatedLoopVariableValue));
         }
         else {
@@ -417,9 +406,15 @@ std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::Number
     return valueOfLoopVariable;
 }
 
+/*
+ * We are currently assuming that defining a loop unroll config with a subsequent partial or full unroll of a loop being done will make the value of the loop variable (if defined)
+ * available regardless of the value of the constant propagation flag
+ */
 inline bool SyReCCustomBaseVisitor::canEvaluateNumber(const syrec::Number::ptr& number) const {
     if (number->isLoopVariable()) {
-        return sharedData->parserConfig->performConstantPropagation && sharedData->currentSymbolTableScope->contains(number->variableName()) && sharedData->loopVariableMappingLookup.count(number->variableName()) != 0;
+        return !sharedData->performingReadOnlyParsingOfLoopBody
+            && sharedData->currentSymbolTableScope->contains(number->variableName())
+            && sharedData->loopVariableMappingLookup.count(number->variableName()) != 0;
     }
     return number->isCompileTimeConstantExpression() ? canEvaluateCompileTimeExpression(number->getExpression()) : true;
 }
@@ -430,13 +425,10 @@ inline bool SyReCCustomBaseVisitor::canEvaluateCompileTimeExpression(const syrec
 
 // TODO: CONSTANT_PROPAGATION: Only use symbol table as source for value of loop variables
 std::optional<unsigned> SyReCCustomBaseVisitor::tryEvaluateNumber(const syrec::Number::ptr& numberContainer, const TokenPosition& evaluationErrorPositionHelper) {
-    if (numberContainer->isLoopVariable()) {
-        const std::string& loopVariableIdent = numberContainer->variableName();
-        if (sharedData->loopVariableMappingLookup.find(loopVariableIdent) == sharedData->loopVariableMappingLookup.end()
-            || !sharedData->parserConfig->performConstantPropagation) {
-            return std::nullopt;
-        }
-    } else if (numberContainer->isCompileTimeConstantExpression()) {
+    if (numberContainer->isLoopVariable() && !canEvaluateNumber(numberContainer)) {
+        return std::nullopt;
+    }
+    if (numberContainer->isCompileTimeConstantExpression()) {
         return tryEvaluateCompileTimeExpression(numberContainer->getExpression(), evaluationErrorPositionHelper);
     }
 
@@ -690,20 +682,17 @@ bool SyReCCustomBaseVisitor::isAccessToAccessedSignalPartRestricted(const syrec:
 /*
  * TODO: First condition can probably be removed since readonly parsing should already disable modifications of reference counts
  */
-void SyReCCustomBaseVisitor::incrementReferenceCountOfSignal(const std::string_view& signalIdent) const {
+void SyReCCustomBaseVisitor::updateReferenceCountOfSignal(const std::string_view& signalIdent, SyReCCustomBaseVisitor::ReferenceCountUpdate typeOfUpdate) const {
     if ((sharedData->performingReadOnlyParsingOfLoopBody && sharedData->loopNestingLevel > 0) || sharedData->modificationsOfReferenceCountsDisabled) {
         return;
     }
 
-    sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);
-}
-
-void SyReCCustomBaseVisitor::decrementReferenceCountOfSignal(const std::string_view& signalIdent) const {
-    if ((sharedData->performingReadOnlyParsingOfLoopBody && sharedData->loopNestingLevel > 0) || sharedData->modificationsOfReferenceCountsDisabled) {
-        return;
+    if (typeOfUpdate == ReferenceCountUpdate::Increment) {
+        sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);   
     }
-
-    sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(signalIdent);
+    else {
+        sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(signalIdent);
+    }
 }
 
 std::string SyReCCustomBaseVisitor::stringifyCompileTimeConstantExpressionOperation(syrec::Number::CompileTimeConstantExpression::Operation ctcOperation) {
@@ -805,4 +794,22 @@ std::optional<syrec::expression::ptr> SyReCCustomBaseVisitor::tryConvertNumberTo
         return tryConvertCompileTimeConstantExpressionToBinaryExpr(number->getExpression(), symbolTable);
     }
     return std::nullopt;
+}
+
+std::optional<unsigned> SyReCCustomBaseVisitor::tryPerformConstantPropagationForSignalAccess(const syrec::VariableAccess::ptr& accessedSignal) const {
+    /*
+     * In addition to the user defined flag for the constant propagation optimization we also use the internal flag indicating
+     * whether we are currently parsing a signal access for which no signal value lookup should be done (i.e. for the operands of a swap or unary assignment statement)
+     */
+    if (!sharedData->performPotentialValueLookupForCurrentlyAccessedSignal || !sharedData->parserConfig->performConstantPropagation || sharedData->performingReadOnlyParsingOfLoopBody) {
+        return std::nullopt;
+    }
+
+    const auto& optionalExistingConstantPropagationRestrictions = !sharedData->loopBodyValuePropagationBlockers.empty() ? std::make_optional(sharedData->loopBodyValuePropagationBlockers.top()) : std::nullopt;
+    if (optionalExistingConstantPropagationRestrictions.has_value() && optionalExistingConstantPropagationRestrictions.value()->isAccessBlockedFor(accessedSignal)) {
+
+        return std::nullopt;
+    }
+
+    return sharedData->currentSymbolTableScope->tryFetchValueForLiteral(accessedSignal);
 }

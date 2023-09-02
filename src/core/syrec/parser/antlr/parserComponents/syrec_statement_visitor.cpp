@@ -70,14 +70,14 @@ std::any SyReCStatementVisitor::visitStatementList(SyReCParser::StatementListCon
 }
 
 std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatementContext* context) {
-    const auto backupOfConstantPropagationFlag = sharedData->parserConfig->performConstantPropagation;
+    //const auto backupOfConstantPropagationFlag = sharedData->parserConfig->performConstantPropagation;
 
-    sharedData->parserConfig->performConstantPropagation = !sharedData->performingReadOnlyParsingOfLoopBody;
+    //sharedData->parserConfig->performConstantPropagation = !sharedData->performingReadOnlyParsingOfLoopBody;
     // We need to disable the value lookup after having parsed the given signal access since constant propagation would otherwise replace the signal access with its fetched value
     sharedData->performPotentialValueLookupForCurrentlyAccessedSignal = false;
     const auto assignedToSignal             = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->signal());
     sharedData->performPotentialValueLookupForCurrentlyAccessedSignal = true;
-    sharedData->parserConfig->performConstantPropagation = backupOfConstantPropagationFlag;
+    //sharedData->parserConfig->performConstantPropagation = backupOfConstantPropagationFlag;
 
     bool       allSemanticChecksOk          = assignedToSignal.has_value() && (*assignedToSignal)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->signal()->IDENT()->getSymbol(), *(*assignedToSignal)->getAsVariableAccess());
     bool       needToResetSignalRestriction = false;
@@ -208,7 +208,7 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
             if (std::holds_alternative<syrec::Variable::ptr>(symTabEntryForCalleeArgument)) {
                 (*potentialModulesToCall)->refineGuessWithNextParameter(std::get<syrec::Variable::ptr>(symTabEntryForCalleeArgument));
                 // We also need to increment the reference count of the callee arguments if we know that the literal references a valid entry in the symbol table
-                incrementReferenceCountOfSignal(calleeArguments.back());
+                updateReferenceCountOfSignal(calleeArguments.back(), SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
                 continue;
             }
         }
@@ -526,7 +526,7 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
              * and updates of the reference counts in case of an optimization of the expression will be done in the corresponding antlr visitor function, we only need to update the
              * reference counts of the remaining signal accesses in the optimized guard expression if either the whole if statement or any of its branches are optimized away
              */ 
-            decrementReferenceCountForUsedVariablesInExpression((*guardExpression)->getAsExpression().value());
+            updateReferenceCountForUsedVariablesInExpression((*guardExpression)->getAsExpression().value(), SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
         }
         return 0;
     }
@@ -671,25 +671,22 @@ std::any SyReCStatementVisitor::visitUnaryStatement(SyReCParser::UnaryStatementC
     sharedData->performPotentialValueLookupForCurrentlyAccessedSignal = true;
 
     allSemanticChecksOk &= accessedSignal.has_value() && (*accessedSignal)->isVariableAccess() && isSignalAssignableOtherwiseCreateError(context->signal()->IDENT()->getSymbol(), *(*accessedSignal)->getAsVariableAccess());
+    
     if (allSemanticChecksOk) {
+        auto        wasValueUpdatePerformed = false;
         const auto& accessedSignalParts = *(*accessedSignal)->getAsVariableAccess();
-        if (const auto& fetchedValueForAccessedSignal = sharedData->currentSymbolTableScope->tryFetchValueForLiteral(accessedSignalParts);
-            sharedData->parserConfig->performConstantPropagation && fetchedValueForAccessedSignal.has_value()) {
-            const auto newValueGeneratedByAssignment = syrec_operation::apply(*unaryOperation, *fetchedValueForAccessedSignal);
-            if (newValueGeneratedByAssignment.has_value()) {
+        if (const auto& fetchedValueForAccessedSignal = tryPerformConstantPropagationForSignalAccess(accessedSignalParts); fetchedValueForAccessedSignal.has_value()) {
+            if (const auto newValueGeneratedByAssignment = syrec_operation::apply(*unaryOperation, *fetchedValueForAccessedSignal); newValueGeneratedByAssignment.has_value()) {
                 const auto& containerForNewValue = std::make_shared<syrec::Number>(*newValueGeneratedByAssignment);
-                const auto  bitWidthOfAccessedSignalParts = tryDetermineBitwidthAfterVariableAccess(accessedSignalParts, determineContextStartTokenPositionOrUseDefaultOne(context));
-                if (bitWidthOfAccessedSignalParts.has_value()) {
-                    const auto& wrapperForContainer = std::make_shared<syrec::NumericExpression>(containerForNewValue, *bitWidthOfAccessedSignalParts);
-                    tryUpdateOrInvalidateStoredValueFor(accessedSignalParts, wrapperForContainer);   
-                } else {
-                    invalidateStoredValueFor(accessedSignalParts);
+                if (const auto  bitWidthOfAccessedSignalParts = tryDetermineBitwidthAfterVariableAccess(accessedSignalParts, determineContextStartTokenPositionOrUseDefaultOne(context)); bitWidthOfAccessedSignalParts.has_value()) {
+                    const auto& exprContainerHoldingNewValue = std::make_shared<syrec::NumericExpression>(containerForNewValue, *bitWidthOfAccessedSignalParts);
+                    tryUpdateOrInvalidateStoredValueFor(accessedSignalParts, exprContainerHoldingNewValue);
+                    wasValueUpdatePerformed = true;
                 }
-            } else {
-                invalidateStoredValueFor(accessedSignalParts);
             }
         }
-        else {
+
+        if (!wasValueUpdatePerformed) {
             invalidateStoredValueFor(accessedSignalParts);
         }
         addStatementToOpenContainer(std::make_shared<syrec::UnaryStatement>(*syrec_operation::tryMapUnaryAssignmentOperationEnumToFlag(*unaryOperation), accessedSignalParts));
@@ -797,7 +794,7 @@ bool SyReCStatementVisitor::areExpressionsEqual(const ExpressionEvaluationResult
 // TODO: CONSTANT_PROPAGATION: In case the rhs expr was a constant, should we trim its value in case it cannot be stored in the lhs ?
 // TODO: CONSTANT_PROPAGATION: When updating N-D signals with another N-D signal, multiple updates need to be performed (one per accessed value of dimension), i.e. wire a[2][4], b[2][4], a += b => a[0][0] += a[0][0]; a[0][1] += b[0][1] ... a[0][3] += b[0][3]; a[1][0] += b[1][0] ... a[1][3] += a[1][3]
 void SyReCStatementVisitor::tryUpdateOrInvalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts, const syrec::expression::ptr& exprContainingNewValue) const {
-    if (!sharedData->parserConfig->performConstantPropagation || sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody) {
+    if (!sharedData->parserConfig->performConstantPropagation || sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody || sharedData->performingReadOnlyParsingOfLoopBody) {
         return;
     }
 
@@ -882,8 +879,12 @@ void SyReCStatementVisitor::invalidateValuesForVariablesUsedAsParametersChangeab
 }
 
 void SyReCStatementVisitor::invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToVariableParts) const {
-    if (!sharedData->parserConfig->performConstantPropagation || sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody) {
+   /* if (!sharedData->parserConfig->performConstantPropagation || sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody) {
         return;
+    }*/
+
+    if (sharedData->performingReadOnlyParsingOfLoopBody || sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody) {
+       return;
     }
 
     createAndStoreBackupForAssignedToSignal(assignedToVariableParts);
@@ -895,7 +896,7 @@ void SyReCStatementVisitor::trimAndDecrementReferenceCountOfUnusedCalleeParamete
     std::size_t numRemovedParameters = 0;
     for (const auto unusedParameterPosition: positionsOfUnusedParameters) {
         const auto positionOfCalleeArgument = unusedParameterPosition - numRemovedParameters++;
-        decrementReferenceCountOfSignal(calleeArguments.at(positionOfCalleeArgument));
+        updateReferenceCountOfSignal(calleeArguments.at(positionOfCalleeArgument), SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
         calleeArguments.erase(std::next(calleeArguments.begin(), positionOfCalleeArgument));
     }
 }
@@ -916,28 +917,28 @@ bool SyReCStatementVisitor::areAccessedValuesForDimensionAndBitsConstant(const s
     return !invalidateAccessedBitRange && !accessedAnyNonConstantValueOfDimension;
 }
 
-void SyReCStatementVisitor::decrementReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression) const {
+void SyReCStatementVisitor::updateReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression, SyReCCustomBaseVisitor::ReferenceCountUpdate typeOfUpdate) const {
     if (sharedData->modificationsOfReferenceCountsDisabled) {
         return;
     }
 
     if (const auto& expressionAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(expression); expressionAsVariableAccess != nullptr) {
         const auto& accessedVariable = expressionAsVariableAccess->var;
-        decrementReferenceCountOfSignal(accessedVariable->var->name);
+        updateReferenceCountOfSignal(accessedVariable->var->name, typeOfUpdate);
     }
     else if (const auto& expressionAsBinaryExpression = std::dynamic_pointer_cast<syrec::BinaryExpression>(expression); expressionAsBinaryExpression != nullptr) {
-        decrementReferenceCountForUsedVariablesInExpression(expressionAsBinaryExpression->lhs);
-        decrementReferenceCountForUsedVariablesInExpression(expressionAsBinaryExpression->rhs);
+        updateReferenceCountForUsedVariablesInExpression(expressionAsBinaryExpression->lhs, typeOfUpdate);
+        updateReferenceCountForUsedVariablesInExpression(expressionAsBinaryExpression->rhs, typeOfUpdate);
     }
     else if (const auto& expressionAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expression); expressionAsShiftExpr != nullptr) {
-        decrementReferenceCountForUsedVariablesInExpression(expressionAsShiftExpr->lhs);
+        updateReferenceCountForUsedVariablesInExpression(expressionAsShiftExpr->lhs, typeOfUpdate);
         if (expressionAsShiftExpr->rhs->isLoopVariable()) {
-            decrementReferenceCountOfSignal(expressionAsShiftExpr->rhs->variableName());
+            updateReferenceCountOfSignal(expressionAsShiftExpr->rhs->variableName(), typeOfUpdate);
         }
     }
     else if (const auto& expressionAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expression); expressionAsNumericExpr != nullptr) {
         if (expressionAsNumericExpr->value->isLoopVariable()) {
-            decrementReferenceCountOfSignal(expressionAsNumericExpr->value->variableName());
+            updateReferenceCountOfSignal(expressionAsNumericExpr->value->variableName(), typeOfUpdate);
         }
     }
 }
@@ -1033,7 +1034,7 @@ void SyReCStatementVisitor::createAndStoreBackupForAssignedToSignal(const syrec:
 
 syrec::expression::ptr SyReCStatementVisitor::tryDetermineNewSignalValueFromAssignment(const syrec::VariableAccess::ptr& assignedToSignal, syrec_operation::operation assignmentOp, const syrec::expression::ptr& assignmentStmtRhsExpr) const {
     const auto& assignmentRhsExprAsConstant = std::dynamic_pointer_cast<syrec::NumericExpression>(assignmentStmtRhsExpr);
-    const auto& currentValueOfAssignedToSignal = sharedData->currentSymbolTableScope->tryFetchValueForLiteral(assignedToSignal);
+    const auto& currentValueOfAssignedToSignal = tryPerformConstantPropagationForSignalAccess(assignedToSignal);
 
     if (assignmentRhsExprAsConstant == nullptr || !assignmentRhsExprAsConstant->value->isConstant() || !currentValueOfAssignedToSignal.has_value()) {
         return assignmentStmtRhsExpr;
@@ -1130,8 +1131,9 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
                     createError(mapAntlrTokenPosition(potentialStartValueEvaluationErrorTokenStart), fmt::format(InvalidLoopVariableValueRangeWithPositiveStepsize, *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *stepSizeEvaluated));
                     loopHeaderValid = false;
                 } else if (*stepSizeEvaluated != 0) {
-                    numIterations = (negativeStepSizeDefined ? (*iterationRangeStartValueEvaluated - *iterationRangeEndValueEvaluated) : (*iterationRangeEndValueEvaluated - *iterationRangeStartValueEvaluated)) + 1;
-                    numIterations /= *stepSizeEvaluated;
+                    const auto& iterationRangeStartValueConsideringStepSizeSign = negativeStepSizeDefined ? *iterationRangeStartValueEvaluated: *iterationRangeEndValueEvaluated;
+                    const auto& iterationRangeEndValueConsideringStepSizeSign = negativeStepSizeDefined ? *iterationRangeEndValueEvaluated : *iterationRangeStartValueEvaluated;
+                    numIterations                                               = *utils::determineNumberOfLoopIterations(iterationRangeStartValueConsideringStepSizeSign, iterationRangeEndValueConsideringStepSizeSign, *stepSizeEvaluated);
                 }
                 else if (*stepSizeEvaluated == 0) {
                     if (*iterationRangeStartValueEvaluated != *iterationRangeEndValueEvaluated) {
@@ -1144,10 +1146,6 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
     }
     if (!loopHeaderValid) {
         return std::nullopt;
-    }
-
-    if (!wasStartValueExplicitlyDefined) {
-        rangeStartValue = rangeEndValue;
     }
 
     return std::make_optional(ParsedLoopHeaderInformation({loopVariableIdent, std::make_pair(*rangeStartValue, *rangeEndValue), *stepSize}));
@@ -1220,17 +1218,11 @@ SyReCStatementVisitor::CustomLoopContextInformation SyReCStatementVisitor::build
 
 std::optional<syrec::Statement::vec> SyReCStatementVisitor::determineLoopBodyWithSideEffectsDisabled(SyReCParser::StatementListContext* loopBodyStmtsContext) {
     const bool backupOfReadonlyParsingOfLoops                     = sharedData->performingReadOnlyParsingOfLoopBody;
-    const bool backupOfConstantPropagationOptimizationFlag        = sharedData->parserConfig->performConstantPropagation;
     const bool backupOfModificationsOfReferenceCountFlag          = sharedData->modificationsOfReferenceCountsDisabled;
-    const bool backofReassociateExpressionsFlag                   = sharedData->parserConfig->reassociateExpressionsEnabled;
-    sharedData->parserConfig->performConstantPropagation          = false;
     sharedData->modificationsOfReferenceCountsDisabled            = true;
-    //sharedData->parserConfig->reassociateExpressionsEnabled       = false;
     sharedData->performingReadOnlyParsingOfLoopBody               = true;
     const auto& loopBodyStmts                                     = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(loopBodyStmtsContext);
-    sharedData->parserConfig->performConstantPropagation          = backupOfConstantPropagationOptimizationFlag;
     sharedData->modificationsOfReferenceCountsDisabled            = backupOfModificationsOfReferenceCountFlag;
-    sharedData->parserConfig->reassociateExpressionsEnabled       = backofReassociateExpressionsFlag;
     sharedData->performingReadOnlyParsingOfLoopBody               = backupOfReadonlyParsingOfLoops;
     return loopBodyStmts;
 }
@@ -1284,17 +1276,20 @@ std::optional<syrec::ForStatement::ptr> SyReCStatementVisitor::visitForStatement
 void SyReCStatementVisitor::visitForStatementWithOptimizationsEnabled(SyReCParser::ForStatementContext* context) {
     sharedData->loopNestingLevel++;
 
-    bool        needToCloseOpenedSymbolTableScopeForLoopVariable = false;
+    auto        needToCloseOpenedSymbolTableScopeForLoopVariable = false;
     const auto& parsedLoopHeader                                 = preDeterminedLoopHeaderInformation.has_value() ? determineLoopHeaderFromPredefinedOne(needToCloseOpenedSymbolTableScopeForLoopVariable) : determineLoopHeader(context, needToCloseOpenedSymbolTableScopeForLoopVariable);
     const auto& loopVariableIdent                                = parsedLoopHeader.has_value() ? parsedLoopHeader->loopVariableIdent : std::nullopt;
-    const bool  loopHeaderValid                                  = parsedLoopHeader.has_value();
+    const auto  loopHeaderValid                                  = parsedLoopHeader.has_value();
 
-    const bool doesLoopOnlyPerformOneIterationInTotal = loopHeaderValid && doesLoopOnlyPerformOneIteration(*parsedLoopHeader);
-    const auto& valueOfLoopVariableInCurrentIteration = loopHeaderValid ? tryEvaluateNumber(parsedLoopHeader->range.first, determineContextStartTokenPositionOrUseDefaultOne(nullptr)) : std::nullopt;
+    auto        doesLoopPerformAnyIterations           = loopHeaderValid;
+    const auto  doesLoopOnlyPerformOneIterationInTotal = doesLoopPerformAnyIterations && doesLoopOnlyPerformOneIteration(*parsedLoopHeader);
+    const auto& valueOfLoopVariableInCurrentIteration = doesLoopPerformAnyIterations ? tryEvaluateNumber(parsedLoopHeader->range.first, determineContextStartTokenPositionOrUseDefaultOne(nullptr)) : std::nullopt;
 
     if (loopHeaderValid) {
         if (const auto& determinedIterationRange = tryDetermineCompileTimeLoopIterationRange(*parsedLoopHeader); determinedIterationRange.has_value()) {
             const auto numberOfIterationsOfLoop = determineNumberOfLoopIterations(*determinedIterationRange);
+            doesLoopPerformAnyIterations        = numberOfIterationsOfLoop > 0;
+
             if (numberOfIterationsOfLoop == 1 
                 && loopVariableIdent.has_value()
                 && valueOfLoopVariableInCurrentIteration.has_value()) {
@@ -1303,125 +1298,96 @@ void SyReCStatementVisitor::visitForStatementWithOptimizationsEnabled(SyReCParse
         }    
     }
 
-    std::optional<syrec::Statement::vec> loopBody;
-    const auto&                          inheritedValuePropagationBlockersFromParentLoopDataFlowAnalysis = !sharedData->loopBodyValuePropagationBlockers.empty()
-    ? std::make_optional(sharedData->loopBodyValuePropagationBlockers.top())
-    : std::nullopt;
-
     /*
-     * If we can determine that the loop will only perform one loop iteration we can skip the data flow analysis of its loop body
-     * but still need to take into account restrictions that stem from a prior data flow analysis of any parent loop
+     * TODO: If we invalidate the values of the assignments in the non nested loops when parsing a nested loop we destroy values that could be made available when unrolling the parent loop
      */
-    const auto& stmtsOfLoopBodyToPerformDataFlowAnalysisOn = !doesLoopOnlyPerformOneIterationInTotal
-        ? determineLoopBodyWithSideEffectsDisabled(context->statementList()).value_or(syrec::Statement::vec())
-        : syrec::Statement::vec();
-    
-    /*
-     * When performing more than one loop iteration, we need to disable the side effects of value updates that are made inside the loop body.
-     */
-    const bool shouldValueUpdatesBeBlockedDuringGeneralOptimizationOfLoopBody = !doesLoopOnlyPerformOneIterationInTotal;
-    /*
-     * When performing more than one loop iteration, we need to disable any updates or invalidation of assigned to signals in the loop body when trying to optimize the latter prior to unrolling it.
-     * If the loop only performs one iteration, we also need to take into account whether loop unrolling is actually enabled and if the loop full fills the condition for unrolling.
-     */
-    /*const auto backupOfPerformConstantPropagationFlag    = sharedData->parserConfig->performConstantPropagation;
-    sharedData->parserConfig->performConstantPropagation = doesLoopOnlyPerformOneIterationInTotal
-        && sharedData->parserConfig->deadCodeEliminationEnabled
-        && sharedData->parserConfig->optionalLoopUnrollConfig.has_value() && sharedData->parserConfig->optionalLoopUnrollConfig->maxUnrollCountPerLoop > 0
-        && sharedData->loopNestingLevel <= sharedData->parserConfig->optionalLoopUnrollConfig->maxAllowedNestingLevelOfInnerLoops;*/
-
-    // TODO: When parsing loop with side effects enabled during first readonly step will invalidate assigned to values which should only happen after the unroll
-
-    /*
-     * Perform an iteration-invariant optimization of the loop body (if the loop will only perform one iteration, the result of this step is also the final optimization of the loop body).
-     * For multiple iterations, the result of this step will be the loop body that is used for the unroll operation
-     *
-     * TODO: We could introduce a new flag to indicate whether side effects like the constant propagation should be enabled
-     */
-
-    std::vector<syrec::VariableAccess::ptr> assignmentsInNonNestedLoop;
-    // Avoid unnecessary work and only make result of data flow analysis regarding assigned to signals in loop body available if any assignments are performed
-    if (const auto additionalValuePropagationRestrictionsDueToDataFlowAnalysis = std::make_shared<optimizations::LoopBodyValuePropagationBlocker>(stmtsOfLoopBodyToPerformDataFlowAnalysisOn, sharedData->currentSymbolTableScope, inheritedValuePropagationBlockersFromParentLoopDataFlowAnalysis); additionalValuePropagationRestrictionsDueToDataFlowAnalysis->areAnyAssignmentsPerformed()) {
-        const auto backupOfAreValuesUpdatesBlockedDuringGeneralLoopBodyOptimization = sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody;
-        sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody           = !doesLoopOnlyPerformOneIterationInTotal;
-        assignmentsInNonNestedLoop                                                  = additionalValuePropagationRestrictionsDueToDataFlowAnalysis->getDefinedAssignmentsInNotNestedLoops(stmtsOfLoopBodyToPerformDataFlowAnalysisOn, inheritedValuePropagationBlockersFromParentLoopDataFlowAnalysis);
-
-        sharedData->loopBodyValuePropagationBlockers.push(additionalValuePropagationRestrictionsDueToDataFlowAnalysis);
-        loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
-        sharedData->loopBodyValuePropagationBlockers.pop();
-        
-        sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody = backupOfAreValuesUpdatesBlockedDuringGeneralLoopBodyOptimization;
-    }
-    else {
-        loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());    
-    }
-
-    if (!loopHeaderValid) {
-        return;
-    }
-
-    /*
-     * Loops with an empty body where the latter is the result of the configured optimizations being applied to the statements of the loop body
-     * can be ignored, if the dead code elimination optimization is enabled. Otherwise, a skip statement will be instead into the loop body.
-     *
-     */
-    if (!loopBody.has_value() || loopBody->empty()) {
-        if (sharedData->parserConfig->deadCodeEliminationEnabled) {
-            return;
-        }
-        loopBody.emplace(syrec::Statement::vec(1, std::make_shared<syrec::SkipStatement>()));
-    }
-    const auto& iterationRangeOfLoop = tryDetermineCompileTimeLoopIterationRange(*parsedLoopHeader);
-
-    const auto isUnrollingOfCurrentLoopDisabled = !sharedData->parserConfig->deadCodeEliminationEnabled
-        || (sharedData->parserConfig->optionalLoopUnrollConfig.has_value() ? sharedData->loopNestingLevel > sharedData->parserConfig->optionalLoopUnrollConfig->maxAllowedNestingLevelOfInnerLoops : false)
-        || (sharedData->parserConfig->optionalLoopUnrollConfig.has_value() ? sharedData->parserConfig->optionalLoopUnrollConfig->maxUnrollCountPerLoop <= 0 : false)
-        || (iterationRangeOfLoop.has_value() 
-                && sharedData->parserConfig->optionalLoopUnrollConfig.has_value() 
-                && sharedData->parserConfig->optionalLoopUnrollConfig->maxUnrollCountPerLoop <= determineNumberOfLoopIterations(*iterationRangeOfLoop)
-                && !sharedData->parserConfig->optionalLoopUnrollConfig->allowRemainderLoop && !sharedData->parserConfig->optionalLoopUnrollConfig->forceUnrollAll);
-
-    if (isUnrollingOfCurrentLoopDisabled) {
-        if (!doesLoopOnlyPerformOneIterationInTotal) {
-            invalidateAssignmentsOfNonNestedLoops(assignmentsInNonNestedLoop);
-        }
-    }
-    if (doesLoopOnlyPerformOneIterationInTotal && !isUnrollingOfCurrentLoopDisabled) {
-        for (const auto& stmt: *loopBody) {
-            addStatementToOpenContainer(stmt);
-        }
+    const auto& iterationInvariantLoopBody = determineIterationInvariantLoopBody(context->statementList(), sharedData->loopNestingLevel == 1 && doesLoopOnlyPerformOneIterationInTotal);
+    if (!loopHeaderValid || iterationInvariantLoopBody.statements.empty() || !doesLoopPerformAnyIterations) {
         return;
     }
     
     const auto loopStatement    = std::make_shared<syrec::ForStatement>();
-    loopStatement->loopVariable = loopVariableIdent.has_value() ? *loopVariableIdent : "";
+    loopStatement->loopVariable = loopVariableIdent.value_or("");
     loopStatement->range        = parsedLoopHeader->range;
     loopStatement->step         = parsedLoopHeader->stepSize;
-    loopStatement->statements   = *loopBody;
+    loopStatement->statements   = iterationInvariantLoopBody.statements;
 
-    
-    auto unrollConfigToUse = sharedData->parserConfig->optionalLoopUnrollConfig;
+    if (sharedData->loopNestingLevel > 1) {
+        if (doesLoopOnlyPerformOneIterationInTotal) {
+            for (const auto& stmt: iterationInvariantLoopBody.statements) {
+                addStatementToOpenContainer(stmt);
+            }
+        } else {
+            addStatementToOpenContainer(loopStatement);
+        }
+    }
+    if (const auto& loopUnrollConfig = getUserDefinedLoopUnrollConfigOrDefault(doesLoopOnlyPerformOneIterationInTotal);
+        loopUnrollConfig.has_value() && !preDeterminedLoopHeaderInformation.has_value()) {
+        // TODO: Loop unroller should consider nesting level
+        const auto  loopUnrollerInstance    = std::make_unique<optimizations::LoopUnroller>(sharedData->loopVariableMappingLookup);
+        const auto& unrolledLoopInformation = sharedData->parserConfig->deadCodeEliminationEnabled
+            ? loopUnrollerInstance->tryUnrollLoop(*loopUnrollConfig, loopStatement)
+            : optimizations::LoopUnroller::UnrollInformation(optimizations::LoopUnroller::NotModifiedLoopInformation({loopStatement}));
+
+    } else {
+        
+    }
     /*
-     * If we could determine that a loop will only perform one iteration and if the dead code elimination optimization is enabled
-     * we will create a loop unroll configuration that will perform the unroll in case that no user provided one is given.
+     * We can perform an unroll of the loop even if constant propagation is disabled if only one loop iteration is performed since in this case the value of the loop variable will be made available for optimizations
      */
-    if (!sharedData->parserConfig->optionalLoopUnrollConfig.has_value() && sharedData->parserConfig->deadCodeEliminationEnabled && doesLoopOnlyPerformOneIterationInTotal) {
-        unrollConfigToUse.emplace(optimizations::LoopOptimizationConfig(1, 0, UINT_MAX, false, false));
+    //const auto unrollLoopWhenConstantPropagationIsDisabled = !sharedData->parserConfig->performConstantPropagation ? doesLoopOnlyPerformOneIterationInTotal : true;
+
+    /*
+     * We should only perform an unroll if the dead code elimination optimization is enabled and no predetermined loop header from a previous unroll exists for the current loop.
+     * If no unrolling of the loop takes place, we need to make the following distinction:
+     * - If the loop will only perform one iteration any optimization and value updates will already be done during the parsing of the loop body.
+     * - If multiple iterations will be performed or if the iteration count cannot be determined, invalidate the assigned to signals in the non nested loops.
+     */
+    if (const auto& loopUnrollConfig = getUserDefinedLoopUnrollConfigOrDefault(doesLoopOnlyPerformOneIterationInTotal); 
+        loopUnrollConfig.has_value() && !preDeterminedLoopHeaderInformation.has_value()) {
+        // TODO: Loop unroller should consider nesting level
+        const auto  loopUnrollerInstance    = std::make_unique<optimizations::LoopUnroller>(sharedData->loopVariableMappingLookup);
+        const auto& unrolledLoopInformation = sharedData->parserConfig->deadCodeEliminationEnabled
+            ? loopUnrollerInstance->tryUnrollLoop(*loopUnrollConfig, loopStatement)
+            : optimizations::LoopUnroller::UnrollInformation(optimizations::LoopUnroller::NotModifiedLoopInformation({loopStatement}));
+
+        /*
+         * TODO: If we invalidate the values of the assignments in the non nested loops when parsing a nested loop we destroy values that could be made available when unrolling the parent loop
+         */
+        if (std::holds_alternative<optimizations::LoopUnroller::NotModifiedLoopInformation>(unrolledLoopInformation.data)) {
+            if (sharedData->loopNestingLevel > 1) {
+                addStatementToOpenContainer(loopStatement);
+            }
+            else {
+                incrementReferenceCountsOfVariablesUsedInStatementsAndInvalidateAssignedToSignals(loopStatement->statements);
+            }
+        }
+        else {
+            if (doesLoopOnlyPerformOneIterationInTotal) {
+                for (const auto& stmt: iterationInvariantLoopBody.statements) {
+                    addStatementToOpenContainer(stmt);
+                }
+            }
+            else {
+                unrollAndProcessLoopBody(context, unrolledLoopInformation);
+            }
+        }
+    }
+    else {
+        if (sharedData->loopNestingLevel > 1) {
+            addStatementToOpenContainer(loopStatement);
+        } else {
+            /*
+             *
+             */
+
+            incrementReferenceCountsOfVariablesUsedInStatementsAndInvalidateAssignedToSignals(loopStatement->statements);
+        }
     }
 
-    /*
-     * If we are parsing an already predetermined loop header (generated during an unroll of a loop with a remainder), we perform no unrolling
-     */
-    if (preDeterminedLoopHeaderInformation.has_value() || !unrollConfigToUse.has_value()) {
-        addStatementToOpenContainer(loopStatement);
-        invalidateAssignmentsOfNonNestedLoops(assignmentsInNonNestedLoop);
-        return;
-    }
-    unrollAndProcessLoopBody(context, loopStatement, *unrollConfigToUse, assignmentsInNonNestedLoop);
-
-    // TODO: Instead of opening and closing a new scope simply insert and remove the entry from the symbol table
+     // TODO: Instead of opening and closing a new scope simply insert and remove the entry from the symbol table
     if (needToCloseOpenedSymbolTableScopeForLoopVariable) {
-        removeLoopVariableAndMakeItsValueUnavailableForEvaluations(*loopVariableIdent, needToCloseOpenedSymbolTableScopeForLoopVariable);   
+        removeLoopVariableAndMakeItsValueUnavailableForEvaluations(*loopVariableIdent, needToCloseOpenedSymbolTableScopeForLoopVariable);
     }
 
     if (sharedData->loopNestingLevel > 0) {
@@ -1429,26 +1395,7 @@ void SyReCStatementVisitor::visitForStatementWithOptimizationsEnabled(SyReCParse
     }
 }
 
-void SyReCStatementVisitor::unrollAndProcessLoopBody(SyReCParser::ForStatementContext* context, const std::shared_ptr<syrec::ForStatement>& loopStatement, const optimizations::LoopOptimizationConfig& loopUnrollConfigToUse, const std::vector<syrec::VariableAccess::ptr>& assignmentsInNonNestedLoops) {
-    const auto  loopUnrollerInstance    = std::make_unique<optimizations::LoopUnroller>(sharedData->loopVariableMappingLookup);
-    const auto& unrolledLoopInformation = loopUnrollerInstance->tryUnrollLoop(loopUnrollConfigToUse, loopStatement);
-
-    if (std::holds_alternative<optimizations::LoopUnroller::NotModifiedLoopInformation>(unrolledLoopInformation.data)) {
-        invalidateAssignmentsOfNonNestedLoops(assignmentsInNonNestedLoops);
-        addStatementToOpenContainer(loopStatement);
-        return;
-    }
-
-    /*
-     * We cannot perform an unroll of a loop with a defined variable if the constant propagation optimization is turn off because this would not fixup the value of the loop variable in the unrolled statements
-     * i.e. for $i = 0 to 4 step 1 do c[$i] += ... rof would be unrolled to c[$i] += ... with the definition of the loop variable $i being removed since the loop was unrolled completely
-     */
-    /*if (!std::holds_alternative<optimizations::LoopUnroller::NotModifiedLoopInformation>(unrolledLoopInformation.data) && !loopStatement->loopVariable.empty()
-        && !sharedData->parserConfig->performConstantPropagation) {
-        addStatementToOpenContainer(loopStatement);
-        return;
-    }*/
-
+void SyReCStatementVisitor::unrollAndProcessLoopBody(SyReCParser::ForStatementContext* context, const optimizations::LoopUnroller::UnrollInformation& unrolledLoopInformation) {
     const auto&                                customLoopContextInformation = buildCustomLoopContextInformation(context);
     std::vector<ModifiedLoopHeaderInformation> modifiedLoopHeaderInformation;
     std::vector<UnrolledLoopVariableValue>     unrolledLoopVariableValueLookup;
@@ -1579,7 +1526,7 @@ bool SyReCStatementVisitor::doesModuleOnlyHaveReadOnlyParameters(const syrec::Mo
 
 void SyReCStatementVisitor::decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(const syrec::Module::ptr& calledModule, const std::vector<std::string>& filteredCalleeArguments) const {
     for (const auto& actuallyUsedCalleeArgument: filteredCalleeArguments) {
-        decrementReferenceCountOfSignal(actuallyUsedCalleeArgument);
+        updateReferenceCountOfSignal(actuallyUsedCalleeArgument, SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
     }
     sharedData->currentSymbolTableScope->decrementReferenceCountOfModulesMatchingSignature(calledModule);
 }
@@ -1608,8 +1555,8 @@ syrec::AssignStatement::vec SyReCStatementVisitor::trySimplifyAssignmentStatemen
             : std::nullopt;
 
         if (optionalConstantValueOfRhs.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*definedAssignmentOperation, *optionalConstantValueOfRhs)) {
-            sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(assignmentStmtCasted->lhs->var->name);
-            decrementReferenceCountForUsedVariablesInExpression(assignmentStmtCasted->rhs);
+            updateReferenceCountOfSignal(assignmentStmtCasted->lhs->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
+            updateReferenceCountForUsedVariablesInExpression(assignmentStmtCasted->rhs, SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
             return {};
         }
     }
@@ -1666,7 +1613,7 @@ void SyReCStatementVisitor::performAssignmentRhsExprSimplification(syrec::expres
         }
 
         for (const auto& optimizedAwaySignalAccess : optimizedAwaySignalAccesses) {
-            decrementReferenceCountOfSignal(optimizedAwaySignalAccess->var->name);
+            updateReferenceCountOfSignal(optimizedAwaySignalAccess->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
         }
     }
 }
@@ -1698,5 +1645,117 @@ SyReCStatementVisitor::IfConditionBranchEvaluationResult SyReCStatementVisitor::
 void SyReCStatementVisitor::invalidateAssignmentsOfNonNestedLoops(const std::vector<syrec::VariableAccess::ptr>& assignmentsOfNonNestedLoop) const {
     for (const auto& assignedToSignal : assignmentsOfNonNestedLoop) {
         invalidateStoredValueFor(assignedToSignal);
+    }
+}
+
+SyReCStatementVisitor::IterationInvariantLoopBodyResult SyReCStatementVisitor::determineIterationInvariantLoopBody(parser::SyReCParser::StatementListContext* loopBodyStmtContexts, bool doesLoopOnlyPerformOneIterationInTotal) {
+    std::optional<syrec::Statement::vec> loopBody;
+    std::vector<syrec::VariableAccess::ptr> assignmentsInNonNestedLoops;
+
+    const auto&                          inheritedValuePropagationBlockersFromParentLoopDataFlowAnalysis = !sharedData->loopBodyValuePropagationBlockers.empty()
+        ? std::make_optional(sharedData->loopBodyValuePropagationBlockers.top())
+        : std::nullopt;
+
+    /*
+     * If we can determine that the loop will only perform one loop iteration we can skip the data flow analysis of its loop body
+     * but still need to take into account restrictions that stem from a prior data flow analysis of any parent loop
+     */
+    const auto& stmtToConsiderForDataFlowAnalysis = !doesLoopOnlyPerformOneIterationInTotal
+        ? determineLoopBodyWithSideEffectsDisabled(loopBodyStmtContexts).value_or(syrec::Statement::vec())
+        : syrec::Statement::vec();
+
+    const auto backupOfAreValuesUpdatesBlockedDuringGeneralLoopBodyOptimization = sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody;
+    const auto backupOfModificationsOfReferenceCounts                           = sharedData->modificationsOfReferenceCountsDisabled;
+    sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody           = true;
+    sharedData->modificationsOfReferenceCountsDisabled                          = true;
+
+    // Avoid unnecessary work and only make result of data flow analysis regarding assigned to signals in loop body available if any assignments are performed
+    if (const auto additionalValuePropagationRestrictionsDueToDataFlowAnalysis = std::make_shared<optimizations::LoopBodyValuePropagationBlocker>(stmtToConsiderForDataFlowAnalysis, sharedData->currentSymbolTableScope, inheritedValuePropagationBlockersFromParentLoopDataFlowAnalysis); additionalValuePropagationRestrictionsDueToDataFlowAnalysis->areAnyAssignmentsPerformed()) {
+        assignmentsInNonNestedLoops                                                 = additionalValuePropagationRestrictionsDueToDataFlowAnalysis->getDefinedAssignmentsInNotNestedLoops(stmtToConsiderForDataFlowAnalysis, inheritedValuePropagationBlockersFromParentLoopDataFlowAnalysis);
+
+        sharedData->loopBodyValuePropagationBlockers.push(additionalValuePropagationRestrictionsDueToDataFlowAnalysis);
+        loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(loopBodyStmtContexts);
+        sharedData->loopBodyValuePropagationBlockers.pop();
+
+    } else {
+        loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(loopBodyStmtContexts);
+    }
+
+    sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody = backupOfAreValuesUpdatesBlockedDuringGeneralLoopBodyOptimization;
+    sharedData->modificationsOfReferenceCountsDisabled                = backupOfModificationsOfReferenceCounts;
+
+    /*
+     * Loops with an empty body where the latter is the result of the configured optimizations being applied to the statements of the loop body
+     * can be ignored, if the dead code elimination optimization is enabled. Otherwise, a skip statement will be instead into the loop body.
+     */
+    if (!loopBody.has_value() || loopBody->empty()) {
+        if (sharedData->parserConfig->deadCodeEliminationEnabled) {
+            loopBody.emplace(syrec::Statement::vec(1, std::make_shared<syrec::SkipStatement>()));   
+        }
+        else {
+            loopBody.emplace(syrec::Statement::vec());
+        }
+    }
+    return IterationInvariantLoopBodyResult(assignmentsInNonNestedLoops, *loopBody);
+}
+
+std::optional<optimizations::LoopOptimizationConfig> SyReCStatementVisitor::getUserDefinedLoopUnrollConfigOrDefault(bool doesCurrentLoopPerformOneLoopInTotal) const {
+    if (sharedData->parserConfig->optionalLoopUnrollConfig.has_value()) {
+        return sharedData->parserConfig->optionalLoopUnrollConfig;
+    }
+
+    if (doesCurrentLoopPerformOneLoopInTotal && !sharedData->parserConfig->deadCodeEliminationEnabled) {
+        return optimizations::LoopOptimizationConfig(1, 0, UINT_MAX, false, false);
+    }
+    return std::nullopt;
+}
+
+void SyReCStatementVisitor::incrementReferenceCountsOfSignalsUsedInStatements(const syrec::Statement::vec& statements) const {
+    for (const auto& stmt : statements) {
+        incrementReferenceCountsOfSignalsUsedInStatement(stmt);
+    }
+}
+
+void SyReCStatementVisitor::incrementReferenceCountsOfSignalsUsedInStatement(const syrec::Statement::ptr& statement) const {
+    if (const auto& statementAsAssignmentStmt = std::dynamic_pointer_cast<syrec::AssignStatement>(statement); statementAsAssignmentStmt != nullptr) {
+        updateReferenceCountOfSignal(statementAsAssignmentStmt->lhs->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        updateReferenceCountForUsedVariablesInExpression(statementAsAssignmentStmt->rhs, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+    } else if (const auto& statementAsUnaryAssignmentStmt = std::dynamic_pointer_cast<syrec::UnaryStatement>(statement); statementAsUnaryAssignmentStmt != nullptr) {
+        updateReferenceCountOfSignal(statementAsUnaryAssignmentStmt->var->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+    }
+    else if (const auto& statementAsIfStmt = std::dynamic_pointer_cast<syrec::IfStatement>(statement); statementAsIfStmt != nullptr) {
+        updateReferenceCountForUsedVariablesInExpression(statementAsIfStmt->condition, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        incrementReferenceCountsOfSignalsUsedInStatements(statementAsIfStmt->thenStatements);
+        incrementReferenceCountsOfSignalsUsedInStatements(statementAsIfStmt->elseStatements);
+    } else if (const auto& statementAsLoopStmt = std::dynamic_pointer_cast<syrec::ForStatement>(statement); statementAsLoopStmt != nullptr) {
+        incrementReferenceCountsOfSignalsUsedInNumber(statementAsLoopStmt->range.first);
+        incrementReferenceCountsOfSignalsUsedInNumber(statementAsLoopStmt->range.second);
+        incrementReferenceCountsOfSignalsUsedInNumber(statementAsLoopStmt->step);
+        incrementReferenceCountsOfSignalsUsedInStatements(statementAsLoopStmt->statements);
+    } else if (const auto& statementAsCallStmt = std::dynamic_pointer_cast<syrec::CallStatement>(statement); statementAsCallStmt != nullptr) {
+        for (const auto& calleeArgument : statementAsCallStmt->parameters) {
+            updateReferenceCountOfSignal(calleeArgument, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        }
+    } else if (const auto& statementAsUncallStmt = std::dynamic_pointer_cast<syrec::UncallStatement>(statement); statementAsUncallStmt != nullptr) {
+        for (const auto& calleeArgument: statementAsUncallStmt->parameters) {
+            updateReferenceCountOfSignal(calleeArgument, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        }
+    } else if (const auto& statementAsSwapStmt = std::dynamic_pointer_cast<syrec::SwapStatement>(statement); statementAsSwapStmt != nullptr) {
+        updateReferenceCountOfSignal(statementAsSwapStmt->lhs->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        updateReferenceCountOfSignal(statementAsSwapStmt->rhs->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+    }
+}
+
+void SyReCStatementVisitor::incrementReferenceCountsOfSignalsUsedInNumber(const syrec::Number::ptr& number) const {
+    if (number->isConstant()) {
+        return;
+    }
+
+    if (number->isLoopVariable()) {
+        updateReferenceCountOfSignal(number->variableName(), SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+    }
+    else if (number->isCompileTimeConstantExpression()) {
+        incrementReferenceCountsOfSignalsUsedInNumber(number->getExpression().lhsOperand);
+        incrementReferenceCountsOfSignalsUsedInNumber(number->getExpression().rhsOperand);
     }
 }

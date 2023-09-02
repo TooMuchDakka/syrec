@@ -167,7 +167,7 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
         }
     }
 
-    if (!leftOperand.has_value() && !rightOperand.has_value()) {
+    if (!leftOperand.has_value() || !rightOperand.has_value()) {
         return std::nullopt;
     }
     return syrec_operation::apply(operation, *leftOperand, *rightOperand);

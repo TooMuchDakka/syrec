@@ -52,7 +52,8 @@ namespace parser {
         bool                                                         doArgumentsBetweenCallAndUncallMatch(const TokenPosition& positionOfPotentialError, const std::string& uncalledModuleIdent, const std::vector<std::string>& calleeArguments);
         [[nodiscard]] std::optional<ExpressionEvaluationResult::ptr> getUnoptimizedExpression(SyReCParser::ExpressionContext* context);
         [[nodiscard]] static bool                                    areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr);
-        void                                                         decrementReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression) const;
+        
+        void                                                         updateReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression, SyReCCustomBaseVisitor::ReferenceCountUpdate typeOfUpdate) const;
         [[nodiscard]] SymbolTableBackupHelper::ptr                   createCopiesOfCurrentValuesOfChangedSignalsAndResetToOriginal(const SymbolTableBackupHelper::ptr& backupOfOriginalValues) const;
         void                                                         mergeChangesFromBranchesAndUpdateSymbolTable(const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInTrueBranch, const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInFalseBranch, bool canAnyBranchBeOmitted, bool canTrueBranchBeOmitted) const;
         void                                                         createAndStoreBackupForAssignedToSignal(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
@@ -61,7 +62,7 @@ namespace parser {
 
         [[nodiscard]] std::optional<syrec::ForStatement::ptr> visitForStatementInReadonlyMode(SyReCParser::ForStatementContext* context);
         void                                                  visitForStatementWithOptimizationsEnabled(SyReCParser::ForStatementContext* context);
-        void                                                  unrollAndProcessLoopBody(SyReCParser::ForStatementContext* context, const std::shared_ptr<syrec::ForStatement>& loopStatement, const optimizations::LoopOptimizationConfig& loopUnrollConfigToUse, const std::vector<syrec::VariableAccess::ptr>& assignmentsInNonNestedLoops);
+        void                                                  unrollAndProcessLoopBody(SyReCParser::ForStatementContext* context, const optimizations::LoopUnroller::UnrollInformation& unrolledLoopInformation);
 
     private:
         std::any visitExpressionFromNumber(SyReCParser::ExpressionFromNumberContext* context) override {
@@ -129,7 +130,7 @@ namespace parser {
                 std::vector<ModifiedLoopHeaderInformation>& modifiedLoopHeaderInformation,
                 const optimizations::LoopUnroller::UnrollInformation& unrollInformation);
 
-        [[nodiscard]] static std::optional<std::string> tryGetLoopVariableIdent(SyReCParser::ForStatementContext* loopContext);
+        [[nodiscard]] static std::optional<std::string>    tryGetLoopVariableIdent(SyReCParser::ForStatementContext* loopContext);
         [[nodiscard]] std::optional<syrec::Statement::vec> determineLoopBodyWithSideEffectsDisabled(SyReCParser::StatementListContext* loopBodyStmtsContext);
         [[nodiscard]] bool                                 isValuePropagationBlockedDueToLoopDataFlowAnalysis(const syrec::VariableAccess::ptr& accessedPartsOfSignalToBeUpdated) const;
         [[nodiscard]] syrec::AssignStatement::vec          trySimplifyAssignmentStatement(const syrec::AssignStatement::ptr& assignmentStmt) const;
@@ -155,6 +156,29 @@ namespace parser {
 
         [[nodiscard]] IfConditionBranchEvaluationResult parseIfConditionBranch(parser::SyReCParser::StatementListContext* ifBranchStmtsContext, bool shouldBeParsedAsReadonly, bool canBranchBeOmittedBasedOnGuardConditionEvaluation);
         void                                            invalidateAssignmentsOfNonNestedLoops(const std::vector<syrec::VariableAccess::ptr>& assignmentsOfNonNestedLoop) const;
+
+
+        struct IterationInvariantLoopBodyResult {
+            std::vector<syrec::VariableAccess::ptr> assignmentsInNonNestedLoops;
+            syrec::Statement::vec                   statements;
+
+            explicit IterationInvariantLoopBodyResult(std::vector<syrec::VariableAccess::ptr> assignmentsInNonNestedLoops, syrec::Statement::vec loopBodyStatements)
+                : assignmentsInNonNestedLoops(std::move(assignmentsInNonNestedLoops)), statements(std::move(loopBodyStatements)) {}
+        };
+
+        /**
+         * \brief Perform loop iteration invariant optimizations of the loop body. Value and reference count updates are only activated when one loop iteration is performed
+         * \param loopBodyStmtContexts The statements of the loop body
+         * \param doesLoopOnlyPerformOneIterationInTotal Will only one loop iteration be performed
+         * \return A struct that contains the optimized loop body as well as the assignments of the loop body that were not defined in nested loops
+         */
+        [[nodiscard]] IterationInvariantLoopBodyResult determineIterationInvariantLoopBody(parser::SyReCParser::StatementListContext* loopBodyStmtContexts, bool doesLoopOnlyPerformOneIterationInTotal);
+        [[nodiscard]] std::optional<optimizations::LoopOptimizationConfig> getUserDefinedLoopUnrollConfigOrDefault(bool doesCurrentLoopPerformOneLoopInTotal) const;
+        void                                                               incrementReferenceCountsOfSignalsUsedInStatements(const syrec::Statement::vec& statements) const;
+        void                                                               incrementReferenceCountsOfSignalsUsedInStatement(const syrec::Statement::ptr& statement) const;
+        void                                                               incrementReferenceCountsOfSignalsUsedInNumber(const syrec::Number::ptr& number) const;
+
+        void incrementReferenceCountsOfVariablesUsedInStatementsAndInvalidateAssignedToSignals(const syrec::Statement::vec& loopBodyStatements);
     };
 } // namespace parser
 #endif

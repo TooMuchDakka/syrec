@@ -261,7 +261,7 @@
   },
   "testLoopVariableOccurrencesCorrectlyReplacedInAssignmentStatementIfLoopIsUnrolled": {
     "circuit": "module forloop(in op(1), out c[2](4), inout a[2](4), inout b[2](4)) for $i = 0 to 1 step 2 do c[$i] ^= (a[$i] + b[$i]) rof",
-    "expectedCircuit": "module forloop(in op(1), out c[2](4), inout a[2](4), inout b[2](4)) c[0] ^= (a[0] + b[0])",
+    "expectedCircuit": "module forloop(out c[2](4), inout a[2](4), inout b[2](4)) c[0] ^= (a[0] + b[0])",
     "optimizations": {
       "loopUnrollMaxNestingLvl": "2",
       "loopUnrollMaxUnrollCnt": "2",
@@ -270,7 +270,7 @@
   },
   "testLoopUnrollIsRevertedIfConstantPropagationIsDisabledWhenUnrollingNestedLoopThatDefinesLoopVariable": {
     "circuit": "module test(out a(4), out b(4), out c[2](4)) for $j = 0 to 4 step 1 do for $i = 0 to 9 step 10 do ++= a; if (a = b) then ++= b else skip fi (a = b); ++= b rof rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
-    "expectedCircuit": "module test(out a(4), out b(4), out c[2](4)) for $i = 0 to 9 step 10 do ++= a; if (a = b) then ++= b else skip fi (a = b); ++= b rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
+    "expectedCircuit": "module test(out a(4), out b(4), out c[2](4)) for $j = 0 to 4 step 1 do ++= a; if (a = b) then ++= b else skip fi (a = b); ++= b rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
     "optimizations": {
       "constantPropON": "0",
       "loopUnrollMaxUnrollCnt": "1",
@@ -299,8 +299,8 @@
     }
   },
   "testLoopUnrollingIsNotReveredIfConstantPropagationIsDisabledWhenUnrollingParentLoopThatDoesNotDefinedLoopVariable": {
-    "circuit": "module test(out a(4), out b(4), out c[2](4)) for 5 step 5 do for $i = 0 to 9 step 1 do ++= a; if ($j = $i) then ++= b else skip fi ($j = $i); ++= b rof rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
-    "expectedCircuit": "module test(out a(4), out b(4), out c[2](4)) for $i = 0 to 9 step 1 do ++= a; if ($j = $i) then ++= b else skip fi ($j = $i); ++= b rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
+    "circuit": "module test(out a(4), out b(4), out c[2](4)) for $j = 0 to 4 step 5 do for $i = 0 to 9 step 1 do ++= a; if ($j = $i) then ++= b else skip fi ($j = $i); ++= b rof rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
+    "expectedCircuit": "module test(out a(4), out b(4), out c[2](4)) for $i = 0 to 9 step 1 do ++= a; if (0 = $i) then ++= b else skip fi (0 = $i); ++= b rof; c[0].0 += a.0; c[0].1 += a.1; c[0].2 += a.2; c[0].3 += a.3; c[1].0 += b.0; c[1].1 += b.1; c[1].2 += b.2; c[1].3 += b.3",
     "optimizations": {
       "constantPropON": "0",
       "loopUnrollMaxUnrollCnt": "1",
@@ -360,42 +360,42 @@
   },
   "testUnrolledParentLoopWithOneIterationAndNotUnrolledNestedLoopWithOneIterationLeavesNotAssignedToSignalsInNestedLoopUnchangedInNestedAndParentLoop": {
     "circuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += d; for $i = 0 to 1 step 2 do for 2 do c[0] += 1; if (a > b) then c[1] += 2 else c[2] += d fi (a > b); c[0] += 2 rof; ++= c[5] rof; c[3] += d; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += c[4]; c[3] += c[5]",
-    "expectedCircuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += d; for $i = 0 to 1 step 2 do for 2 do c[0] += 1; if (a > b) then c[1] += 2 else c[2] += d fi (a > b); c[0] += 2 rof; ++= c[5] rof; c[3] += 2; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += c[4]; c[3] += c[5]",
+    "expectedCircuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += 2; for 0 to 2 step 1 do c[0] += 1; if (a > b) then c[1] += 2 else c[2] += 2 fi (a > b); c[0] += 2 rof; ++= c[5]; c[3] += 2; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += 2; c[3] += 1",
     "optimizations": {
       "deadCoreElimON": "1",
       "constantPropON": "1",
       "loopUnrollMaxNestingLvl": "1",
-      "loopUnrolMaxUnrollCnt": "1"
+      "loopUnrollMaxUnrollCnt": "1"
     }
   },
   "testUnrolledParentLoopWithOneIterationAndNotUnrolledNestedLoopWithOneIterationInvalidatesAssignedToSignalInNestedLoopInNestedAndParentLoop": {
-    "circuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += d; for $i = 0 to 1 step 2 do for 0 do c[$i] += 1; if (a > b) then c[1] += 2 else c[2] += d fi (a > b); c[$i] += 2 rof; ++= c[5] rof; c[3] += d; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += c[4]; c[3] += c[5]",
-    "expectedCircuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += d; for 0 do c[0] += 1; if (a > b) then c[1] += 2 else c[2] += d fi (a > b); c[0] += 2 rof; ++= c[5] rof; c[3] += 2; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += 2; c[3] += c[5]",
+    "circuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += d; for $i = 0 to 1 step 2 do for 0 to 1 step 2 do c[$i] += 1; if (a > b) then c[1] += 2 else c[2] += d fi (a > b); c[$i] += 2 rof; ++= c[5] rof; c[3] += d; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += c[4]; c[3] += c[5]",
+    "expectedCircuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += d; for 0 to 1 step 2 do c[0] += 1; if (a > b) then c[1] += 2 else c[2] += d fi (a > b); c[0] += 2 rof; ++= c[5] rof; c[3] += 2; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += 2; c[3] += c[5]",
     "optimizations": {
       "deadCodeElimON": "1",
       "constantPropON": "1",
       "loopUnrollMaxNestingLvl": "1",
-      "loopUnrolMaxUnrollCnt": "1"
+      "loopUnrollMaxUnrollCnt": "1"
     }
   },
   "testUnrolledParentLoopWithOneIterationAndNotUnrolledNestedLoopWithMultipleIterationsLeavesNotAssignedToSignalsInNestedLoopUnchangedAndInvalidatesAssignedToOnesInNestedAndParentLoop": {
     "circuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += d; for $i = 0 to 1 step 2 do for 2 do c[$i] += 1; if (a > b) then c[1] += 2 else c[2] += d fi (a > b); c[$i] += 2 rof; ++= c[5] rof; c[3] += d; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += c[4]; c[3] += c[5]",
-    "expectedCircuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += 2; for 2 do c[0] += 1; if (a > b) then c[1] += 2 else c[2] += 2 fi (a > b); c[0] += 2 rof; ++= c[5] rof; c[3] += 2; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += 2; c[3] += c[5]",
+    "expectedCircuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += 2; for 0 to 2 step 1 do c[0] += 1; if (a > b) then c[1] += 2 else c[2] += 2 fi (a > b); c[0] += 2 rof; ++= c[5]; c[3] += 2; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += 2; c[3] += 1",
     "optimizations": {
       "deadCodeElimON": "1",
       "constantPropON": "1",
       "loopUnrollMaxNestingLvl": "1",
-      "loopUnrolMaxUnrollCnt": "1"
+      "loopUnrollMaxUnrollCnt": "1"
     }
   },
   "testUnrolledParentLoopWithMultipleIterationsUpdatesValuesOfAssignedToSignalsCorrectlyAndLeavesUnassignedSignalsUnchanged": {
     "circuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += d; for $i = 0 to 1 step 1 do c[0] += 1; if (c[0] > b) then c[1] += 2 else c[2] += d fi (c[0] > b); c[0] += 2; ++= c[5] rof; c[3] += d; c[3] += c[0]; c[3] += c[1]; c[3] += c[2]; c[3] += c[4]; c[3] += c[5]",
-    "expectedCircuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += 2; c[0] += 1; if (1 > b) then c[1] += 2 else c[2] += d fi (1 > b); c[0] += 2 ++= c[5]; c[0] += 1; c[1] += 2; c[0] += 2; ++= c[5]; c[3] += d; c[3] += 6; c[3] += c[1]; c[3] += c[2]; c[3] += 2; c[3] += 2",
+    "expectedCircuit": "module add(in a(4), in b(4), out c[6](4)) wire d(4) d += 2; c[4] += 2; c[0] += 1; if (1 > b) then c[1] += 2 else c[2] += 2 fi (1 > b); c[0] += 2 ++= c[5]; c[0] += 1; if (4 > b) then c[1] += 2 else c[2] += 2 fi (4 > b); c[0] += 2; ++= c[5]; c[3] += 2; c[3] += 6; c[3] += c[1]; c[3] += c[2]; c[3] += 2; c[3] += 2",
     "optimizations": {
       "deadCodeElimON": "1",
       "constantPropON": "1",
       "loopUnrollMaxNestingLvl": "1",
-      "loopUnrolMaxUnrollCnt": "2"
+      "loopUnrollMaxUnrollCnt": "2"
     }
   },
   "testConstantPropagationWillNotBePerformedToReplaceSignalOccurrencesForAssignedToSignalInLoopIfNotUnrolled": {
@@ -407,7 +407,7 @@
   },
   "testConstantPropagationWillBePerformedToReplaceSignalOccurrencesForNotAssignedToSignalInLoopIfNotUnrolled": {
     "circuit": "module add(in a(4), in b(4), out d(4), out c[3](4)) d += 2; for $i = 0 to 1 step 2 do if (d > c[0]) then ++= c[$i] else skip fi (d > c[0]) rof; c[2] += c[0]; c[2] += c[1]; c[2] += d",
-    "expectedCircuit": "module add(in a(4), in b(4), out d(4), out c[3](4)) d += 2; for $i = 0 to 1 step 2 do if (2 > c[0]) then ++= c[$i] else skip fi (2 > c[0]) rof; c[2] += c[0]; c[2] += c[1]; c[2] += 2",
+    "expectedCircuit": "module add(in a(4), in b(4), out d(4), out c[3](4)) d += 2; for $i = 0 to 1 step 2 do if 1 then ++= c[0] else skip fi 1 rof; c[2] += 1; c[2] += 0; c[2] += 2",
     "optimizations": {
       "deadCodeElimON": "0",
       "constantPropON": "1"
@@ -415,22 +415,22 @@
   },
   "testConstantPropagationDisabledWhenUnrollingLoopWithOneIterationInvalidatesAssignedToSignalsInLoop": {
     "circuit": "module add(in a(4), in b(4), out d(4), out c[3](4)) d += 2; for $i = 0 to 1 step 2 do if (d > c[0]) then ++= c[$i] else skip fi (d > c[0]) rof; c[2] += c[0]; c[2] += c[1]; c[2] += d",
-    "expectedCircuit": "module add(in a(4), in b(4), out d(4), out c[3](4)) d += 2; if (2 > c[0]) then ++= c[$i] else skip fi (d > c[0]); c[2] += c[0]; c[2] += c[1]; c[2] += 2",
+    "expectedCircuit": "module add(out d(4), out c[3](4)) d += 2; if (d > c[0]) then ++= c[0] else skip fi (d > c[0]); c[2] += c[0]; c[2] += c[1]; c[2] += d",
     "optimizations": {
       "deadCodeElimON": "1",
       "constantPropON": "0",
       "loopUnrollMaxNestingLvl": "1",
-      "loopUnrolMaxUnrollCnt": "1"
+      "loopUnrollMaxUnrollCnt": "1"
     }
   },
   "testConstantPropagationDisabledWhenUnrollingLoopWithMultipleIterationsInvalidatesAssignedToSignalsInLoop": {
     "circuit": "module add(in a(4), in b(4), out d(4), out c[3](4)) d += 2; for $i = 0 to 1 step 1 do if (d > c[0]) then ++= c[$i] else skip fi (d > c[0]) rof; c[2] += c[0]; c[2] += c[1]; c[2] += d",
-    "expectedCircuit": "module add(in a(4), in b(4), out d(4), out c[3](4)) d += 2; if (2 > c[0]) then ++= c[$i] else skip fi (2 > c[0]); d += 2; if (4 > c[0]) then ++= c[$i] else skip fi (4 > c[0]); c[2] += c[0]; c[2] += c[1]; c[2] += 4",
+    "expectedCircuit": "module add(out d(4), out c[3](4)) d += 2; if (d > c[0]) then ++= c[0] else skip fi (d > c[0]); if (d > c[0]) then ++= c[1] else skip fi (d > c[0]); c[2] += c[0]; c[2] += c[1]; c[2] += d",
     "optimizations": {
       "deadCodeElimON": "1",
       "constantPropON": "0",
       "loopUnrollMaxNestingLvl": "1",
-      "loopUnrolMaxUnrollCnt": "2"
+      "loopUnrollMaxUnrollCnt": "2"
     }
   },
   "DISABLED_SameTestsForPartiallyUnrolledLoop": {
@@ -440,8 +440,8 @@
 
   },
   "testLoopUnrollingWithLoopNotUnrolledMakesValueOfAssignedToSignalsInvalid": {
-    "circuit": "module add(in a(4), out b(4), out c[3](4)) c[0] += 2; c[1] += 4; c[2] += 8; for $i = 0 to 2 step 1 do ++= b; if (b > 2) then --= c[0] else skip fi (b > 2) rof; c[1] += b; c[1] += c[0]",
-    "expectedCircuit": "module add(out b(4), out c[3](4)) c[0] += 2; c[1] += 4; c[2] += 8; for $i = 0 to 2 step 1 do ++= b; if (b > 2) then --= c[0] else skip fi (b > 2) rof; c[2] += 4; c2[1] += b; c2[1] += c[0]",
+    "circuit": "module add(in a(4), out b(4), out c[3](4)) c[0] += 2; c[1] += 4; c[2] += 8; for $i = 0 to 2 step 1 do ++= b; if (b > 2) then --= c[0] else skip fi (b > 2) rof; c[2] += c[1]; c[2] += b; c[2] += c[0]",
+    "expectedCircuit": "module add(out b(4), out c[3](4)) c[0] += 2; c[1] += 4; c[2] += 8; for $i = 0 to 2 step 1 do ++= b; if (b > 2) then --= c[0] else skip fi (b > 2) rof; c[2] += 4; c[2] += b; c[2] += c[0]",
     "optimizations": {
       "deadCodeElimON": "1",
       "constantPropON": "1",
@@ -460,6 +460,24 @@
     }
   },
   "DISABLED_TODO_testPartiallyUnrolledLoopLeavesValueOfSignalPriorToUnrollUnchangedAndAvailableInFirstUnrolledIteration": {
+
+  },
+  "testLoopPerformingNoIterationsWithNoNestedLoopLeavesAllSignalsUnchangedAndRemoved": {
+
+  },
+  "testLoopPerformingNoIterationsWithNestedLoopLeavesAllSignalsUnchangedAndRemoved": {
+
+  },
+  "testNestedLoopPerformingNoIterationsWithoutNestedLoopLeavesAllSignalsUnchangedAndRemoved": {
+
+  },
+  "testNestedLoopPerformingNoIterationsWithNestedLoopLeavesAllSignalsUnchangedAndRemoved": {
+
+  },
+  "testNestedLoopPerformingNoIterationsWithNestedLoopLeavesAllSignalsUnchangedAndBeRemovedEvenWhenConfiguredNestingLevelIsExceeded": {
+
+  },
+  "testNestedLoopPerformingNoIterationsWithNestedLoopLeavesAllSignalsUnchangedAndBeRemoved": {
 
   }
 }

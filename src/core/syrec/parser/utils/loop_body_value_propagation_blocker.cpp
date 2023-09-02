@@ -2,7 +2,6 @@
 
 #include "core/syrec/parser/utils/signal_access_utils.hpp"
 
-
 optimizations::LoopBodyValuePropagationBlocker::LoopBodyValuePropagationBlocker(const syrec::Statement::vec& stmtBlock, const parser::SymbolTable::ptr& symbolTable, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions):
     symbolTableReference(symbolTable) {
 
@@ -55,7 +54,6 @@ std::vector<syrec::VariableAccess::ptr> optimizations::LoopBodyValuePropagationB
     }
     return containerOfDefinedAssignments;
 }
-
 
 void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec::Statement::ptr& stmt) {
     if (const auto& stmtAsAssignmentStmt = tryConvertStmtToStmtOfOtherType<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
@@ -130,7 +128,6 @@ void optimizations::LoopBodyValuePropagationBlocker::handleAssignment(const syre
     return std::make_optional(signalValueLookupForAccessedSignal);
 }
 
-
 std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> optimizations::LoopBodyValuePropagationBlocker::transformAccessedBitRange(const syrec::VariableAccess::ptr& accessedPartsOfSignal) {
     if (!accessedPartsOfSignal->range.has_value()) {
         return std::nullopt;
@@ -167,7 +164,7 @@ void optimizations::LoopBodyValuePropagationBlocker::storeAssignmentIfNoOverlapp
         return;
     }
 
-    const auto wasAssignmentAlreadyDefined = !std::all_of(
+    const auto wasAssignmentAlreadyDefined = std::any_of(
             alreadyDefinedAssignments.cbegin(),
             alreadyDefinedAssignments.cend(),
             [&assignedToSignal, &symbolTable](const syrec::VariableAccess::ptr& alreadyAssignedToSignal) {
@@ -177,11 +174,11 @@ void optimizations::LoopBodyValuePropagationBlocker::storeAssignmentIfNoOverlapp
                         SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping,
                         SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping,
                         symbolTable);
-                return signalAccessEquivalenceResult.isResultCertain && signalAccessEquivalenceResult.equality == SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual;
+                return signalAccessEquivalenceResult.equality != SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual;
             });
+    
     if (wasAssignmentAlreadyDefined) {
         return;
     }
     alreadyDefinedAssignments.emplace_back(assignedToSignal);
 }
-

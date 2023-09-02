@@ -265,6 +265,6 @@ bool SyReCExpressionVisitor::isValidBinaryOperation(syrec_operation::operation u
 
 void SyReCExpressionVisitor::decrementReferenceCountsOfOptimizedAwaySignalAccesses(const std::vector<syrec::VariableAccess::ptr>& optimizedAwaySignalAccesses) const {
     for (const auto& signalAccess : optimizedAwaySignalAccesses) {
-        decrementReferenceCountOfSignal(signalAccess->var->name);
+        updateReferenceCountOfSignal(signalAccess->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
     }
 }

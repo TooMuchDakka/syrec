@@ -46,21 +46,26 @@ namespace parser {
         void                 createWarning(const TokenPosition& tokenPosition, const std::string& warningMessage);
 
         bool                                                    checkIfSignalWasDeclaredOrLogError(const std::string& signalIdent, const bool isLoopVariable, const TokenPosition& signalIdentTokenPosition);
-        [[nodiscard]] bool isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable);
+        [[nodiscard]] bool                                      isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable);
         [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
         bool                                                    checkIfNumberOfValuesPerDimensionMatchOrLogError(const TokenPosition& positionOfOptionalError, const std::vector<unsigned int>& lhsOperandNumValuesPerDimension, const std::vector<unsigned int>& rhsOperandNumValuesPerDimension);
         [[nodiscard]] std::optional<unsigned int>               tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, const TokenPosition& evaluationErrorPositionHelper);
         [[nodiscard]] std::optional<unsigned int>               tryDetermineExpressionBitwidth(const syrec::expression::ptr& expression, const TokenPosition& evaluationErrorPosition);
 
         [[nodiscard]] bool                                      canEvaluateNumber(const syrec::Number::ptr& number) const;
-        [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& numberContainer, const TokenPosition& evaluationErrorPositionHelper);
-        [[nodiscard]] std::optional<unsigned int> tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, const TokenPosition& evaluationErrorPositionHelper);
-        [[nodiscard]] std::optional<unsigned int>            applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand, const TokenPosition& potentialErrorPosition);
+        [[nodiscard]] std::optional<unsigned int>               tryEvaluateNumber(const syrec::Number::ptr& numberContainer, const TokenPosition& evaluationErrorPositionHelper);
+        [[nodiscard]] std::optional<unsigned int>               tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, const TokenPosition& evaluationErrorPositionHelper);
+        [[nodiscard]] std::optional<unsigned int>               applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand, const TokenPosition& potentialErrorPosition);
         void                                                    insertSkipStatementIfStatementListIsEmpty(syrec::Statement::vec& statementList) const;
 
         std::optional<SignalAccessRestriction::SignalAccess> tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const TokenPosition& optionalEvaluationErrorPosition);
-        void incrementReferenceCountOfSignal(const std::string_view& signalIdent) const;
-        void                                                 decrementReferenceCountOfSignal(const std::string_view& signalIdent) const;
+
+        enum ReferenceCountUpdate {
+            Increment,
+            Decrement
+        };
+        void updateReferenceCountOfSignal(const std::string_view& signalIdent, ReferenceCountUpdate typeOfUpdate) const;
+        [[nodiscard]] std::optional<unsigned int> tryPerformConstantPropagationForSignalAccess(const syrec::VariableAccess::ptr& accessedSignal) const;
 
         std::any visitSignal(SyReCParser::SignalContext* context) override;
         std::any visitNumberFromConstant(SyReCParser::NumberFromConstantContext* context) override;

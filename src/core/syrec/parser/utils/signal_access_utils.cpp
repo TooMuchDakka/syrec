@@ -193,7 +193,7 @@ SignalAccessEquivalenceResult SignalAccessUtils::areDimensionAccessesEqual(const
             referenceSignalDimensionAccessEvaluated->cend(),
             [](const unsigned int thisValueOfDimension, const unsigned int thatValueOfDimension) {
                 return thisValueOfDimension == thatValueOfDimension;
-            }) == accessedSignalDimensionAccessEvaluated->cend();
+            }) != accessedSignalDimensionAccessEvaluated->cend();
     return SignalAccessEquivalenceResult(areAllAccessedValuesOfDimensionEqual ? SignalAccessEquivalenceResult::Equality::Equal : SignalAccessEquivalenceResult::Equality::NotEqual, true);
 }
 
