@@ -2,99 +2,124 @@
 
 #include "core/syrec/parser/range_check.hpp"
 
-std::vector<std::unique_ptr<syrec::Module>> optimizations::Optimizer::optimizeProgram(const std::vector<std::reference_wrapper<syrec::Module>>& modules) {
+// TODO: Refactoring if case switches with visitor pattern as its available in std::visit call
+
+optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::optimizeProgram(const std::vector<std::reference_wrapper<syrec::Module>>& modules) {
     std::vector<std::unique_ptr<syrec::Module>> optimizedModules;
-    for (const auto& module : modules) {
-        if (auto&& optimizedModule = handleModule(module); optimizedModule != nullptr) {
-            optimizedModules.emplace_back(std::move(optimizedModule));
+    bool                                        optimizedAnyModule = false;
+    for (const auto& module: modules) {
+        auto&& optimizedModule = handleModule(module);
+        const auto optimizationResultStatus = optimizedModule.getStatusOfResult();
+        optimizedAnyModule                  = optimizationResultStatus == OptimizationResultFlag::WasOptimized;
+
+        if (optimizationResultStatus == OptimizationResultFlag::WasOptimized) {
+            optimizedModules.emplace_back(std::move(optimizedModule.tryTakeOwnershipOfOptimizationResult()->front()));
+        } else if (optimizedModule.getStatusOfResult() == OptimizationResultFlag::IsUnchanged) {
+            // TODO:
         }
     }
-    return optimizedModules;
+
+    if (optimizedAnyModule) {
+        return !optimizedModules.empty() ? OptimizationResult<syrec::Module>::fromOptimizedContainer(std::move(optimizedModules)) : OptimizationResult<syrec::Module>::asOptimizedAwayContainer();
+    }
+    return OptimizationResult<syrec::Module>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::Module> optimizations::Optimizer::handleModule(const syrec::Module& module) {
-    return std::make_unique<syrec::Module>(module);
+optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::handleModule(const syrec::Module& module) {
+    return OptimizationResult<syrec::Module>::asUnchangedOriginal();
 }
 
-optimizations::Optimizer::ListOfStatementReferences optimizations::Optimizer::handleStatements(const std::vector<std::reference_wrapper<syrec::Statement>>& statements) {
-    ListOfStatementReferences optimizedStatements;
-    for (const auto& statement : statements) {
-        if (auto&& optimizedStatement = handleStatement(statement); !optimizedStatement.empty()) {
-            std::move(optimizedStatement.begin(), optimizedStatement.end(), optimizedStatements.end());
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleStatements(const std::vector<std::reference_wrapper<syrec::Statement>>& statements) {
+    std::vector<std::unique_ptr<syrec::Statement>> optimizedStmts;
+    bool optimizedAnyStmt = false;
+    for (const auto& stmt: statements) {
+        auto&& optimizedStatement = handleStatement(stmt);
+
+        const auto& stmtOptimizationResultFlag = optimizedStatement.getStatusOfResult();
+        optimizedAnyStmt                       = stmtOptimizationResultFlag == OptimizationResultFlag::WasOptimized;
+        if (stmtOptimizationResultFlag == OptimizationResultFlag::WasOptimized) {
+            if (auto optimizationResultOfStatement = optimizedStatement.tryTakeOwnershipOfOptimizationResult(); optimizationResultOfStatement.has_value()) {
+                for (auto&& optimizedStmt : *optimizationResultOfStatement) {
+                    optimizedStmts.push_back(std::move(optimizedStmt));
+                }
+            }
+        } else if (stmtOptimizationResultFlag == OptimizationResultFlag::IsUnchanged) {
+            // TODO:
         }
     }
-    return optimizedStatements;
+
+    if (optimizedAnyStmt) {
+        return !optimizedStmts.empty() ? OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(optimizedStmts)) : OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
+    }
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-// TODO: Refactoring using visitor pattern
-optimizations::Optimizer::ListOfStatementReferences optimizations::Optimizer::handleStatement(const syrec::Statement& stmt) {
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleStatement(const syrec::Statement& stmt) {
+    std::optional<OptimizationResult<syrec::Statement>> optimizationResultContainerOfStmt;
     if (typeid(stmt) == typeid(syrec::SkipStatement)) {
-        if (auto&& optimizedSkipStmt = handleSkipStmt(stmt); optimizedSkipStmt != nullptr) {
-            ListOfStatementReferences stmtContainer;
-            stmtContainer.emplace_back(std::make_unique<syrec::SkipStatement>());
-            return stmtContainer;
-        } 
+        optimizationResultContainerOfStmt = handleSkipStmt(stmt);
+    }
+    else if (const auto& statementAsAssignmentStmt = dynamic_cast<const syrec::AssignStatement*>(&stmt); statementAsAssignmentStmt != nullptr) {
+        optimizationResultContainerOfStmt = handleAssignmentStmt(*statementAsAssignmentStmt);
+    }
+    else if (const auto& statementAsUnaryAssignmentStmt = dynamic_cast<const syrec::UnaryStatement*>(&stmt); statementAsUnaryAssignmentStmt != nullptr) {
+        optimizationResultContainerOfStmt = handleUnaryStmt(*statementAsUnaryAssignmentStmt);
+    }
+    else if (const auto& statementAsIfStatement = dynamic_cast<const syrec::IfStatement*>(&stmt); statementAsIfStatement != nullptr) {
+        optimizationResultContainerOfStmt = handleIfStmt(*statementAsIfStatement);
+    }
+    else if (const auto& statementAsLoopStatement = dynamic_cast<const syrec::ForStatement*>(&stmt); statementAsLoopStatement != nullptr) {
+        optimizationResultContainerOfStmt = handleLoopStmt(*statementAsLoopStatement);
+    }
+    else if (const auto& statementAsSwapStatement = dynamic_cast<const syrec::SwapStatement*>(&stmt); statementAsSwapStatement != nullptr) {
+        optimizationResultContainerOfStmt = handleSwapStmt(*statementAsSwapStatement);
+    }
+    else if (const auto& statementAsCallStatement = dynamic_cast<const syrec::CallStatement*>(&stmt); statementAsCallStatement != nullptr) {
+        optimizationResultContainerOfStmt = handleCallStmt(*statementAsCallStatement);
     }
 
-    if (const auto& statementAsAssignmentStmt = dynamic_cast<const syrec::AssignStatement*>(&stmt); statementAsAssignmentStmt != nullptr) {
-        return handleAssignmentStmt(*statementAsAssignmentStmt);
+    if (!optimizationResultContainerOfStmt.has_value()) {
+        return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
     }
-    if (const auto& statementAsUnaryAssignmentStmt = dynamic_cast<const syrec::UnaryStatement*>(&stmt); statementAsUnaryAssignmentStmt != nullptr) {
-        if (auto&& simplifiedUnaryAssignmentStmt = handleUnaryStmt(*statementAsUnaryAssignmentStmt); simplifiedUnaryAssignmentStmt != nullptr) {
-            ListOfStatementReferences stmtContainer;
-            stmtContainer.emplace_back(std::make_unique<syrec::UnaryStatement>(statementAsUnaryAssignmentStmt->op, statementAsUnaryAssignmentStmt->var));
-            return stmtContainer;
-        }
+    const auto& optimizationStatusFlag = optimizationResultContainerOfStmt->getStatusOfResult();
+    if (optimizationStatusFlag == OptimizationResultFlag::RemovedByOptimization) {
+        return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
     }
-    if (const auto& statementAsIfStatement = dynamic_cast<const syrec::IfStatement*>(&stmt); statementAsIfStatement != nullptr) {
-        return handleIfStmt(*statementAsIfStatement);
+    if (optimizationStatusFlag == OptimizationResultFlag::WasOptimized) {
+        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(*optimizationResultContainerOfStmt->tryTakeOwnershipOfOptimizationResult()));
     }
-    if (const auto& statementAsLoopStatement = dynamic_cast<const syrec::ForStatement*>(&stmt); statementAsLoopStatement != nullptr) {
-        return handleLoopStmt(*statementAsLoopStatement);
-    }
-    if (const auto& statementAsSwapStatement = dynamic_cast<const syrec::SwapStatement*>(&stmt); statementAsSwapStatement != nullptr) {
-        ListOfStatementReferences stmtContainer;
-        stmtContainer.emplace_back(std::make_unique<syrec::SwapStatement>(statementAsSwapStatement->lhs, statementAsSwapStatement->rhs));
-        return stmtContainer;
-    }
-    if (const auto& statementAsCallStatement = dynamic_cast<const syrec::CallStatement*>(&stmt); statementAsCallStatement != nullptr) {
-        return handleCallStmt(*statementAsCallStatement);
-    }
-    /*if (const auto& statementAsUncallStatement = dynamic_cast<const syrec::UncallStatement*>(&stmt); statementAsUncallStatement != nullptr) {
-        
-    }*/
-    return {};
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-optimizations::Optimizer::ListOfStatementReferences optimizations::Optimizer::handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt) {
-    return {};
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt) {
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::Statement> optimizations::Optimizer::handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) {
-    return nullptr;
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleCallStmt(const syrec::CallStatement& callStatement) {
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-optimizations::Optimizer::ListOfStatementReferences optimizations::Optimizer::handleIfStmt(const syrec::IfStatement& ifStatement) {
-    return {};
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleIfStmt(const syrec::IfStatement& ifStatement) {
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-optimizations::Optimizer::ListOfStatementReferences optimizations::Optimizer::handleLoopStmt(const syrec::ForStatement& forStatement) {
-    return {};
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleLoopStmt(const syrec::ForStatement& forStatement) {
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::Statement> optimizations::Optimizer::handleSwapStmt(const syrec::SwapStatement& swapStatement) {
-    return nullptr;
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleSkipStmt(const syrec::SkipStatement& skipStatement) {
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::Statement> optimizations::Optimizer::handleSkipStmt(const syrec::SkipStatement& skipStatement) {
-    return nullptr;
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleSwapStmt(const syrec::SwapStatement& swapStatement) {
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-optimizations::Optimizer::ListOfStatementReferences optimizations::Optimizer::handleCallStmt(const syrec::CallStatement& callStatement) {
-    return {};
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) {
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::expression> optimizations::Optimizer::handleExpr(const syrec::expression& expression) const {
+optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleExpr(const syrec::expression& expression) const {
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expression); exprAsBinaryExpr != nullptr) {
         return handleBinaryExpr(*exprAsBinaryExpr);
     }
@@ -107,37 +132,37 @@ std::unique_ptr<syrec::expression> optimizations::Optimizer::handleExpr(const sy
     if (const auto& exprAsVariableExpr = dynamic_cast<const syrec::VariableExpression*>(&expression); exprAsVariableExpr != nullptr) {
         return handleVariableExpr(*exprAsVariableExpr);
     }
-    return nullptr;
-    //return std::make_unique<syrec::expression>(expression);
+    return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::expression> optimizations::Optimizer::handleBinaryExpr(const syrec::BinaryExpression& expression) const {
-    return nullptr;
+optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleBinaryExpr(const syrec::BinaryExpression& expression) const {
+    return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::expression> optimizations::Optimizer::handleShiftExpr(const syrec::ShiftExpression& expression) const {
-    return nullptr;
+optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleNumericExpr(const syrec::NumericExpression& numericExpr) const {
+    return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::NumericExpression> optimizations::Optimizer::handleNumericExpr(const syrec::NumericExpression& numericExpr) const {
-    return nullptr;
+optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleVariableExpr(const syrec::VariableExpression& expression) const {
+    return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::expression> optimizations::Optimizer::handleVariableExpr(const syrec::VariableExpression& expression) const {
-    return nullptr;
+optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleShiftExpr(const syrec::ShiftExpression& expression) const {
+    return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::Number> optimizations::Optimizer::handleNumber(const syrec::Number& number) const {
+// TODO:
+optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optimizer::handleNumber(const syrec::Number& number) const {
     if (number.isConstant()) {
-        return std::make_unique<syrec::Number>(number);
+        return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
     if (number.isLoopVariable()) {
-        return std::make_unique<syrec::Number>(number);
+        return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
     if (number.isCompileTimeConstantExpression()) {
-        return std::make_unique<syrec::Number>(number);
+        return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
-    return nullptr;
+    return OptimizationResult<syrec::Number>::asUnchangedOriginal();
 }
 
 void optimizations::Optimizer::updateReferenceCountOf(const std::string_view& signalIdent, ReferenceCountUpdate typeOfUpdate) const {
@@ -165,8 +190,8 @@ std::optional<unsigned> optimizations::Optimizer::tryFetchValueForAccessedSignal
         && std::all_of(
             evaluatedDimensionAccess->valuePerDimension.cbegin(), 
             evaluatedDimensionAccess->valuePerDimension.cend(),
-            [](const std::pair<DimensionAccessEvaluationResult::ValueOfDimensionValidity, DimensionAccessEvaluationResult::ValueOfDimension>& valueOfDimensionEvaluationResult) {
-                    return valueOfDimensionEvaluationResult.first == DimensionAccessEvaluationResult::ValueOfDimensionValidity::Valid;
+            [](const std::pair<IndexValidityStatus, std::optional<unsigned int>>& valueOfDimensionEvaluationResult) {
+                    return valueOfDimensionEvaluationResult.first == IndexValidityStatus::Valid && valueOfDimensionEvaluationResult.second.has_value();
     });
 
    
@@ -177,7 +202,7 @@ std::optional<unsigned> optimizations::Optimizer::tryFetchValueForAccessedSignal
 
     const auto& evaluatedBitRangeAccess = tryEvaluateUserDefinedBitRangeAccess(accessedSignal.var->name, transformedBitRangeAccess);
     const auto areBitRangeComponentsKnownAndValid = evaluatedBitRangeAccess.has_value()
-        ? evaluatedBitRangeAccess->rangeStartEvaluationResult.first == BitRangeEvaluationResult::Valid && evaluatedBitRangeAccess->rangeEndEvaluationResult.first == BitRangeEvaluationResult::Valid
+        ? evaluatedBitRangeAccess->rangeStartEvaluationResult.first == IndexValidityStatus::Valid && evaluatedBitRangeAccess->rangeEndEvaluationResult.first == IndexValidityStatus::Valid
         : true;
 
     if (!isEveryValueOfDimensionKnownAndValid || !areBitRangeComponentsKnownAndValid) {
@@ -195,25 +220,25 @@ std::optional<optimizations::Optimizer::DimensionAccessEvaluationResult> optimiz
 
     const auto& signalData = std::get<syrec::Variable::ptr>(*symbolTableEntryForAccessedSignal);
     if (accessedValuePerDimension.empty()) {
-        return std::make_optional(DimensionAccessEvaluationResult());
+        return std::make_optional(DimensionAccessEvaluationResult({false, std::vector<std::pair<IndexValidityStatus, std::optional<unsigned int>>>()}));
     }
 
     const auto wasUserDefinedAccessTrimmed = accessedValuePerDimension.size() > signalData->dimensions.size();
     const auto numEntriesToTransform       = wasUserDefinedAccessTrimmed ? signalData->dimensions.size() : accessedValuePerDimension.size();
-
-    DimensionAccessEvaluationResult result;
-    result.valuePerDimension.reserve(numEntriesToTransform);
+    
+    std::vector<std::pair<IndexValidityStatus, std::optional<unsigned int>>> evaluatedValuePerDimension;
+    evaluatedValuePerDimension.reserve(numEntriesToTransform);
 
     for (std::size_t i = 0; i < numEntriesToTransform; ++i) {
         const auto& userDefinedValueOfDimension = accessedValuePerDimension.at(i);
         if (const auto& valueOfDimensionEvaluated   = tryEvaluateExpressionToConstant(userDefinedValueOfDimension); valueOfDimensionEvaluated.has_value()) {
             const auto isAccessedValueOfDimensionWithinRange = parser::isValidDimensionAccess(signalData, i, *valueOfDimensionEvaluated);
-            result.valuePerDimension.emplace_back(isAccessedValueOfDimensionWithinRange ? DimensionAccessEvaluationResult::ValueOfDimensionValidity::Valid : DimensionAccessEvaluationResult::ValueOfDimensionValidity::OutOfRange, *valueOfDimensionEvaluated);
+            evaluatedValuePerDimension.emplace_back(isAccessedValueOfDimensionWithinRange ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange, *valueOfDimensionEvaluated);
         } else {
-            result.valuePerDimension.emplace_back(DimensionAccessEvaluationResult::ValueOfDimensionValidity::Unknown, createCopyOfExpr(userDefinedValueOfDimension));
+            evaluatedValuePerDimension.emplace_back(IndexValidityStatus::Unknown, std::nullopt);
         }
     }
-    return std::make_optional(result);
+    return std::make_optional(DimensionAccessEvaluationResult({wasUserDefinedAccessTrimmed, evaluatedValuePerDimension}));
 }
 
 std::optional<std::pair<unsigned, unsigned>> optimizations::Optimizer::tryEvaluateBitRangeAccessComponents(const std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>& accessedBitRange) const {
@@ -226,8 +251,11 @@ std::optional<std::pair<unsigned, unsigned>> optimizations::Optimizer::tryEvalua
 }
 
 std::optional<unsigned> optimizations::Optimizer::tryEvaluateNumberAsConstant(const syrec::Number& number) const {
-    const auto& numberEvaluated = handleNumber(number);
-    return numberEvaluated != nullptr && numberEvaluated->isConstant() ? std::make_optional(numberEvaluated->evaluate({})) : std::nullopt;
+    auto numberEvaluated = handleNumber(number);
+    if (const auto& optimizationResultOfNumber = numberEvaluated.tryTakeOwnershipOfOptimizationResult(); numberEvaluated.getStatusOfResult() == OptimizationResultFlag::WasOptimized && optimizationResultOfNumber.has_value() && optimizationResultOfNumber->front()->isConstant()) {
+        return std::make_optional(optimizationResultOfNumber->front()->evaluate({}));
+    }
+    return std::nullopt;
 }
 
 std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations::Optimizer::tryEvaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const {
@@ -238,7 +266,7 @@ std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations:
 
     const auto& signalData = std::get<syrec::Variable::ptr>(*symbolTableEntryForAccessedSignal);
     if (!accessedBitRange.has_value()) {
-        return std::make_optional(BitRangeEvaluationResult(BitRangeEvaluationResult::Valid, std::make_optional(0), BitRangeEvaluationResult::Valid, std::make_optional(signalData->bitwidth - 1)));
+        return std::make_optional(BitRangeEvaluationResult(IndexValidityStatus::Valid, std::make_optional(0), IndexValidityStatus::Valid, std::make_optional(signalData->bitwidth - 1)));
     }
 
     const auto& accessedBitRangeEvaluated = tryEvaluateBitRangeAccessComponents(*accessedBitRange);
@@ -246,32 +274,31 @@ std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations:
         const auto& isBitRangeStartOutOfRange            = !parser::isValidBitAccess(signalData, accessedBitRangeEvaluated->first);
         const auto& isBitRangeEndOutOfRange              = !parser::isValidBitAccess(signalData, accessedBitRangeEvaluated->second);
         return std::make_optional(BitRangeEvaluationResult(
-                isBitRangeStartOutOfRange ? BitRangeEvaluationResult::OutOfRange : BitRangeEvaluationResult::Valid, accessedBitRangeEvaluated->first,
-                isBitRangeEndOutOfRange ? BitRangeEvaluationResult::OutOfRange : BitRangeEvaluationResult::Valid, accessedBitRangeEvaluated->second));
+                isBitRangeStartOutOfRange ? IndexValidityStatus::OutOfRange : IndexValidityStatus::Valid, accessedBitRangeEvaluated->first,
+                isBitRangeEndOutOfRange ? IndexValidityStatus::OutOfRange : IndexValidityStatus::Valid, accessedBitRangeEvaluated->second));
     }
 
     const auto& bitRangeStartEvaluated = tryEvaluateNumberAsConstant(accessedBitRange->first);
     const auto& bitRangeEndEvaluated   = tryEvaluateNumberAsConstant(accessedBitRange->second);
 
-    auto bitRangeStartEvaluationStatus = BitRangeEvaluationResult::Unknown;
+    auto bitRangeStartEvaluationStatus = IndexValidityStatus::Unknown;
     if (bitRangeStartEvaluated.has_value()) {
-        bitRangeStartEvaluationStatus = parser::isValidBitAccess(signalData, *bitRangeStartEvaluated) ? BitRangeEvaluationResult::Valid : BitRangeEvaluationResult::OutOfRange;
+        bitRangeStartEvaluationStatus = parser::isValidBitAccess(signalData, *bitRangeStartEvaluated) ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange;
     }
-    auto bitRangeEndEvaluationStatus = BitRangeEvaluationResult::Unknown;
+    auto bitRangeEndEvaluationStatus = IndexValidityStatus::Unknown;
     if (bitRangeEndEvaluated.has_value()) {
-        bitRangeEndEvaluationStatus = parser::isValidBitAccess(signalData, *bitRangeEndEvaluated) ? BitRangeEvaluationResult::Valid : BitRangeEvaluationResult::OutOfRange;
+        bitRangeEndEvaluationStatus = parser::isValidBitAccess(signalData, *bitRangeEndEvaluated) ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange;
     }
     return std::make_optional(BitRangeEvaluationResult(bitRangeStartEvaluationStatus, bitRangeStartEvaluated, bitRangeEndEvaluationStatus, bitRangeEndEvaluated));
 }
 
 std::optional<unsigned> optimizations::Optimizer::tryEvaluateExpressionToConstant(const syrec::expression& expr) const {
-    if (const auto& optimizedExpr = handleExpr(expr); optimizedExpr != nullptr && dynamic_cast<syrec::NumericExpression*>(optimizedExpr.get()) != nullptr) {
-        const auto& optimizedExprAsNumericExpr = static_cast<syrec::NumericExpression*>(optimizedExpr.get());
-        return tryEvaluateNumberAsConstant(*optimizedExprAsNumericExpr->value);
+    if (auto exprOptimizationResult = handleExpr(expr); exprOptimizationResult.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
+        const auto& optimizedExpr = exprOptimizationResult.tryTakeOwnershipOfOptimizationResult();
+        if (optimizedExpr.has_value() && optimizedExpr->size() == 1 && dynamic_cast<syrec::NumericExpression*>(optimizedExpr->front().get()) != nullptr) {
+            const auto& optimizedExprAsNumericExpr = static_cast<syrec::NumericExpression*>(optimizedExpr->front().get());
+            return tryEvaluateNumberAsConstant(*optimizedExprAsNumericExpr->value);
+        }
     }
     return std::nullopt;
-}
-
-std::unique_ptr<syrec::expression> optimizations::Optimizer::createCopyOfExpr(const syrec::expression& expr) const {
-    return nullptr;
 }

@@ -66,10 +66,21 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
                  parserConfigToUse);
     if (parsingResult.wasParsingSuccessful) {
         const auto& optimizer = std::make_unique<optimizations::Optimizer>(parserConfigToUse, nullptr);
-        if (auto optimizedProgram = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsingResult.foundModules)); !optimizedProgram.empty()) {
-            this->modulesVec = transformProgramOptimizationResult(std::move(optimizedProgram));   
+        auto optimizationResultOfProgram = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsingResult.foundModules));
+        if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::IsUnchanged) {
+            this->modulesVec = parsingResult.foundModules;
+        } else if(optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::WasOptimized) {
+            auto&& optimizedModules = optimizationResultOfProgram.tryTakeOwnershipOfOptimizationResult();
+            if (!optimizedModules.has_value()) {
+                // TODO: This should not happen
+                return "";
+            }
+
+            this->modulesVec.reserve(optimizedModules->size());
+            std::move(optimizedModules->begin(), optimizedModules->end(), std::back_inserter(this->modulesVec));
         } else {
-            this->modulesVec = parsingResult.foundModules;    
+            // TODO: What should happen in this case
+            this->modulesVec = parsingResult.foundModules;
         }
         return "";
     }
