@@ -94,6 +94,11 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::expression>     handleVariableExpr(const syrec::VariableExpression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::expression>     handleNumericExpr(const syrec::NumericExpression& numericExpr) const;
 
+        [[nodiscard]] static std::unique_ptr<syrec::Statement> createCopyOfStmt(const syrec::Statement& stmt);
+        [[nodiscard]] static std::unique_ptr<syrec::expression> createCopyOfExpression(const syrec::expression& expr);
+        [[nodiscard]] static std::unique_ptr<syrec::Number>     createCopyOfNumber(const syrec::Number& number);
+        [[nodiscard]] static std::unique_ptr<syrec::Module>     createCopyOfModule(const syrec::Module& module);
+
         enum ReferenceCountUpdate {
             Increment,
             Decrement
@@ -127,6 +132,12 @@ namespace optimizations {
                 rangeEndEvaluationResult(std::make_pair(rangeEndEvaluationResultFlag, rangeEndEvaluated)) {}
         };
         [[nodiscard]] std::optional<BitRangeEvaluationResult> tryEvaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const;
+    private:
+        template<class... Fs>
+        struct Overload: Fs... { using Fs::operator()...; };
+
+        template<class... Fs>
+        Overload(Fs...) -> Overload<Fs...>;
     };
 }
 #endif

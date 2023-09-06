@@ -15,7 +15,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
         if (optimizationResultStatus == OptimizationResultFlag::WasOptimized) {
             optimizedModules.emplace_back(std::move(optimizedModule.tryTakeOwnershipOfOptimizationResult()->front()));
         } else if (optimizedModule.getStatusOfResult() == OptimizationResultFlag::IsUnchanged) {
-            // TODO:
+            optimizedModules.emplace_back(createCopyOfModule(module));
         }
     }
 
@@ -44,7 +44,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
                 }
             }
         } else if (stmtOptimizationResultFlag == OptimizationResultFlag::IsUnchanged) {
-            // TODO:
+            optimizedStmts.push_back(createCopyOfStmt(stmt));
         }
     }
 
@@ -151,7 +151,6 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
     return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
-// TODO:
 optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optimizer::handleNumber(const syrec::Number& number) const {
     if (number.isConstant()) {
         return OptimizationResult<syrec::Number>::asUnchangedOriginal();
@@ -163,6 +162,89 @@ optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optim
         return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
     return OptimizationResult<syrec::Number>::asUnchangedOriginal();
+}
+
+std::unique_ptr<syrec::Module> optimizations::Optimizer::createCopyOfModule(const syrec::Module& module) {
+    auto copyOfModule        = std::make_unique<syrec::Module>(module.name);
+    copyOfModule->parameters = module.parameters;
+    copyOfModule->variables  = module.variables;
+    copyOfModule->statements = module.statements;
+    return copyOfModule;
+}
+
+std::unique_ptr<syrec::Statement> optimizations::Optimizer::createCopyOfStmt(const syrec::Statement& stmt) {
+    if (typeid(stmt) == typeid(syrec::SkipStatement)) {
+        return std::make_unique<syrec::SkipStatement>();
+    }
+    if (const auto& statementAsAssignmentStmt = dynamic_cast<const syrec::AssignStatement*>(&stmt); statementAsAssignmentStmt != nullptr) {
+        return std::make_unique<syrec::AssignStatement>(statementAsAssignmentStmt->lhs, statementAsAssignmentStmt->op, statementAsAssignmentStmt->rhs);
+    }
+    if (const auto& statementAsUnaryAssignmentStmt = dynamic_cast<const syrec::UnaryStatement*>(&stmt); statementAsUnaryAssignmentStmt != nullptr) {
+        return std::make_unique<syrec::UnaryStatement>(statementAsUnaryAssignmentStmt->op, statementAsUnaryAssignmentStmt->var);
+    }
+    if (const auto& statementAsIfStatement = dynamic_cast<const syrec::IfStatement*>(&stmt); statementAsIfStatement != nullptr) {
+        auto copyOfIfStatement = std::make_unique<syrec::IfStatement>();
+        copyOfIfStatement->condition = statementAsIfStatement->condition;
+        copyOfIfStatement->fiCondition = statementAsIfStatement->fiCondition;
+        copyOfIfStatement->thenStatements = statementAsIfStatement->thenStatements;
+        copyOfIfStatement->elseStatements = statementAsIfStatement->elseStatements;
+        return copyOfIfStatement;
+    }
+    if (const auto& statementAsLoopStatement = dynamic_cast<const syrec::ForStatement*>(&stmt); statementAsLoopStatement != nullptr) {
+        auto copyOfLoopStatement = std::make_unique<syrec::ForStatement>();
+        copyOfLoopStatement->loopVariable = statementAsLoopStatement->loopVariable;
+        copyOfLoopStatement->range = statementAsLoopStatement->range;
+        copyOfLoopStatement->step       = statementAsLoopStatement->step;
+        copyOfLoopStatement->statements = statementAsLoopStatement->statements;
+        return copyOfLoopStatement;
+    }
+    if (const auto& statementAsSwapStatement = dynamic_cast<const syrec::SwapStatement*>(&stmt); statementAsSwapStatement != nullptr) {
+        return std::make_unique<syrec::SwapStatement>(statementAsSwapStatement->lhs, statementAsSwapStatement->rhs);
+    }
+    if (const auto& statementAsCallStatement = dynamic_cast<const syrec::CallStatement*>(&stmt); statementAsCallStatement != nullptr) {
+        return std::make_unique<syrec::CallStatement>(statementAsCallStatement->target, statementAsCallStatement->parameters);    
+    }
+    return nullptr;
+}
+
+std::unique_ptr<syrec::expression> optimizations::Optimizer::createCopyOfExpression(const syrec::expression& expr) {
+    if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr != nullptr) {
+        return std::make_unique<syrec::BinaryExpression>(
+            exprAsBinaryExpr->lhs,
+            exprAsBinaryExpr->op,
+            exprAsBinaryExpr->rhs
+        );
+    }
+    if (const auto& exprAsShiftExpr = dynamic_cast<const syrec::ShiftExpression*>(&expr); exprAsShiftExpr != nullptr) {
+        return std::make_unique<syrec::ShiftExpression>(
+            exprAsShiftExpr->lhs,
+            exprAsShiftExpr->op,
+            exprAsShiftExpr->rhs
+        );
+    }
+    if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr != nullptr) {
+        return std::make_unique<syrec::NumericExpression>(
+                createCopyOfNumber(*exprAsNumericExpr->value),
+                exprAsNumericExpr->bwidth
+        );
+    }
+    if (const auto& exprAsVariableExpr = dynamic_cast<const syrec::VariableExpression*>(&expr); exprAsVariableExpr != nullptr) {
+        return std::make_unique<syrec::VariableExpression>(exprAsVariableExpr->var);
+    }
+    return nullptr;
+}
+
+std::unique_ptr<syrec::Number> optimizations::Optimizer::createCopyOfNumber(const syrec::Number& number) {
+    if (number.isConstant()) {
+        return std::make_unique<syrec::Number>(number.evaluate({}));
+    }
+    if (number.isLoopVariable()) {
+        return std::make_unique<syrec::Number>(number.variableName());
+    }
+    if (number.isCompileTimeConstantExpression()) {
+        return std::make_unique<syrec::Number>(number.getExpression());
+    }
+    return nullptr;
 }
 
 void optimizations::Optimizer::updateReferenceCountOf(const std::string_view& signalIdent, ReferenceCountUpdate typeOfUpdate) const {
