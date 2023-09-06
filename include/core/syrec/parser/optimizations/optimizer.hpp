@@ -3,6 +3,7 @@
 #pragma once
 
 #include "core/syrec/statement.hpp"
+#include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 
@@ -25,6 +26,10 @@ namespace optimizations {
         public:
             
             [[nodiscard]] static OptimizationResult fromOptimizedContainer(std::vector<std::unique_ptr<ToBeOptimizedContainerType>> optimizationResult) {
+                return OptimizationResult(OptimizationResultFlag::WasOptimized, std::move(optimizationResult));
+            }
+
+            [[nodiscard]] static OptimizationResult fromOptimizedContainer(std::unique_ptr<ToBeOptimizedContainerType> optimizationResult) {
                 return OptimizationResult(OptimizationResultFlag::WasOptimized, std::move(optimizationResult));
             }
 
@@ -54,16 +59,17 @@ namespace optimizations {
             }
 
             OptimizationResult(OptimizationResultFlag resultFlag, std::unique_ptr<ToBeOptimizedContainerType> optimizationResult):
-                status(resultFlag), result(optimizationResult) {
+                status(resultFlag) {
                 if (optimizationResult) {
-                    result = std::make_optional(std::vector<std::unique_ptr<ToBeOptimizedContainerType>>(std::move(optimizationResult)));   
+                    result->reserve(1);
+                    result->push_back(std::move(optimizationResult));
                 }
             }
 
             OptimizationResult(OptimizationResultFlag resultFlag, std::vector<std::unique_ptr<ToBeOptimizedContainerType>> optimizationResult):
                 status(resultFlag), result(std::make_optional(std::move(optimizationResult))) {}
 
-            OptimizationResult(OptimizationResultFlag resultFlag, std::nullptr_t emptyOptimizationResult):
+            OptimizationResult(OptimizationResultFlag resultFlag, std::nullptr_t):
                 status(resultFlag), result(std::nullopt) {}
         private:
             OptimizationResultFlag                                                  status;
@@ -94,16 +100,26 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::expression>     handleVariableExpr(const syrec::VariableExpression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::expression>     handleNumericExpr(const syrec::NumericExpression& numericExpr) const;
 
-        [[nodiscard]] static std::unique_ptr<syrec::Statement> createCopyOfStmt(const syrec::Statement& stmt);
+        [[nodiscard]] static std::unique_ptr<syrec::Statement>  createCopyOfStmt(const syrec::Statement& stmt);
         [[nodiscard]] static std::unique_ptr<syrec::expression> createCopyOfExpression(const syrec::expression& expr);
         [[nodiscard]] static std::unique_ptr<syrec::Number>     createCopyOfNumber(const syrec::Number& number);
         [[nodiscard]] static std::unique_ptr<syrec::Module>     createCopyOfModule(const syrec::Module& module);
+
+        [[nodiscard]] std::unique_ptr<syrec::expression>                                            trySimplifyExpr(const syrec::expression& expr) const;
+        [[nodiscard]] static std::unique_ptr<syrec::expression>                                     transformCompileTimeConstantExpressionToNumber(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr);
+        [[nodiscard]] static std::optional<syrec_operation::operation>                              tryMapCompileTimeConstantOperation(syrec::Number::CompileTimeConstantExpression::Operation compileTimeConstantExprOperation);
+        [[nodiscard]] static std::optional<syrec::Number::CompileTimeConstantExpression::Operation> tryMapOperationToCompileTimeConstantOperation(syrec_operation::operation operation);
+        [[nodiscard]] static std::unique_ptr<syrec::expression>                                     tryMapCompileTimeConstantOperandToExpr(const syrec::Number& number);
+        [[nodiscard]] static std::unique_ptr<syrec::Number>                                         tryMapExprToCompileTimeConstantExpr(const syrec::expression& expr);
 
         enum ReferenceCountUpdate {
             Increment,
             Decrement
         };
         void updateReferenceCountOf(const std::string_view& signalIdent, ReferenceCountUpdate typeOfUpdate) const;
+        void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, ReferenceCountUpdate typeOfUpdate) const;
+        void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, ReferenceCountUpdate typeOfUpdate) const;
+
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForAccessedSignal(const syrec::VariableAccess& accessedSignal) const;
 
         enum IndexValidityStatus {
@@ -116,7 +132,7 @@ namespace optimizations {
             const bool wasTrimmed;
             const std::vector<std::pair<IndexValidityStatus, std::optional<unsigned int>>> valuePerDimension;
         };
-        [[nodiscard]] std::optional<DimensionAccessEvaluationResult> tryEvaluateUserDefinedDimensionAccess(const std::string_view& accessedSignalIdent, const std::vector<std::reference_wrapper<const syrec::expression>>& accessedValuePerDimension) const;
+        [[nodiscard]] std::optional<DimensionAccessEvaluationResult>       tryEvaluateUserDefinedDimensionAccess(const std::string_view& accessedSignalIdent, const std::vector<std::reference_wrapper<const syrec::expression>>& accessedValuePerDimension) const;
         [[nodiscard]] std::optional<std::pair<unsigned int, unsigned int>> tryEvaluateBitRangeAccessComponents(const std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>& accessedBitRange) const;
         [[nodiscard]] std::optional<unsigned int>                          tryEvaluateNumberAsConstant(const syrec::Number& number) const;
         [[nodiscard]] std::optional<unsigned int>                          tryEvaluateExpressionToConstant(const syrec::expression& expr) const;
@@ -131,13 +147,15 @@ namespace optimizations {
                 rangeStartEvaluationResult(std::make_pair(rangeStartEvaluationResultFlag, rangeStartEvaluated)),
                 rangeEndEvaluationResult(std::make_pair(rangeEndEvaluationResultFlag, rangeEndEvaluated)) {}
         };
-        [[nodiscard]] std::optional<BitRangeEvaluationResult> tryEvaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const;
-    private:
-        template<class... Fs>
-        struct Overload: Fs... { using Fs::operator()...; };
+        [[nodiscard]] std::optional<BitRangeEvaluationResult>         tryEvaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const;
+        [[nodiscard]] static std::unique_ptr<syrec::BinaryExpression> createBinaryExprFromCompileTimeConstantExpr(const syrec::Number& number);
 
-        template<class... Fs>
-        Overload(Fs...) -> Overload<Fs...>;
+        struct SignalIdentCountLookup {
+            std::map<std::string_view, std::size_t, std::less<void>> lookup;
+        };
+        static void                                     determineUsedSignalIdentsIn(const syrec::expression& expr, SignalIdentCountLookup& lookupContainer);
+        static void                                     determineUsedSignalIdentsIn(const syrec::Number& number, SignalIdentCountLookup& lookupContainer);
+        static void                                     addSignalIdentToLookup(const std::string_view& signalIdent, SignalIdentCountLookup& lookupContainer);
     };
 }
 #endif

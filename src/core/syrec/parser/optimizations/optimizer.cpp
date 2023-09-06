@@ -1,6 +1,9 @@
 #include "core/syrec/parser/optimizations/optimizer.hpp"
 
+#include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/range_check.hpp"
+#include "core/syrec/parser/optimizations/reassociate_expression.hpp"
+#include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 
 // TODO: Refactoring if case switches with visitor pattern as its available in std::visit call
 
@@ -135,19 +138,114 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
     return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
+// TODO: Reassociate expression simplification
 optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleBinaryExpr(const syrec::BinaryExpression& expression) const {
-    return OptimizationResult<syrec::expression>::asUnchangedOriginal();
+    auto simplificationResultOfLhsExpr = handleExpr(*expression.lhs);
+    auto simplificationResultOfRhsExpr = handleExpr(*expression.rhs);
+    auto wasOriginalExprModified       = simplificationResultOfLhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged || simplificationResultOfRhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged;
+
+    auto simplifiedLhsExpr = simplificationResultOfLhsExpr.getStatusOfResult() == OptimizationResultFlag::WasOptimized
+        ? std::move(simplificationResultOfLhsExpr.tryTakeOwnershipOfOptimizationResult()->front())
+        : createCopyOfExpression(*expression.lhs);
+
+    auto simplifiedRhsExpr = simplificationResultOfRhsExpr.getStatusOfResult() == OptimizationResultFlag::WasOptimized
+        ? std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front())
+        : createCopyOfExpression(*expression.rhs);
+
+    std::unique_ptr<syrec::expression> simplifiedBinaryExpr;
+    const auto& evaluatedSimplifiedLhsExpr = tryEvaluateExpressionToConstant(*simplifiedLhsExpr);
+    const auto& evaluatedSimplifiedRhsExpr = tryEvaluateExpressionToConstant(*simplifiedRhsExpr);
+
+    const auto mappedToBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(expression.op);
+    if (mappedToBinaryOperation.has_value()) {
+        if (evaluatedSimplifiedLhsExpr.has_value() && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(*mappedToBinaryOperation, *evaluatedSimplifiedLhsExpr)) {
+            simplifiedBinaryExpr =  std::move(simplifiedRhsExpr);
+            wasOriginalExprModified = true;
+        }
+        if (evaluatedSimplifiedRhsExpr.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToBinaryOperation, *evaluatedSimplifiedRhsExpr)) {
+            simplifiedBinaryExpr = std::move(simplifiedLhsExpr);
+            wasOriginalExprModified = true;
+        }
+        if (evaluatedSimplifiedLhsExpr.has_value() && evaluatedSimplifiedRhsExpr.has_value()) {
+            if (const auto evaluationResultOfBinaryOperation = syrec_operation::apply(*mappedToBinaryOperation, *evaluatedSimplifiedLhsExpr, *evaluatedSimplifiedRhsExpr); evaluationResultOfBinaryOperation.has_value()) {
+                simplifiedBinaryExpr = std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*evaluationResultOfBinaryOperation), expression.bitwidth());
+                wasOriginalExprModified = true;
+            }
+        }
+    }
+
+    if (!simplifiedBinaryExpr) {
+        simplifiedBinaryExpr = std::make_unique<syrec::BinaryExpression>(std::move(simplifiedLhsExpr), expression.op, std::move(simplifiedRhsExpr));   
+    }
+
+    if (auto simplificationResultOfExpr = trySimplifyExpr(*simplifiedBinaryExpr); simplificationResultOfExpr != nullptr) {
+        simplifiedBinaryExpr = std::move(simplificationResultOfExpr);
+        wasOriginalExprModified = true;
+    }
+
+    return wasOriginalExprModified
+        ? OptimizationResult<syrec::expression>::fromOptimizedContainer(std::move(simplifiedBinaryExpr))
+        : OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleNumericExpr(const syrec::NumericExpression& numericExpr) const {
+    if (auto optimizationResultOfUnderlyingNumber = handleNumber(*numericExpr.value); optimizationResultOfUnderlyingNumber.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
+        return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::make_unique<syrec::NumericExpression>(std::move(optimizationResultOfUnderlyingNumber.tryTakeOwnershipOfOptimizationResult()->front()), numericExpr.bitwidth()));
+    }
     return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
+// TODO: Index checks due to new values being available ?
+// TODO: Bitwidth ?
 optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleVariableExpr(const syrec::VariableExpression& expression) const {
+    if (const auto& fetchedValueForSignal = symbolTable->tryFetchValueForLiteral(expression.var); fetchedValueForSignal.has_value() && parserConfig.performConstantPropagation) {
+        updateReferenceCountOf(expression.var->var->name, ReferenceCountUpdate::Decrement);
+        return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*fetchedValueForSignal), expression.bitwidth()));
+    }
+    updateReferenceCountOf(expression.var->var->name, ReferenceCountUpdate::Increment);
     return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleShiftExpr(const syrec::ShiftExpression& expression) const {
+    auto simplificationResultOfToBeShiftedExpr = handleExpr(*expression.lhs);
+    auto simplificationResultOfShiftAmount     = handleNumber(*expression.rhs);
+
+    auto simplifiedToBeShiftedExpr = simplificationResultOfToBeShiftedExpr.getStatusOfResult() == OptimizationResultFlag::WasOptimized
+        ? std::move(simplificationResultOfToBeShiftedExpr.tryTakeOwnershipOfOptimizationResult()->front())
+        : createCopyOfExpression(*expression.lhs);
+
+    const auto simplifiedShiftAmount = simplificationResultOfShiftAmount.getStatusOfResult() == OptimizationResultFlag::WasOptimized
+        ? std::move(simplificationResultOfShiftAmount.tryTakeOwnershipOfOptimizationResult()->front())
+        : createCopyOfNumber(*expression.rhs);
+
+    const auto evaluatedToValueOfToBeShiftedExpr = tryEvaluateExpressionToConstant(*simplifiedToBeShiftedExpr);
+    const auto evaluatedToValueOfShiftAmount     = tryEvaluateNumberAsConstant(*simplifiedShiftAmount);
+
+    const auto& mappedToShiftOperation = syrec_operation::tryMapShiftOperationFlagToEnum(expression.op);
+    if (!mappedToShiftOperation.has_value()) {
+        return OptimizationResult<syrec::expression>::asUnchangedOriginal();
+    }
+    
+    std::unique_ptr<syrec::expression> finalSimplificationResult;
+    if (evaluatedToValueOfShiftAmount.has_value()) {
+        if (syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToShiftOperation, *evaluatedToValueOfShiftAmount)) {
+            finalSimplificationResult = std::move(simplifiedToBeShiftedExpr);
+            updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, ReferenceCountUpdate::Decrement);
+        } else if (evaluatedToValueOfToBeShiftedExpr.has_value()) {
+            if (const auto& evaluatedShiftOperationResult = syrec_operation::apply(*mappedToShiftOperation, evaluatedToValueOfToBeShiftedExpr, evaluatedToValueOfShiftAmount)) {
+                finalSimplificationResult = std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*evaluatedShiftOperationResult), expression.bitwidth());
+            }
+            updateReferenceCountsOfSignalIdentsUsedIn(*expression.lhs, ReferenceCountUpdate::Decrement);
+            updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, ReferenceCountUpdate::Decrement);
+        }
+    } else if (evaluatedToValueOfToBeShiftedExpr.has_value() && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(*mappedToShiftOperation, *evaluatedToValueOfToBeShiftedExpr)) {
+        finalSimplificationResult = std::move(simplifiedToBeShiftedExpr);
+        updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, ReferenceCountUpdate::Decrement);
+    }
+
+    if (finalSimplificationResult) {
+        return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::move(finalSimplificationResult));   
+    }
     return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
@@ -156,11 +254,22 @@ optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optim
         return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
     if (number.isLoopVariable()) {
+        if (const auto& fetchedValueOfLoopVariable = symbolTable->tryFetchValueOfLoopVariable(number.variableName()); parserConfig.performConstantPropagation && fetchedValueOfLoopVariable.has_value()) {
+            updateReferenceCountOf(number.variableName(), ReferenceCountUpdate::Decrement);
+            return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::make_unique<syrec::Number>(*fetchedValueOfLoopVariable));   
+        }
+        updateReferenceCountOf(number.variableName(), ReferenceCountUpdate::Increment);
         return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
     if (number.isCompileTimeConstantExpression()) {
-        return OptimizationResult<syrec::Number>::asUnchangedOriginal();
+        const auto mappedToBinaryExpr = transformCompileTimeConstantExpressionToNumber(number.getExpression());
+        if (const auto& simplificationResultOfBinaryExpr = trySimplifyExpr(*mappedToBinaryExpr); simplificationResultOfBinaryExpr != nullptr) {
+            if (auto simplificationResultAsCompileTimeExpr = tryMapExprToCompileTimeConstantExpr(*simplificationResultOfBinaryExpr); simplificationResultAsCompileTimeExpr != nullptr) {
+                return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::move(simplificationResultAsCompileTimeExpr));
+            }
+        }
     }
+    updateReferenceCountsOfSignalIdentsUsedIn(number, ReferenceCountUpdate::Increment);
     return OptimizationResult<syrec::Number>::asUnchangedOriginal();
 }
 
@@ -245,6 +354,101 @@ std::unique_ptr<syrec::Number> optimizations::Optimizer::createCopyOfNumber(cons
         return std::make_unique<syrec::Number>(number.getExpression());
     }
     return nullptr;
+}
+
+std::unique_ptr<syrec::expression> optimizations::Optimizer::trySimplifyExpr(const syrec::expression& expr) const {
+    std::unique_ptr<syrec::expression> simplificationResult;
+    std::vector<syrec::VariableAccess::ptr> droppedSignalAccesses;
+    const std::shared_ptr<syrec::expression> toBeSimplifiedExpr = createCopyOfExpression(expr);
+    if (parserConfig.reassociateExpressionsEnabled) {
+        
+        if (const auto& reassociateExpressionResult = optimizations::simplifyBinaryExpression(toBeSimplifiedExpr, parserConfig.operationStrengthReductionEnabled, std::nullopt, symbolTable, droppedSignalAccesses); reassociateExpressionResult != nullptr) {
+            simplificationResult = createCopyOfExpression(*reassociateExpressionResult);
+        }
+    } else {
+        if (const auto& generalBinaryExpressionSimplificationResult = optimizations::trySimplify(toBeSimplifiedExpr, parserConfig.operationStrengthReductionEnabled, symbolTable, droppedSignalAccesses); generalBinaryExpressionSimplificationResult.couldSimplify) {
+            simplificationResult = createCopyOfExpression(*generalBinaryExpressionSimplificationResult.simplifiedExpression);
+        }
+    }
+
+    std::for_each(
+            droppedSignalAccesses.cbegin(),
+            droppedSignalAccesses.cend(),
+            [&](const syrec::VariableAccess::ptr& droppedSignalAccess) {
+                updateReferenceCountOf(droppedSignalAccess->var->name, ReferenceCountUpdate::Decrement);
+            });
+    return simplificationResult;
+}
+
+std::unique_ptr<syrec::expression> optimizations::Optimizer::transformCompileTimeConstantExpressionToNumber(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr) {
+    if (const auto& mappedToExprOperation = tryMapCompileTimeConstantOperation(compileTimeConstantExpr.operation); mappedToExprOperation.has_value()) {
+        auto lhsOperandAsExpr = tryMapCompileTimeConstantOperandToExpr(*compileTimeConstantExpr.lhsOperand);
+        auto rhsOperandAsExpr = tryMapCompileTimeConstantOperandToExpr(*compileTimeConstantExpr.rhsOperand);
+        if (lhsOperandAsExpr != nullptr && rhsOperandAsExpr != nullptr) {
+            return std::make_unique<syrec::BinaryExpression>(std::move(lhsOperandAsExpr), *syrec_operation::tryMapBinaryOperationEnumToFlag(*mappedToExprOperation), std::move(rhsOperandAsExpr));
+        }
+    }
+    return nullptr;
+}
+
+// TODO: bitwidth
+std::unique_ptr<syrec::expression> optimizations::Optimizer::tryMapCompileTimeConstantOperandToExpr(const syrec::Number& number) {
+    if (number.isConstant()) {
+        return std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(number.evaluate({})), 1);
+    }
+    if (number.isLoopVariable()) {
+        return std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(number.variableName()), 1);
+    }
+    if (number.isCompileTimeConstantExpression()) {
+        return transformCompileTimeConstantExpressionToNumber(number.getExpression());
+    }
+    return nullptr;
+}
+
+std::unique_ptr<syrec::Number> optimizations::Optimizer::tryMapExprToCompileTimeConstantExpr(const syrec::expression& expr) {
+    if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr != nullptr) {
+        if (const auto& mappedToBinaryOp = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op); mappedToBinaryOp.has_value() && tryMapOperationToCompileTimeConstantOperation(*mappedToBinaryOp).has_value()) {
+            auto lhsExprAsOperand = tryMapExprToCompileTimeConstantExpr(*exprAsBinaryExpr->lhs);
+            auto rhsExprAsOperand = tryMapExprToCompileTimeConstantExpr(*exprAsBinaryExpr->rhs);
+            if (lhsExprAsOperand != nullptr && rhsExprAsOperand != nullptr) {
+                return std::make_unique<syrec::Number>(syrec::Number::CompileTimeConstantExpression(std::move(lhsExprAsOperand), *tryMapOperationToCompileTimeConstantOperation(*mappedToBinaryOp), std::move(rhsExprAsOperand)));       
+            }
+        }
+    }
+    if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr != nullptr) {
+        return createCopyOfNumber(*exprAsNumericExpr->value);   
+    }
+    return nullptr;
+}
+
+std::optional<syrec_operation::operation> optimizations::Optimizer::tryMapCompileTimeConstantOperation(syrec::Number::CompileTimeConstantExpression::Operation compileTimeConstantExprOperation) {
+    switch (compileTimeConstantExprOperation) {
+        case syrec::Number::CompileTimeConstantExpression::Operation::Addition:
+            return std::make_optional(syrec_operation::operation::Addition);
+        case syrec::Number::CompileTimeConstantExpression::Operation::Subtraction:
+            return std::make_optional(syrec_operation::operation::Subtraction);
+        case syrec::Number::CompileTimeConstantExpression::Operation::Multiplication:
+            return std::make_optional(syrec_operation::operation::Multiplication);
+        case syrec::Number::CompileTimeConstantExpression::Operation::Division:
+            return std::make_optional(syrec_operation::operation::Division);
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<syrec::Number::CompileTimeConstantExpression::Operation> optimizations::Optimizer::tryMapOperationToCompileTimeConstantOperation(syrec_operation::operation operation) {
+    switch (operation) {
+        case syrec_operation::operation::Addition:
+            return std::make_optional(syrec::Number::CompileTimeConstantExpression::Addition);
+        case syrec_operation::operation::Subtraction:
+            return std::make_optional(syrec::Number::CompileTimeConstantExpression::Addition);
+        case syrec_operation::operation::Multiplication:
+            return std::make_optional(syrec::Number::CompileTimeConstantExpression::Multiplication);
+        case syrec_operation::operation::Division:
+            return std::make_optional(syrec::Number::CompileTimeConstantExpression::Division);
+        default:
+            return std::nullopt;
+    }
 }
 
 void optimizations::Optimizer::updateReferenceCountOf(const std::string_view& signalIdent, ReferenceCountUpdate typeOfUpdate) const {
@@ -383,4 +587,60 @@ std::optional<unsigned> optimizations::Optimizer::tryEvaluateExpressionToConstan
         }
     }
     return std::nullopt;
+}
+
+void optimizations::Optimizer::updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, ReferenceCountUpdate typeOfUpdate) const {
+    if (number.isLoopVariable()) {
+        updateReferenceCountOf(number.variableName(), typeOfUpdate);
+    } else if (number.isCompileTimeConstantExpression()) {
+        updateReferenceCountsOfSignalIdentsUsedIn(*number.getExpression().lhsOperand, typeOfUpdate);
+        updateReferenceCountsOfSignalIdentsUsedIn(*number.getExpression().rhsOperand, typeOfUpdate);
+    }
+}
+
+void optimizations::Optimizer::updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, ReferenceCountUpdate typeOfUpdate) const {
+    SignalIdentCountLookup signalIdentCountLookup;
+    determineUsedSignalIdentsIn(expr, signalIdentCountLookup);
+
+    for (const auto& [signalIdent, occurrenceCount] : signalIdentCountLookup.lookup) {
+        for (std::size_t i = 0; i < occurrenceCount; ++i) {
+            updateReferenceCountOf(signalIdent, typeOfUpdate);    
+        }
+    }
+}
+
+std::unique_ptr<syrec::BinaryExpression> optimizations::Optimizer::createBinaryExprFromCompileTimeConstantExpr(const syrec::Number& number) {
+    return nullptr;
+}
+
+void optimizations::Optimizer::determineUsedSignalIdentsIn(const syrec::expression& expr, SignalIdentCountLookup& lookupContainer) {
+    if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr != nullptr) {
+        determineUsedSignalIdentsIn(*exprAsBinaryExpr->lhs, lookupContainer);
+        determineUsedSignalIdentsIn(*exprAsBinaryExpr->rhs, lookupContainer);
+    } else if (const auto& exprAsShiftExpr = dynamic_cast<const syrec::ShiftExpression*>(&expr); exprAsShiftExpr != nullptr) {
+        determineUsedSignalIdentsIn(*exprAsShiftExpr->lhs, lookupContainer);
+        determineUsedSignalIdentsIn(*exprAsShiftExpr->rhs, lookupContainer);
+    } else if (const auto& exprAsVariableExpr = dynamic_cast<const syrec::VariableExpression*>(&expr); exprAsVariableExpr != nullptr) {
+        addSignalIdentToLookup(exprAsVariableExpr->var->var->name, lookupContainer);
+    } else if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr != nullptr) {
+        determineUsedSignalIdentsIn(*exprAsNumericExpr->value, lookupContainer);
+    }
+}
+
+void optimizations::Optimizer::determineUsedSignalIdentsIn(const syrec::Number& number, SignalIdentCountLookup& lookupContainer) {
+    if (number.isLoopVariable()) {
+        addSignalIdentToLookup(number.variableName(), lookupContainer);
+    }
+    if (number.isCompileTimeConstantExpression()) {
+        determineUsedSignalIdentsIn(*number.getExpression().lhsOperand, lookupContainer);
+        determineUsedSignalIdentsIn(*number.getExpression().rhsOperand, lookupContainer);
+    }
+}
+
+void optimizations::Optimizer::addSignalIdentToLookup(const std::string_view& signalIdent, SignalIdentCountLookup& lookupContainer) {
+    if (lookupContainer.lookup.find(signalIdent) != lookupContainer.lookup.end()) {
+        lookupContainer.lookup.at(signalIdent)++;
+    }else {
+        lookupContainer.lookup.insert(std::make_pair(signalIdent, 1));
+    }
 }
