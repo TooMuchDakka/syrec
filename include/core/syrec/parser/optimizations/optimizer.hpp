@@ -7,6 +7,9 @@
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
 
+/*
+ * TODO: Support for VHDL like signal access (i.e. bit range structured as .bitRangeEnd:bitRangeStart instead of .bitRangeStart:bitRangeEnd)
+ */
 namespace optimizations {
     class Optimizer {
     public:
@@ -87,13 +90,13 @@ namespace optimizations {
         
         [[nodiscard]] OptimizationResult<syrec::Module> handleModule(const syrec::Module& module);
 
-        [[nodiscard]] OptimizationResult<syrec::Statement>               handleUnaryStmt(const syrec::UnaryStatement& unaryStmt);
-        [[nodiscard]] OptimizationResult<syrec::Statement>               handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt);
+        [[nodiscard]] OptimizationResult<syrec::Statement>               handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) const;
+        [[nodiscard]] OptimizationResult<syrec::Statement>               handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt) const;
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleCallStmt(const syrec::CallStatement& callStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleIfStmt(const syrec::IfStatement& ifStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleLoopStmt(const syrec::ForStatement& forStatement);
-        [[nodiscard]] OptimizationResult<syrec::Statement>               handleSwapStmt(const syrec::SwapStatement& swapStatement);
-        [[nodiscard]] OptimizationResult<syrec::Statement>               handleSkipStmt(const syrec::SkipStatement& skipStatement);
+        [[nodiscard]] OptimizationResult<syrec::Statement>               handleSwapStmt(const syrec::SwapStatement& swapStatement) const;
+        [[nodiscard]] static OptimizationResult<syrec::Statement>        handleSkipStmt(const syrec::SkipStatement& skipStatement);
 
         [[nodiscard]] OptimizationResult<syrec::expression>     handleBinaryExpr(const syrec::BinaryExpression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::expression>     handleShiftExpr(const syrec::ShiftExpression& expression) const;
@@ -104,6 +107,7 @@ namespace optimizations {
         [[nodiscard]] static std::unique_ptr<syrec::expression> createCopyOfExpression(const syrec::expression& expr);
         [[nodiscard]] static std::unique_ptr<syrec::Number>     createCopyOfNumber(const syrec::Number& number);
         [[nodiscard]] static std::unique_ptr<syrec::Module>     createCopyOfModule(const syrec::Module& module);
+
 
         [[nodiscard]] std::unique_ptr<syrec::expression>                                            trySimplifyExpr(const syrec::expression& expr) const;
         [[nodiscard]] static std::unique_ptr<syrec::expression>                                     transformCompileTimeConstantExpressionToNumber(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr);
@@ -132,7 +136,7 @@ namespace optimizations {
             const bool wasTrimmed;
             const std::vector<std::pair<IndexValidityStatus, std::optional<unsigned int>>> valuePerDimension;
         };
-        [[nodiscard]] std::optional<DimensionAccessEvaluationResult>       tryEvaluateUserDefinedDimensionAccess(const std::string_view& accessedSignalIdent, const std::vector<std::reference_wrapper<const syrec::expression>>& accessedValuePerDimension) const;
+        [[nodiscard]] DimensionAccessEvaluationResult                      evaluateUserDefinedDimensionAccess(const std::string_view& accessedSignalIdent, const std::vector<std::reference_wrapper<const syrec::expression>>& accessedValuePerDimension) const;
         [[nodiscard]] std::optional<std::pair<unsigned int, unsigned int>> tryEvaluateBitRangeAccessComponents(const std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>& accessedBitRange) const;
         [[nodiscard]] std::optional<unsigned int>                          tryEvaluateNumberAsConstant(const syrec::Number& number) const;
         [[nodiscard]] std::optional<unsigned int>                          tryEvaluateExpressionToConstant(const syrec::expression& expr) const;
@@ -147,8 +151,26 @@ namespace optimizations {
                 rangeStartEvaluationResult(std::make_pair(rangeStartEvaluationResultFlag, rangeStartEvaluated)),
                 rangeEndEvaluationResult(std::make_pair(rangeEndEvaluationResultFlag, rangeEndEvaluated)) {}
         };
-        [[nodiscard]] std::optional<BitRangeEvaluationResult>         tryEvaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const;
+        [[nodiscard]] BitRangeEvaluationResult                        evaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const;
         [[nodiscard]] static std::unique_ptr<syrec::BinaryExpression> createBinaryExprFromCompileTimeConstantExpr(const syrec::Number& number);
+
+        struct EvaluatedSignalAccess {
+            const std::string_view accessedSignalIdent;
+            const DimensionAccessEvaluationResult accessedValuePerDimension;
+            const BitRangeEvaluationResult        accessedBitRange;
+        };
+        [[nodiscard]] std::optional<EvaluatedSignalAccess>          tryEvaluateDefinedSignalAccess(const syrec::VariableAccess& accessedSignalParts) const;
+
+        void                                                        invalidateValueOfAccessedSignalParts(const EvaluatedSignalAccess& accessedSignalParts) const;
+        void                                                        performAssignment(const EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, unsigned int assignmentRhsValue) const;
+        void                                                        performAssignment(const EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, const EvaluatedSignalAccess& assignmentRhsOperand) const;
+        void                                                        performSwap(const EvaluatedSignalAccess& swapOperationLhsOperand, const EvaluatedSignalAccess& swapOperationRhsOperand) const;
+        [[nodiscard]] std::unique_ptr<syrec::VariableAccess>        transformEvaluatedSignalAccess(const EvaluatedSignalAccess& accessedSignalParts, std::optional<bool>* wasAnyAccessedComponentOutOfRange, bool* areAllAccessedSignalAccessComponentsConstants) const;
+        [[nodiscard]] std::optional<unsigned int>                   tryFetchValueFromEvaluatedSignalAccess(const EvaluatedSignalAccess& accessedSignalParts) const;
+        
+        [[nodiscard]] OptimizationResult<syrec::VariableAccess> handleSignalAccess(const syrec::VariableAccess& signalAccess, bool performConstantPropagationForAccessedSignal, std::optional<unsigned int>* fetchedValue) const;
+        static void filterAssignmentsThatDoNotChangeAssignedToSignal(syrec::Statement::vec& assignmentsToCheck);
+
 
         struct SignalIdentCountLookup {
             std::map<std::string_view, std::size_t, std::less<void>> lookup;
