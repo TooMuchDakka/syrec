@@ -160,14 +160,16 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 // TODO: Should the semantic checks that we assume to be already done in the parser be repeated again, i.e. does a matching module exist, etc.
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleCallStmt(const syrec::CallStatement& callStatement) const {
     if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(symbolTable, callStatement.target->name); moduleCallGuessResolver.has_value()) {
+        const auto moduleIdsOfInitialGuess = moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess();
+
         bool                              calleeArgumentsOk = true;
         std::vector<syrec::Variable::ptr> symbolTableEntryForCalleeArguments(callStatement.parameters.size());
-        for (std::size_t i = 0; i < symbolTableEntryForCalleeArguments.size() && calleeArgumentsOk; ++i) {
+        for (std::size_t i = 0; i < symbolTableEntryForCalleeArguments.size(); ++i) {
             if (const auto& symbolTableEntryForCalleeArgument = symbolTable->getVariable(callStatement.parameters.at(i)); symbolTableEntryForCalleeArgument.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForCalleeArgument)) {
-                const auto matchingSignalForCallleeArgument = std::get<syrec::Variable::ptr>(*symbolTableEntryForCalleeArgument);
-                symbolTableEntryForCalleeArguments.emplace_back(matchingSignalForCallleeArgument);
-                moduleCallGuessResolver->get()->refineGuessWithNextParameter(*matchingSignalForCallleeArgument);
-                calleeArgumentsOk = true;
+                const auto matchingSignalForCalleeArgument = std::get<syrec::Variable::ptr>(*symbolTableEntryForCalleeArgument);
+                symbolTableEntryForCalleeArguments.emplace_back(matchingSignalForCalleeArgument);
+                moduleCallGuessResolver->get()->refineGuessWithNextParameter(*matchingSignalForCalleeArgument);
+                calleeArgumentsOk &= true;
             }
         }
 
@@ -186,16 +188,17 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
                     invalidateValueOfAccessedSignalParts(*tryEvaluateDefinedSignalAccess(*calleeArgumentAsSignalAccess));
                 }
+                symbolTable->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), parser::SymbolTable::ReferenceCountUpdate::Increment);
             } else {
                 const auto setOfOptimizedModuleParameterLookup = std::set<std::size_t>(modulesMatchingCallSignature.front().indicesOfOptimizedAwayParameters.begin(), modulesMatchingCallSignature.front().indicesOfOptimizedAwayParameters.end());
-                const auto& calledModule = modulesMatchingCallSignature.front();
+                const auto& signatureOfCalledModuleInSymbolTable = modulesMatchingCallSignature.front();
 
-                for (std::size_t i = 0; i < calledModule.declaredParameters.size(); i++) {
+                for (std::size_t i = 0; i < signatureOfCalledModuleInSymbolTable.declaredParameters.size(); i++) {
                     if (setOfOptimizedModuleParameterLookup.count(i) != 0) {
                         continue;   
                     }
 
-                    const auto& signalTypeOfCallerParameter = calledModule.declaredParameters.at(i)->type;
+                    const auto& signalTypeOfCallerParameter = signatureOfCalledModuleInSymbolTable.declaredParameters.at(i)->type;
                     if (signalTypeOfCallerParameter == syrec::Variable::Types::In) {
                         continue;
                     }
@@ -207,7 +210,25 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
                     invalidateValueOfAccessedSignalParts(*tryEvaluateDefinedSignalAccess(*calleeArgumentAsSignalAccess));
                 }
+                symbolTable->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, {signatureOfCalledModuleInSymbolTable.internalModuleId}, parser::SymbolTable::ReferenceCountUpdate::Increment);
             }
+
+        } else {
+            /*
+             * We are assuming that the all defined callee arguments refer to previously declared signals, thus this branch should not be relevant but could be kept as a fail-safe in case our assumed precondition does not hold.
+             * Additionally, on which guess basis should our update start from? The only choice would be the initial one since an invalid callee argument is not supported by the module call guess resolver (but could be supported in the future)
+             * and thus our guesses are not further refined (based only on the data of the valid callee arguments and the number of actually defined parameters).
+             * TODO: Check whether this branch is required
+             */
+            symbolTable->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), parser::SymbolTable::ReferenceCountUpdate::Increment);
+        }
+
+        /*
+         * In case that our precondition does not hold, invalid callee arguments will not produce an increment of the reference count of all declared signals in all reachable scopes of the symbol table.
+         * TODO: Is this assumption OK?
+         */
+        for (const auto& calleeArgument: callStatement.parameters) {
+            symbolTable->updateReferenceCountOfLiteral(calleeArgument, parser::SymbolTable::ReferenceCountUpdate::Increment);
         }
     }
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
