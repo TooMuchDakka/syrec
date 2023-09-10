@@ -60,12 +60,8 @@ namespace parser {
         void                                                    insertSkipStatementIfStatementListIsEmpty(syrec::Statement::vec& statementList) const;
 
         std::optional<SignalAccessRestriction::SignalAccess> tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const messageUtils::Message::Position& optionalEvaluationErrorPosition);
-
-        enum ReferenceCountUpdate {
-            Increment,
-            Decrement
-        };
-        void updateReferenceCountOfSignal(const std::string_view& signalIdent, ReferenceCountUpdate typeOfUpdate) const;
+        
+        void updateReferenceCountOfSignal(const std::string_view& signalIdent, SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         [[nodiscard]] std::optional<unsigned int> tryPerformConstantPropagationForSignalAccess(const syrec::VariableAccess::ptr& accessedSignal) const;
         [[nodiscard]] static std::optional<unsigned int> convertToNumber(const std::string& text);
 

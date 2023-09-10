@@ -92,7 +92,7 @@ namespace optimizations {
 
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) const;
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt) const;
-        [[nodiscard]] OptimizationResult<syrec::Statement>               handleCallStmt(const syrec::CallStatement& callStatement);
+        [[nodiscard]] OptimizationResult<syrec::Statement>               handleCallStmt(const syrec::CallStatement& callStatement) const;
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleIfStmt(const syrec::IfStatement& ifStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleLoopStmt(const syrec::ForStatement& forStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleSwapStmt(const syrec::SwapStatement& swapStatement) const;
@@ -115,14 +115,10 @@ namespace optimizations {
         [[nodiscard]] static std::optional<syrec::Number::CompileTimeConstantExpression::Operation> tryMapOperationToCompileTimeConstantOperation(syrec_operation::operation operation);
         [[nodiscard]] static std::unique_ptr<syrec::expression>                                     tryMapCompileTimeConstantOperandToExpr(const syrec::Number& number);
         [[nodiscard]] static std::unique_ptr<syrec::Number>                                         tryMapExprToCompileTimeConstantExpr(const syrec::expression& expr);
-
-        enum ReferenceCountUpdate {
-            Increment,
-            Decrement
-        };
-        void updateReferenceCountOf(const std::string_view& signalIdent, ReferenceCountUpdate typeOfUpdate) const;
-        void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, ReferenceCountUpdate typeOfUpdate) const;
-        void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, ReferenceCountUpdate typeOfUpdate) const;
+        
+        void updateReferenceCountOf(const std::string_view& signalIdent, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
+        void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
+        void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
 
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForAccessedSignal(const syrec::VariableAccess& accessedSignal) const;
 

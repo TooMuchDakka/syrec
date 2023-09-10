@@ -1,5 +1,6 @@
 #include "core/syrec/parser/optimizations/optimizer.hpp"
 
+#include "core/syrec/parser/module_call_guess.hpp"
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
@@ -156,7 +157,59 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleCallStmt(const syrec::CallStatement& callStatement) {
+// TODO: Should the semantic checks that we assume to be already done in the parser be repeated again, i.e. does a matching module exist, etc.
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleCallStmt(const syrec::CallStatement& callStatement) const {
+    if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(symbolTable, callStatement.target->name); moduleCallGuessResolver.has_value()) {
+        bool                              calleeArgumentsOk = true;
+        std::vector<syrec::Variable::ptr> symbolTableEntryForCalleeArguments(callStatement.parameters.size());
+        for (std::size_t i = 0; i < symbolTableEntryForCalleeArguments.size() && calleeArgumentsOk; ++i) {
+            if (const auto& symbolTableEntryForCalleeArgument = symbolTable->getVariable(callStatement.parameters.at(i)); symbolTableEntryForCalleeArgument.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForCalleeArgument)) {
+                const auto matchingSignalForCallleeArgument = std::get<syrec::Variable::ptr>(*symbolTableEntryForCalleeArgument);
+                symbolTableEntryForCalleeArguments.emplace_back(matchingSignalForCallleeArgument);
+                moduleCallGuessResolver->get()->refineGuessWithNextParameter(*matchingSignalForCallleeArgument);
+                calleeArgumentsOk = true;
+            }
+        }
+
+        if (calleeArgumentsOk) {
+            /*
+             * If the called module is not resolved already by the provided call statement, we also need to take special care when more than one module matches the given signature.
+             * TODO: Invalidation of provided modifiable caller parameters given the user provided callee arguments
+             */
+            const auto modulesMatchingCallSignature = moduleCallGuessResolver->get()->getMatchesForGuess();
+            if (modulesMatchingCallSignature.empty() || modulesMatchingCallSignature.size() > 1) {
+                for (const auto& calleeArgument : symbolTableEntryForCalleeArguments) {
+                    const auto calleeArgumentAsSignalAccess = std::make_unique<syrec::VariableAccess>();
+                    calleeArgumentAsSignalAccess->var       = calleeArgument;
+                    calleeArgumentAsSignalAccess->indexes   = {};
+                    calleeArgumentAsSignalAccess->range     = std::nullopt;
+
+                    invalidateValueOfAccessedSignalParts(*tryEvaluateDefinedSignalAccess(*calleeArgumentAsSignalAccess));
+                }
+            } else {
+                const auto setOfOptimizedModuleParameterLookup = std::set<std::size_t>(modulesMatchingCallSignature.front().indicesOfOptimizedAwayParameters.begin(), modulesMatchingCallSignature.front().indicesOfOptimizedAwayParameters.end());
+                const auto& calledModule = modulesMatchingCallSignature.front();
+
+                for (std::size_t i = 0; i < calledModule.declaredParameters.size(); i++) {
+                    if (setOfOptimizedModuleParameterLookup.count(i) != 0) {
+                        continue;   
+                    }
+
+                    const auto& signalTypeOfCallerParameter = calledModule.declaredParameters.at(i)->type;
+                    if (signalTypeOfCallerParameter == syrec::Variable::Types::In) {
+                        continue;
+                    }
+
+                    const auto calleeArgumentAsSignalAccess = std::make_unique<syrec::VariableAccess>();
+                    calleeArgumentAsSignalAccess->var       = symbolTableEntryForCalleeArguments.at(i);
+                    calleeArgumentAsSignalAccess->indexes   = {};
+                    calleeArgumentAsSignalAccess->range     = std::nullopt;
+
+                    invalidateValueOfAccessedSignalParts(*tryEvaluateDefinedSignalAccess(*calleeArgumentAsSignalAccess));
+                }
+            }
+        }
+    }
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
@@ -188,16 +241,16 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     const auto& evaluatedSwapOperationRhsSignalAccess = tryEvaluateDefinedSignalAccess(*rhsOperandAfterSimplification);
 
     if (evaluatedSwapOperationLhsSignalAccess.has_value() && evaluatedSwapOperationRhsSignalAccess.has_value()) {
-        updateReferenceCountOf(evaluatedSwapOperationLhsSignalAccess->accessedSignalIdent, ReferenceCountUpdate::Increment);
-        updateReferenceCountOf(evaluatedSwapOperationRhsSignalAccess->accessedSignalIdent, ReferenceCountUpdate::Increment);
+        updateReferenceCountOf(evaluatedSwapOperationLhsSignalAccess->accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Increment);
+        updateReferenceCountOf(evaluatedSwapOperationRhsSignalAccess->accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Increment);
         performSwap(*evaluatedSwapOperationLhsSignalAccess, *evaluatedSwapOperationRhsSignalAccess);
     } else {
         if (evaluatedSwapOperationLhsSignalAccess.has_value()) {
-            updateReferenceCountOf(evaluatedSwapOperationLhsSignalAccess->accessedSignalIdent, ReferenceCountUpdate::Increment);
+            updateReferenceCountOf(evaluatedSwapOperationLhsSignalAccess->accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Increment);
             invalidateValueOfAccessedSignalParts(*evaluatedSwapOperationLhsSignalAccess);
         }
         if (evaluatedSwapOperationRhsSignalAccess.has_value()) {
-            updateReferenceCountOf(evaluatedSwapOperationRhsSignalAccess->accessedSignalIdent, ReferenceCountUpdate::Increment);
+            updateReferenceCountOf(evaluatedSwapOperationRhsSignalAccess->accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Increment);
             invalidateValueOfAccessedSignalParts(*evaluatedSwapOperationRhsSignalAccess);
         }        
     }
@@ -216,7 +269,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     if (const auto& evaluatedUnaryOperandSignalAccess = tryEvaluateDefinedSignalAccess(*signalAccessOperand); evaluatedUnaryOperandSignalAccess.has_value()) {
-        updateReferenceCountOf(evaluatedUnaryOperandSignalAccess->accessedSignalIdent, ReferenceCountUpdate::Increment);
+        updateReferenceCountOf(evaluatedUnaryOperandSignalAccess->accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Increment);
         const auto& fetchedValueForAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(*evaluatedUnaryOperandSignalAccess);
         const auto& mappedToUnaryOperationFromFlag  = syrec_operation::tryMapUnaryAssignmentOperationFlagToEnum(unaryStmt.op);
 
@@ -310,10 +363,10 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
 // TODO: Bitwidth ?
 optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleVariableExpr(const syrec::VariableExpression& expression) const {
     if (const auto& fetchedValueForSignal = symbolTable->tryFetchValueForLiteral(expression.var); fetchedValueForSignal.has_value() && parserConfig.performConstantPropagation) {
-        updateReferenceCountOf(expression.var->var->name, ReferenceCountUpdate::Decrement);
+        updateReferenceCountOf(expression.var->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
         return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*fetchedValueForSignal), expression.bitwidth()));
     }
-    updateReferenceCountOf(expression.var->var->name, ReferenceCountUpdate::Increment);
+    updateReferenceCountOf(expression.var->var->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
     return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
@@ -341,17 +394,17 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
     if (evaluatedToValueOfShiftAmount.has_value()) {
         if (syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToShiftOperation, *evaluatedToValueOfShiftAmount)) {
             finalSimplificationResult = std::move(simplifiedToBeShiftedExpr);
-            updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, ReferenceCountUpdate::Decrement);
+            updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
         } else if (evaluatedToValueOfToBeShiftedExpr.has_value()) {
             if (const auto& evaluatedShiftOperationResult = syrec_operation::apply(*mappedToShiftOperation, evaluatedToValueOfToBeShiftedExpr, evaluatedToValueOfShiftAmount)) {
                 finalSimplificationResult = std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*evaluatedShiftOperationResult), expression.bitwidth());
             }
-            updateReferenceCountsOfSignalIdentsUsedIn(*expression.lhs, ReferenceCountUpdate::Decrement);
-            updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, ReferenceCountUpdate::Decrement);
+            updateReferenceCountsOfSignalIdentsUsedIn(*expression.lhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
+            updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
         }
     } else if (evaluatedToValueOfToBeShiftedExpr.has_value() && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(*mappedToShiftOperation, *evaluatedToValueOfToBeShiftedExpr)) {
         finalSimplificationResult = std::move(simplifiedToBeShiftedExpr);
-        updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, ReferenceCountUpdate::Decrement);
+        updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
     }
 
     if (finalSimplificationResult) {
@@ -366,10 +419,10 @@ optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optim
     }
     if (number.isLoopVariable()) {
         if (const auto& fetchedValueOfLoopVariable = symbolTable->tryFetchValueOfLoopVariable(number.variableName()); parserConfig.performConstantPropagation && fetchedValueOfLoopVariable.has_value()) {
-            updateReferenceCountOf(number.variableName(), ReferenceCountUpdate::Decrement);
+            updateReferenceCountOf(number.variableName(), parser::SymbolTable::ReferenceCountUpdate::Decrement);
             return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::make_unique<syrec::Number>(*fetchedValueOfLoopVariable));   
         }
-        updateReferenceCountOf(number.variableName(), ReferenceCountUpdate::Increment);
+        updateReferenceCountOf(number.variableName(), parser::SymbolTable::ReferenceCountUpdate::Increment);
         return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
     if (number.isCompileTimeConstantExpression()) {
@@ -380,7 +433,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optim
             }
         }
     }
-    updateReferenceCountsOfSignalIdentsUsedIn(number, ReferenceCountUpdate::Increment);
+    updateReferenceCountsOfSignalIdentsUsedIn(number, parser::SymbolTable::ReferenceCountUpdate::Increment);
     return OptimizationResult<syrec::Number>::asUnchangedOriginal();
 }
 
@@ -486,7 +539,7 @@ std::unique_ptr<syrec::expression> optimizations::Optimizer::trySimplifyExpr(con
             droppedSignalAccesses.cbegin(),
             droppedSignalAccesses.cend(),
             [&](const syrec::VariableAccess::ptr& droppedSignalAccess) {
-                updateReferenceCountOf(droppedSignalAccess->var->name, ReferenceCountUpdate::Decrement);
+                updateReferenceCountOf(droppedSignalAccess->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
             });
     return simplificationResult;
 }
@@ -562,12 +615,8 @@ std::optional<syrec::Number::CompileTimeConstantExpression::Operation> optimizat
     }
 }
 
-void optimizations::Optimizer::updateReferenceCountOf(const std::string_view& signalIdent, ReferenceCountUpdate typeOfUpdate) const {
-    if (typeOfUpdate == ReferenceCountUpdate::Increment) {
-        symbolTable->incrementLiteralReferenceCount(signalIdent);
-    } else if (typeOfUpdate == ReferenceCountUpdate::Decrement) {
-        symbolTable->decrementLiteralReferenceCount(signalIdent);
-    }
+void optimizations::Optimizer::updateReferenceCountOf(const std::string_view& signalIdent, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const {
+    symbolTable->updateReferenceCountOfLiteral(signalIdent, typeOfUpdate);
 }
 
 std::optional<unsigned> optimizations::Optimizer::tryFetchValueForAccessedSignal(const syrec::VariableAccess& accessedSignal) const {
@@ -648,7 +697,7 @@ std::optional<unsigned> optimizations::Optimizer::tryEvaluateExpressionToConstan
     return std::nullopt;
 }
 
-void optimizations::Optimizer::updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, ReferenceCountUpdate typeOfUpdate) const {
+void optimizations::Optimizer::updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const {
     if (number.isLoopVariable()) {
         updateReferenceCountOf(number.variableName(), typeOfUpdate);
     } else if (number.isCompileTimeConstantExpression()) {
@@ -657,7 +706,7 @@ void optimizations::Optimizer::updateReferenceCountsOfSignalIdentsUsedIn(const s
     }
 }
 
-void optimizations::Optimizer::updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, ReferenceCountUpdate typeOfUpdate) const {
+void optimizations::Optimizer::updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const {
     SignalIdentCountLookup signalIdentCountLookup;
     determineUsedSignalIdentsIn(expr, signalIdentCountLookup);
 
@@ -765,7 +814,7 @@ void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& as
 void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, const EvaluatedSignalAccess& assignmentRhsOperand) const {
     if (const auto fetchedValueForAssignmentRhsOperand = tryFetchValueFromEvaluatedSignalAccess(assignmentRhsOperand); fetchedValueForAssignmentRhsOperand.has_value()) {
         performAssignment(assignmentLhsOperand, assignmentOperation, *fetchedValueForAssignmentRhsOperand);
-        updateReferenceCountOf(assignmentRhsOperand.accessedSignalIdent, ReferenceCountUpdate::Decrement);
+        updateReferenceCountOf(assignmentRhsOperand.accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Decrement);
         return;
     }
     auto                                         transformedLhsOperandSignalAccess       = transformEvaluatedSignalAccess(assignmentLhsOperand, nullptr, nullptr);
@@ -922,7 +971,7 @@ optimizations::Optimizer::OptimizationResult<syrec::VariableAccess> optimization
         }
 
         if (!skipReferenceCountUpdate) {
-            updateReferenceCountOf(simplifiedSignalAccess->var->name, ReferenceCountUpdate::Increment);
+            updateReferenceCountOf(simplifiedSignalAccess->var->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
         }
 
         if (performConstantPropagationForAccessedSignal && fetchedValue != nullptr && fetchedValue->has_value()) {
@@ -934,7 +983,7 @@ optimizations::Optimizer::OptimizationResult<syrec::VariableAccess> optimization
         }
         return OptimizationResult<syrec::VariableAccess>::asUnchangedOriginal();
     }
-    updateReferenceCountOf(signalAccess.var->name, ReferenceCountUpdate::Increment);
+    updateReferenceCountOf(signalAccess.var->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
     return OptimizationResult<syrec::VariableAccess>::asUnchangedOriginal();
 }
 

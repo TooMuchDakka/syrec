@@ -53,7 +53,7 @@ namespace parser {
         [[nodiscard]] std::optional<ExpressionEvaluationResult::ptr> getUnoptimizedExpression(SyReCParser::ExpressionContext* context);
         [[nodiscard]] static bool                                    areExpressionsEqual(const ExpressionEvaluationResult::ptr& firstExpr, const ExpressionEvaluationResult::ptr& otherExpr);
         
-        void                                                         updateReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression, SyReCCustomBaseVisitor::ReferenceCountUpdate typeOfUpdate) const;
+        void                                                         updateReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression, SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         [[nodiscard]] SymbolTableBackupHelper::ptr                   createCopiesOfCurrentValuesOfChangedSignalsAndResetToOriginal(const SymbolTableBackupHelper::ptr& backupOfOriginalValues) const;
         void                                                         mergeChangesFromBranchesAndUpdateSymbolTable(const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInTrueBranch, const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInFalseBranch, bool canAnyBranchBeOmitted, bool canTrueBranchBeOmitted) const;
         void                                                         createAndStoreBackupForAssignedToSignal(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
@@ -140,7 +140,6 @@ namespace parser {
         [[nodiscard]] static bool doesModuleOnlyHaveReadOnlyParameters(const syrec::Module::ptr& calledModule);
         [[nodiscard]] static bool doesModuleOnlyConsistOfSkipStatements(const syrec::Module::ptr& calledModule);
         
-        void                                                       decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(const syrec::Module::ptr& calledModule, const std::vector<std::string>& filteredCalleeArguments) const;
         void                                                       performAssignmentRhsExprSimplification(syrec::expression::ptr& assignmentRhsExpr) const;
         void                                                       performAssignmentOperation(const syrec::AssignStatement::ptr& assignmentStmt) const;
 

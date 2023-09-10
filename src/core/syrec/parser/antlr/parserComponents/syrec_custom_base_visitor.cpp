@@ -153,7 +153,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
             const syrec::VariableAccess::ptr container = std::make_shared<syrec::VariableAccess>();
             container->setVar(std::get<syrec::Variable::ptr>(*signalSymTabEntry));
             accessedSignal.emplace(container);
-            updateReferenceCountOfSignal(signalIdent, Increment);
+            updateReferenceCountOfSignal(signalIdent, SymbolTable::ReferenceCountUpdate::Increment);
         }
     }
 
@@ -230,7 +230,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
             createMessage(restrictionErrorPosition, messageUtils::Message::Severity::Error, AccessingRestrictedPartOfSignal, signalIdent);
         } else {
             if (const auto& fetchedValueByConstantPropagation = tryPerformConstantPropagationForSignalAccess(*accessedSignal); fetchedValueByConstantPropagation.has_value()) {
-                updateReferenceCountOfSignal(accessedSignal.value()->var->name, Decrement);
+                updateReferenceCountOfSignal(accessedSignal.value()->var->name, SymbolTable::ReferenceCountUpdate::Decrement);
                 return std::make_optional(std::make_shared<SignalEvaluationResult>(std::make_shared<syrec::Number>(*fetchedValueByConstantPropagation)));
             }
             return std::make_optional(std::make_shared<SignalEvaluationResult>(*accessedSignal));
@@ -334,7 +334,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromExpression(SyReCParser::NumberFr
             
             if (!optimizedAwaySignalAccesses.empty()) {
                 for (const auto& optimizedAwaySignalAccess : optimizedAwaySignalAccesses) {
-                    updateReferenceCountOfSignal(optimizedAwaySignalAccess->var->name, Decrement);
+                    updateReferenceCountOfSignal(optimizedAwaySignalAccess->var->name, SymbolTable::ReferenceCountUpdate::Decrement);
                 }
             }
         }
@@ -372,7 +372,7 @@ std::any SyReCCustomBaseVisitor::visitNumberFromLoopVariable(SyReCParser::Number
                 messageUtils::Message::Position(context->IDENT()->getSymbol()->getLine(), context->IDENT()->getSymbol()->getCharPositionInLine()))) {
         return std::nullopt;
     }
-    updateReferenceCountOfSignal(signalIdent, Increment);
+    updateReferenceCountOfSignal(signalIdent, SymbolTable::ReferenceCountUpdate::Increment);
     if (sharedData->lastDeclaredLoopVariable.has_value() && *sharedData->lastDeclaredLoopVariable == signalIdent) {
         createMessage(mapAntlrTokenPosition(context->IDENT()->getSymbol()), messageUtils::Message::Severity::Error, CannotReferenceLoopVariableInInitalValueDefinition, signalIdent);
         return std::nullopt;
@@ -674,17 +674,11 @@ bool SyReCCustomBaseVisitor::isAccessToAccessedSignalPartRestricted(const syrec:
 /*
  * TODO: First condition can probably be removed since readonly parsing should already disable modifications of reference counts
  */
-void SyReCCustomBaseVisitor::updateReferenceCountOfSignal(const std::string_view& signalIdent, SyReCCustomBaseVisitor::ReferenceCountUpdate typeOfUpdate) const {
+void SyReCCustomBaseVisitor::updateReferenceCountOfSignal(const std::string_view& signalIdent, SymbolTable::ReferenceCountUpdate typeOfUpdate) const {
     if ((sharedData->performingReadOnlyParsingOfLoopBody && sharedData->loopNestingLevel > 0) || sharedData->modificationsOfReferenceCountsDisabled) {
         return;
     }
-
-    if (typeOfUpdate == ReferenceCountUpdate::Increment) {
-        sharedData->currentSymbolTableScope->incrementLiteralReferenceCount(signalIdent);   
-    }
-    else {
-        sharedData->currentSymbolTableScope->decrementLiteralReferenceCount(signalIdent);
-    }
+    sharedData->currentSymbolTableScope->updateReferenceCountOfLiteral(signalIdent, typeOfUpdate);
 }
 
 std::string SyReCCustomBaseVisitor::stringifyCompileTimeConstantExpressionOperation(syrec::Number::CompileTimeConstantExpression::Operation ctcOperation) {

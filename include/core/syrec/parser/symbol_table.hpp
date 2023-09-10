@@ -24,20 +24,27 @@ namespace parser {
         [[nodiscard]] bool                                                                  contains(const std::string_view& literalIdent) const;
         [[nodiscard]] bool                                                                  contains(const syrec::Module::ptr& module) const;
         [[nodiscard]] std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> getVariable(const std::string_view& literalIdent) const;
-        [[nodiscard]] std::optional<syrec::Module::vec>                                     getMatchingModulesForName(const std::string_view& moduleName) const;
-        [[nodiscard]] std::optional<std::set<std::size_t>>                                  getPositionOfUnusedParametersForModule(const syrec::Module::ptr& module) const;
+
+        struct DeclaredModuleSignature {
+            std::size_t              internalModuleId;
+            syrec::Variable::vec     declaredParameters;
+            std::vector<std::size_t> indicesOfOptimizedAwayParameters;
+        };
+
+        [[nodiscard]] std::vector<DeclaredModuleSignature>          getMatchingModuleSignaturesForName(const std::string_view& moduleName) const;
+        [[nodiscard]] std::optional<std::unique_ptr<syrec::Module>> getFullDeclaredModuleInformation(const std::string_view& moduleName, std::size_t internalModuleId) const;
+
         bool                                                                                addEntry(const syrec::Variable::ptr& variable);
         bool                                                                                addEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
-        bool                                                                                addEntry(const syrec::Module::ptr& module, const std::vector<bool>& isUnusedStatusPerModuleParameter);
+        bool                                                                                addEntry(const syrec::Module::ptr& module, const std::vector<std::size_t>& indicesOfOptimizedAwayParameters);
         void                                                                                removeVariable(const std::string& literalIdent);
 
-        // BEGIN 
-        // TODO: UNUSED_REFERENCE - Marked as used
-        void incrementLiteralReferenceCount(const std::string_view& literalIdent) const;
-        void decrementLiteralReferenceCount(const std::string_view& literalIdent) const;
-
-        void incrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const;
-        void decrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const;
+        enum ReferenceCountUpdate {
+            Increment,
+            Decrement
+        };
+        void updateReferenceCountOfLiteral(const std::string_view& literalIdent, ReferenceCountUpdate typeOfUpdate) const;
+        void updateReferenceCountOfModulesMatchingSignature(const std::string_view& moduleIdent, const std::vector<std::size_t>& internalModuleIds, ReferenceCountUpdate typeOfUpdate) const;
 
         // TODO: CONSTANT_PROPAGATION
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
@@ -58,7 +65,7 @@ namespace parser {
 
         static void openScope(SymbolTable::ptr& currentScope);
         static void closeScope(SymbolTable::ptr& currentScope);
-        static bool isAssignableTo(const syrec::Variable::ptr& formalParameter, const syrec::Variable::ptr& actualParameter, bool mustParameterTypesMatch);
+        static bool isAssignableTo(const syrec::Variable& formalParameter, const syrec::Variable& actualParameter, bool mustParameterTypesMatch);
 
     private:
         struct VariableSymbolTableEntry {
@@ -91,16 +98,18 @@ namespace parser {
         };
 
         struct ModuleSymbolTableEntry {
-            syrec::Module::vec matchingModules;
-            std::vector<std::size_t> referenceCountsPerModule;
-            std::vector<std::vector<bool>> optimizedAwayStatusPerParameterOfModulePerModule;
+            struct InternalModuleHelperData {
+                const std::size_t              internalId;
+                const syrec::Module::ptr       declaredModule;
+                std::size_t              referenceCount;
+                const std::vector<std::size_t> indicesOfDroppedParametersInOptimizedVersion;
+            };
 
-            ModuleSymbolTableEntry(): matchingModules({}), referenceCountsPerModule({}), optimizedAwayStatusPerParameterOfModulePerModule({}) {}
+            std::map<std::size_t, InternalModuleHelperData> internalDataLookup;
 
-            void addModule(const syrec::Module::ptr& module, const std::vector<bool>& isUnusedStatusPerModuleParameter) {
-                matchingModules.emplace_back(module);
-                referenceCountsPerModule.emplace_back(0);
-                optimizedAwayStatusPerParameterOfModulePerModule.emplace_back(isUnusedStatusPerModuleParameter);
+            void addModule(const syrec::Module::ptr& module, const std::vector<std::size_t>& indexOfDroppedParametersInOptimizedVersionOfModule) {
+                const auto internalIdForModule = internalDataLookup.size();
+                internalDataLookup.insert(std::make_pair(internalIdForModule, InternalModuleHelperData({internalIdForModule, module, 0, indexOfDroppedParametersInOptimizedVersionOfModule})));
             }
         };
 
@@ -112,11 +121,11 @@ namespace parser {
         [[nodiscard]] ModuleSymbolTableEntry*   getEntryForModulesWithMatchingName(const std::string_view& moduleIdent) const;
         [[nodiscard]] VariableSymbolTableEntry* getEntryForVariable(const std::string_view& literalIdent) const;
         static bool                             doModuleSignaturesMatch(const syrec::Module::ptr& module, const syrec::Module::ptr& otherModule);
-        void                                    incrementOrDecrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module, bool incrementReferenceCount) const;
 
         [[nodiscard]] bool doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const;
         static std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts);
         static std::vector<std::optional<unsigned int>>                                  tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable);
+        static void                                                                      performReferenceCountUpdate(std::size_t& currentReferenceCount, ReferenceCountUpdate typeOfUpdate);
     };    
 }
 

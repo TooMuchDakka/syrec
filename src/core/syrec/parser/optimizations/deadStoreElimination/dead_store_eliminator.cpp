@@ -319,7 +319,7 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
 
     if (transformedAccessOnDimension.size() < numDimensionsOfAccessedSignal) {
         const auto numElementsToAppendToDefineFullDimensionAccess = numDimensionsOfAccessedSignal - transformedAccessOnDimension.size();
-        for (auto i = 0; i < numElementsToAppendToDefineFullDimensionAccess; ++i) {
+        for (std::size_t i = 0; i < numElementsToAppendToDefineFullDimensionAccess; ++i) {
             transformedAccessOnDimension.emplace_back(std::nullopt);
         }
     }
@@ -561,7 +561,7 @@ void DeadStoreEliminator::decrementReferenceCountsOfUsedSignalsInExpression(cons
 }
 
 void DeadStoreEliminator::decrementReferenceCountForAccessedSignal(const syrec::VariableAccess::ptr& accessedSignal) const {
-    symbolTable->decrementLiteralReferenceCount(accessedSignal->var->name);
+    symbolTable->updateReferenceCountOfLiteral(accessedSignal->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
 }
 
 void DeadStoreEliminator::decrementReferenceCountOfNumber(const syrec::Number::ptr& number) const {
@@ -574,7 +574,7 @@ void DeadStoreEliminator::decrementReferenceCountOfNumber(const syrec::Number::p
         decrementReferenceCountOfNumber(number->getExpression().rhsOperand);
     }
     else if (number->isLoopVariable()){
-        symbolTable->decrementLiteralReferenceCount(number->variableName());
+        symbolTable->updateReferenceCountOfLiteral(number->variableName(), parser::SymbolTable::ReferenceCountUpdate::Decrement);
     }
 }
 
@@ -858,8 +858,8 @@ bool DeadStoreEliminator::doBitRangesOverlap(const optimizations::BitRangeAccess
      * Accessed BY: |---|
      *
      */
-    if (doesAssignedToBitRangePrecedeAccessedBitRange && assignedToBitRange.second < accessedBitRange.first
-        || doesAssignedToBitRangeExceedAccessedBitRange && assignedToBitRange.first > accessedBitRange.second) {
+    if ((doesAssignedToBitRangePrecedeAccessedBitRange && assignedToBitRange.second < accessedBitRange.first)
+        || (doesAssignedToBitRangeExceedAccessedBitRange && assignedToBitRange.first > accessedBitRange.second)) {
         return false;
     }
     return true;

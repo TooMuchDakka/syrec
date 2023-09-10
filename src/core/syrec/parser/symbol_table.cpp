@@ -14,19 +14,16 @@ bool SymbolTable::contains(const syrec::Module::ptr& module) const {
         return false;
     }
 
-    bool       foundModuleMatchingSignature    = false;
     const auto module_search_result = this->modules.find(module->name);
     if (module_search_result != this->modules.end()) {
-        const syrec::Module::vec modulesWithMatchingName = module_search_result->second->matchingModules;
-
-        foundModuleMatchingSignature = std::find_if(
-            cbegin(modulesWithMatchingName),
-            cend(modulesWithMatchingName),
-            [&module](const syrec::Module::ptr& moduleWithMatchingName) { return doModuleSignaturesMatch(moduleWithMatchingName, module); })
-        != cend(modulesWithMatchingName);
+        for (const auto& [_, symbolTableDataOfModulesMatchingName] : module_search_result->second->internalDataLookup) {
+            if (doModuleSignaturesMatch(symbolTableDataOfModulesMatchingName.declaredModule, module)) {
+                return true;
+            }
+        }
     }
 
-    return foundModuleMatchingSignature || (nullptr != outer && outer->contains(module));
+    return nullptr != outer && outer->contains(module);
 }
 
 std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> SymbolTable::getVariable(const std::string_view& literalIdent) const {
@@ -41,14 +38,31 @@ std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> SymbolTabl
     return found_entry;
 }
 
-std::optional<syrec::Module::vec> SymbolTable::getMatchingModulesForName(const std::string_view& moduleName) const {
-    std::optional<syrec::Module::vec> matchingModules;
-    if (this->modules.find(moduleName) != this->modules.end()) {
-        matchingModules.emplace(this->modules.find(moduleName)->second->matchingModules);
-    } else if (nullptr != outer) {
-        matchingModules = outer->getMatchingModulesForName(moduleName);
+std::vector<SymbolTable::DeclaredModuleSignature> SymbolTable::getMatchingModuleSignaturesForName(const std::string_view& moduleName) const {
+    if (const auto& matchingModules = getEntryForModulesWithMatchingName(moduleName); matchingModules != nullptr && !matchingModules->internalDataLookup.empty()) {
+        std::vector<SymbolTable::DeclaredModuleSignature> containerForMatchingSignatures;
+        containerForMatchingSignatures.reserve(matchingModules->internalDataLookup.size());
+        
+        std::transform(
+        matchingModules->internalDataLookup.cbegin(),
+        matchingModules->internalDataLookup.cend(),
+        std::back_inserter(containerForMatchingSignatures),
+        [](const std::pair<std::size_t, SymbolTable::ModuleSymbolTableEntry::InternalModuleHelperData>& internalDataLookupEntry) {
+            return SymbolTable::DeclaredModuleSignature({internalDataLookupEntry.second.internalId, internalDataLookupEntry.second.declaredModule->parameters, internalDataLookupEntry.second.indicesOfDroppedParametersInOptimizedVersion});
+        });
+        return containerForMatchingSignatures;
     }
-    return matchingModules;
+    return {};
+}
+
+std::optional<std::unique_ptr<syrec::Module>> SymbolTable::getFullDeclaredModuleInformation(const std::string_view& moduleName, std::size_t internalModuleId) const {
+    if (const auto& matchingModules = getEntryForModulesWithMatchingName(moduleName); matchingModules != nullptr && !matchingModules->internalDataLookup.empty()) {
+        const auto moduleMatchingId = matchingModules->internalDataLookup.find(internalModuleId);
+        if (moduleMatchingId != matchingModules->internalDataLookup.cend()) {
+            return std::make_unique<syrec::Module>(*moduleMatchingId->second.declaredModule);    
+        }
+    }
+    return std::nullopt;
 }
 
 bool SymbolTable::addEntry(const syrec::Variable::ptr& variable) {
@@ -69,7 +83,7 @@ bool SymbolTable::addEntry(const syrec::Number::ptr& number, const unsigned int 
     return true;
 }
 
-bool SymbolTable::addEntry(const syrec::Module::ptr& module, const std::vector<bool>& isUnusedStatusPerModuleParameter) {
+bool SymbolTable::addEntry(const syrec::Module::ptr& module, const std::vector<std::size_t>& indicesOfOptimizedAwayParameters) {
     if (nullptr == module) {
         return false;
     }
@@ -80,7 +94,7 @@ bool SymbolTable::addEntry(const syrec::Module::ptr& module, const std::vector<b
         modules.insert(std::pair(module->name, newSymbolTableEntryForModuleName));
         symbolTableEntryForModuleName = newSymbolTableEntryForModuleName.get();
     }
-    symbolTableEntryForModuleName->addModule(module, isUnusedStatusPerModuleParameter);
+    symbolTableEntryForModuleName->addModule(module, indicesOfOptimizedAwayParameters);
     return true;
 }
 
@@ -96,33 +110,22 @@ void SymbolTable::removeVariable(const std::string& literalIdent) {
     }
 }
 
-
-std::optional<std::set<std::size_t>> SymbolTable::getPositionOfUnusedParametersForModule(const syrec::Module::ptr& module) const {
-    const auto& symbolTableEntryForModuleName = getEntryForModulesWithMatchingName(module->name);
-    if (symbolTableEntryForModuleName == nullptr) {
-        return std::nullopt;
+void SymbolTable::updateReferenceCountOfLiteral(const std::string_view& literalIdent, ReferenceCountUpdate typeOfUpdate) const {
+    if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
+        performReferenceCountUpdate(foundSymbolTableEntryForLiteral->referenceCount, typeOfUpdate);
     }
-    
-    const auto& foundPositionOfModuleMatchingSignature =
-            std::find_if(symbolTableEntryForModuleName->matchingModules.cbegin(),
-                         symbolTableEntryForModuleName->matchingModules.cend(),
-                         [&module](const syrec::Module::ptr& moduleStoredInSymbolTable) {
-                             return doModuleSignaturesMatch(module, moduleStoredInSymbolTable);
-                         });
-    if (foundPositionOfModuleMatchingSignature == symbolTableEntryForModuleName->matchingModules.cend()) {
-        return std::nullopt;
-    }
+}
 
-    const std::size_t positionOfMatch = std::distance(symbolTableEntryForModuleName->matchingModules.cbegin(), foundPositionOfModuleMatchingSignature);
-    const auto&              isUnusedStatusPerParameter = symbolTableEntryForModuleName->optimizedAwayStatusPerParameterOfModulePerModule.at(positionOfMatch);
-    std::set<std::size_t> positionOfUnusedParameters;
-    for (std::size_t i = 0; i < isUnusedStatusPerParameter.size(); ++i) {
-        if (isUnusedStatusPerParameter.at(i)) {
-            positionOfUnusedParameters.emplace(i);
+void SymbolTable::updateReferenceCountOfModulesMatchingSignature(const std::string_view& moduleIdent, const std::vector<std::size_t>& internalModuleIds, SymbolTable::ReferenceCountUpdate typeOfUpdate) const {
+    if (const auto& symbolTableEntryForModulesMatchingIdent =getEntryForModulesWithMatchingName(moduleIdent); symbolTableEntryForModulesMatchingIdent != nullptr) {
+        for (const auto& internalModuleId : internalModuleIds) {
+            if (const auto& internalDataOfModuleMatchingId = symbolTableEntryForModulesMatchingIdent->internalDataLookup.find(internalModuleId); internalDataOfModuleMatchingId != symbolTableEntryForModulesMatchingIdent->internalDataLookup.end()) {
+                performReferenceCountUpdate(internalDataOfModuleMatchingId->second.referenceCount, typeOfUpdate);
+            }
         }
     }
-    return std::make_optional(positionOfUnusedParameters);
 }
+
 
 
 void SymbolTable::openScope(SymbolTable::ptr& currentScope) {
@@ -139,44 +142,47 @@ void SymbolTable::closeScope(SymbolTable::ptr& currentScope) {
 }
 
 bool SymbolTable::doModuleSignaturesMatch(const syrec::Module::ptr& module, const syrec::Module::ptr& otherModule) {
-    bool signatures_match = module->parameters.size() == otherModule->parameters.size();
-    for (size_t param_idx = 0; param_idx < module->parameters.size() && signatures_match; param_idx++) {
-        const syrec::Variable::ptr & parameter_first_module = module->parameters.at(param_idx);
-        const syrec::Variable::ptr&  parameter_other_module = otherModule->parameters.at(param_idx);
-        signatures_match                                    = parameter_first_module->name == parameter_other_module->name && isAssignableTo(parameter_first_module, parameter_other_module, true);
-    }
-    return signatures_match;
+    auto doSignaturesMatch = module->parameters.size() == otherModule->parameters.size();
+    doSignaturesMatch &= std::find_first_of(
+            module->parameters.cbegin(),
+            module->parameters.cend(),
+            otherModule->parameters.cbegin(),
+            otherModule->parameters.cend(),
+            [](const syrec::Variable::ptr& formalParameterOfModule, const syrec::Variable::ptr& formalParameterOfOtherModule) {
+                return formalParameterOfModule->name != formalParameterOfOtherModule->name || !isAssignableTo(*formalParameterOfModule, *formalParameterOfOtherModule, true);}
+    ) == module->parameters.cend();
+    return doSignaturesMatch;
 }
 
 // TODO: Can this condition be relaxed (i.e. is a variable of bitwidth 32 assignable to one with a bitwidth of 16 by truncation ?)
-bool SymbolTable::isAssignableTo(const syrec::Variable::ptr& formalParameter, const syrec::Variable::ptr& actualParameter, bool mustParameterTypesMatch) {
-    return (mustParameterTypesMatch ? formalParameter->type == actualParameter->type : true) 
-        && formalParameter->dimensions == actualParameter->dimensions
-        && formalParameter->bitwidth == actualParameter->bitwidth;
+bool SymbolTable::isAssignableTo(const syrec::Variable& formalParameter, const syrec::Variable& actualParameter, bool mustParameterTypesMatch) {
+    return (mustParameterTypesMatch ? formalParameter.type == actualParameter.type : true) 
+        && formalParameter.dimensions == actualParameter.dimensions
+        && formalParameter.bitwidth == actualParameter.bitwidth;
 }
 
-void SymbolTable::incrementLiteralReferenceCount(const std::string_view& literalIdent) const {
-    if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
-        if (foundSymbolTableEntryForLiteral->referenceCount == SIZE_MAX) {
-            return;
-        }
-        foundSymbolTableEntryForLiteral->referenceCount++;
-    }
-}
-
-void SymbolTable::decrementLiteralReferenceCount(const std::string_view& literalIdent) const {
-    if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
-        foundSymbolTableEntryForLiteral->referenceCount = foundSymbolTableEntryForLiteral->referenceCount == 0 ? 0 : foundSymbolTableEntryForLiteral->referenceCount - 1;
-    }
-}
-
-void SymbolTable::incrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const {
-    incrementOrDecrementReferenceCountOfModulesMatchingSignature(module, true);
-}
-
-void SymbolTable::decrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const {
-    incrementOrDecrementReferenceCountOfModulesMatchingSignature(module, false);
-}
+//void SymbolTable::incrementLiteralReferenceCount(const std::string_view& literalIdent) const {
+//    if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
+//        if (foundSymbolTableEntryForLiteral->referenceCount == SIZE_MAX) {
+//            return;
+//        }
+//        foundSymbolTableEntryForLiteral->referenceCount++;
+//    }
+//}
+//
+//void SymbolTable::decrementLiteralReferenceCount(const std::string_view& literalIdent) const {
+//    if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
+//        foundSymbolTableEntryForLiteral->referenceCount = foundSymbolTableEntryForLiteral->referenceCount == 0 ? 0 : foundSymbolTableEntryForLiteral->referenceCount - 1;
+//    }
+//}
+//
+//void SymbolTable::incrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const {
+//    incrementOrDecrementReferenceCountOfModulesMatchingSignature(module, true);
+//}
+//
+//void SymbolTable::decrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module) const {
+//    incrementOrDecrementReferenceCountOfModulesMatchingSignature(module, false);
+//}
 
 std::optional<unsigned int> SymbolTable::tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const {
     const auto& symbolTableEntryForVariable = getEntryForVariable(assignedToSignalParts->var->name);
@@ -262,22 +268,20 @@ std::vector<bool> SymbolTable::determineIfModuleWasUsed(const syrec::Module::vec
                 if (foundModulesMatchingName == nullptr) {
                     return false;
                 }
-
-                const auto& modulesMatchingName          = foundModulesMatchingName->matchingModules;
+                
                 const auto& foundModuleMatchingSignature = std::find_if(
-                        modulesMatchingName.cbegin(),
-                        modulesMatchingName.cend(),
-                        [&moduleToCheck](const syrec::Module::ptr& moduleInSymbolTable) {
-                            return doModuleSignaturesMatch(moduleInSymbolTable, moduleToCheck);
+                        foundModulesMatchingName->internalDataLookup.cbegin(),
+                        foundModulesMatchingName->internalDataLookup.cend(),
+                        [&moduleToCheck](const std::pair<std::size_t, SymbolTable::ModuleSymbolTableEntry::InternalModuleHelperData>& internalSymbolTableDataForModule) {
+                            return doModuleSignaturesMatch(internalSymbolTableDataForModule.second.declaredModule, moduleToCheck);
                         });
 
-                if (foundModuleMatchingSignature == modulesMatchingName.end()) {
+                if (foundModuleMatchingSignature == foundModulesMatchingName->internalDataLookup.cend()) {
                     return false;
                 }
 
-                const std::size_t offsetForModuleInSymbolTableEntry = std::distance(modulesMatchingName.begin(), foundModuleMatchingSignature);
-                const auto&       referenceCountsPerModule               = foundModulesMatchingName->referenceCountsPerModule;
-                return referenceCountsPerModule.at(offsetForModuleInSymbolTableEntry) > 0;
+                const auto& internalIdOfModuleMatchingSignature = foundModuleMatchingSignature->first;
+                return foundModulesMatchingName->internalDataLookup.at(internalIdOfModuleMatchingSignature).referenceCount > 0;
             });
     return usageStatusPerModule;
 }
@@ -335,33 +339,32 @@ SymbolTable::VariableSymbolTableEntry* SymbolTable::getEntryForVariable(const st
     return nullptr;
 }
 
-void SymbolTable::incrementOrDecrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module, bool incrementReferenceCount) const {
-    const auto matchingModulesForName = getEntryForModulesWithMatchingName(module->name);
-    if (matchingModulesForName == nullptr) {
-        return;
-    }
-
-    const auto  numMatchingModulesForName = matchingModulesForName->matchingModules.size();
-    const auto& currentlyStoredModules    = matchingModulesForName->matchingModules;
-    auto&       referenceCountPerModule   = matchingModulesForName->referenceCountsPerModule;
-
-    for (std::size_t moduleIdx = 0; moduleIdx < numMatchingModulesForName; ++moduleIdx) {
-        if (referenceCountPerModule.at(moduleIdx) > 0) {
-            continue;
-        }
-
-        if (doModuleSignaturesMatch(module, currentlyStoredModules.at(moduleIdx))) {
-            auto& currentReferenceCountOfModule = referenceCountPerModule.at(moduleIdx);
-            if (incrementReferenceCount) {
-                if (currentReferenceCountOfModule != SIZE_MAX) {
-                    currentReferenceCountOfModule++;
-                }
-            } else {
-                currentReferenceCountOfModule = referenceCountPerModule.at(moduleIdx) == 0 ? 0 : referenceCountPerModule.at(moduleIdx) - 1;   
-            }
-        }
-    }
-}
+//void SymbolTable::incrementOrDecrementReferenceCountOfModulesMatchingSignature(const syrec::Module::ptr& module, bool incrementReferenceCount) const {
+//    const auto matchingModulesForName = getEntryForModulesWithMatchingName(module->name);
+//    if (matchingModulesForName == nullptr) {
+//        return;
+//    }
+//
+//    const auto  numMatchingModulesForName = matchingModulesForName->internalDataLookup.size();
+//    const auto& internalDataOfMatchingModules = matchingModulesForName->internalDataLookup;
+//
+//    for (const auto&)
+//
+//    for (std::size_t moduleIdx = 0; moduleIdx < numMatchingModulesForName; ++moduleIdx) {
+//        if (doModuleSignaturesMatch(module, internalDataOfMatchingModules.at(moduleIdx).declaredModule)) {
+//            auto& currentReferenceCountOfModule = matchingModulesForName->internalData.at(moduleIdx).referenceCount;
+//            if (incrementReferenceCount) {
+//                if( currentReferenceCountOfModule != SIZE_MAX) {
+//                    currentReferenceCountOfModule++;
+//                }
+//            } else {
+//                if (currentReferenceCountOfModule) {
+//                    currentReferenceCountOfModule--;
+//                }
+//            }
+//        }
+//    }
+//}
 
 bool SymbolTable::doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const {
     const auto isAssignedToVariableLoopVariable = std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation);
@@ -511,4 +514,16 @@ void SymbolTable::swap(const syrec::VariableAccess::ptr& swapLhsOperand, const s
             tryTransformAccessedDimensions(swapRhsOperand, false), tryTransformAccessedBitRange(swapRhsOperand),
         *signalValueLookupOfRhsVariable
     );
+}
+
+void SymbolTable::performReferenceCountUpdate(std::size_t& currentReferenceCount, ReferenceCountUpdate typeOfUpdate) {
+    if (typeOfUpdate == ReferenceCountUpdate::Increment) {
+        if (currentReferenceCount != SIZE_MAX) {
+            currentReferenceCount++;
+        }
+    } else if (typeOfUpdate == ReferenceCountUpdate::Decrement) {
+        if (currentReferenceCount) {
+            currentReferenceCount--;
+        }
+    }
 }

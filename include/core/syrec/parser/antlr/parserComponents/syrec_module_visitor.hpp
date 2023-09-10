@@ -41,7 +41,7 @@ namespace parser {
 
         [[nodiscard]] std::string determineExpectedNameOfTopLevelModule() const;
         [[nodiscard]] syrec::Module::ptr createCopyOfModule(const syrec::Module::ptr& moduleToCreateCopyFrom) const;
-        [[nodiscard]] std::vector<bool> determineUnusedParametersBetweenModuleVersions(const syrec::Module::ptr& unoptimizedModule, const syrec::Module::ptr& optimizedModule) const;
+        [[nodiscard]] std::vector<std::size_t> determineUnusedParametersBetweenModuleVersions(const syrec::Module::ptr& unoptimizedModule, const syrec::Module::ptr& optimizedModule) const;
 
         static std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
         static std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);

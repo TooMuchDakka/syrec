@@ -40,16 +40,16 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
             } else {
                 const auto& unoptimizedModuleVersion       = *moduleParseResult;
                 auto        optimizedModuleVersion         = unoptimizedModuleVersion;
-                auto        unusedStatusPerModuleParameter = std::vector(unoptimizedModuleVersion->parameters.size(), false);
+                std::vector<std::size_t> indicesOfOptimizedAwayParameters;
                 if (sharedData->parserConfig->deadCodeEliminationEnabled) {
                     optimizedModuleVersion = createCopyOfModule(unoptimizedModuleVersion);
                     // TODO: UNUSED_REFERENCE - Marked as used
                     removeUnusedVariablesAndParametersFromModule(optimizedModuleVersion);
-                    unusedStatusPerModuleParameter = determineUnusedParametersBetweenModuleVersions(unoptimizedModuleVersion, optimizedModuleVersion);
+                    indicesOfOptimizedAwayParameters = determineUnusedParametersBetweenModuleVersions(unoptimizedModuleVersion, optimizedModuleVersion);
                 }
                 alreadyClosedOpenedSymbolTableScope = true;
                 SymbolTable::closeScope(sharedData->currentSymbolTableScope);
-                sharedData->currentSymbolTableScope->addEntry(unoptimizedModuleVersion, unusedStatusPerModuleParameter);
+                sharedData->currentSymbolTableScope->addEntry(unoptimizedModuleVersion, indicesOfOptimizedAwayParameters);
                 unoptimizedModules.emplace_back(unoptimizedModuleVersion);
                 foundModules.emplace_back(optimizedModuleVersion);   
             }
@@ -305,7 +305,7 @@ syrec::Module::ptr SyReCModuleVisitor::createCopyOfModule(const syrec::Module::p
     return createCopyOfModule;
 }
 
-std::vector<bool> SyReCModuleVisitor::determineUnusedParametersBetweenModuleVersions(const syrec::Module::ptr& unoptimizedModule, const syrec::Module::ptr& optimizedModule) const {
+std::vector<std::size_t> SyReCModuleVisitor::determineUnusedParametersBetweenModuleVersions(const syrec::Module::ptr& unoptimizedModule, const syrec::Module::ptr& optimizedModule) const {
     std::set<std::string> setOfParameterNamesOfOptimizedModule;
     std::transform(
     optimizedModule->parameters.cbegin(),
@@ -315,12 +315,14 @@ std::vector<bool> SyReCModuleVisitor::determineUnusedParametersBetweenModuleVers
         return variable->name;
     });
 
-    std::vector<bool> isUnusedStatusPerParameterOfUnoptimizedModule(unoptimizedModule->parameters.size(), false);
+    std::vector<std::size_t> droppedParametersInOptimizedModule;
     for (std::size_t i = 0; i < unoptimizedModule->parameters.size(); ++i) {
         const auto& parameterName                        = unoptimizedModule->parameters.at(i)->name;
-        isUnusedStatusPerParameterOfUnoptimizedModule[i] = setOfParameterNamesOfOptimizedModule.count(parameterName) == 0;
+        if(setOfParameterNamesOfOptimizedModule.count(parameterName) == 0) {
+            droppedParametersInOptimizedModule.emplace_back(i);
+        }
     }
-    return isUnusedStatusPerParameterOfUnoptimizedModule;
+    return droppedParametersInOptimizedModule;
 }
 
 

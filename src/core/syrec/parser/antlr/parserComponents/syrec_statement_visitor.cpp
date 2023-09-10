@@ -175,7 +175,7 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
 
     std::optional<std::string>          moduleIdent;
     bool                                existsModuleForIdent = false;
-    std::optional<ModuleCallGuess::ptr> potentialModulesToCall;
+    std::optional<std::unique_ptr<ModuleCallGuess>> moduleCallGuessResolver;
     auto                       moduleIdentPosition = messageUtils::Message::Position(sharedData->fallbackErrorLinePosition, sharedData->fallbackErrorColumnPosition);
 
     if (context->moduleIdent != nullptr) {
@@ -183,7 +183,7 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
         moduleIdentPosition  = messageUtils::Message::Position(context->moduleIdent->getLine(), context->moduleIdent->getCharPositionInLine());
         existsModuleForIdent = checkIfSignalWasDeclaredOrLogError(*moduleIdent, false, moduleIdentPosition);
         if (existsModuleForIdent) {
-            potentialModulesToCall = ModuleCallGuess::fetchPotentialMatchesForMethodIdent(sharedData->currentSymbolTableScope, *moduleIdent);
+            moduleCallGuessResolver = ModuleCallGuess::tryInitializeWithModulesMatchingName(sharedData->currentSymbolTableScope, *moduleIdent);
         }
         isValidCallOperationDefined &= existsModuleForIdent;
     } else {
@@ -203,12 +203,12 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
 
         calleeArguments.emplace_back(userDefinedCallArgument->getText());
         const auto callArgumentTokenPosition = messageUtils::Message::Position(userDefinedCallArgument->getLine(), userDefinedCallArgument->getCharPositionInLine());
-        if (checkIfSignalWasDeclaredOrLogError(userDefinedCallArgument->getText(), false, callArgumentTokenPosition) && potentialModulesToCall.has_value()) {
+        if (checkIfSignalWasDeclaredOrLogError(userDefinedCallArgument->getText(), false, callArgumentTokenPosition) && moduleCallGuessResolver.has_value()) {
             const auto symTabEntryForCalleeArgument = *sharedData->currentSymbolTableScope->getVariable(userDefinedCallArgument->getText());
             if (std::holds_alternative<syrec::Variable::ptr>(symTabEntryForCalleeArgument)) {
-                (*potentialModulesToCall)->refineGuessWithNextParameter(std::get<syrec::Variable::ptr>(symTabEntryForCalleeArgument));
+                moduleCallGuessResolver->get()->refineGuessWithNextParameter(*std::get<syrec::Variable::ptr>(symTabEntryForCalleeArgument));
                 // We also need to increment the reference count of the callee arguments if we know that the literal references a valid entry in the symbol table
-                updateReferenceCountOfSignal(calleeArguments.back(), SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+                updateReferenceCountOfSignal(calleeArguments.back(), SymbolTable::ReferenceCountUpdate::Increment);
                 continue;
             }
         }
@@ -237,18 +237,18 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
         return 0;
     }
 
-    if (!potentialModulesToCall.has_value()) {
+    if (!moduleCallGuessResolver.has_value()) {
         createMessage(mapAntlrTokenPosition(context->moduleIdent), messageUtils::Message::Severity::Error, NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size());
         return 0;
     }
 
-    (*potentialModulesToCall)->discardGuessesWithMoreThanNParameters(calleeArguments.size());
-    if (!(*potentialModulesToCall)->hasSomeMatches()) {
+    (*moduleCallGuessResolver)->discardGuessesWithMoreThanNParameters(calleeArguments.size());
+    if (!(*moduleCallGuessResolver)->hasSomeMatches()) {
         createMessage(mapAntlrTokenPosition(context->moduleIdent), messageUtils::Message::Severity::Error, NoMatchForGuessWithNActualParameters, *moduleIdent, calleeArguments.size());
         return 0;
     }
 
-    if ((*potentialModulesToCall)->getMatchesForGuess().size() > 1) {
+    if ((*moduleCallGuessResolver)->getMatchesForGuess().size() > 1) {
         // TODO: GEN_ERROR Ambigous call, more than one match for given arguments
         // TODO: Error position
         createMessage(mapAntlrTokenPosition(context->moduleIdent), messageUtils::Message::Severity::Error, AmbigousCall, *moduleIdent);
@@ -259,9 +259,7 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
             /*
             * Since we have an ambiguous call, we will mark all modules matching the current call signature as used
             */
-            for (const auto& moduleMatchingCall: (*potentialModulesToCall)->getMatchesForGuess()) {
-                sharedData->currentSymbolTableScope->incrementReferenceCountOfModulesMatchingSignature(moduleMatchingCall);
-            }    
+            sharedData->currentSymbolTableScope->updateReferenceCountOfModulesMatchingSignature(*moduleIdent, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), SymbolTable::ReferenceCountUpdate::Increment);
         }
         return 0;
     }
@@ -273,17 +271,18 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
         * We do this before checking whether the call is valid (at this point it would either indicate a missmatch between the formal and actual parameters)
         * or a semantic error between a call / uncall
         */
-        sharedData->currentSymbolTableScope->incrementReferenceCountOfModulesMatchingSignature((*potentialModulesToCall)->getMatchesForGuess().front());
+        sharedData->currentSymbolTableScope->updateReferenceCountOfModulesMatchingSignature(*moduleIdent, {moduleCallGuessResolver->get()->getMatchesForGuess().front().internalModuleId}, SymbolTable::ReferenceCountUpdate::Increment);
 
         if (!isValidCallOperationDefined) {
             return 0;
         }    
     }
 
-    const auto moduleMatchingCalleeArguments = (*potentialModulesToCall)->getMatchesForGuess().front();
-    std::set<std::size_t> positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters;
+    const auto               signatureDataOfModuleMatchingCalleeArguments = moduleCallGuessResolver->get()->getMatchesForGuess().front();
+    const syrec::Module::ptr moduleMatchingCalleeArguments                = *sharedData->currentSymbolTableScope->getFullDeclaredModuleInformation(*moduleIdent, signatureDataOfModuleMatchingCalleeArguments.internalModuleId);
+    std::set<std::size_t>    positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters;
     if (sharedData->parserConfig->deadCodeEliminationEnabled) {
-        positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters = *sharedData->currentSymbolTableScope->getPositionOfUnusedParametersForModule(moduleMatchingCalleeArguments);
+        positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters = std::set<std::size_t>(signatureDataOfModuleMatchingCalleeArguments.indicesOfOptimizedAwayParameters.begin(), signatureDataOfModuleMatchingCalleeArguments.indicesOfOptimizedAwayParameters.end());
     }
 
     trimAndDecrementReferenceCountOfUnusedCalleeParameters(calleeArguments, positionOfParametersThatWillNotBeInvalidatedDueThemBeingUnusedParameters);
@@ -298,7 +297,10 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
         && (doesModuleOnlyHaveReadOnlyParameters(moduleMatchingCalleeArguments) 
             || doesModuleOnlyConsistOfSkipStatements(moduleMatchingCalleeArguments))) {
         if (!sharedData->modificationsOfReferenceCountsDisabled) {
-            decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(moduleMatchingCalleeArguments, calleeArguments);   
+            for (const auto& calleeArgument: calleeArguments) {
+                updateReferenceCountOfSignal(calleeArgument, SymbolTable::ReferenceCountUpdate::Decrement);
+            }
+            sharedData->currentSymbolTableScope->updateReferenceCountOfModulesMatchingSignature(*moduleIdent, {signatureDataOfModuleMatchingCalleeArguments.internalModuleId}, SymbolTable::ReferenceCountUpdate::Decrement);
         }
     } else {
         syrec::Statement::ptr createdCallOrUncallStmt;
@@ -314,7 +316,7 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
             addStatementToOpenContainer(createdCallOrUncallStmt);
         } else {
             if (!sharedData->modificationsOfReferenceCountsDisabled) {
-                sharedData->currentSymbolTableScope->decrementReferenceCountOfModulesMatchingSignature(moduleMatchingCalleeArguments);
+                sharedData->currentSymbolTableScope->updateReferenceCountOfModulesMatchingSignature(*moduleIdent, {signatureDataOfModuleMatchingCalleeArguments.internalModuleId}, SymbolTable::ReferenceCountUpdate::Decrement);
             }
         }        
     }
@@ -526,7 +528,7 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
              * and updates of the reference counts in case of an optimization of the expression will be done in the corresponding antlr visitor function, we only need to update the
              * reference counts of the remaining signal accesses in the optimized guard expression if either the whole if statement or any of its branches are optimized away
              */ 
-            updateReferenceCountForUsedVariablesInExpression((*guardExpression)->getAsExpression().value(), SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
+            updateReferenceCountForUsedVariablesInExpression((*guardExpression)->getAsExpression().value(), SymbolTable::ReferenceCountUpdate::Decrement);
         }
         return 0;
     }
@@ -896,7 +898,7 @@ void SyReCStatementVisitor::trimAndDecrementReferenceCountOfUnusedCalleeParamete
     std::size_t numRemovedParameters = 0;
     for (const auto unusedParameterPosition: positionsOfUnusedParameters) {
         const auto positionOfCalleeArgument = unusedParameterPosition - numRemovedParameters++;
-        updateReferenceCountOfSignal(calleeArguments.at(positionOfCalleeArgument), SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
+        updateReferenceCountOfSignal(calleeArguments.at(positionOfCalleeArgument), SymbolTable::ReferenceCountUpdate::Decrement);
         calleeArguments.erase(std::next(calleeArguments.begin(), positionOfCalleeArgument));
     }
 }
@@ -917,7 +919,7 @@ bool SyReCStatementVisitor::areAccessedValuesForDimensionAndBitsConstant(const s
     return !invalidateAccessedBitRange && !accessedAnyNonConstantValueOfDimension;
 }
 
-void SyReCStatementVisitor::updateReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression, SyReCCustomBaseVisitor::ReferenceCountUpdate typeOfUpdate) const {
+void SyReCStatementVisitor::updateReferenceCountForUsedVariablesInExpression(const syrec::expression::ptr& expression, SymbolTable::ReferenceCountUpdate typeOfUpdate) const {
     if (sharedData->modificationsOfReferenceCountsDisabled) {
         return;
     }
@@ -1524,13 +1526,6 @@ bool SyReCStatementVisitor::doesModuleOnlyHaveReadOnlyParameters(const syrec::Mo
     });
 }
 
-void SyReCStatementVisitor::decrementReferenceCountsOfCalledModuleAndActuallyUsedCalleeArguments(const syrec::Module::ptr& calledModule, const std::vector<std::string>& filteredCalleeArguments) const {
-    for (const auto& actuallyUsedCalleeArgument: filteredCalleeArguments) {
-        updateReferenceCountOfSignal(actuallyUsedCalleeArgument, SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
-    }
-    sharedData->currentSymbolTableScope->decrementReferenceCountOfModulesMatchingSignature(calledModule);
-}
-
 syrec::AssignStatement::vec SyReCStatementVisitor::trySimplifyAssignmentStatement(const syrec::AssignStatement::ptr& assignmentStmt) const {
     // TODO: Remove, only used for testing
     // TODO: Bitwidth is not set for simplification of binary expression for example circuit bn_2
@@ -1555,8 +1550,8 @@ syrec::AssignStatement::vec SyReCStatementVisitor::trySimplifyAssignmentStatemen
             : std::nullopt;
 
         if (optionalConstantValueOfRhs.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*definedAssignmentOperation, *optionalConstantValueOfRhs)) {
-            updateReferenceCountOfSignal(assignmentStmtCasted->lhs->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
-            updateReferenceCountForUsedVariablesInExpression(assignmentStmtCasted->rhs, SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
+            updateReferenceCountOfSignal(assignmentStmtCasted->lhs->var->name, SymbolTable::ReferenceCountUpdate::Decrement);
+            updateReferenceCountForUsedVariablesInExpression(assignmentStmtCasted->rhs, SymbolTable::ReferenceCountUpdate::Decrement);
             return {};
         }
     }
@@ -1613,7 +1608,7 @@ void SyReCStatementVisitor::performAssignmentRhsExprSimplification(syrec::expres
         }
 
         for (const auto& optimizedAwaySignalAccess : optimizedAwaySignalAccesses) {
-            updateReferenceCountOfSignal(optimizedAwaySignalAccess->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Decrement);
+            updateReferenceCountOfSignal(optimizedAwaySignalAccess->var->name, SymbolTable::ReferenceCountUpdate::Decrement);
         }
     }
 }
@@ -1718,13 +1713,13 @@ void SyReCStatementVisitor::incrementReferenceCountsOfSignalsUsedInStatements(co
 
 void SyReCStatementVisitor::incrementReferenceCountsOfSignalsUsedInStatement(const syrec::Statement::ptr& statement) const {
     if (const auto& statementAsAssignmentStmt = std::dynamic_pointer_cast<syrec::AssignStatement>(statement); statementAsAssignmentStmt != nullptr) {
-        updateReferenceCountOfSignal(statementAsAssignmentStmt->lhs->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
-        updateReferenceCountForUsedVariablesInExpression(statementAsAssignmentStmt->rhs, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        updateReferenceCountOfSignal(statementAsAssignmentStmt->lhs->var->name, SymbolTable::ReferenceCountUpdate::Increment);
+        updateReferenceCountForUsedVariablesInExpression(statementAsAssignmentStmt->rhs, SymbolTable::ReferenceCountUpdate::Increment);
     } else if (const auto& statementAsUnaryAssignmentStmt = std::dynamic_pointer_cast<syrec::UnaryStatement>(statement); statementAsUnaryAssignmentStmt != nullptr) {
-        updateReferenceCountOfSignal(statementAsUnaryAssignmentStmt->var->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        updateReferenceCountOfSignal(statementAsUnaryAssignmentStmt->var->var->name, SymbolTable::ReferenceCountUpdate::Increment);
     }
     else if (const auto& statementAsIfStmt = std::dynamic_pointer_cast<syrec::IfStatement>(statement); statementAsIfStmt != nullptr) {
-        updateReferenceCountForUsedVariablesInExpression(statementAsIfStmt->condition, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        updateReferenceCountForUsedVariablesInExpression(statementAsIfStmt->condition, SymbolTable::ReferenceCountUpdate::Increment);
         incrementReferenceCountsOfSignalsUsedInStatements(statementAsIfStmt->thenStatements);
         incrementReferenceCountsOfSignalsUsedInStatements(statementAsIfStmt->elseStatements);
     } else if (const auto& statementAsLoopStmt = std::dynamic_pointer_cast<syrec::ForStatement>(statement); statementAsLoopStmt != nullptr) {
@@ -1734,15 +1729,15 @@ void SyReCStatementVisitor::incrementReferenceCountsOfSignalsUsedInStatement(con
         incrementReferenceCountsOfSignalsUsedInStatements(statementAsLoopStmt->statements);
     } else if (const auto& statementAsCallStmt = std::dynamic_pointer_cast<syrec::CallStatement>(statement); statementAsCallStmt != nullptr) {
         for (const auto& calleeArgument : statementAsCallStmt->parameters) {
-            updateReferenceCountOfSignal(calleeArgument, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+            updateReferenceCountOfSignal(calleeArgument, SymbolTable::ReferenceCountUpdate::Increment);
         }
     } else if (const auto& statementAsUncallStmt = std::dynamic_pointer_cast<syrec::UncallStatement>(statement); statementAsUncallStmt != nullptr) {
         for (const auto& calleeArgument: statementAsUncallStmt->parameters) {
-            updateReferenceCountOfSignal(calleeArgument, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+            updateReferenceCountOfSignal(calleeArgument, SymbolTable::ReferenceCountUpdate::Increment);
         }
     } else if (const auto& statementAsSwapStmt = std::dynamic_pointer_cast<syrec::SwapStatement>(statement); statementAsSwapStmt != nullptr) {
-        updateReferenceCountOfSignal(statementAsSwapStmt->lhs->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
-        updateReferenceCountOfSignal(statementAsSwapStmt->rhs->var->name, SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        updateReferenceCountOfSignal(statementAsSwapStmt->lhs->var->name, SymbolTable::ReferenceCountUpdate::Increment);
+        updateReferenceCountOfSignal(statementAsSwapStmt->rhs->var->name, SymbolTable::ReferenceCountUpdate::Increment);
     }
 }
 
@@ -1752,7 +1747,7 @@ void SyReCStatementVisitor::incrementReferenceCountsOfSignalsUsedInNumber(const 
     }
 
     if (number->isLoopVariable()) {
-        updateReferenceCountOfSignal(number->variableName(), SyReCCustomBaseVisitor::ReferenceCountUpdate::Increment);
+        updateReferenceCountOfSignal(number->variableName(), SymbolTable::ReferenceCountUpdate::Increment);
     }
     else if (number->isCompileTimeConstantExpression()) {
         incrementReferenceCountsOfSignalsUsedInNumber(number->getExpression().lhsOperand);

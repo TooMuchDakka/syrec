@@ -2,29 +2,39 @@
 
 using namespace parser;
 
-std::optional<ModuleCallGuess::ptr> ModuleCallGuess::fetchPotentialMatchesForMethodIdent(const SymbolTable::ptr& activeSymbolTableScope, const std::string_view& moduleIdent) {
-    const std::optional<syrec::Module::vec>& modulesMatchingName = activeSymbolTableScope->getMatchingModulesForName(moduleIdent);
-    if (modulesMatchingName.has_value()) {
-        return std::make_optional(std::shared_ptr<ModuleCallGuess>(new ModuleCallGuess(*modulesMatchingName)));
+std::optional<std::unique_ptr<ModuleCallGuess>> ModuleCallGuess::tryInitializeWithModulesMatchingName(const SymbolTable::ptr& symbolTable, const std::string_view& moduleIdent) {
+    if (const auto& modulesMatchingName = symbolTable->getMatchingModuleSignaturesForName(moduleIdent); !modulesMatchingName.empty()) {
+        return createFrom(modulesMatchingName);
     }
     return std::nullopt;
 }
 
 bool ModuleCallGuess::hasSomeMatches() const {
-    return !this->modulesMatchingSignature.empty();
+    return !this->modulesMatchingRequestedSignature.empty();
 }
 
-syrec::Module::vec ModuleCallGuess::getMatchesForGuess() const {
-    return this->modulesMatchingSignature;
+std::vector<SymbolTable::DeclaredModuleSignature> ModuleCallGuess::getMatchesForGuess() const {
+    return this->modulesMatchingRequestedSignature;
+}
+
+std::vector<std::size_t> ModuleCallGuess::getInternalIdsOfModulesMatchingGuess() const {
+    std::vector<std::size_t> internalModuleIds(this->modulesMatchingRequestedSignature.size(), 0);
+    std::transform(
+            this->modulesMatchingRequestedSignature.cbegin(),
+            this->modulesMatchingRequestedSignature.cend(),
+            std::back_inserter(internalModuleIds),
+            [](const SymbolTable::DeclaredModuleSignature& moduleSignature) {
+                return moduleSignature.internalModuleId;
+            });
+    return internalModuleIds;
 }
 
 
-void ModuleCallGuess::refineGuessWithNextParameter(const syrec::Variable::ptr& nextActualParameter) {
+void ModuleCallGuess::refineGuessWithNextParameter(const syrec::Variable& nextActualParameter) {
     this->discardGuessesWithLessThanActualNumberOfParameters(this->formalParameterIdx + 1);
     this->discardGuessesWhereActualParameterIsNotAssignableToFormalOne(nextActualParameter);
     this->formalParameterIdx++;
 }
-
 
 void ModuleCallGuess::discardGuessesWithLessThanActualNumberOfParameters(const std::size_t& numActualParameters) {
     return discardGuessBasedOnNumberOfParameters(numActualParameters, true);
@@ -35,41 +45,41 @@ void ModuleCallGuess::discardGuessesWithMoreThanNParameters(const std::size_t& m
 }
 
 void ModuleCallGuess::discardGuessBasedOnNumberOfParameters(const std::size_t& numParameterThreshold, bool filterWithLess) {
-    if (this->modulesMatchingSignature.empty()) {
+    if (this->modulesMatchingRequestedSignature.empty()) {
         return;
     }
 
-    modulesMatchingSignature.erase(
+    modulesMatchingRequestedSignature.erase(
             std::remove_if(
-                    this->modulesMatchingSignature.begin(),
-                    this->modulesMatchingSignature.end(),
-                    [numParameterThreshold, filterWithLess](const syrec::Module::ptr& module) {
+                    this->modulesMatchingRequestedSignature.begin(),
+                    this->modulesMatchingRequestedSignature.end(),
+                    [numParameterThreshold, filterWithLess](const SymbolTable::DeclaredModuleSignature& moduleSignature) {
                         if (filterWithLess) {
-                            return module->parameters.size() < numParameterThreshold;
+                            return moduleSignature.declaredParameters.size() < numParameterThreshold;
                         }
-                        return module->parameters.size() > numParameterThreshold;
+                        return moduleSignature.declaredParameters.size() > numParameterThreshold;
                     }),
-            this->modulesMatchingSignature.end());
+            this->modulesMatchingRequestedSignature.end());
 }
 
-void ModuleCallGuess::discardGuessesWhereActualParameterIsNotAssignableToFormalOne(const syrec::Variable::ptr& actualParameter) {
-    if (this->modulesMatchingSignature.empty()) {
+void ModuleCallGuess::discardGuessesWhereActualParameterIsNotAssignableToFormalOne(const syrec::Variable& actualParameter) {
+    if (this->modulesMatchingRequestedSignature.empty()) {
         return;
     }
 
     const std::size_t tmpFormalParameterIdx = this->formalParameterIdx;
-    modulesMatchingSignature.erase(
+    modulesMatchingRequestedSignature.erase(
             std::remove_if(
-                    this->modulesMatchingSignature.begin(),
-                    this->modulesMatchingSignature.end(),
-                    [tmpFormalParameterIdx, actualParameter](const syrec::Module::ptr& module) {
-                        const syrec::Variable::ptr& formalParameter = module->parameters.at(tmpFormalParameterIdx);
+                    this->modulesMatchingRequestedSignature.begin(),
+                    this->modulesMatchingRequestedSignature.end(),
+                    [tmpFormalParameterIdx, actualParameter](const SymbolTable::DeclaredModuleSignature& moduleSignature) {
+                        const syrec::Variable& formalParameter = *moduleSignature.declaredParameters.at(tmpFormalParameterIdx);
                         return !isActualParameterAssignableToFormalOne(actualParameter, formalParameter);
                     }),
-            this->modulesMatchingSignature.end());
+            this->modulesMatchingRequestedSignature.end());
 }
 
 // TODO: Is flag in symbol table required
-bool ModuleCallGuess::isActualParameterAssignableToFormalOne(const syrec::Variable::ptr& actualParameter, const syrec::Variable::ptr& formalParameter) {
+bool ModuleCallGuess::isActualParameterAssignableToFormalOne(const syrec::Variable& actualParameter, const syrec::Variable& formalParameter) {
     return SymbolTable::isAssignableTo(formalParameter, actualParameter, false);
 }
