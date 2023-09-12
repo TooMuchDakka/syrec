@@ -169,11 +169,11 @@ void optimizations::LoopBodyValuePropagationBlocker::storeAssignmentIfNoOverlapp
             alreadyDefinedAssignments.cend(),
             [&assignedToSignal, &symbolTable](const syrec::VariableAccess::ptr& alreadyAssignedToSignal) {
                 const auto signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(
-                        assignedToSignal,
-                        alreadyAssignedToSignal,
+                        *assignedToSignal,
+                        *alreadyAssignedToSignal,
                         SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping,
                         SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping,
-                        symbolTable);
+                        *symbolTable);
                 return signalAccessEquivalenceResult.equality != SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual;
             });
     

@@ -1,6 +1,7 @@
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
 #include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 #include "core/syrec/parser/operation.hpp"
+#include "core/syrec/parser/utils/signal_access_utils.hpp"
 
 #include <tuple>
 
@@ -8,6 +9,39 @@ using namespace optimizations;
 
 // TODO: Would the transformation (<subExpr_1> - (<subExpr_2> - <subExpr_3>)) to (<subExpr_1> + (<subExpr_3> - <subExpr_2>)) lead to better results ?
 // TODO: If we introduce additional signal accesses, reference counts of newly added signal accesses need to be incremented
+static void addOptimizedAwaySignalAccessToContainerIfNoExactMatchExists(const syrec::VariableAccess::ptr& optimizedAwaySignalAccess, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses, const parser::SymbolTable& symbolTable) {
+    if (!droppedSignalAccesses) {
+        return;
+    }
+
+    const auto wasSignalAccessAlreadyDefined = std::any_of(
+            droppedSignalAccesses->cbegin(),
+            droppedSignalAccesses->cend(),
+            [&optimizedAwaySignalAccess, &symbolTable](const syrec::VariableAccess::ptr& alreadyDefinedSignalAccess) {
+                const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(
+                        *optimizedAwaySignalAccess,
+                        *alreadyDefinedSignalAccess,
+                        SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Equal,
+                        SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Equal,
+                        symbolTable);
+                return signalAccessEquivalenceResult.isResultCertain && signalAccessEquivalenceResult.equality == SignalAccessUtils::SignalAccessEquivalenceResult::Equal;
+            });
+    if (wasSignalAccessAlreadyDefined) {
+        return;
+    }
+    droppedSignalAccesses->emplace_back(optimizedAwaySignalAccess);
+}
+
+static void addOptimizedAwaySignalAccessesToContainer(const syrec::expression::ptr& optimizedAwayExpr, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses, const parser::SymbolTable& symbolTable) {
+    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(optimizedAwayExpr); exprAsBinaryExpr != nullptr) {
+        addOptimizedAwaySignalAccessesToContainer(exprAsBinaryExpr->lhs, droppedSignalAccesses, symbolTable);
+        addOptimizedAwaySignalAccessesToContainer(exprAsBinaryExpr->rhs, droppedSignalAccesses, symbolTable);
+    } else if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(optimizedAwayExpr); exprAsShiftExpr != nullptr) {
+        addOptimizedAwaySignalAccessesToContainer(exprAsShiftExpr->lhs, droppedSignalAccesses, symbolTable);
+    } else if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(optimizedAwayExpr); exprAsVariableExpr != nullptr) {
+        addOptimizedAwaySignalAccessToContainerIfNoExactMatchExists(exprAsVariableExpr->var, droppedSignalAccesses, symbolTable);
+    }
+}
 
 inline std::optional<std::shared_ptr<syrec::BinaryExpression>> tryConvertExpressionToBinaryOne(const syrec::expression::ptr& expr) {
     if (const auto& exprAsBinaryExpression = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpression != nullptr) {
@@ -20,7 +54,7 @@ inline syrec::expression::ptr createBinaryExpression(const syrec::expression::pt
     return std::make_shared<syrec::BinaryExpression>(lhsOperand, binaryOperation, rhsOperand);
 }
 
-inline syrec::expression::ptr simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr, bool operationStrengthReductionEnabled, const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>>& optionalMultiplicationSimplifier, const parser::SymbolTable::ptr& symbolTable, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses) {
+inline syrec::expression::ptr simplifyBinaryExpressionIfSimplificationOfOperandsResultsInNewOperands(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr, bool operationStrengthReductionEnabled, const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>>& optionalMultiplicationSimplifier, const parser::SymbolTable& symbolTable, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses) {
     const auto simplificationResultOfLhsOperand = simplifyBinaryExpression(binaryExpr->lhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
     const auto simplificationResultOfRhsOperand = simplifyBinaryExpression(binaryExpr->rhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
     if (simplificationResultOfLhsOperand == binaryExpr->lhs && simplificationResultOfRhsOperand == binaryExpr->rhs) {
@@ -52,16 +86,26 @@ bool isOperationCombinedWithMultiplicationDistributive(syrec_operation::operatio
     }
 }
 
-std::optional<syrec::expression::ptr> trySimplifyExprIfOneOperandIsIdentityElement(const syrec::expression::ptr& referenceExpr, const std::optional<unsigned int>& constOperandValue, bool isLhsOperandConst, bool isReferenceExprBinaryOne, syrec_operation::operation definedOperationForExpr) {
+std::optional<syrec::expression::ptr> trySimplifyExprIfOneOperandIsIdentityElement(const syrec::expression::ptr& referenceExpr, const std::optional<unsigned int>& constOperandValue, bool isLhsOperandConst, bool isReferenceExprBinaryOne, syrec_operation::operation definedOperationForExpr, const parser::SymbolTable& symbolTable, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses) {
     if (referenceExpr == nullptr || !constOperandValue.has_value()) {
         return std::nullopt;
     }
 
     if (isLhsOperandConst && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(definedOperationForExpr, *constOperandValue)) {
-        return std::make_optional(isReferenceExprBinaryOne ? std::static_pointer_cast<syrec::BinaryExpression>(referenceExpr)->rhs : std::make_shared<syrec::NumericExpression>(std::static_pointer_cast<syrec::ShiftExpression>(referenceExpr)->rhs, referenceExpr->bitwidth()));
+        if (isReferenceExprBinaryOne) {
+            addOptimizedAwaySignalAccessesToContainer(std::static_pointer_cast<syrec::BinaryExpression>(referenceExpr)->lhs, droppedSignalAccesses, symbolTable);
+            return std::make_optional(std::static_pointer_cast<syrec::BinaryExpression>(referenceExpr)->rhs);
+        }
+        addOptimizedAwaySignalAccessesToContainer(std::static_pointer_cast<syrec::ShiftExpression>(referenceExpr)->lhs, droppedSignalAccesses, symbolTable);
+        return std::make_optional(std::make_shared<syrec::NumericExpression>(std::static_pointer_cast<syrec::ShiftExpression>(referenceExpr)->rhs, referenceExpr->bitwidth()));
     }
     if (!isLhsOperandConst && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(definedOperationForExpr, *constOperandValue)) {
-        return std::make_optional(isReferenceExprBinaryOne ? std::static_pointer_cast<syrec::BinaryExpression>(referenceExpr)->lhs : std::static_pointer_cast<syrec::ShiftExpression>(referenceExpr)->lhs);
+        if (isReferenceExprBinaryOne) {
+            addOptimizedAwaySignalAccessesToContainer(std::static_pointer_cast<syrec::BinaryExpression>(referenceExpr)->rhs, droppedSignalAccesses, symbolTable);
+            return std::make_optional(std::static_pointer_cast<syrec::BinaryExpression>(referenceExpr)->lhs);
+        }
+        // TODO: Handling of optimized away syrec::Number containers
+        return std::make_optional(std::static_pointer_cast<syrec::ShiftExpression>(referenceExpr)->lhs);
     }
     return std::nullopt;
 }
@@ -115,7 +159,7 @@ std::optional<syrec::expression::ptr> trySimplifyMultiplicationOfBinaryExpressio
  *          which in turn is a contradiction (for reversivel circuits)
  * TODO: There is room for further optimizations where one would 'accumulate' signals (i.e. a + (2 + a) => (2 * a) + 2)
  */
-syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expression::ptr& expr, bool operationStrengthReductionEnabled, const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>>& optionalMultiplicationSimplifier, const parser::SymbolTable::ptr& symbolTable, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses) {
+syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expression::ptr& expr, bool operationStrengthReductionEnabled, const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>>& optionalMultiplicationSimplifier, const parser::SymbolTable& symbolTable, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses) {
     const auto exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr);
     const auto binaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     if (binaryExpr == nullptr && exprAsShiftExpr == nullptr) {
@@ -153,7 +197,7 @@ syrec::expression::ptr optimizations::simplifyBinaryExpression(const syrec::expr
 
     const auto binaryOperationOfExpr = mappedFlagToEnum.value();
     if (lOperandConstValue.has_value() || rOperandConstValue.has_value()) {
-        if (const auto& simplifiedExprIfConstOperandIsIdentityElement = trySimplifyExprIfOneOperandIsIdentityElement(expr, lOperandConstValue.has_value() ? lOperandConstValue : rOperandConstValue, lOperandConstValue.has_value(), binaryExpr != nullptr, *mappedFlagToEnum); simplifiedExprIfConstOperandIsIdentityElement.has_value()) {
+        if (const auto& simplifiedExprIfConstOperandIsIdentityElement = trySimplifyExprIfOneOperandIsIdentityElement(expr, lOperandConstValue.has_value() ? lOperandConstValue : rOperandConstValue, lOperandConstValue.has_value(), binaryExpr != nullptr, *mappedFlagToEnum, symbolTable, droppedSignalAccesses); simplifiedExprIfConstOperandIsIdentityElement.has_value()) {
             return simplifyBinaryExpression(*simplifiedExprIfConstOperandIsIdentityElement, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
         }
 

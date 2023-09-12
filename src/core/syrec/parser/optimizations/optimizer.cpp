@@ -6,6 +6,7 @@
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/main_additional_line_for_assignment_simplifier.hpp"
 #include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
+#include "core/syrec/parser/utils/bit_helpers.hpp"
 
 // TODO: Refactoring if case switches with visitor pattern as its available in std::visit call
 
@@ -117,15 +118,8 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     const auto skipCheckForSplitOfAssignmentInSubAssignments = !parserConfig.noAdditionalLineOptimizationEnabled || rhsOperandEvaluatedAsConstant.has_value();
-    if (const auto& evaluatedAssignedToSignal = tryEvaluateDefinedSignalAccess(*assignedToSignalPartsAfterSimplification); evaluatedAssignedToSignal.has_value()) {
-        const auto& currentValueOfAssignedToSignal      = tryFetchValueFromEvaluatedSignalAccess(*evaluatedAssignedToSignal);
-
-        if (currentValueOfAssignedToSignal.has_value() && mappedToAssignmentOperationFromFlag.has_value() && rhsOperandEvaluatedAsConstant.has_value()) {
-            performAssignment(*evaluatedAssignedToSignal, *mappedToAssignmentOperationFromFlag, *rhsOperandEvaluatedAsConstant);
-        }
-        else {
-            invalidateValueOfAccessedSignalParts(*evaluatedAssignedToSignal);
-        }
+    if (auto evaluatedAssignedToSignal = tryEvaluateDefinedSignalAccess(*assignedToSignalPartsAfterSimplification); evaluatedAssignedToSignal.has_value()) {
+        performAssignment(*evaluatedAssignedToSignal, *mappedToAssignmentOperationFromFlag, *rhsOperandEvaluatedAsConstant);
     }
 
     if (!skipCheckForSplitOfAssignmentInSubAssignments) {
@@ -181,12 +175,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
             const auto modulesMatchingCallSignature = moduleCallGuessResolver->get()->getMatchesForGuess();
             if (modulesMatchingCallSignature.empty() || modulesMatchingCallSignature.size() > 1) {
                 for (const auto& calleeArgument : symbolTableEntryForCalleeArguments) {
-                    const auto calleeArgumentAsSignalAccess = std::make_unique<syrec::VariableAccess>();
-                    calleeArgumentAsSignalAccess->var       = calleeArgument;
-                    calleeArgumentAsSignalAccess->indexes   = {};
-                    calleeArgumentAsSignalAccess->range     = std::nullopt;
-
-                    invalidateValueOfAccessedSignalParts(*tryEvaluateDefinedSignalAccess(*calleeArgumentAsSignalAccess));
+                    invalidateValueOfWholeSignal(calleeArgument->name);
                 }
                 symbolTable->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), parser::SymbolTable::ReferenceCountUpdate::Increment);
             } else {
@@ -202,13 +191,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
                     if (signalTypeOfCallerParameter == syrec::Variable::Types::In) {
                         continue;
                     }
-
-                    const auto calleeArgumentAsSignalAccess = std::make_unique<syrec::VariableAccess>();
-                    calleeArgumentAsSignalAccess->var       = symbolTableEntryForCalleeArguments.at(i);
-                    calleeArgumentAsSignalAccess->indexes   = {};
-                    calleeArgumentAsSignalAccess->range     = std::nullopt;
-
-                    invalidateValueOfAccessedSignalParts(*tryEvaluateDefinedSignalAccess(*calleeArgumentAsSignalAccess));
+                    invalidateValueOfWholeSignal(symbolTableEntryForCalleeArguments.at(i)->name);
                 }
                 symbolTable->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, {signatureOfCalledModuleInSymbolTable.internalModuleId}, parser::SymbolTable::ReferenceCountUpdate::Increment);
             }
@@ -258,8 +241,8 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         ? std::make_shared<syrec::VariableAccess>(*simplificationResultOfRhsOperand.tryTakeOwnershipOfOptimizationResult()->front())
         : swapStatement.rhs;
     
-    const auto& evaluatedSwapOperationLhsSignalAccess = tryEvaluateDefinedSignalAccess(*lhsOperandAfterSimplification);
-    const auto& evaluatedSwapOperationRhsSignalAccess = tryEvaluateDefinedSignalAccess(*rhsOperandAfterSimplification);
+    auto evaluatedSwapOperationLhsSignalAccess = tryEvaluateDefinedSignalAccess(*lhsOperandAfterSimplification);
+    auto evaluatedSwapOperationRhsSignalAccess = tryEvaluateDefinedSignalAccess(*rhsOperandAfterSimplification);
 
     if (evaluatedSwapOperationLhsSignalAccess.has_value() && evaluatedSwapOperationRhsSignalAccess.has_value()) {
         updateReferenceCountOf(evaluatedSwapOperationLhsSignalAccess->accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Increment);
@@ -289,7 +272,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         signalAccessOperand = std::move(simplificationResultOfUnaryOperandSignalAccess.tryTakeOwnershipOfOptimizationResult()->front());
     }
 
-    if (const auto& evaluatedUnaryOperandSignalAccess = tryEvaluateDefinedSignalAccess(*signalAccessOperand); evaluatedUnaryOperandSignalAccess.has_value()) {
+    if (auto evaluatedUnaryOperandSignalAccess = tryEvaluateDefinedSignalAccess(*signalAccessOperand); evaluatedUnaryOperandSignalAccess.has_value()) {
         updateReferenceCountOf(evaluatedUnaryOperandSignalAccess->accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Increment);
         const auto& fetchedValueForAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(*evaluatedUnaryOperandSignalAccess);
         const auto& mappedToUnaryOperationFromFlag  = syrec_operation::tryMapUnaryAssignmentOperationFlagToEnum(unaryStmt.op);
@@ -323,7 +306,6 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
     return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
-// TODO: Reassociate expression simplification
 optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleBinaryExpr(const syrec::BinaryExpression& expression) const {
     auto simplificationResultOfLhsExpr = handleExpr(*expression.lhs);
     auto simplificationResultOfRhsExpr = handleExpr(*expression.rhs);
@@ -363,9 +345,14 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
         simplifiedBinaryExpr = std::make_unique<syrec::BinaryExpression>(std::move(simplifiedLhsExpr), expression.op, std::move(simplifiedRhsExpr));   
     }
 
-    if (auto simplificationResultOfExpr = trySimplifyExpr(*simplifiedBinaryExpr); simplificationResultOfExpr != nullptr) {
+    std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
+    if (auto simplificationResultOfExpr = trySimplifyExpr(*simplifiedBinaryExpr, *symbolTable, parserConfig.reassociateExpressionsEnabled, parserConfig.operationStrengthReductionEnabled, &optimizedAwaySignalAccesses); simplificationResultOfExpr != nullptr) {
         simplifiedBinaryExpr = std::move(simplificationResultOfExpr);
         wasOriginalExprModified = true;
+    }
+
+    for (const auto& optimizedAwaySignalAccess : optimizedAwaySignalAccesses) {
+        updateReferenceCountOf(optimizedAwaySignalAccess->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
     }
 
     return wasOriginalExprModified
@@ -380,14 +367,16 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
     return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
-// TODO: Index checks due to new values being available ?
-// TODO: Bitwidth ?
 optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleVariableExpr(const syrec::VariableExpression& expression) const {
-    if (const auto& fetchedValueForSignal = symbolTable->tryFetchValueForLiteral(expression.var); fetchedValueForSignal.has_value() && parserConfig.performConstantPropagation) {
-        updateReferenceCountOf(expression.var->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-        return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*fetchedValueForSignal), expression.bitwidth()));
+    std::optional<unsigned int> fetchedValueOfSignal;
+    if (auto simplificationResultOfUserDefinedSignalAccess = handleSignalAccess(*expression.var, parserConfig.performConstantPropagation, &fetchedValueOfSignal); simplificationResultOfUserDefinedSignalAccess.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        if (fetchedValueOfSignal.has_value()) {
+            return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*fetchedValueOfSignal), expression.bitwidth()));
+        }
+        if (simplificationResultOfUserDefinedSignalAccess.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
+            return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::make_unique<syrec::VariableExpression>(std::move(simplificationResultOfUserDefinedSignalAccess.tryTakeOwnershipOfOptimizationResult()->front())));
+        }
     }
-    updateReferenceCountOf(expression.var->var->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
     return OptimizationResult<syrec::expression>::asUnchangedOriginal();
 }
 
@@ -447,10 +436,14 @@ optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optim
         return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
     if (number.isCompileTimeConstantExpression()) {
-        const auto mappedToBinaryExpr = transformCompileTimeConstantExpressionToNumber(number.getExpression());
-        if (const auto& simplificationResultOfBinaryExpr = trySimplifyExpr(*mappedToBinaryExpr); simplificationResultOfBinaryExpr != nullptr) {
-            if (auto simplificationResultAsCompileTimeExpr = tryMapExprToCompileTimeConstantExpr(*simplificationResultOfBinaryExpr); simplificationResultAsCompileTimeExpr != nullptr) {
-                return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::move(simplificationResultAsCompileTimeExpr));
+        if (auto simplificationResult = trySimplifyNumber(number, *symbolTable, parserConfig.reassociateExpressionsEnabled, parserConfig.operationStrengthReductionEnabled, nullptr); simplificationResult.has_value()) {
+            if (std::holds_alternative<unsigned int>(*simplificationResult)) {
+                return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::make_unique<syrec::Number>(std::get<unsigned int>(*simplificationResult)));
+            }
+            if (std::holds_alternative<std::unique_ptr<syrec::Number>>(*simplificationResult)) {
+                auto containerForSimplifiedNumber = std::move(std::get<std::unique_ptr<syrec::Number>>(*simplificationResult));
+                updateReferenceCountsOfSignalIdentsUsedIn(*containerForSimplifiedNumber, parser::SymbolTable::ReferenceCountUpdate::Increment);
+                return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::move(containerForSimplifiedNumber));
             }
         }
     }
@@ -541,27 +534,18 @@ std::unique_ptr<syrec::Number> optimizations::Optimizer::createCopyOfNumber(cons
     return nullptr;
 }
 
-std::unique_ptr<syrec::expression> optimizations::Optimizer::trySimplifyExpr(const syrec::expression& expr) const {
+std::unique_ptr<syrec::expression> optimizations::Optimizer::trySimplifyExpr(const syrec::expression& expr, const parser::SymbolTable& symbolTable, bool simplifyExprByReassociation, bool performOperationStrengthReduction, std::vector<syrec::VariableAccess::ptr>* optimizedAwaySignalAccesses) {
     std::unique_ptr<syrec::expression> simplificationResult;
-    std::vector<syrec::VariableAccess::ptr> droppedSignalAccesses;
     const std::shared_ptr<syrec::expression> toBeSimplifiedExpr = createCopyOfExpression(expr);
-    if (parserConfig.reassociateExpressionsEnabled) {
-        
-        if (const auto& reassociateExpressionResult = optimizations::simplifyBinaryExpression(toBeSimplifiedExpr, parserConfig.operationStrengthReductionEnabled, std::nullopt, symbolTable, droppedSignalAccesses); reassociateExpressionResult != nullptr) {
+    if (simplifyExprByReassociation) {
+        if (const auto& reassociateExpressionResult = optimizations::simplifyBinaryExpression(toBeSimplifiedExpr, performOperationStrengthReduction, std::nullopt, symbolTable, optimizedAwaySignalAccesses); reassociateExpressionResult != nullptr) {
             simplificationResult = createCopyOfExpression(*reassociateExpressionResult);
         }
     } else {
-        if (const auto& generalBinaryExpressionSimplificationResult = optimizations::trySimplify(toBeSimplifiedExpr, parserConfig.operationStrengthReductionEnabled, symbolTable, droppedSignalAccesses); generalBinaryExpressionSimplificationResult.couldSimplify) {
+        if (const auto& generalBinaryExpressionSimplificationResult = optimizations::trySimplify(toBeSimplifiedExpr, performOperationStrengthReduction, symbolTable, optimizedAwaySignalAccesses); generalBinaryExpressionSimplificationResult.couldSimplify) {
             simplificationResult = createCopyOfExpression(*generalBinaryExpressionSimplificationResult.simplifiedExpression);
         }
     }
-
-    std::for_each(
-            droppedSignalAccesses.cbegin(),
-            droppedSignalAccesses.cend(),
-            [&](const syrec::VariableAccess::ptr& droppedSignalAccess) {
-                updateReferenceCountOf(droppedSignalAccess->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-            });
     return simplificationResult;
 }
 
@@ -606,6 +590,25 @@ std::unique_ptr<syrec::Number> optimizations::Optimizer::tryMapExprToCompileTime
     return nullptr;
 }
 
+std::optional<std::variant<unsigned, std::unique_ptr<syrec::Number>>> optimizations::Optimizer::trySimplifyNumber(const syrec::Number& number, const parser::SymbolTable& symbolTable, bool simplifyExprByReassociation, bool performOperationStrengthReduction, std::vector<syrec::VariableAccess::ptr>* optimizedAwaySignalAccesses) {
+    if (number.isConstant()) {
+        return std::make_optional(number.evaluate({}));
+    }
+    if (!number.isCompileTimeConstantExpression()) {
+        return std::nullopt;
+    }
+
+    if (const auto& compileTimeExprAsBinaryExpr = createBinaryExprFromCompileTimeConstantExpr(number); compileTimeExprAsBinaryExpr != nullptr) {
+        if (const auto& simplificationResultOfExpr = trySimplifyExpr(*compileTimeExprAsBinaryExpr, symbolTable, simplifyExprByReassociation, performOperationStrengthReduction, optimizedAwaySignalAccesses); simplificationResultOfExpr != nullptr) {
+            if (auto simplifiedExprAsCompileTimeConstantExpr = tryMapExprToCompileTimeConstantExpr(*simplificationResultOfExpr); simplifiedExprAsCompileTimeConstantExpr != nullptr) {
+                return simplifiedExprAsCompileTimeConstantExpr;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+
 std::optional<syrec_operation::operation> optimizations::Optimizer::tryMapCompileTimeConstantOperation(syrec::Number::CompileTimeConstantExpression::Operation compileTimeConstantExprOperation) {
     switch (compileTimeConstantExprOperation) {
         case syrec::Number::CompileTimeConstantExpression::Operation::Addition:
@@ -645,34 +648,34 @@ std::optional<unsigned> optimizations::Optimizer::tryFetchValueForAccessedSignal
         return std::nullopt;
     }
 
-    if (const auto& evaluatedSignalAccess = tryEvaluateDefinedSignalAccess(accessedSignal); evaluatedSignalAccess.has_value()) {
+    if (auto evaluatedSignalAccess = tryEvaluateDefinedSignalAccess(accessedSignal); evaluatedSignalAccess.has_value()) {
         return tryFetchValueFromEvaluatedSignalAccess(*evaluatedSignalAccess);
     }
     return std::nullopt;
 }
 
 optimizations::Optimizer::DimensionAccessEvaluationResult optimizations::Optimizer::evaluateUserDefinedDimensionAccess(const std::string_view& accessedSignalIdent, const std::vector<std::reference_wrapper<const syrec::expression>>& accessedValuePerDimension) const {
-    const auto& signalData = std::get<syrec::Variable::ptr>(*symbolTable->getVariable(accessedSignalIdent));
     if (accessedValuePerDimension.empty()) {
-        return DimensionAccessEvaluationResult({false, std::vector<std::pair<IndexValidityStatus, std::optional<unsigned int>>>()});
+        return DimensionAccessEvaluationResult({false, std::vector<SignalAccessIndexEvaluationResult<syrec::expression>>()});
     }
 
+    const auto& signalData = std::get<syrec::Variable::ptr>(*symbolTable->getVariable(accessedSignalIdent));
     const auto wasUserDefinedAccessTrimmed = accessedValuePerDimension.size() > signalData->dimensions.size();
     const auto numEntriesToTransform       = wasUserDefinedAccessTrimmed ? signalData->dimensions.size() : accessedValuePerDimension.size();
     
-    std::vector<std::pair<IndexValidityStatus, std::optional<unsigned int>>> evaluatedValuePerDimension;
+    std::vector<SignalAccessIndexEvaluationResult<syrec::expression>> evaluatedValuePerDimension;
     evaluatedValuePerDimension.reserve(numEntriesToTransform);
 
     for (std::size_t i = 0; i < numEntriesToTransform; ++i) {
         const auto& userDefinedValueOfDimension = accessedValuePerDimension.at(i);
         if (const auto& valueOfDimensionEvaluated   = tryEvaluateExpressionToConstant(userDefinedValueOfDimension); valueOfDimensionEvaluated.has_value()) {
             const auto isAccessedValueOfDimensionWithinRange = parser::isValidDimensionAccess(signalData, i, *valueOfDimensionEvaluated);
-            evaluatedValuePerDimension.emplace_back(isAccessedValueOfDimensionWithinRange ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange, *valueOfDimensionEvaluated);
+            evaluatedValuePerDimension.push_back(SignalAccessIndexEvaluationResult<syrec::expression>::createFromConstantValue(isAccessedValueOfDimensionWithinRange ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange, *valueOfDimensionEvaluated));
         } else {
-            evaluatedValuePerDimension.emplace_back(IndexValidityStatus::Unknown, std::nullopt);
+            evaluatedValuePerDimension.push_back(SignalAccessIndexEvaluationResult<syrec::expression>::createFromSimplifiedNonConstantValue(IndexValidityStatus::Unknown, createCopyOfExpression(userDefinedValueOfDimension)));
         }
     }
-    return DimensionAccessEvaluationResult({wasUserDefinedAccessTrimmed, evaluatedValuePerDimension});
+    return DimensionAccessEvaluationResult({wasUserDefinedAccessTrimmed, std::move(evaluatedValuePerDimension)});
 }
 
 std::optional<std::pair<unsigned, unsigned>> optimizations::Optimizer::tryEvaluateBitRangeAccessComponents(const std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>& accessedBitRange) const {
@@ -691,10 +694,10 @@ std::optional<unsigned> optimizations::Optimizer::tryEvaluateNumberAsConstant(co
     return std::nullopt;
 }
 
-optimizations::Optimizer::BitRangeEvaluationResult optimizations::Optimizer::evaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const {
+std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations::Optimizer::evaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const {
     const auto& signalData = std::get<syrec::Variable::ptr>(*symbolTable->getVariable(accessedSignalIdent));
     if (!accessedBitRange.has_value()) {
-        return BitRangeEvaluationResult(IndexValidityStatus::Valid, std::make_optional(0), IndexValidityStatus::Valid, std::make_optional(signalData->bitwidth - 1));
+        return std::nullopt;
     }
     
     const auto& bitRangeStartEvaluated = tryEvaluateNumberAsConstant(accessedBitRange->first);
@@ -708,7 +711,16 @@ optimizations::Optimizer::BitRangeEvaluationResult optimizations::Optimizer::eva
     if (bitRangeEndEvaluated.has_value()) {
         bitRangeEndEvaluationStatus = parser::isValidBitAccess(signalData, *bitRangeEndEvaluated) ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange;
     }
-    return BitRangeEvaluationResult(bitRangeStartEvaluationStatus, bitRangeStartEvaluated, bitRangeEndEvaluationStatus, bitRangeEndEvaluated);
+
+    auto rangeStartEvaluationResult = bitRangeStartEvaluationStatus == IndexValidityStatus::Unknown
+        ? SignalAccessIndexEvaluationResult<syrec::Number>::createFromSimplifiedNonConstantValue(bitRangeStartEvaluationStatus, createCopyOfNumber(accessedBitRange->first))
+        : SignalAccessIndexEvaluationResult<syrec::Number>::createFromConstantValue(bitRangeStartEvaluationStatus, *bitRangeStartEvaluated);
+
+    auto rangeEndEvaluationResult = bitRangeEndEvaluationStatus == IndexValidityStatus::Unknown
+        ? SignalAccessIndexEvaluationResult<syrec::Number>::createFromSimplifiedNonConstantValue(bitRangeEndEvaluationStatus, createCopyOfNumber(accessedBitRange->second))
+        : SignalAccessIndexEvaluationResult<syrec::Number>::createFromConstantValue(bitRangeEndEvaluationStatus, *bitRangeEndEvaluated);
+
+    return std::make_optional(BitRangeEvaluationResult({.rangeStartEvaluationResult = std::move(rangeStartEvaluationResult), .rangeEndEvaluationResult = std::move(rangeEndEvaluationResult)}));
 }
 
 std::optional<unsigned> optimizations::Optimizer::tryEvaluateExpressionToConstant(const syrec::expression& expr) const {
@@ -790,40 +802,97 @@ std::optional<optimizations::Optimizer::EvaluatedSignalAccess> optimizations::Op
         if (accessedSignalParts.range.has_value()) {
             accessedBitRangeWithoutOwnership = std::make_pair(*accessedSignalParts.range->first, *accessedSignalParts.range->second);
         }
-
-        return std::make_optional(optimizations::Optimizer::EvaluatedSignalAccess({
-            accessedSignalParts.var->name,
-            evaluateUserDefinedDimensionAccess(accessedSignalIdent, accessedValueOfDimensionWithoutOwnership),
-            evaluateUserDefinedBitRangeAccess(accessedSignalIdent, accessedBitRangeWithoutOwnership)})
-        );
+        
+        return std::make_optional(EvaluatedSignalAccess({accessedSignalParts.var->name,
+                                                         evaluateUserDefinedDimensionAccess(accessedSignalIdent, accessedValueOfDimensionWithoutOwnership),
+                                                         evaluateUserDefinedBitRangeAccess(accessedSignalIdent, accessedBitRangeWithoutOwnership), false}));
     }
     return std::nullopt;
 }
 
+std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvaluatedSignalAccess(EvaluatedSignalAccess& evaluatedSignalAccess, std::optional<bool>* wasAnyDefinedIndexOutOfRange, bool* didAllDefinedIndicesEvaluateToConstants) const {
+    if (const auto& matchingSymbolTableEntryForIdent = symbolTable->getVariable(evaluatedSignalAccess.accessedSignalIdent); matchingSymbolTableEntryForIdent.has_value() && std::holds_alternative<syrec::Variable::ptr>(*matchingSymbolTableEntryForIdent)) {
+        std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> definedBitRangeAccess;
+        std::vector<syrec::expression::ptr>                              definedDimensionAccess(evaluatedSignalAccess.accessedValuePerDimension.valuePerDimension.size(), nullptr);
+
+        if (evaluatedSignalAccess.accessedBitRange.has_value()) {
+            syrec::Number::ptr bitRangeStart;
+            syrec::Number::ptr bitRangeEnd;
+
+            if (const auto& constantValueOfBitRangeStart = tryFetchConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeStartEvaluationResult); constantValueOfBitRangeStart.has_value()) {
+                bitRangeStart = std::make_shared<syrec::Number>(*constantValueOfBitRangeStart);
+                if (didAllDefinedIndicesEvaluateToConstants) {
+                    *didAllDefinedIndicesEvaluateToConstants = true;
+                }
+            } else {
+                bitRangeStart = *tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeStartEvaluationResult);
+            }
+
+            if (const auto& constantValueOfBitRangeEnd = tryFetchConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeEndEvaluationResult); constantValueOfBitRangeEnd.has_value()) {
+                bitRangeEnd = std::make_shared<syrec::Number>(*constantValueOfBitRangeEnd);
+                if (didAllDefinedIndicesEvaluateToConstants) {
+                    *didAllDefinedIndicesEvaluateToConstants &= true;
+                }
+            } else {
+                bitRangeEnd = *tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeEndEvaluationResult);
+            }
+            definedBitRangeAccess = std::make_pair(bitRangeStart, bitRangeEnd);
+        }
+
+        for (auto& evaluatedValueOfDimension : evaluatedSignalAccess.accessedValuePerDimension.valuePerDimension) {
+            if (const auto& constantValueOfValueOfDimension = tryFetchConstantValueOfIndex(evaluatedValueOfDimension); constantValueOfValueOfDimension.has_value()) {
+                definedDimensionAccess.emplace_back(std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(*constantValueOfValueOfDimension), BitHelpers::getRequiredBitsToStoreValue(*constantValueOfValueOfDimension)));
+                if (didAllDefinedIndicesEvaluateToConstants) {
+                    *didAllDefinedIndicesEvaluateToConstants = true;
+                }
+            }
+            definedDimensionAccess.emplace_back(*tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(evaluatedValueOfDimension));
+        }
+
+        auto transformedToSignalAccess = std::make_unique<syrec::VariableAccess>();
+        transformedToSignalAccess->var = std::get<syrec::Variable::ptr>(*matchingSymbolTableEntryForIdent);
+        transformedToSignalAccess->indexes = definedDimensionAccess;
+        transformedToSignalAccess->range   = definedBitRangeAccess;
+        return transformedToSignalAccess;
+    }
+    return nullptr;
+}
 
 /*
  * TODO: Removed additional pointer conversion when symbol table can be called with references instead of smart pointers
  */
-void optimizations::Optimizer::invalidateValueOfAccessedSignalParts(const EvaluatedSignalAccess& accessedSignalParts) const {
+void optimizations::Optimizer::invalidateValueOfAccessedSignalParts(EvaluatedSignalAccess& accessedSignalParts) const {
     if (auto transformedSignalAccess = transformEvaluatedSignalAccess(accessedSignalParts, nullptr, nullptr); transformedSignalAccess != nullptr) {
         const std::shared_ptr<syrec::VariableAccess> sharedTransformedSignalAccess = std::move(transformedSignalAccess);
         symbolTable->invalidateStoredValuesFor(sharedTransformedSignalAccess);
     }
 }
 
+void optimizations::Optimizer::invalidateValueOfWholeSignal(const std::string_view& signalIdent) const {
+    if (const auto& matchingSymbolTableEntry = symbolTable->getVariable(signalIdent); matchingSymbolTableEntry.has_value() && std::holds_alternative<syrec::Variable::ptr>(*matchingSymbolTableEntry)) {
+        const auto& sharedTransformedSignalAccess = std::make_shared<syrec::VariableAccess>();
+        sharedTransformedSignalAccess->var        = std::get<syrec::Variable::ptr>(*matchingSymbolTableEntry);
+        symbolTable->invalidateStoredValuesFor(sharedTransformedSignalAccess);
+    }
+}
+
+
 /*
  * TODO: Removed additional pointer conversion when symbol table can be called with references instead of smart pointers
  */
-void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, unsigned assignmentRhsValue) const {
+void optimizations::Optimizer::performAssignment(EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, unsigned assignmentRhsValue) const {
     std::optional<bool> areAnyComponentsOfAssignedToSignalAccessOutOfRange;
-    bool                areAllComponentsOfAssignedToSignalConstants;
-    if (auto transformedSignalAccess = transformEvaluatedSignalAccess(assignedToSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &areAllComponentsOfAssignedToSignalConstants); transformedSignalAccess != nullptr) {
+    bool                didAllDefinedIndicesEvaluateToConstants = false;
+    if (auto transformedSignalAccess = transformEvaluatedSignalAccess(assignedToSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &didAllDefinedIndicesEvaluateToConstants); transformedSignalAccess != nullptr) {
         const std::shared_ptr<syrec::VariableAccess> sharedTransformedSignalAccess = std::move(transformedSignalAccess);
-        if (const auto& currentValueOfAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(assignedToSignalParts); currentValueOfAssignedToSignal.has_value()) {
-            if (const auto evaluationResultOfOperation = syrec_operation::apply(assignmentOperation, currentValueOfAssignedToSignal, assignmentRhsValue); evaluationResultOfOperation.has_value()) {
-                symbolTable->updateStoredValueFor(sharedTransformedSignalAccess, *evaluationResultOfOperation);
-                return;
-            }
+
+        if (!(areAnyComponentsOfAssignedToSignalAccessOutOfRange.has_value() && *areAnyComponentsOfAssignedToSignalAccessOutOfRange) || !didAllDefinedIndicesEvaluateToConstants) {
+            if (const auto& currentValueOfAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(assignedToSignalParts); currentValueOfAssignedToSignal.has_value()) {
+                if (const auto evaluationResultOfOperation = syrec_operation::apply(assignmentOperation, currentValueOfAssignedToSignal, assignmentRhsValue); evaluationResultOfOperation.has_value()) {
+                    symbolTable->updateStoredValueFor(sharedTransformedSignalAccess, *evaluationResultOfOperation);
+                    return;
+                }
+            }   
         }
         symbolTable->invalidateStoredValuesFor(sharedTransformedSignalAccess);
     }
@@ -832,7 +901,7 @@ void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& as
 /*
  * TODO: Removed additional pointer conversion when symbol table can be called with references instead of smart pointers
  */
-void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, const EvaluatedSignalAccess& assignmentRhsOperand) const {
+void optimizations::Optimizer::performAssignment(EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, EvaluatedSignalAccess& assignmentRhsOperand) const {
     if (const auto fetchedValueForAssignmentRhsOperand = tryFetchValueFromEvaluatedSignalAccess(assignmentRhsOperand); fetchedValueForAssignmentRhsOperand.has_value()) {
         performAssignment(assignmentLhsOperand, assignmentOperation, *fetchedValueForAssignmentRhsOperand);
         updateReferenceCountOf(assignmentRhsOperand.accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Decrement);
@@ -843,17 +912,20 @@ void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& as
     symbolTable->invalidateStoredValuesFor(sharedTransformedLhsOperandSignalAccess);
 }
 
-void optimizations::Optimizer::performSwap(const EvaluatedSignalAccess& swapOperationLhsOperand, const EvaluatedSignalAccess& swapOperationRhsOperand) const {
+void optimizations::Optimizer::performSwap(EvaluatedSignalAccess& swapOperationLhsOperand, EvaluatedSignalAccess& swapOperationRhsOperand) const {
     std::optional<bool> areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange;
     std::optional<bool> areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange;
+    auto                didAllDefinedIndicesOfLhsSwapOperandEvaluateToConstants = false;
+    auto                didAllDefinedIndicesOfRhsSwapOperandEvaluateToConstants = false;
 
-    auto transformedSignalAccessForLhsOperand = transformEvaluatedSignalAccess(swapOperationLhsOperand, &areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange, nullptr);
-    auto transformedSignalAccessForRhsOperand = transformEvaluatedSignalAccess(swapOperationRhsOperand, &areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange, nullptr);
+    auto transformedSignalAccessForLhsOperand = transformEvaluatedSignalAccess(swapOperationLhsOperand, &areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange, &didAllDefinedIndicesOfLhsSwapOperandEvaluateToConstants);
+    auto transformedSignalAccessForRhsOperand = transformEvaluatedSignalAccess(swapOperationRhsOperand, &areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange, &didAllDefinedIndicesOfRhsSwapOperandEvaluateToConstants);
 
     const std::shared_ptr<syrec::VariableAccess> sharedTransformedSwapLhsOperand = std::move(transformedSignalAccessForLhsOperand);
     const std::shared_ptr<syrec::VariableAccess> sharedTransformedSwapRhsOperand = std::move(transformedSignalAccessForRhsOperand);
 
-    if (areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange.has_value() && !*areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange && areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange.has_value() && !*areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange) {
+    if (areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange.has_value() && !*areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange && didAllDefinedIndicesOfLhsSwapOperandEvaluateToConstants
+        && areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange.has_value() && !*areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange && didAllDefinedIndicesOfRhsSwapOperandEvaluateToConstants) {
         symbolTable->swap(sharedTransformedSwapLhsOperand, sharedTransformedSwapRhsOperand);
     }
 
@@ -865,147 +937,78 @@ void optimizations::Optimizer::performSwap(const EvaluatedSignalAccess& swapOper
     }
 }
 
-std::optional<unsigned> optimizations::Optimizer::tryFetchValueFromEvaluatedSignalAccess(const EvaluatedSignalAccess& accessedSignalParts) const {
+std::optional<unsigned> optimizations::Optimizer::tryFetchValueFromEvaluatedSignalAccess(EvaluatedSignalAccess& accessedSignalParts) const {
     std::optional<bool> areAnyComponentsOfAssignedToSignalAccessOutOfRange;
-    bool                areAllComponentsOfAssignedToSignalConstants;
-    if (auto transformedSignalAccess = transformEvaluatedSignalAccess(accessedSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &areAllComponentsOfAssignedToSignalConstants); transformedSignalAccess != nullptr) {
+    bool                didAllDefinedIndicesEvaluateToConstants;
+    if (auto transformedSignalAccess = transformEvaluatedSignalAccess(accessedSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &didAllDefinedIndicesEvaluateToConstants); transformedSignalAccess != nullptr) {
         const std::shared_ptr<syrec::VariableAccess> sharedTransformedSignalAccess = std::move(transformedSignalAccess);
-        if (areAnyComponentsOfAssignedToSignalAccessOutOfRange.has_value() && !*areAnyComponentsOfAssignedToSignalAccessOutOfRange && areAllComponentsOfAssignedToSignalConstants) {
+        if (!areAnyComponentsOfAssignedToSignalAccessOutOfRange.has_value() && !*areAnyComponentsOfAssignedToSignalAccessOutOfRange && didAllDefinedIndicesEvaluateToConstants) {
             return symbolTable->tryFetchValueForLiteral(sharedTransformedSignalAccess);
         }
     }
     return std::nullopt;
 }
 
-std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvaluatedSignalAccess(const EvaluatedSignalAccess& accessedSignalParts, std::optional<bool>* wasAnyAccessedComponentOutOfRange, bool* areAllAccessedSignalAccessComponentsConstants) const {
-    if (const auto& symbolTableEntryForAccessedSignal = symbolTable->getVariable(accessedSignalParts.accessedSignalIdent); symbolTableEntryForAccessedSignal.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForAccessedSignal)) {
-        if (areAllAccessedSignalAccessComponentsConstants != nullptr) {
-            *areAllAccessedSignalAccessComponentsConstants = true;   
-        }
-
-        std::vector<syrec::expression::ptr> transformedAccessedValuePerDimension(accessedSignalParts.accessedValuePerDimension.valuePerDimension.size(), nullptr);
-        const std::string                   loopVariableToUsedToIndicateAllValueForDimensionAccessed = "test";
-
-        for (std::size_t i = 0; i < transformedAccessedValuePerDimension.size(); ++i) {
-            const auto& [definedValueValidityStatus, evaluatedValueForDimension] = accessedSignalParts.accessedValuePerDimension.valuePerDimension.at(i);
-
-            const auto accessedValueForDimension = definedValueValidityStatus == IndexValidityStatus::Valid
-                ? std::make_shared<syrec::NumericExpression>(std::make_unique<syrec::Number>(*evaluatedValueForDimension), 1)
-                : std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(loopVariableToUsedToIndicateAllValueForDimensionAccessed), 1);
-            transformedAccessedValuePerDimension.push_back(accessedValueForDimension);
-
-            if (wasAnyAccessedComponentOutOfRange != nullptr && wasAnyAccessedComponentOutOfRange->has_value()) {
-                *wasAnyAccessedComponentOutOfRange = *wasAnyAccessedComponentOutOfRange || definedValueValidityStatus == IndexValidityStatus::OutOfRange;
-            }
-            if (areAllAccessedSignalAccessComponentsConstants != nullptr) {
-                *areAllAccessedSignalAccessComponentsConstants &= definedValueValidityStatus == IndexValidityStatus::Valid;   
-            }
-        }
-
-        std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> transformedAccessedBitRange;
-        const auto& [validityStatusOfBitRangeStart, evaluateValueForBitRangeStart] = accessedSignalParts.accessedBitRange.rangeStartEvaluationResult;
-        const auto& [validityStatusOfBitRangeEnd, evaluateValueForBitRangeEnd]     = accessedSignalParts.accessedBitRange.rangeEndEvaluationResult;
-
-        if (validityStatusOfBitRangeStart == IndexValidityStatus::Valid && validityStatusOfBitRangeEnd == IndexValidityStatus::Valid) {
-            transformedAccessedBitRange = std::make_pair(std::make_unique<syrec::Number>(*evaluateValueForBitRangeStart), std::make_unique<syrec::Number>(*evaluateValueForBitRangeEnd));
-        } else {
-            const auto& bitWidthOfAccessedSignal = std::get<syrec::Variable::ptr>(*symbolTableEntryForAccessedSignal)->bitwidth;
-
-            unsigned int transformedBitRangeStart = 0;
-            unsigned int transformedBitRangeEnd   = bitWidthOfAccessedSignal - 1;
-            if (validityStatusOfBitRangeStart == IndexValidityStatus::Valid) {
-                transformedBitRangeStart = *evaluateValueForBitRangeStart;
-            }
-            transformedAccessedBitRange = std::make_pair(std::make_unique<syrec::Number>(transformedBitRangeStart), std::make_unique<syrec::Number>(transformedBitRangeEnd));
-        }
-
-        if (wasAnyAccessedComponentOutOfRange != nullptr && wasAnyAccessedComponentOutOfRange->has_value()) {
-            *wasAnyAccessedComponentOutOfRange = *wasAnyAccessedComponentOutOfRange && (validityStatusOfBitRangeStart == IndexValidityStatus::OutOfRange || validityStatusOfBitRangeEnd == IndexValidityStatus::OutOfRange);
-        }
-        if (areAllAccessedSignalAccessComponentsConstants != nullptr) {
-            *areAllAccessedSignalAccessComponentsConstants &= validityStatusOfBitRangeStart == IndexValidityStatus::Valid && validityStatusOfBitRangeEnd == IndexValidityStatus::Valid;   
-        }
-
-        auto generatedSignalAccess     = std::make_unique<syrec::VariableAccess>();
-        generatedSignalAccess->var     = std::get<syrec::Variable::ptr>(*symbolTableEntryForAccessedSignal);
-        generatedSignalAccess->indexes = transformedAccessedValuePerDimension;
-        generatedSignalAccess->range   = transformedAccessedBitRange;
-        return generatedSignalAccess;
-    }
-    return nullptr;
-}
-
 optimizations::Optimizer::OptimizationResult<syrec::VariableAccess> optimizations::Optimizer::handleSignalAccess(const syrec::VariableAccess& signalAccess, bool performConstantPropagationForAccessedSignal, std::optional<unsigned int>* fetchedValue) const {
-    if (const auto& evaluatedSignalAccess = tryEvaluateDefinedSignalAccess(signalAccess); evaluatedSignalAccess.has_value()) {
-        std::vector<OptimizationResult<syrec::expression>> simplifiedValuePerDimensionAccess;
-        simplifiedValuePerDimensionAccess.reserve(signalAccess.indexes.size());
-        bool wasAnyValueOfDimensionSimplified = false;
-
-        for (const auto& userDefinedValueOfDimension : signalAccess.indexes) {
-            const auto& simplificationResultOfValueOfDimension = handleExpr(*userDefinedValueOfDimension);
-            wasAnyValueOfDimensionSimplified                   = simplificationResultOfValueOfDimension.getStatusOfResult() == OptimizationResultFlag::WasOptimized;
-            simplifiedValuePerDimensionAccess.push_back(handleExpr(*userDefinedValueOfDimension));
-        }
-
-        std::optional<OptimizationResult<syrec::Number>> bitRangeStartSimplified = signalAccess.range.has_value() ? std::make_optional(handleNumber(*signalAccess.range->first)) : std::nullopt;
-        std::optional<OptimizationResult<syrec::Number>> bitRangeEndSimplified = signalAccess.range.has_value() ? std::make_optional(handleNumber(*signalAccess.range->second)) : std::nullopt;
-
-        std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> simplifiedBitRangeAccess;
-        const auto                                             wasBitRangeStartSimplified = signalAccess.range.has_value() && bitRangeStartSimplified.has_value() && bitRangeStartSimplified->getStatusOfResult() == OptimizationResultFlag::WasOptimized;
-        const auto                                             wasBitRangeEndSimplified = signalAccess.range.has_value() && bitRangeEndSimplified.has_value() && bitRangeEndSimplified->getStatusOfResult() == OptimizationResultFlag::WasOptimized;
-        if (wasBitRangeStartSimplified || wasBitRangeEndSimplified) {
-            const syrec::Number::ptr finalBitRangeStart = wasBitRangeStartSimplified ? std::make_shared<syrec::Number>(*bitRangeStartSimplified->tryTakeOwnershipOfOptimizationResult()->front()) : signalAccess.range->first;
-            const syrec::Number::ptr finalBitRangeEnd   = wasBitRangeEndSimplified ? std::make_shared<syrec::Number>(*bitRangeEndSimplified->tryTakeOwnershipOfOptimizationResult()->front()) : signalAccess.range->second;
-            simplifiedBitRangeAccess                    = std::make_pair(finalBitRangeStart, finalBitRangeEnd);
-        }
-
-        auto simplifiedSignalAccess = std::make_shared<syrec::VariableAccess>(signalAccess);
-        if (wasAnyValueOfDimensionSimplified || wasBitRangeStartSimplified || wasBitRangeEndSimplified) {
-            simplifiedSignalAccess = syrec::VariableAccess::ptr();
-            simplifiedSignalAccess->var       = signalAccess.var;
-            simplifiedSignalAccess->range     = simplifiedBitRangeAccess;
-
-            if (wasAnyValueOfDimensionSimplified) {
-                syrec::expression::vec simplifiedDimensionAccesses(signalAccess.indexes.size(), nullptr);
-                for (std::size_t i = 0; i < simplifiedDimensionAccesses.size(); ++i) {
-                    if (simplifiedValuePerDimensionAccess.at(i).getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
-                        simplifiedDimensionAccesses.push_back(std::move(simplifiedValuePerDimensionAccess.at(i).tryTakeOwnershipOfOptimizationResult()->front()));
-                    }
-                    else {
-                        simplifiedDimensionAccesses.push_back(signalAccess.indexes.at(i));
-                    }
-                }
-                simplifiedSignalAccess->indexes = simplifiedDimensionAccesses;
-            }
-            else {
-                simplifiedSignalAccess->indexes = signalAccess.indexes;
-            }
-        }
-
-        bool        skipReferenceCountUpdate        = false;
-        const auto& evaluatedSimplifiedSignalAccess = *tryEvaluateDefinedSignalAccess(*simplifiedSignalAccess);
-        if (performConstantPropagationForAccessedSignal && fetchedValue != nullptr) {
-            if (const auto& fetchedValueForSimplifiedSignalAccess = tryFetchValueFromEvaluatedSignalAccess(evaluatedSimplifiedSignalAccess); fetchedValueForSimplifiedSignalAccess.has_value()) {
-                *fetchedValue = *fetchedValueForSimplifiedSignalAccess;
-                skipReferenceCountUpdate = true;
-            }
-        }
-
-        if (!skipReferenceCountUpdate) {
-            updateReferenceCountOf(simplifiedSignalAccess->var->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
-        }
-
-        if (performConstantPropagationForAccessedSignal && fetchedValue != nullptr && fetchedValue->has_value()) {
-            return OptimizationResult<syrec::VariableAccess>::asOptimizedAwayContainer();
-        }
-
-        if (wasAnyValueOfDimensionSimplified || wasBitRangeStartSimplified || wasBitRangeEndSimplified) {
-            return OptimizationResult<syrec::VariableAccess>::fromOptimizedContainer(std::make_unique<syrec::VariableAccess>(*simplifiedSignalAccess));
-        }
+    auto evaluatedSignalAccess = tryEvaluateDefinedSignalAccess(signalAccess);
+    if (!evaluatedSignalAccess.has_value()) {
+        updateReferenceCountOf(signalAccess.var->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
         return OptimizationResult<syrec::VariableAccess>::asUnchangedOriginal();
     }
-    updateReferenceCountOf(signalAccess.var->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
-    return OptimizationResult<syrec::VariableAccess>::asUnchangedOriginal();
+    updateReferenceCountOf(evaluatedSignalAccess->accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Increment);
+
+    const auto& wasDefinedBitRangeAccessOk      = evaluatedSignalAccess->accessedBitRange.has_value() ? evaluatedSignalAccess->accessedBitRange->rangeStartEvaluationResult.validityStatus != IndexValidityStatus::OutOfRange : true;
+    const auto& wasDefinedBitRangeStartAccessOk = evaluatedSignalAccess->accessedBitRange.has_value() ? evaluatedSignalAccess->accessedBitRange->rangeEndEvaluationResult.validityStatus != IndexValidityStatus::OutOfRange : true;
+    const auto& wasDefinedDimensionAccessOk     = !evaluatedSignalAccess->accessedValuePerDimension.wasTrimmed && std::none_of(
+                                                                                                                          evaluatedSignalAccess->accessedValuePerDimension.valuePerDimension.cbegin(),
+                                                                                                                          evaluatedSignalAccess->accessedValuePerDimension.valuePerDimension.cend(),
+                                                                                                                          [](const SignalAccessIndexEvaluationResult<syrec::expression>& valueOfDimensionEvaluationResult) {
+                                                                                                                          return valueOfDimensionEvaluationResult.validityStatus != IndexValidityStatus::OutOfRange;
+                                                                                                                      });
+
+    if (!(wasDefinedBitRangeAccessOk && wasDefinedBitRangeStartAccessOk && wasDefinedDimensionAccessOk)) {
+        return OptimizationResult<syrec::VariableAccess>::asUnchangedOriginal();
+    }
+
+    auto signalAccessUsedForValueLookup = std::make_unique<syrec::VariableAccess>(signalAccess);
+    bool                       wasAnyOriginalIndexModified    = false;
+    if (evaluatedSignalAccess->wereAnyIndicesSimplified) {
+        if (evaluatedSignalAccess->accessedBitRange.has_value()) {
+            auto definedBitRangeStartEvaluationResult = std::move(evaluatedSignalAccess->accessedBitRange->rangeStartEvaluationResult);
+            auto definedBitRangeEndEvaluationResult   = std::move(evaluatedSignalAccess->accessedBitRange->rangeEndEvaluationResult);
+
+            auto simplifiedBitRangeStart = tryConvertSimplifiedIndexValueToUsableSignalAccessIndex(definedBitRangeStartEvaluationResult);
+            auto simplifiedBitRangeEnd   = tryConvertSimplifiedIndexValueToUsableSignalAccessIndex(definedBitRangeEndEvaluationResult);
+
+            signalAccessUsedForValueLookup->range = std::make_pair(
+                    simplifiedBitRangeStart.has_value() ? std::move(*simplifiedBitRangeStart) : signalAccess.range->first,
+                    simplifiedBitRangeEnd.has_value() ? std::move(*simplifiedBitRangeEnd) : signalAccess.range->second);
+            wasAnyOriginalIndexModified = simplifiedBitRangeStart.has_value() || simplifiedBitRangeEnd.has_value();
+        }
+
+        std::size_t dimensionIdx = 0;
+        for (auto& evaluatedValueOfDimension: evaluatedSignalAccess->accessedValuePerDimension.valuePerDimension) {
+            if (auto simplifiedValueOfDimension = tryConvertSimplifiedIndexValueToUsableSignalAccessIndex(evaluatedValueOfDimension); simplifiedValueOfDimension.has_value()) {
+                signalAccessUsedForValueLookup->indexes[dimensionIdx] = std::move(*simplifiedValueOfDimension);
+                wasAnyOriginalIndexModified                           = true;
+            }
+            ++dimensionIdx;
+        }
+    } else if (!performConstantPropagationForAccessedSignal) {
+        return OptimizationResult<syrec::VariableAccess>::asUnchangedOriginal();
+    }
+
+    if (performConstantPropagationForAccessedSignal) {
+        if (const auto& fetchedValueForSimplifiedSignalAccess = tryFetchValueForAccessedSignal(*signalAccessUsedForValueLookup); fetchedValueForSimplifiedSignalAccess.has_value()) {
+            if (fetchedValue) {
+                *fetchedValue = *fetchedValueForSimplifiedSignalAccess;
+                return OptimizationResult<syrec::VariableAccess>::fromOptimizedContainer(std::move(signalAccessUsedForValueLookup));
+            }
+        }
+    }
+    return !wasAnyOriginalIndexModified
+        ? OptimizationResult<syrec::VariableAccess>::asUnchangedOriginal()
+        : OptimizationResult<syrec::VariableAccess>::fromOptimizedContainer(std::move(signalAccessUsedForValueLookup));     
 }
 
 void optimizations::Optimizer::filterAssignmentsThatDoNotChangeAssignedToSignal(syrec::Statement::vec& assignmentsToCheck) {
@@ -1022,4 +1025,18 @@ void optimizations::Optimizer::filterAssignmentsThatDoNotChangeAssignedToSignal(
             return true;
     }),
     assignmentsToCheck.end());
+}
+
+std::optional<std::unique_ptr<syrec::Number>> optimizations::Optimizer::tryConvertSimplifiedIndexValueToUsableSignalAccessIndex(SignalAccessIndexEvaluationResult<syrec::Number>& index) {
+    if (const auto& fetchedConstantValueForIndex = tryFetchConstantValueOfIndex(index); fetchedConstantValueForIndex.has_value()) {
+        return std::make_unique<syrec::Number>(*fetchedConstantValueForIndex);
+    }
+    return tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(index);
+}
+
+std::optional<std::unique_ptr<syrec::expression>> optimizations::Optimizer::tryConvertSimplifiedIndexValueToUsableSignalAccessIndex(SignalAccessIndexEvaluationResult<syrec::expression>& index) {
+    if (const auto& fetchedConstantValueForIndex = tryFetchConstantValueOfIndex(index); fetchedConstantValueForIndex.has_value()) {
+        return std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*fetchedConstantValueForIndex), BitHelpers::getRequiredBitsToStoreValue(*fetchedConstantValueForIndex));
+    }
+    return tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(index);
 }

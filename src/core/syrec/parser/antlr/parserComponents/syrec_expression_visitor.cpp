@@ -145,7 +145,7 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
 
                 if (sharedData->parserConfig->reassociateExpressionsEnabled) {
                     std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
-                    createdBinaryExpr = optimizations::simplifyBinaryExpression(createdBinaryExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses);
+                    createdBinaryExpr = optimizations::simplifyBinaryExpression(createdBinaryExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, *sharedData->currentSymbolTableScope, &optimizedAwaySignalAccesses);
                     decrementReferenceCountsOfOptimizedAwaySignalAccesses(optimizedAwaySignalAccesses);
                 } 
 
@@ -232,7 +232,7 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     syrec::expression::ptr createdShiftExpression = std::make_shared<syrec::ShiftExpression>(*(*expressionToShift)->getAsExpression(), *syrec_operation::tryMapShiftOperationEnumToFlag(*definedShiftOperation), *shiftAmount);
     if (sharedData->parserConfig->reassociateExpressionsEnabled) {
         std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
-        createdShiftExpression = optimizations::simplifyBinaryExpression(createdShiftExpression, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses);
+        createdShiftExpression = optimizations::simplifyBinaryExpression(createdShiftExpression, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, *sharedData->currentSymbolTableScope, &optimizedAwaySignalAccesses);
         decrementReferenceCountsOfOptimizedAwaySignalAccesses(optimizedAwaySignalAccesses);
     }
     return std::make_optional(ExpressionEvaluationResult::createFromExpression(createdShiftExpression, numValuesPerDimensionOfExpressiontoShift));

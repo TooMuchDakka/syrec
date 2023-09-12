@@ -326,9 +326,9 @@ std::any SyReCCustomBaseVisitor::visitNumberFromExpression(SyReCParser::NumberFr
         syrec::expression::ptr simplifiedToExpr;
         if (const auto& compileTimeConstantExprAsBinaryOne = tryConvertCompileTimeConstantExpressionToBinaryExpr(compileTimeConstantExpression, sharedData->currentSymbolTableScope); compileTimeConstantExprAsBinaryOne.has_value()) {
             std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
-            if (const auto& simplificationResultOfBinaryExpr = optimizations::simplifyBinaryExpression(*compileTimeConstantExprAsBinaryOne, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses); simplificationResultOfBinaryExpr != nullptr) {
+            if (const auto& simplificationResultOfBinaryExpr = optimizations::simplifyBinaryExpression(*compileTimeConstantExprAsBinaryOne, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, *sharedData->currentSymbolTableScope, &optimizedAwaySignalAccesses); simplificationResultOfBinaryExpr != nullptr) {
                 simplifiedToExpr = simplificationResultOfBinaryExpr;
-            } else if (const auto& basicSimplificationResultOfBinaryExpr = optimizations::trySimplify(*compileTimeConstantExprAsBinaryOne, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses); basicSimplificationResultOfBinaryExpr.couldSimplify) {
+            } else if (const auto& basicSimplificationResultOfBinaryExpr = optimizations::trySimplify(*compileTimeConstantExprAsBinaryOne, sharedData->parserConfig->operationStrengthReductionEnabled, *sharedData->currentSymbolTableScope, &optimizedAwaySignalAccesses); basicSimplificationResultOfBinaryExpr.couldSimplify) {
                 simplifiedToExpr = basicSimplificationResultOfBinaryExpr.simplifiedExpression;
             }
             
@@ -767,7 +767,7 @@ std::optional<syrec::Number::ptr> SyReCCustomBaseVisitor::tryConvertExpressionTo
 
 std::optional<syrec::expression::ptr> SyReCCustomBaseVisitor::tryConvertNumberToExpr(const syrec::Number::ptr& number, const parser::SymbolTable::ptr& symbolTable) {
     if (number->isConstant()) {
-        if (const auto& constantValueOfNumber = SignalAccessUtils::tryEvaluateNumber(number, symbolTable); constantValueOfNumber.has_value()) {
+        if (const auto& constantValueOfNumber = SignalAccessUtils::tryEvaluateNumber(*number, *symbolTable); constantValueOfNumber.has_value()) {
             return std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(*constantValueOfNumber), BitHelpers::getRequiredBitsToStoreValue(*constantValueOfNumber));
         }
         return std::nullopt;

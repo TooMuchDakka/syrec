@@ -1600,10 +1600,10 @@ void SyReCStatementVisitor::performAssignmentRhsExprSimplification(syrec::expres
     if (std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentRhsExpr) != nullptr || std::dynamic_pointer_cast<syrec::ShiftExpression>(assignmentRhsExpr) != nullptr) {
         std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
         if (sharedData->parserConfig->reassociateExpressionsEnabled) {
-            if (const auto& reassociateExpressionOptimizationResult = optimizations::simplifyBinaryExpression(assignmentRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses); reassociateExpressionOptimizationResult != assignmentRhsExpr) {
+            if (const auto& reassociateExpressionOptimizationResult = optimizations::simplifyBinaryExpression(assignmentRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->optionalMultiplicationSimplifier, *sharedData->currentSymbolTableScope, &optimizedAwaySignalAccesses); reassociateExpressionOptimizationResult != assignmentRhsExpr) {
                 assignmentRhsExpr = reassociateExpressionOptimizationResult;
             }
-        } else if (const auto& defaultBinaryExpressionOptimizationResult = optimizations::trySimplify(assignmentRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled, sharedData->currentSymbolTableScope, optimizedAwaySignalAccesses); defaultBinaryExpressionOptimizationResult.couldSimplify) {
+        } else if (const auto& defaultBinaryExpressionOptimizationResult = optimizations::trySimplify(assignmentRhsExpr, sharedData->parserConfig->operationStrengthReductionEnabled, *sharedData->currentSymbolTableScope, &optimizedAwaySignalAccesses); defaultBinaryExpressionOptimizationResult.couldSimplify) {
             assignmentRhsExpr = defaultBinaryExpressionOptimizationResult.simplifiedExpression;
         }
 

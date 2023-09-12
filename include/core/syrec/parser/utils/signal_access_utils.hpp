@@ -35,10 +35,10 @@ namespace SignalAccessUtils {
             equality(equality), isResultCertain(isResultCertain) {}
     };
 
-    [[nodiscard]] std::optional<unsigned int>   tryEvaluateNumber(const syrec::Number::ptr& number, const parser::SymbolTable::ptr& symbolTable);
-    [[nodiscard]] std::optional<unsigned int>   tryEvaluateCompileTimeConstantExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression, const parser::SymbolTable::ptr& symbolTable);
-    [[nodiscard]] SignalAccessEquivalenceResult areAccessedBitRangesEqual(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::VariableAccess::ptr& referenceSignalAccess, SignalAccessComponentEquivalenceCriteria::BitRange expectedBitRangeEquivalenceCriteria, const parser::SymbolTable::ptr& symbolTable);
-    [[nodiscard]] SignalAccessEquivalenceResult areDimensionAccessesEqual(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::VariableAccess::ptr& referenceSignalAccess, SignalAccessComponentEquivalenceCriteria::DimensionAccess dimensionAccessEquivalenceCriteria, const parser::SymbolTable::ptr& symbolTable);
-    [[nodiscard]] SignalAccessEquivalenceResult areSignalAccessesEqual(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::VariableAccess::ptr& referenceSignalAccess, SignalAccessComponentEquivalenceCriteria::DimensionAccess dimensionAccessEquivalenceCriteria, SignalAccessComponentEquivalenceCriteria::BitRange expectedBitRangeEquivalenceCriteria, const parser::SymbolTable::ptr& symbolTable);
+    [[nodiscard]] std::optional<unsigned int>   tryEvaluateNumber(const syrec::Number& number, const parser::SymbolTable& symbolTable);
+    [[nodiscard]] std::optional<unsigned int>   tryEvaluateCompileTimeConstantExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression, const parser::SymbolTable& symbolTable);
+    [[nodiscard]] SignalAccessEquivalenceResult areAccessedBitRangesEqual(const syrec::VariableAccess& accessedSignalParts, const syrec::VariableAccess& referenceSignalAccess, SignalAccessComponentEquivalenceCriteria::BitRange expectedBitRangeEquivalenceCriteria, const parser::SymbolTable& symbolTable);
+    [[nodiscard]] SignalAccessEquivalenceResult areDimensionAccessesEqual(const syrec::VariableAccess& accessedSignalParts, const syrec::VariableAccess& referenceSignalAccess, SignalAccessComponentEquivalenceCriteria::DimensionAccess dimensionAccessEquivalenceCriteria, const parser::SymbolTable& symbolTable);
+    [[nodiscard]] SignalAccessEquivalenceResult areSignalAccessesEqual(const syrec::VariableAccess& accessedSignalParts, const syrec::VariableAccess& referenceSignalAccess, SignalAccessComponentEquivalenceCriteria::DimensionAccess dimensionAccessEquivalenceCriteria, SignalAccessComponentEquivalenceCriteria::BitRange expectedBitRangeEquivalenceCriteria, const parser::SymbolTable& symbolTable);
 }
 #endif

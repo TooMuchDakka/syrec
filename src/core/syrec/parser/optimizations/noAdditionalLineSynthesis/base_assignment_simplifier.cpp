@@ -93,7 +93,7 @@ std::optional<bool> BaseAssignmentSimplifier::isValueOfAssignedToSignalZero(cons
             locallyDisabledSignalWithValueOfZeroMap->at(assignedToSignal->var->name).cbegin(),
             locallyDisabledSignalWithValueOfZeroMap->at(assignedToSignal->var->name).cend(),
             [&](const syrec::VariableAccess::ptr& locallyDisabledSignalWithValueOfZero) {
-                const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(assignedToSignal, locallyDisabledSignalWithValueOfZero, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, symbolTable);
+                const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(*assignedToSignal, *locallyDisabledSignalWithValueOfZero, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, *symbolTable);
                 return signalAccessEquivalenceResult.equality != SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual;
             });
         }   
@@ -112,7 +112,7 @@ void BaseAssignmentSimplifier::invalidateSignalWithPreviousValueOfZero(const syr
             locallyDisabledSignalWithValueOfZeroMap->at(assignedToSignal->var->name).cbegin(),
             locallyDisabledSignalWithValueOfZeroMap->at(assignedToSignal->var->name).cend(),
             [&](const syrec::VariableAccess::ptr& locallyDisabledSignalWithValueOfZero) {
-                    const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(assignedToSignal, locallyDisabledSignalWithValueOfZero, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, symbolTable);
+                    const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(*assignedToSignal, *locallyDisabledSignalWithValueOfZero, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, *symbolTable);
                     return signalAccessEquivalenceResult.equality != SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual;
             })) {
                 locallyDisabledSignalWithValueOfZeroMap->at(assignedToSignal->var->name).emplace_back(assignedToSignal);
@@ -179,7 +179,7 @@ bool BaseAssignmentSimplifier::wasAccessOnSignalAlreadyDefined(const syrec::Vari
             alreadyDefinedAccessesForSignal.cbegin(),
             alreadyDefinedAccessesForSignal.cend(),
             [&](const syrec::VariableAccess::ptr& alreadyDefinedSignalAccess) {
-                const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(accessedSignalParts, alreadyDefinedSignalAccess, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, symbolTable);
+                const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(*accessedSignalParts, *alreadyDefinedSignalAccess, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, *symbolTable);
                 return signalAccessEquivalenceResult.equality != SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual;
             });
 }
@@ -195,7 +195,7 @@ bool BaseAssignmentSimplifier::wasAnyAccessedSignalPartPreviouslyNotAccessed(con
             previouslyAccessedSignalPartsInLookup.cbegin(),
             previouslyAccessedSignalPartsInLookup.cend(),
             [&](const syrec::VariableAccess::ptr& previouslyAccessedSignalParts) {
-                const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(accessedSignalParts, previouslyAccessedSignalParts, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, symbolTable);
+                const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(*accessedSignalParts, *previouslyAccessedSignalParts, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, *symbolTable);
                 return signalAccessEquivalenceResult.equality == SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual && signalAccessEquivalenceResult.isResultCertain;
             });
 }

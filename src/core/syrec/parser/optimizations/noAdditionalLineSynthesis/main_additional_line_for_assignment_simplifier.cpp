@@ -276,7 +276,7 @@ bool MainAdditionalLineForAssignmentSimplifier::isExpressionConstantNumber(const
 }
 
 bool MainAdditionalLineForAssignmentSimplifier::doVariableAccessesOverlap(const syrec::VariableAccess::ptr& signalPartsToCheck, const syrec::VariableAccess::ptr& signalPartsToBeCheckedForOverlap, const parser::SymbolTable::ptr& symbolTable) {
-    const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(signalPartsToCheck, signalPartsToBeCheckedForOverlap, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, symbolTable);
+    const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(*signalPartsToCheck, *signalPartsToBeCheckedForOverlap, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, *symbolTable);
     return signalAccessEquivalenceResult.equality != SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual;
 }
 

@@ -5,14 +5,19 @@
 
 using namespace optimizations;
 
-static void addOptimizedAwaySignalAccessToContainerIfNoExactMatchExists(const syrec::VariableAccess::ptr& optimizedAwaySignalAccess, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses, const parser::SymbolTable::ptr& symbolTable) {
+// TODO: Handling of optimized away syrec::Number containers
+static void addOptimizedAwaySignalAccessToContainerIfNoExactMatchExists(const syrec::VariableAccess::ptr& optimizedAwaySignalAccess, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses, const parser::SymbolTable& symbolTable) {
+    if (!droppedSignalAccesses) {
+        return;
+    }
+
     const auto wasSignalAccessAlreadyDefined = std::any_of(
-            droppedSignalAccesses.cbegin(),
-            droppedSignalAccesses.cend(),
+            droppedSignalAccesses->cbegin(),
+            droppedSignalAccesses->cend(),
             [&optimizedAwaySignalAccess, &symbolTable](const syrec::VariableAccess::ptr& alreadyDefinedSignalAccess) {
                 const auto& signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(
-                    optimizedAwaySignalAccess,
-                    alreadyDefinedSignalAccess,
+                    *optimizedAwaySignalAccess,
+                    *alreadyDefinedSignalAccess,
                     SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Equal,
                     SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Equal,
                     symbolTable
@@ -22,10 +27,10 @@ static void addOptimizedAwaySignalAccessToContainerIfNoExactMatchExists(const sy
     if (wasSignalAccessAlreadyDefined) {
         return;
     }
-    droppedSignalAccesses.emplace_back(optimizedAwaySignalAccess);
+    droppedSignalAccesses->emplace_back(optimizedAwaySignalAccess);
 }
 
-static void addOptimizedAwaySignalAccessesToContainer(const syrec::expression::ptr& optimizedAwayExpr, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses, const parser::SymbolTable::ptr& symbolTable) {
+static void addOptimizedAwaySignalAccessesToContainer(const syrec::expression::ptr& optimizedAwayExpr, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses, const parser::SymbolTable& symbolTable) {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(optimizedAwayExpr); exprAsBinaryExpr != nullptr) {
         addOptimizedAwaySignalAccessesToContainer(exprAsBinaryExpr->lhs, droppedSignalAccesses, symbolTable);
         addOptimizedAwaySignalAccessesToContainer(exprAsBinaryExpr->rhs, droppedSignalAccesses, symbolTable);
@@ -36,7 +41,7 @@ static void addOptimizedAwaySignalAccessesToContainer(const syrec::expression::p
     }
 }
 
-static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExpr(const std::variant<std::shared_ptr<syrec::ShiftExpression>, std::shared_ptr<syrec::BinaryExpression>>& exprToOptimize, bool onlyTopLevelExpr, bool shouldPerformOperationStrengthReduction, const parser::SymbolTable::ptr& symbolTable, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses) {
+static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExpr(const std::variant<std::shared_ptr<syrec::ShiftExpression>, std::shared_ptr<syrec::BinaryExpression>>& exprToOptimize, bool onlyTopLevelExpr, bool shouldPerformOperationStrengthReduction, const parser::SymbolTable& symbolTable, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses) {
     const auto&            isExprBinaryOne = std::holds_alternative<std::shared_ptr<syrec::BinaryExpression>>(exprToOptimize);
 
     syrec::expression::ptr referenceExpression;
@@ -171,7 +176,7 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
 
 }
 
-BinaryExpressionSimplificationResult optimizations::trySimplify(const syrec::expression::ptr& expr, bool shouldPerformOperationStrengthReduction, const parser::SymbolTable::ptr& symbolTable, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses) {
+BinaryExpressionSimplificationResult optimizations::trySimplify(const syrec::expression::ptr& expr, bool shouldPerformOperationStrengthReduction, const parser::SymbolTable& symbolTable, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses) {
     const std::shared_ptr<syrec::BinaryExpression> exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     const std::shared_ptr<syrec::ShiftExpression> exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr);
     

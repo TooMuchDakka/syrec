@@ -15,6 +15,6 @@ namespace optimizations {
             couldSimplify(couldSimplify), simplifiedExpression(std::move(simplifiedExpression)) {}
     };
 
-    [[nodiscard]] BinaryExpressionSimplificationResult trySimplify(const syrec::expression::ptr& binaryExpr, bool shouldPerformOperationStrengthReduction, const parser::SymbolTable::ptr& symbolTable, std::vector<syrec::VariableAccess::ptr>& droppedSignalAccesses);
+    [[nodiscard]] BinaryExpressionSimplificationResult trySimplify(const syrec::expression::ptr& binaryExpr, bool shouldPerformOperationStrengthReduction, const parser::SymbolTable& symbolTable, std::vector<syrec::VariableAccess::ptr>* droppedSignalAccesses);
 };
 #endif
