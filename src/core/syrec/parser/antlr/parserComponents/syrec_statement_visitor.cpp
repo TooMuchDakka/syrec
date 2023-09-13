@@ -956,7 +956,7 @@ SymbolTableBackupHelper::ptr SyReCStatementVisitor::createCopiesOfCurrentValuesO
     const auto& backupOfCurrentValuesOfSymbolTable = std::make_shared<SymbolTableBackupHelper>();
     for (const auto& identOfChangedSignal: backupOfOriginalValues->getIdentsOfChangedSignals()) {
         backupOfCurrentValuesOfSymbolTable->storeBackupOf(identOfChangedSignal, *sharedData->currentSymbolTableScope->createBackupOfValueOfSignal(identOfChangedSignal));
-        sharedData->currentSymbolTableScope->restoreValuesFromBackup(identOfChangedSignal, *backupOfOriginalValues->getBackedupEntryFor(identOfChangedSignal));
+        sharedData->currentSymbolTableScope->restoreValuesFromBackup(identOfChangedSignal, *backupOfOriginalValues->getBackedUpEntryFor(identOfChangedSignal));
     }
     return backupOfCurrentValuesOfSymbolTable;
 }
@@ -980,8 +980,8 @@ void SyReCStatementVisitor::mergeChangesFromBranchesAndUpdateSymbolTable(const S
     for (const auto& changedSignal: unionOfChangedSignalsOfBothBranches) {
         const valueLookup::SignalValueLookup::ptr originalValueOfSignal = *sharedData->currentSymbolTableScope->createBackupOfValueOfSignal(changedSignal);
         if (changedSignalsInBothBranches.count(changedSignal) != 0 && !canAnyBranchBeOmitted) {
-            const auto& backupOfValueInTrueBranch = *valuesOfChangedSignalsInTrueBranch->getBackedupEntryFor(changedSignal);
-            const auto& backupOfValueInFalseBranch = *valuesOfChangedSignalsInFalseBranch->getBackedupEntryFor(changedSignal);
+            const auto& backupOfValueInTrueBranch = *valuesOfChangedSignalsInTrueBranch->getBackedUpEntryFor(changedSignal);
+            const auto& backupOfValueInFalseBranch = *valuesOfChangedSignalsInFalseBranch->getBackedUpEntryFor(changedSignal);
             originalValueOfSignal->copyRestrictionsAndMergeValuesFromAlternatives(backupOfValueInTrueBranch, backupOfValueInFalseBranch);
         } else {
             const bool  wasSignalOnlyChangedInTrueBranch  = ((canAnyBranchBeOmitted && !canTrueBranchBeOmitted) ? true : changedSignalsInFalseBranch.count(changedSignal) == 0)
@@ -995,7 +995,7 @@ void SyReCStatementVisitor::mergeChangesFromBranchesAndUpdateSymbolTable(const S
             }
 
             if (wasSignalOnlyChangedInTrueBranch) {
-                const auto& backupOfValueInTrueBranch = *valuesOfChangedSignalsInTrueBranch->getBackedupEntryFor(changedSignal);
+                const auto& backupOfValueInTrueBranch = *valuesOfChangedSignalsInTrueBranch->getBackedUpEntryFor(changedSignal);
                 if (!canAnyBranchBeOmitted) {
                     originalValueOfSignal->copyRestrictionsAndInvalidateChangedValuesFrom(backupOfValueInTrueBranch);
                 }
@@ -1008,7 +1008,7 @@ void SyReCStatementVisitor::mergeChangesFromBranchesAndUpdateSymbolTable(const S
                             *backupOfValueInTrueBranch); 
                 }
             } else {
-                const auto& backupOfValueInFalseBranch = *valuesOfChangedSignalsInFalseBranch->getBackedupEntryFor(changedSignal);
+                const auto& backupOfValueInFalseBranch = *valuesOfChangedSignalsInFalseBranch->getBackedUpEntryFor(changedSignal);
                 if (!canAnyBranchBeOmitted) {
                     originalValueOfSignal->copyRestrictionsAndInvalidateChangedValuesFrom(backupOfValueInFalseBranch);
                 } else {
