@@ -617,11 +617,16 @@ void BaseValueLookup<Vt>::copyRestrictionsAndMergeValuesFromAlternatives(const B
             const auto& valueForBitInFirstAlternative = alternativeOne->tryFetchValueFor(actualDimensionAccess, accessedBitRange);
             const auto& valueForBitInSecondAlternative = alternativeTwo->tryFetchValueFor(actualDimensionAccess, accessedBitRange);
 
-            if (currentValueForBit.has_value() && 
-                ((!valueForBitInFirstAlternative.has_value() || !valueForBitInSecondAlternative.has_value())
-                    || *valueForBitInFirstAlternative != *valueForBitInSecondAlternative
-                    || (*valueForBitInFirstAlternative == *valueForBitInSecondAlternative && *valueForBitInFirstAlternative != *currentValueForBit))) {
-                    invalidateStoredValueForBitrange(actualDimensionAccess, accessedBitRange);                
+            if ((!valueForBitInFirstAlternative.has_value() || !valueForBitInSecondAlternative.has_value())
+                || *valueForBitInFirstAlternative != *valueForBitInSecondAlternative) {
+                if (currentValueForBit.has_value()) {
+                    invalidateStoredValueForBitrange(actualDimensionAccess, accessedBitRange);   
+                }
+            }
+
+            if (*valueForBitInFirstAlternative == *valueForBitInSecondAlternative && (!currentValueForBit.has_value() || *valueForBitInFirstAlternative != *currentValueForBit)) {
+                liftRestrictionsOfDimensions(actualDimensionAccess, accessedBitRange);
+                updateStoredValueFor(actualDimensionAccess, accessedBitRange, *valueForBitInFirstAlternative);
             }
         }
     );
@@ -644,7 +649,7 @@ void BaseValueLookup<Vt>::copyRestrictionsAndInvalidateChangedValuesFrom(const B
                     invalidateStoredValueForBitrange(actualDimensionAccess, accessedBitRange);                
                 }
             }
-            else {
+            else if (currentValueOfBit.has_value()){
                 invalidateStoredValueForBitrange(actualDimensionAccess, accessedBitRange);                
             }
         }
