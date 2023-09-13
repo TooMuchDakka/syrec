@@ -6,6 +6,8 @@
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
+#include <stack>
+#include "core/syrec/parser/symbol_table_backup_helper.hpp"
 
 /*
  * TODO: Support for VHDL like signal access (i.e. bit range structured as .bitRangeEnd:bitRangeStart instead of .bitRangeStart:bitRangeEnd)
@@ -79,15 +81,23 @@ namespace optimizations {
             std::optional<std::vector<std::unique_ptr<ToBeOptimizedContainerType>>> result;
         };
 
-        [[nodiscard]] OptimizationResult<syrec::Module>       optimizeProgram(const std::vector<std::reference_wrapper<syrec::Module>>& modules);
-        [[nodiscard]] OptimizationResult<syrec::Statement>    handleStatements(const std::vector<std::reference_wrapper<syrec::Statement>>& statements);
+        [[nodiscard]] OptimizationResult<syrec::Module>       optimizeProgram(const std::vector<std::reference_wrapper<const syrec::Module>>& modules);
+        [[nodiscard]] OptimizationResult<syrec::Statement>    handleStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements);
         [[nodiscard]] OptimizationResult<syrec::Statement>    handleStatement(const syrec::Statement& stmt);
         [[nodiscard]] OptimizationResult<syrec::expression>   handleExpr(const syrec::expression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::Number>       handleNumber(const syrec::Number& number) const;
     protected:
         parser::ParserConfig                 parserConfig;
         const parser::SymbolTable::ptr       symbolTable;
-        
+        std::stack<std::unique_ptr<parser::SymbolTableBackupHelper>> symbolTableBackupScopeStack;
+
+        void openNewSymbolTableBackupScope();
+        void discardChangesMadeInCurrentSymbolTableBackupScope() const;
+        void mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& firstLocalBackupScope, const parser::SymbolTableBackupHelper& secondLocalBackupScope) const;
+        void destroySymbolTableBackupScope();
+        void createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess) const;
+        [[nodiscard]] std::optional<std::unique_ptr<parser::SymbolTableBackupHelper>> popCurrentSymbolTableBackupScope();
+
         [[nodiscard]] OptimizationResult<syrec::Module> handleModule(const syrec::Module& module);
 
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) const;
@@ -201,6 +211,10 @@ namespace optimizations {
         void                                                        performAssignment(EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, unsigned int assignmentRhsValue) const;
         void                                                        performAssignment(EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, EvaluatedSignalAccess& assignmentRhsOperand) const;
         void                                                        performSwap(EvaluatedSignalAccess& swapOperationLhsOperand, EvaluatedSignalAccess& swapOperationRhsOperand) const;
+        void                                                        invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignal) const;
+        void                                                        updateStoredValueOf(const syrec::VariableAccess::ptr& assignedToSignal, unsigned int newValueOfAssignedToSignal) const;
+        void                                                        performSwapAndCreateBackupOfOperands(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const;
+
         [[nodiscard]] std::optional<unsigned int>                   tryFetchValueFromEvaluatedSignalAccess(EvaluatedSignalAccess& accessedSignalParts) const;
 
         [[nodiscard]] OptimizationResult<syrec::VariableAccess> handleSignalAccess(const syrec::VariableAccess& signalAccess, bool performConstantPropagationForAccessedSignal, std::optional<unsigned int>* fetchedValue) const;
@@ -212,6 +226,7 @@ namespace optimizations {
         static void                                     determineUsedSignalIdentsIn(const syrec::expression& expr, SignalIdentCountLookup& lookupContainer);
         static void                                     determineUsedSignalIdentsIn(const syrec::Number& number, SignalIdentCountLookup& lookupContainer);
         static void                                     addSignalIdentToLookup(const std::string_view& signalIdent, SignalIdentCountLookup& lookupContainer);
+        [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Statement>> transformCollectionOfSharedPointersToReferences(const syrec::Statement::vec& statements);
     };
 }
 #endif

@@ -92,8 +92,8 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
     return "Failed to combine the found error messages";
 }
 
-std::vector<std::reference_wrapper<syrec::Module>> program::prepareParsingResultForOptimizations(const syrec::Module::vec& foundModules) {
-    std::vector<std::reference_wrapper<syrec::Module>> transformedModuleReferences;
+std::vector<std::reference_wrapper<const syrec::Module>> program::prepareParsingResultForOptimizations(const syrec::Module::vec& foundModules) {
+    std::vector<std::reference_wrapper<const syrec::Module>> transformedModuleReferences;
     for (const auto& foundModule: foundModules) {
         transformedModuleReferences.emplace_back(*foundModule.get());
     }
