@@ -32,7 +32,7 @@ namespace parser {
             syrec::Variable::vec     declaredParameters;
             std::vector<std::size_t> indicesOfOptimizedAwayParameters;
 
-            [[nodiscard]] syrec::Variable::vec determineOptimizedCallSignature(std::unordered_set<std::size_t>* indicesOfRemainingParameters) const;
+            [[maybe_unused]] syrec::Variable::vec determineOptimizedCallSignature(std::unordered_set<std::size_t>* indicesOfRemainingParameters) const;
         };
 
         [[nodiscard]] std::vector<DeclaredModuleSignature>          getMatchingModuleSignaturesForName(const std::string_view& moduleName) const;

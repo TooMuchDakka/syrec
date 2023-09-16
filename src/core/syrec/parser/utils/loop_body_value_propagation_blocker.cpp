@@ -43,11 +43,11 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec
     if (const auto& stmtAsLoopStmt = stmtCastedAs<syrec::ForStatement>(stmt); stmtAsLoopStmt != nullptr) {
         handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsLoopStmt->statements), wasUniqueAssignmentDefined);
     }
-    if (const auto& stmtAsIfStmt = stmtCastedAs<syrec::IfStatement>(stmt); stmtAsIfStmt != nullptr) {
+    else if (const auto& stmtAsIfStmt = stmtCastedAs<syrec::IfStatement>(stmt); stmtAsIfStmt != nullptr) {
         handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->thenStatements), wasUniqueAssignmentDefined);
         handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->elseStatements), wasUniqueAssignmentDefined && *wasUniqueAssignmentDefined ? nullptr : wasUniqueAssignmentDefined);
     }
-    if (const auto& stmtAsSwapStmt = stmtCastedAs<syrec::SwapStatement>(stmt); stmtAsSwapStmt != nullptr) {
+    else if (const auto& stmtAsSwapStmt = stmtCastedAs<syrec::SwapStatement>(stmt); stmtAsSwapStmt != nullptr) {
         if (const auto& uniqueAssignmentResolverResultOfLhsOperand = handleAssignment(*stmtAsSwapStmt->lhs); uniqueAssignmentResolverResultOfLhsOperand) {
             if (wasUniqueAssignmentDefined && !*wasUniqueAssignmentDefined) {
                 *wasUniqueAssignmentDefined = true;
@@ -61,7 +61,7 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec
             storeUniqueAssignmentForCurrentScope(uniqueAssignmentResolverResultOfRhsOperand->first, uniqueAssignmentResolverResultOfRhsOperand->second);
         }
     }
-    if (const auto& stmtAsAssignmentStmt = stmtCastedAs<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
+    else if (const auto& stmtAsAssignmentStmt = stmtCastedAs<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
         if (const auto& uniqueAssignmentResolverResultOfAssignedToSignal = handleAssignment(*stmtAsAssignmentStmt->lhs); uniqueAssignmentResolverResultOfAssignedToSignal) {
             if (wasUniqueAssignmentDefined && !*wasUniqueAssignmentDefined) {
                 *wasUniqueAssignmentDefined = true;
@@ -69,7 +69,7 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec
             storeUniqueAssignmentForCurrentScope(uniqueAssignmentResolverResultOfAssignedToSignal->first, uniqueAssignmentResolverResultOfAssignedToSignal->second);
         }
     }
-    if (const auto& stmtAsUnaryAssignmntStmt = stmtCastedAs<syrec::UnaryStatement>(stmt); stmtAsUnaryAssignmntStmt != nullptr) {
+    else if (const auto& stmtAsUnaryAssignmntStmt = stmtCastedAs<syrec::UnaryStatement>(stmt); stmtAsUnaryAssignmntStmt != nullptr) {
         if (const auto& uniqueAssignmentResolverResultOfAssignedToSignal = handleAssignment(*stmtAsUnaryAssignmntStmt->var); uniqueAssignmentResolverResultOfAssignedToSignal) {
             if (wasUniqueAssignmentDefined && !*wasUniqueAssignmentDefined) {
                 *wasUniqueAssignmentDefined = true;
@@ -77,14 +77,17 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec
             storeUniqueAssignmentForCurrentScope(uniqueAssignmentResolverResultOfAssignedToSignal->first, uniqueAssignmentResolverResultOfAssignedToSignal->second);
         }
     }
-    if (const auto& stmtAsCallStmt = stmtCastedAs<syrec::CallStatement>(stmt); stmtAsCallStmt != nullptr) {
+    else if (const auto& stmtAsCallStmt = stmtCastedAs<syrec::CallStatement>(stmt); stmtAsCallStmt != nullptr) {
         if (const auto& matchingModulesForGivenSignature = symbolTableReference->tryGetOptimizedSignatureForModuleCall(stmtAsCallStmt->target->name, stmtAsCallStmt->parameters); matchingModulesForGivenSignature.has_value()) {
-            for (const auto& declaredCalleeArgument : matchingModulesForGivenSignature->determineOptimizedCallSignature()) {
-                if (declaredCalleeArgument->type == syrec::Variable::Types::Inout || declaredCalleeArgument->type == syrec::Variable::Out) {
+            std::unordered_set<std::size_t> indicesOfRemainingCallerArguments;
+            matchingModulesForGivenSignature->determineOptimizedCallSignature(&indicesOfRemainingCallerArguments);
+
+            for (const auto& i : indicesOfRemainingCallerArguments) {
+                if (const auto& calleeParameter = matchingModulesForGivenSignature->declaredParameters.at(i); calleeParameter->type == syrec::Variable::Types::Inout ||calleeParameter->type == syrec::Variable::Types::Out) {
                     if (wasUniqueAssignmentDefined && !*wasUniqueAssignmentDefined) {
                         *wasUniqueAssignmentDefined = true;
                     }
-                    storeUniqueAssignmentForCurrentScope(declaredCalleeArgument->name, ScopeLocalAssignmentParts({.dimensionAccess = {}, .bitRange = std::nullopt}));
+                    storeUniqueAssignmentForCurrentScope(stmtAsCallStmt->parameters.at(i), ScopeLocalAssignmentParts({.dimensionAccess = {}, .bitRange = std::nullopt}));
                 }
             }
         }

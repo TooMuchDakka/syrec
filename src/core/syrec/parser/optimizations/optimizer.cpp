@@ -66,36 +66,28 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleStatement(const syrec::Statement& stmt) {
     std::optional<OptimizationResult<syrec::Statement>> optimizationResultContainerOfStmt;
     if (typeid(stmt) == typeid(syrec::SkipStatement)) {
-        optimizationResultContainerOfStmt = handleSkipStmt();
+        return handleSkipStmt();
     }
-    else if (const auto& statementAsAssignmentStmt = dynamic_cast<const syrec::AssignStatement*>(&stmt); statementAsAssignmentStmt != nullptr) {
-        optimizationResultContainerOfStmt = handleAssignmentStmt(*statementAsAssignmentStmt);
+    if (const auto& statementAsAssignmentStmt = dynamic_cast<const syrec::AssignStatement*>(&stmt); statementAsAssignmentStmt != nullptr) {
+        return handleAssignmentStmt(*statementAsAssignmentStmt);
     }
-    else if (const auto& statementAsUnaryAssignmentStmt = dynamic_cast<const syrec::UnaryStatement*>(&stmt); statementAsUnaryAssignmentStmt != nullptr) {
-        optimizationResultContainerOfStmt = handleUnaryStmt(*statementAsUnaryAssignmentStmt);
+    if (const auto& statementAsUnaryAssignmentStmt = dynamic_cast<const syrec::UnaryStatement*>(&stmt); statementAsUnaryAssignmentStmt != nullptr) {
+        return handleUnaryStmt(*statementAsUnaryAssignmentStmt);
     }
-    else if (const auto& statementAsIfStatement = dynamic_cast<const syrec::IfStatement*>(&stmt); statementAsIfStatement != nullptr) {
-        optimizationResultContainerOfStmt = handleIfStmt(*statementAsIfStatement);
+    if (const auto& statementAsIfStatement = dynamic_cast<const syrec::IfStatement*>(&stmt); statementAsIfStatement != nullptr) {
+        return handleIfStmt(*statementAsIfStatement);
     }
-    else if (const auto& statementAsLoopStatement = dynamic_cast<const syrec::ForStatement*>(&stmt); statementAsLoopStatement != nullptr) {
-        optimizationResultContainerOfStmt = handleLoopStmt(*statementAsLoopStatement);
+    if (const auto& statementAsLoopStatement = dynamic_cast<const syrec::ForStatement*>(&stmt); statementAsLoopStatement != nullptr) {
+        return handleLoopStmt(*statementAsLoopStatement);
     }
-    else if (const auto& statementAsSwapStatement = dynamic_cast<const syrec::SwapStatement*>(&stmt); statementAsSwapStatement != nullptr) {
-        optimizationResultContainerOfStmt = handleSwapStmt(*statementAsSwapStatement);
+    if (const auto& statementAsSwapStatement = dynamic_cast<const syrec::SwapStatement*>(&stmt); statementAsSwapStatement != nullptr) {
+        return handleSwapStmt(*statementAsSwapStatement);
     }
-    else if (const auto& statementAsCallStatement = dynamic_cast<const syrec::CallStatement*>(&stmt); statementAsCallStatement != nullptr) {
-        optimizationResultContainerOfStmt = handleCallStmt(*statementAsCallStatement);
+    if (const auto& statementAsCallStatement = dynamic_cast<const syrec::CallStatement*>(&stmt); statementAsCallStatement != nullptr) {
+        return handleCallStmt(*statementAsCallStatement);
     }
-
-    if (!optimizationResultContainerOfStmt.has_value()) {
-        return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
-    }
-    const auto& optimizationStatusFlag = optimizationResultContainerOfStmt->getStatusOfResult();
-    if (optimizationStatusFlag == OptimizationResultFlag::RemovedByOptimization) {
-        return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
-    }
-    if (optimizationStatusFlag == OptimizationResultFlag::WasOptimized) {
-        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(*optimizationResultContainerOfStmt->tryTakeOwnershipOfOptimizationResult()));
+    if (const auto& statementAsUncallStatement = dynamic_cast<const syrec::UncallStatement*>(&stmt); statementAsUncallStatement != nullptr) {
+        return handleUncallStmt(*statementAsUncallStatement);
     }
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
@@ -160,26 +152,26 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(symbolTable, callStatement.target->name); moduleCallGuessResolver.has_value()) {
         const auto moduleIdsOfInitialGuess = moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess();
 
-        bool                              calleeArgumentsOk = true;
-        std::vector<syrec::Variable::ptr> symbolTableEntryForCalleeArguments(callStatement.parameters.size());
-        for (std::size_t i = 0; i < symbolTableEntryForCalleeArguments.size(); ++i) {
-            if (const auto& symbolTableEntryForCalleeArgument = symbolTable->getVariable(callStatement.parameters.at(i)); symbolTableEntryForCalleeArgument.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForCalleeArgument)) {
-                const auto matchingSignalForCalleeArgument = std::get<syrec::Variable::ptr>(*symbolTableEntryForCalleeArgument);
-                symbolTableEntryForCalleeArguments.emplace_back(matchingSignalForCalleeArgument);
-                moduleCallGuessResolver->get()->refineGuessWithNextParameter(*matchingSignalForCalleeArgument);
-                calleeArgumentsOk &= true;
+        bool                              callerArgumentsOk = true;
+        std::vector<syrec::Variable::ptr> symbolTableEntryForCallerArguments(callStatement.parameters.size());
+        for (std::size_t i = 0; i < symbolTableEntryForCallerArguments.size(); ++i) {
+            if (const auto& symbolTableEntryForCallerArgument = symbolTable->getVariable(callStatement.parameters.at(i)); symbolTableEntryForCallerArgument.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument)) {
+                const auto matchingSignalForCallerArgument = std::get<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument);
+                symbolTableEntryForCallerArguments.emplace_back(matchingSignalForCallerArgument);
+                moduleCallGuessResolver->get()->refineGuessWithNextParameter(*matchingSignalForCallerArgument);
+                callerArgumentsOk &= true;
             }
         }
 
-        if (calleeArgumentsOk) {
+        if (callerArgumentsOk) {
             /*
              * If the called module is not resolved already by the provided call statement, we also need to take special care when more than one module matches the given signature.
              * TODO: Invalidation of provided modifiable caller parameters given the user provided callee arguments
              */
             const auto modulesMatchingCallSignature = moduleCallGuessResolver->get()->getMatchesForGuess();
             if (modulesMatchingCallSignature.empty() || modulesMatchingCallSignature.size() > 1) {
-                for (const auto& calleeArgument : symbolTableEntryForCalleeArguments) {
-                    invalidateValueOfWholeSignal(calleeArgument->name);
+                for (const auto& callerArgument : symbolTableEntryForCallerArguments) {
+                    invalidateValueOfWholeSignal(callerArgument->name);
                 }
                 symbolTable->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), parser::SymbolTable::ReferenceCountUpdate::Increment);
             } else {
@@ -224,12 +216,59 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
          * In case that our precondition does not hold, invalid callee arguments will not produce an increment of the reference count of all declared signals in all reachable scopes of the symbol table.
          * TODO: Is this assumption OK?
          */
-        for (const auto& calleeArgument: callStatement.parameters) {
-            updateReferenceCountOf(calleeArgument, parser::SymbolTable::ReferenceCountUpdate::Increment);
+        for (const auto& callerArgument: callStatement.parameters) {
+            updateReferenceCountOf(callerArgument, parser::SymbolTable::ReferenceCountUpdate::Increment);
         }
     }
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
+
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleUncallStmt(const syrec::UncallStatement& uncallStatement) const {
+    /*
+     * Similarly to the handling of the guard expression in the if-statement, we do not update the reference counts of neither the caller arguments nor the called module.
+     * This also holds if the assumed precondition, all ambiguities regarding the call are resolved (i.e. the given arguments are all defined and refer to exactly one module), does not hold.
+     */
+    if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(symbolTable, uncallStatement.target->name); moduleCallGuessResolver.has_value()) {
+        const auto moduleIdsOfInitialGuess = moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess();
+
+        bool                              callerArgumentsOk = true;
+        std::vector<syrec::Variable::ptr> symbolTableEntryForCalleeArguments(uncallStatement.parameters.size());
+        for (std::size_t i = 0; i < symbolTableEntryForCalleeArguments.size(); ++i) {
+            if (const auto& symbolTableEntryForCallerArgument = symbolTable->getVariable(uncallStatement.parameters.at(i)); symbolTableEntryForCallerArgument.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument)) {
+                const auto matchingSignalForCallerArgument = std::get<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument);
+                symbolTableEntryForCalleeArguments.emplace_back(matchingSignalForCallerArgument);
+                moduleCallGuessResolver->get()->refineGuessWithNextParameter(*matchingSignalForCallerArgument);
+                callerArgumentsOk &= true;
+            }
+        }
+
+        if (callerArgumentsOk) {
+            const auto modulesMatchingCallSignature = moduleCallGuessResolver->get()->getMatchesForGuess();
+            if (modulesMatchingCallSignature.size() == 1) {
+                if (const auto& signatureOfCalledModule = symbolTable->tryGetOptimizedSignatureForModuleCall(uncallStatement.target->name, uncallStatement.parameters); signatureOfCalledModule.has_value()) {
+                    std::vector<std::string>        callerArgumentsForOptimizedModuleCall;
+                    std::unordered_set<std::size_t> indicesOfRemainingParameters;
+                    if (const auto& optimizedModuleSignature = signatureOfCalledModule->determineOptimizedCallSignature(&indicesOfRemainingParameters); !optimizedModuleSignature.empty()) {
+                        callerArgumentsForOptimizedModuleCall.resize(optimizedModuleSignature.size());
+                        
+                        for (const auto& i: indicesOfRemainingParameters) {
+                            const auto& symbolTableEntryForCallerArgument = signatureOfCalledModule->declaredParameters.at(i);
+                            callerArgumentsForOptimizedModuleCall.emplace_back(symbolTableEntryForCallerArgument->name);
+                        }
+                    }
+                    if (indicesOfRemainingParameters.empty()) {
+                        return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
+                    }
+                    if (indicesOfRemainingParameters.size() != signatureOfCalledModule->declaredParameters.size()) {
+                        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::UncallStatement>(uncallStatement.target, callerArgumentsForOptimizedModuleCall));
+                    }
+                }
+            }
+        }
+    }
+    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
+}
+
 
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleIfStmt(const syrec::IfStatement& ifStatement) {
     auto                   wasGuardExpressionSimplified = false;
