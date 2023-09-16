@@ -791,12 +791,9 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryPerformConstantPropagationFor
         return std::nullopt;
     }
 
-    const auto& optionalExistingConstantPropagationRestrictions = !sharedData->loopBodyValuePropagationBlockers.empty() ? std::make_optional(sharedData->loopBodyValuePropagationBlockers.top()) : std::nullopt;
-    if (optionalExistingConstantPropagationRestrictions.has_value() && optionalExistingConstantPropagationRestrictions.value()->isAccessBlockedFor(accessedSignal)) {
-
+    if (sharedData->activeDataFlowValuePropagationRestrictions->isAccessBlockedFor(*accessedSignal)) {
         return std::nullopt;
     }
-
     return sharedData->currentSymbolTableScope->tryFetchValueForLiteral(accessedSignal);
 }
 

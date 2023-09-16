@@ -1230,11 +1230,7 @@ std::optional<syrec::Statement::vec> SyReCStatementVisitor::determineLoopBodyWit
 }
 
 bool SyReCStatementVisitor::isValuePropagationBlockedDueToLoopDataFlowAnalysis(const syrec::VariableAccess::ptr& accessedPartsOfSignalToBeUpdated) const {
-    if (!sharedData->loopBodyValuePropagationBlockers.empty()) {
-        const auto& blockedUpdatesToDueLoopDataFlowAnalysis = sharedData->loopBodyValuePropagationBlockers.top();
-        return blockedUpdatesToDueLoopDataFlowAnalysis->isAccessBlockedFor(accessedPartsOfSignalToBeUpdated);
-    }
-    return false;
+    return sharedData->activeDataFlowValuePropagationRestrictions->isAccessBlockedFor(*accessedPartsOfSignalToBeUpdated);
 }
 
 std::optional<syrec::ForStatement::ptr> SyReCStatementVisitor::visitForStatementInReadonlyMode(SyReCParser::ForStatementContext* context) {
@@ -1647,10 +1643,6 @@ SyReCStatementVisitor::IterationInvariantLoopBodyResult SyReCStatementVisitor::d
     std::optional<syrec::Statement::vec> loopBody;
     std::vector<syrec::VariableAccess::ptr> assignmentsInNonNestedLoops;
 
-    const auto&                          inheritedValuePropagationBlockersFromParentLoopDataFlowAnalysis = !sharedData->loopBodyValuePropagationBlockers.empty()
-        ? std::make_optional(sharedData->loopBodyValuePropagationBlockers.top())
-        : std::nullopt;
-
     /*
      * If we can determine that the loop will only perform one loop iteration we can skip the data flow analysis of its loop body
      * but still need to take into account restrictions that stem from a prior data flow analysis of any parent loop
@@ -1664,16 +1656,18 @@ SyReCStatementVisitor::IterationInvariantLoopBodyResult SyReCStatementVisitor::d
     sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody           = true;
     sharedData->modificationsOfReferenceCountsDisabled                          = true;
 
-    // Avoid unnecessary work and only make result of data flow analysis regarding assigned to signals in loop body available if any assignments are performed
-    if (const auto additionalValuePropagationRestrictionsDueToDataFlowAnalysis = std::make_shared<optimizations::LoopBodyValuePropagationBlocker>(stmtToConsiderForDataFlowAnalysis, sharedData->currentSymbolTableScope, inheritedValuePropagationBlockersFromParentLoopDataFlowAnalysis); additionalValuePropagationRestrictionsDueToDataFlowAnalysis->areAnyAssignmentsPerformed()) {
-        assignmentsInNonNestedLoops                                                 = additionalValuePropagationRestrictionsDueToDataFlowAnalysis->getDefinedAssignmentsInNotNestedLoops(stmtToConsiderForDataFlowAnalysis, inheritedValuePropagationBlockersFromParentLoopDataFlowAnalysis);
+    auto wereAnyAssignmentsPerformedInLoop = false;
+    std::vector<std::reference_wrapper<const syrec::Statement>> resultContainer;
+    resultContainer.reserve(stmtToConsiderForDataFlowAnalysis.size());
 
-        sharedData->loopBodyValuePropagationBlockers.push(additionalValuePropagationRestrictionsDueToDataFlowAnalysis);
-        loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(loopBodyStmtContexts);
-        sharedData->loopBodyValuePropagationBlockers.pop();
+    for (const auto& stmt: stmtToConsiderForDataFlowAnalysis) {
+        resultContainer.emplace_back(*stmt.get());
+    }
 
-    } else {
-        loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(loopBodyStmtContexts);
+    sharedData->activeDataFlowValuePropagationRestrictions->openNewScopeAndAppendDataDataFlowAnalysisResult(resultContainer, &wereAnyAssignmentsPerformedInLoop);
+    loopBody = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(loopBodyStmtContexts);
+    if (wereAnyAssignmentsPerformedInLoop) {
+        sharedData->activeDataFlowValuePropagationRestrictions->closeScopeAndDiscardDataFlowAnalysisResult();
     }
 
     sharedData->areValueUpdatesBlockedByGeneralOptimizationOfLoopBody = backupOfAreValuesUpdatesBlockedDuringGeneralLoopBodyOptimization;

@@ -33,7 +33,7 @@ namespace parser {
         bool                                                                              modificationsOfReferenceCountsDisabled;
         bool                                                                              performingReadOnlyParsingOfLoopBody;
         std::stack<SymbolTableBackupHelper::ptr>                                          localSignalValuesBackup;
-        std::stack<std::shared_ptr<optimizations::LoopBodyValuePropagationBlocker>>       loopBodyValuePropagationBlockers;
+        std::unique_ptr<optimizations::LoopBodyValuePropagationBlocker>                   activeDataFlowValuePropagationRestrictions;
         bool                                                                              areValueUpdatesBlockedByGeneralOptimizationOfLoopBody;
         bool                                                                              performPotentialValueLookupForCurrentlyAccessedSignal;
         const std::optional<std::unique_ptr<optimizations::BaseMultiplicationSimplifier>> optionalMultiplicationSimplifier;
@@ -48,7 +48,7 @@ namespace parser {
         std::map<std::string, LoopVariableUnrollModification> loopVariableModificationsDueToUnroll;
         std::size_t                                            loopNestingLevel;
 
-        explicit SharedVisitorData(const ParserConfig& parserConfig) :
+        explicit SharedVisitorData(const ParserConfig& parserConfig):
             parserConfig(std::make_unique<ParserConfig>(parserConfig)),
             currentSymbolTableScope(std::make_shared<SymbolTable>()),
             currentModuleCallNestingLevel(0),
@@ -56,6 +56,7 @@ namespace parser {
             currentlyParsingAssignmentStmtRhs(false),
             modificationsOfReferenceCountsDisabled(false),
             performingReadOnlyParsingOfLoopBody(false),
+            activeDataFlowValuePropagationRestrictions(std::make_unique<optimizations::LoopBodyValuePropagationBlocker>(currentSymbolTableScope)),
             areValueUpdatesBlockedByGeneralOptimizationOfLoopBody(false),
             performPotentialValueLookupForCurrentlyAccessedSignal(true),
             optionalMultiplicationSimplifier(createMultiplicationSimplifier(parserConfig.multiplicationSimplificationMethod)),

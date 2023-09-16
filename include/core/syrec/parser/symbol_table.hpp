@@ -8,6 +8,8 @@
 #include "core/syrec/variable.hpp"
 #include "optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp"
 
+#include <unordered_set>
+
 namespace parser {
     class SymbolTable {
     public:
@@ -29,9 +31,12 @@ namespace parser {
             std::size_t              internalModuleId;
             syrec::Variable::vec     declaredParameters;
             std::vector<std::size_t> indicesOfOptimizedAwayParameters;
+
+            [[nodiscard]] syrec::Variable::vec determineOptimizedCallSignature(std::unordered_set<std::size_t>* indicesOfRemainingParameters) const;
         };
 
         [[nodiscard]] std::vector<DeclaredModuleSignature>          getMatchingModuleSignaturesForName(const std::string_view& moduleName) const;
+        [[nodiscard]] std::optional<DeclaredModuleSignature>        tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, const std::vector<std::string>& calleeArguments) const;
         [[nodiscard]] std::optional<std::unique_ptr<syrec::Module>> getFullDeclaredModuleInformation(const std::string_view& moduleName, std::size_t internalModuleId) const;
 
         bool                                                                                addEntry(const syrec::Variable::ptr& variable);

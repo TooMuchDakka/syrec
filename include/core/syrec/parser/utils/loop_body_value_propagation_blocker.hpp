@@ -6,31 +6,42 @@
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp"
 
+#include <stack>
+
 namespace optimizations {
     class LoopBodyValuePropagationBlocker {
     public:
-        explicit           LoopBodyValuePropagationBlocker(const syrec::Statement::vec& stmtBlock, const parser::SymbolTable::ptr& symbolTable, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions);
-        [[nodiscard]] bool isAccessBlockedFor(const syrec::VariableAccess::ptr& accessedPartsOfSignal) const;
-        [[nodiscard]] bool areAnyAssignmentsPerformed() const;
-        [[nodiscard]] std::vector<syrec::VariableAccess::ptr> getDefinedAssignmentsInNotNestedLoops(const syrec::Statement::vec& stmtBlock, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions);
+        explicit LoopBodyValuePropagationBlocker(const parser::SymbolTable::ptr& symbolTableReference)
+            : symbolTableReference(symbolTableReference) {}
 
+        void openNewScopeAndAppendDataDataFlowAnalysisResult(const std::vector<std::reference_wrapper<const syrec::Statement>>& stmtsToAnalyze, bool* wereAnyAssignmentsPerformedInCurrentScope);
+        void closeScopeAndDiscardDataFlowAnalysisResult();
+
+        [[nodiscard]] bool isAccessBlockedFor(const syrec::VariableAccess& accessedPartsOfSignal) const;
     private:
-        std::map<std::string, valueLookup::SignalValueLookup::ptr> assignedToSignalsInLoopBody;
-        const parser::SymbolTable::ptr&                            symbolTableReference;
+        struct ScopeLocalAssignmentParts {
+            std::vector<std::optional<unsigned int>>                 dimensionAccess;
+            std::optional<BitRangeAccessRestriction::BitRangeAccess> bitRange;
+        };
+        
+        const parser::SymbolTable::ptr&                                           symbolTableReference;
+        std::map<std::string, valueLookup::SignalValueLookup::ptr>                restrictionStatusPerSignal;
+        std::stack<std::map<std::string, std::vector<ScopeLocalAssignmentParts>>> uniqueAssignmentsPerScope;
 
-        void handleStatement(const syrec::Statement::ptr& stmt);
-        void handleAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts);
-        [[nodiscard]] std::optional<valueLookup::SignalValueLookup::ptr> fetchAndAddNewAssignedToSignalToLookupIfNoEntryExists(const syrec::VariableAccess::ptr& assignedToSignalParts);
+        void                                                                           handleStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& stmtsToAnalyze, bool* wasUniqueAssignmentDefined);
+        void                                                                           handleStatement(const syrec::Statement& stmt, bool* wasUniqueAssignmentDefined);
+        [[nodiscard]] std::optional<std::pair<std::string, ScopeLocalAssignmentParts>> handleAssignment(const syrec::VariableAccess& assignedToSignalParts) const;
+        [[nodiscard]] std::optional<ScopeLocalAssignmentParts>                         determineScopeLocalAssignmentFrom(const syrec::VariableAccess& assignedToSignal) const;
 
-        [[nodiscard]] static std::vector<std::optional<unsigned int>> transformDimensionAccess(const syrec::VariableAccess::ptr& accessedPartsOfSignal);
-        [[nodiscard]] static std::optional<BitRangeAccessRestriction::BitRangeAccess> transformAccessedBitRange(const syrec::VariableAccess::ptr& accessedPartsOfSignal);
+        [[nodiscard]] static std::vector<std::optional<unsigned int>>                 transformUserDefinedDimensionAccess(const syrec::VariableAccess& accessedPartsOfSignal);
+        [[nodiscard]] static std::optional<BitRangeAccessRestriction::BitRangeAccess> transformUserDefinedBitRangeAccess(const syrec::VariableAccess& accessedPartsOfSignal);
 
         template<typename T>
-        [[nodiscard]] std::shared_ptr<T> tryConvertStmtToStmtOfOtherType(const syrec::Statement::ptr& stmt) {
-            return std::dynamic_pointer_cast<T>(stmt);
+        [[nodiscard]] static const T* stmtCastedAs(const syrec::Statement& stmt) {
+            return dynamic_cast<const T*>(&stmt);
         }
-
-        static void storeAssignmentIfNoOverlappingOneExistsIn(const syrec::VariableAccess::ptr& assignedToSignal, std::vector<syrec::VariableAccess::ptr>& alreadyDefinedAssignments, const parser::SymbolTable::ptr& symbolTable, const std::optional<std::shared_ptr<LoopBodyValuePropagationBlocker>>& aggregateOfExistingLoopBodyValueRestrictions);
+        [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Statement>> transformCollectionOfSharedPointersToReferences(const syrec::Statement::vec& statements);
+        void                                                                             storeUniqueAssignmentForCurrentScope(const std::string& assignedToSignalIdent, const ScopeLocalAssignmentParts& uniqueAssignment);
     };
 }
 #endif

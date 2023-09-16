@@ -8,6 +8,7 @@
 #include "core/syrec/parser/symbol_table.hpp"
 #include <stack>
 #include "core/syrec/parser/symbol_table_backup_helper.hpp"
+#include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
 
 /*
  * TODO: Support for VHDL like signal access (i.e. bit range structured as .bitRangeEnd:bitRangeStart instead of .bitRangeStart:bitRangeEnd)
@@ -18,7 +19,7 @@ namespace optimizations {
         using ListOfStatementReferences = std::vector<std::unique_ptr<syrec::Statement>>;
 
         explicit Optimizer(const parser::ParserConfig& parserConfig, parser::SymbolTable::ptr sharedSymbolTableReference):
-            parserConfig(parserConfig), symbolTable(std::move(sharedSymbolTableReference)) {}
+            parserConfig(parserConfig), symbolTable(std::move(sharedSymbolTableReference)), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(symbolTable)) {}
 
         
         enum OptimizationResultFlag {
@@ -87,13 +88,14 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::expression>   handleExpr(const syrec::expression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::Number>       handleNumber(const syrec::Number& number) const;
     protected:
-        parser::ParserConfig                 parserConfig;
-        const parser::SymbolTable::ptr       symbolTable;
+        parser::ParserConfig                                         parserConfig;
+        const parser::SymbolTable::ptr                               symbolTable;
         std::stack<std::unique_ptr<parser::SymbolTableBackupHelper>> symbolTableBackupScopeStack;
+        std::unique_ptr<LoopBodyValuePropagationBlocker>             activeDataFlowValuePropagationRestrictions;
 
         void openNewSymbolTableBackupScope();
         void discardChangesMadeInCurrentSymbolTableBackupScope() const;
-        void mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& firstLocalBackupScope, const parser::SymbolTableBackupHelper& secondLocalBackupScope) const;
+        void mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupContainingOriginalSignalValues, const parser::SymbolTableBackupHelper& backupOfSignalValuesAfterFirstScope) const;
         void destroySymbolTableBackupScope();
         void createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess) const;
         [[nodiscard]] std::optional<std::unique_ptr<parser::SymbolTableBackupHelper>> popCurrentSymbolTableBackupScope();
@@ -106,7 +108,7 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleIfStmt(const syrec::IfStatement& ifStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleLoopStmt(const syrec::ForStatement& forStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleSwapStmt(const syrec::SwapStatement& swapStatement) const;
-        [[nodiscard]] static OptimizationResult<syrec::Statement>        handleSkipStmt(const syrec::SkipStatement& skipStatement);
+        [[nodiscard]] static OptimizationResult<syrec::Statement>        handleSkipStmt();
 
         [[nodiscard]] OptimizationResult<syrec::expression>     handleBinaryExpr(const syrec::BinaryExpression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::expression>     handleShiftExpr(const syrec::ShiftExpression& expression) const;
@@ -227,6 +229,8 @@ namespace optimizations {
         static void                                     determineUsedSignalIdentsIn(const syrec::Number& number, SignalIdentCountLookup& lookupContainer);
         static void                                     addSignalIdentToLookup(const std::string_view& signalIdent, SignalIdentCountLookup& lookupContainer);
         [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Statement>> transformCollectionOfSharedPointersToReferences(const syrec::Statement::vec& statements);
+        void                                                                             decrementReferenceCountsOfLoopHeaderComponents(const syrec::Number& iterationRangeStart, const std::optional<std::reference_wrapper<const syrec::Number>>& iterationRangeEnd, const syrec::Number& stepSize) const;
+        [[nodiscard]] static syrec::Statement::vec                                       createStatementListFrom(const syrec::Statement::vec& originalStmtList, std::vector<std::unique_ptr<syrec::Statement>> simplifiedStmtList);
     };
 }
 #endif
