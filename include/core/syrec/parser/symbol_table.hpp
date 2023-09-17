@@ -39,9 +39,9 @@ namespace parser {
         [[nodiscard]] std::optional<DeclaredModuleSignature>        tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, const std::vector<std::string>& calleeArguments) const;
         [[nodiscard]] std::optional<std::unique_ptr<syrec::Module>> getFullDeclaredModuleInformation(const std::string_view& moduleName, std::size_t internalModuleId) const;
 
-        bool                                                                                addEntry(const syrec::Variable::ptr& variable);
-        bool                                                                                addEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
-        bool                                                                                addEntry(const syrec::Module::ptr& module, const std::vector<std::size_t>& indicesOfOptimizedAwayParameters);
+        bool                                                                                addEntry(const syrec::Variable& variable);
+        bool                                                                                addEntry(const syrec::Number& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
+        bool                                                                                addEntry(const syrec::Module& module, std::size_t* internalModuleId);
         void                                                                                removeVariable(const std::string& literalIdent);
 
         enum ReferenceCountUpdate {
@@ -62,7 +62,10 @@ namespace parser {
         void updateViaSignalAssignment(const syrec::VariableAccess::ptr& assignmentLhsOperand, const syrec::VariableAccess::ptr& assignmentRhsOperand) const;
         void swap(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const;
 
-        [[nodiscard]] std::set<std::string>                              getUnusedLiterals() const;
+        [[nodiscard]] std::unordered_set<std::string>   getUnusedLiterals() const;
+        [[nodiscard]] std::unordered_set<std::size_t>   updateOptimizedModuleSignatureByMarkingAndReturningUnusedParametersOfModule(const std::string_view& moduleName, std::size_t internalModuleId) const;
+        [[nodiscard]] std::unordered_set<std::size_t>   fetchUnusedLocalModuleVariables(const std::string_view& moduleName, std::size_t internalModuleId) const;
+        
         [[nodiscard]] std::vector<bool>                                  determineIfModuleWasUsed(const syrec::Module::vec& modules) const;
         [[nodiscard]] std::optional<valueLookup::SignalValueLookup::ptr> createBackupOfValueOfSignal(const std::string_view& literalIdent) const;
         void                                                             restoreValuesFromBackup(const std::string_view& literalIdent, const valueLookup::SignalValueLookup::ptr& newValues) const;
@@ -78,17 +81,19 @@ namespace parser {
             std::optional<valueLookup::SignalValueLookup::ptr>     optionalValueLookup;
             std::size_t                                            referenceCount;
             
-            VariableSymbolTableEntry(const syrec::Variable::ptr& variable): referenceCount(0) {
-                variableInformation = std::variant<syrec::Variable::ptr, syrec::Number::ptr>(variable);
+            VariableSymbolTableEntry(const syrec::Variable& variable): referenceCount(0) {
+                const auto& sharedPointerToVariable = std::make_shared<syrec::Variable>(variable);
+                variableInformation = std::variant<syrec::Variable::ptr, syrec::Number::ptr>(sharedPointerToVariable);
 
-                valueLookup::SignalValueLookup::ptr valueLookup = std::make_shared<valueLookup::SignalValueLookup>(valueLookup::SignalValueLookup(variable->bitwidth, variable->dimensions, 0));
-                if (variable->type == syrec::Variable::Types::In || variable->type == syrec::Variable::Types::Inout) {
+                valueLookup::SignalValueLookup::ptr valueLookup = std::make_shared<valueLookup::SignalValueLookup>(valueLookup::SignalValueLookup(variable.bitwidth, variable.dimensions, 0));
+                if (variable.type == syrec::Variable::Types::In || variable.type == syrec::Variable::Types::Inout) {
                     valueLookup->invalidateAllStoredValuesForSignal();
                 }
                 optionalValueLookup = valueLookup;
             }
-            VariableSymbolTableEntry(const syrec::Number::ptr& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultLoopVariableValue): referenceCount(0) {
-                variableInformation = std::variant<syrec::Variable::ptr, syrec::Number::ptr>(number);
+            VariableSymbolTableEntry(const syrec::Number& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultLoopVariableValue): referenceCount(0) {
+                const auto& sharedPointerToNumber = std::make_shared<syrec::Number>(number);
+                variableInformation = std::variant<syrec::Variable::ptr, syrec::Number::ptr>(sharedPointerToNumber);
 
                 valueLookup::SignalValueLookup::ptr valueLookup;
                 if (defaultLoopVariableValue.has_value()) {
@@ -106,15 +111,17 @@ namespace parser {
             struct InternalModuleHelperData {
                 const std::size_t              internalId;
                 const syrec::Module::ptr       declaredModule;
-                std::size_t              referenceCount;
-                const std::vector<std::size_t> indicesOfDroppedParametersInOptimizedVersion;
+                std::size_t                    referenceCount;
+                std::vector<std::size_t>       indicesOfDroppedParametersInOptimizedVersion;
             };
 
             std::map<std::size_t, InternalModuleHelperData> internalDataLookup;
 
-            void addModule(const syrec::Module::ptr& module, const std::vector<std::size_t>& indexOfDroppedParametersInOptimizedVersionOfModule) {
+            [[nodiscard]] std::size_t addModule(const syrec::Module& module) {
+                const auto& sharedPointerToModule = std::make_shared<syrec::Module>(module);
                 const auto internalIdForModule = internalDataLookup.size();
-                internalDataLookup.insert(std::make_pair(internalIdForModule, InternalModuleHelperData({internalIdForModule, module, 0, indexOfDroppedParametersInOptimizedVersionOfModule})));
+                internalDataLookup.insert(std::make_pair(internalIdForModule, InternalModuleHelperData({internalIdForModule, sharedPointerToModule, 0, {}})));
+                return internalIdForModule;
             }
         };
 
@@ -127,7 +134,8 @@ namespace parser {
         [[nodiscard]] VariableSymbolTableEntry* getEntryForVariable(const std::string_view& literalIdent) const;
         static bool                             doModuleSignaturesMatch(const syrec::Module::ptr& module, const syrec::Module::ptr& otherModule);
 
-        [[nodiscard]] bool doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const;
+        [[nodiscard]] bool                                                               doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const;
+        [[nodiscard]] std::optional<DeclaredModuleSignature>                             tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, std::size_t& internalModuleId) const;
         static std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts);
         static std::vector<std::optional<unsigned int>>                                  tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable);
         static void                                                                      performReferenceCountUpdate(std::size_t& currentReferenceCount, ReferenceCountUpdate typeOfUpdate);

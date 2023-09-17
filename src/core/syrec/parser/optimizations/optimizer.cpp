@@ -4,6 +4,7 @@
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/range_check.hpp"
 #include "core/syrec/parser/optimizations/reassociate_expression.hpp"
+#include "core/syrec/parser/optimizations/deadStoreElimination/dead_store_eliminator.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/main_additional_line_for_assignment_simplifier.hpp"
 #include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 #include "core/syrec/parser/utils/bit_helpers.hpp"
@@ -34,8 +35,69 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
     return OptimizationResult<syrec::Module>::asUnchangedOriginal();
 }
 
+// TODO:
 optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::handleModule(const syrec::Module& module) {
-    return OptimizationResult<syrec::Module>::asUnchangedOriginal();
+    auto copyOfModule = createCopyOfModule(module);
+    
+    bool wereAnyStatementsOptimizedAway = false;
+    if (auto optimizationResultOfModuleStatements = handleStatements(transformCollectionOfSharedPointersToReferences(module.statements)); optimizationResultOfModuleStatements.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        if (optimizationResultOfModuleStatements.getStatusOfResult() == OptimizationResultFlag::RemovedByOptimization) {
+            return OptimizationResult<syrec::Module>::asOptimizedAwayContainer();
+        }
+        if (auto resultOfModuleBodyOptimization = optimizationResultOfModuleStatements.tryTakeOwnershipOfOptimizationResult(); resultOfModuleBodyOptimization.has_value()) {
+            copyOfModule->statements       = createStatementListFrom({}, std::move(*resultOfModuleBodyOptimization));
+            wereAnyStatementsOptimizedAway = true;
+        }
+    }
+
+    const auto& numberOfDeclaredModuleStatements = copyOfModule->statements.size();
+    if (parserConfig.deadStoreEliminationEnabled) {
+        const auto deadStoreEliminator = std::make_unique<deadStoreElimination::DeadStoreEliminator>(symbolTable);
+        deadStoreEliminator->removeDeadStoresFrom(copyOfModule->statements);
+    }
+    wereAnyStatementsOptimizedAway &= numberOfDeclaredModuleStatements == copyOfModule->statements.size();
+
+    std::size_t generatedInternalIdForModule = 0;
+    symbolTable->addEntry(*copyOfModule, &generatedInternalIdForModule);
+
+    if (!parserConfig.deadCodeEliminationEnabled) {
+        if (wereAnyStatementsOptimizedAway) {
+            return OptimizationResult<syrec::Module>::asUnchangedOriginal();
+        }
+        return OptimizationResult<syrec::Module>::fromOptimizedContainer(std::move(copyOfModule));
+    }
+    
+    const auto& indicesOfRemovedLocalVariablesOfModule = symbolTable->fetchUnusedLocalModuleVariables(module.name, generatedInternalIdForModule);
+    for (const std::size_t i : indicesOfRemovedLocalVariablesOfModule) {
+        copyOfModule->variables.erase(std::next(copyOfModule->variables.begin(), i + 1));
+    }
+
+    const auto& indicesOfUnusedParameters = symbolTable->updateOptimizedModuleSignatureByMarkingAndReturningUnusedParametersOfModule(module.name, generatedInternalIdForModule);
+    for (const std::size_t& i: indicesOfUnusedParameters) {
+        copyOfModule->parameters.erase(std::next(copyOfModule->parameters.begin(), i + 1));
+    }    
+
+    const auto doesOptimizedModuleBodyContainAnyStatement = copyOfModule->statements.size();
+    const auto doesOptimizedModuleOnlyHaveReadOnlyParameters = copyOfModule->parameters.empty()
+        || std::all_of(copyOfModule->parameters.cbegin(), copyOfModule->parameters.cend(), [](const syrec::Variable::ptr& declaredParameter) {
+            return declaredParameter->type != syrec::Variable::Types::In;
+        });
+
+    const auto doesModulePerformAssignmentToAnyModifiableParameterOrLocal = isAnyModifiableParameterOrLocalModifiedInModuleBody(*copyOfModule);
+
+    if ((wereAnyStatementsOptimizedAway && !doesOptimizedModuleBodyContainAnyStatement) 
+        || !doesOptimizedModuleBodyContainAnyStatement 
+        || (doesOptimizedModuleOnlyHaveReadOnlyParameters && copyOfModule->variables.empty())
+        || (copyOfModule->parameters.empty() && copyOfModule->variables.empty())
+        || !doesModulePerformAssignmentToAnyModifiableParameterOrLocal) {
+        return OptimizationResult<syrec::Module>::asOptimizedAwayContainer();
+    }
+
+    if (numberOfDeclaredModuleStatements == copyOfModule->statements.size() && indicesOfRemovedLocalVariablesOfModule.empty() && indicesOfUnusedParameters.empty()) {
+        return OptimizationResult<syrec::Module>::asUnchangedOriginal();
+    }
+
+    return OptimizationResult<syrec::Module>::fromOptimizedContainer(std::move(copyOfModule));
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements) {
@@ -383,20 +445,21 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     auto iterationRangeStartSimplificationResult = handleNumber(*forStatement.range.first);
     auto iterationRangeStartSimplified           = std::move(iterationRangeStartSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
 
+    const auto iterationRangeStartConstantValue = tryEvaluateNumberAsConstant(*iterationRangeStartSimplified);
+    updateValueOfLoopVariable(forStatement.loopVariable, iterationRangeStartConstantValue);
+
     auto iterationRangeEndSimplificationResult = forStatement.range.first != forStatement.range.second ? std::make_optional(handleNumber(*forStatement.range.second)) : std::nullopt;
     auto iterationRangeEndSimplified           = iterationRangeEndSimplificationResult.has_value() ? std::make_optional(std::move(iterationRangeEndSimplificationResult->tryTakeOwnershipOfOptimizationResult()->front())) : std::nullopt;
 
     auto stepSizeSimplificationResult = handleNumber(*forStatement.step);
     auto stepSizeSimplified        = std::move(stepSizeSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
-
-    const auto iterationRangeStartConstantValue = tryEvaluateNumberAsConstant(*iterationRangeStartSimplified);
+    
     const auto iterationRangEndConstantValue    = iterationRangeEndSimplified.has_value() ? tryEvaluateNumberAsConstant(**iterationRangeEndSimplified) : iterationRangeStartConstantValue;
     const auto stepSizeConstantValue            = tryEvaluateNumberAsConstant(*stepSizeSimplified);
 
     std::optional<unsigned int> numLoopIterations;
     if (iterationRangeStartConstantValue.has_value() && iterationRangeEndSimplified.has_value() && stepSizeConstantValue.has_value()) {
         numLoopIterations = utils::determineNumberOfLoopIterations(*iterationRangeStartConstantValue, *iterationRangEndConstantValue, *stepSizeConstantValue);
-        
     }
 
     // TODO: Handling of loops with zero iterations when dead code elimination is disabled
@@ -411,10 +474,11 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     bool wereAnyAssignmentPerformInLoopBody = false;
     auto shouldNewValuePropagationBlockerScopeOpened = numLoopIterations.has_value() && *numLoopIterations > 1;
 
+    // TODO: Should constant propagation be perform again here
     if (shouldNewValuePropagationBlockerScopeOpened) {
         activeDataFlowValuePropagationRestrictions->openNewScopeAndAppendDataDataFlowAnalysisResult(transformCollectionOfSharedPointersToReferences(forStatement.statements), &wereAnyAssignmentPerformInLoopBody);
     }
-
+    
     // TODO: Correct setting of internal flags
     // TODO: General optimization of loop body
     auto simplificationResultOfLoopBodyStmts = handleStatements(transformCollectionOfSharedPointersToReferences(forStatement.statements));
@@ -422,6 +486,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     if (auto simplifiedStmts = simplificationResultOfLoopBodyStmts.tryTakeOwnershipOfOptimizationResult(); simplifiedStmts.has_value()) {
         loopBodyStmtsSimplified = std::move(*simplifiedStmts);
     }
+    removeLoopVariableFromSymbolTable(forStatement.loopVariable);
 
     if (!wereAnyAssignmentPerformInLoopBody || !loopBodyStmtsSimplified.has_value()) {
         if (parserConfig.deadCodeEliminationEnabled) {
@@ -457,6 +522,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     auto simplifiedLoopStmt = std::make_unique<syrec::ForStatement>();
+    // TODO: If loop only performs one iteration and the dead code elimination is not enabled, one could replace the declaration of for $i = X to Y step Z with for $X to Y step Z
     simplifiedLoopStmt->loopVariable = forStatement.loopVariable;
     simplifiedLoopStmt->step         = std::move(stepSizeSimplified);
     if (iterationRangeEndSimplified.has_value()) {
@@ -1400,3 +1466,112 @@ syrec::Statement::vec optimizations::Optimizer::createStatementListFrom(const sy
     }
     return stmtsContainer;
 }
+
+void optimizations::Optimizer::updateValueOfLoopVariable(const std::string_view& loopVariableIdent, std::optional<unsigned> value) const {
+    if (loopVariableIdent.empty()) {
+        return;
+    }
+
+    if (!symbolTable->contains(loopVariableIdent)) {
+        symbolTable->addEntry(syrec::Number({std::string(loopVariableIdent)}), BitHelpers::getRequiredBitsToStoreValue(*value), value);
+    }
+    else {
+        if (!value.has_value()) {
+            symbolTable->invalidateStoredValueForLoopVariable(loopVariableIdent);
+        }
+        symbolTable->updateStoredValueForLoopVariable(loopVariableIdent, *value);        
+    }
+}
+
+void optimizations::Optimizer::removeLoopVariableFromSymbolTable(const std::string_view& loopVariableIdent) const {
+    if (loopVariableIdent.empty()) {
+        return;
+    }
+    symbolTable->removeVariable(std::string(loopVariableIdent));
+}
+
+bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInModuleBody(const syrec::Module& module) const {
+    if (module.statements.empty()) {
+        return false;
+    }
+
+    std::map<std::string, std::reference_wrapper<const syrec::Variable>> lookupOfModifiableParametersAndLocals;
+    for (const auto& moduleParameter : module.parameters) {
+        if (isVariableReadOnly(*moduleParameter) && lookupOfModifiableParametersAndLocals.count(moduleParameter->name) == 0) {
+            lookupOfModifiableParametersAndLocals.insert(std::make_pair(moduleParameter->name, *moduleParameter));
+        }
+    }
+
+    for (const auto& moduleLocalVariable: module.variables) {
+        if (isVariableReadOnly(*moduleLocalVariable) && lookupOfModifiableParametersAndLocals.count(moduleLocalVariable->name) == 0) {
+            lookupOfModifiableParametersAndLocals.insert(std::make_pair(moduleLocalVariable->name, *moduleLocalVariable));
+        }
+    }
+
+    if (lookupOfModifiableParametersAndLocals.empty()) {
+        return false;
+    }
+
+    return std::none_of(module.statements.cbegin(), module.statements.cend(), [&](const syrec::Statement::ptr& stmt) {
+        return isAnyModifiableParameterOrLocalModifiedInStatement(*stmt, lookupOfModifiableParametersAndLocals);
+    });
+}
+
+// TODO: Swap with lhs and rhs operand being equal does not count as a signal modification
+bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::map<std::string, std::reference_wrapper<const syrec::Variable>>& parameterAndLocalLookup) const {
+    if (const auto& stmtAsLoopStatement = dynamic_cast<const syrec::ForStatement*>(&statement); stmtAsLoopStatement != nullptr) {
+        const auto& iterationRangeStartEvaluated = tryEvaluateNumberAsConstant(*stmtAsLoopStatement->range.first);
+        const auto& iterationRangEndEvaluated    = tryEvaluateNumberAsConstant(*stmtAsLoopStatement->range.second);
+        const auto& iterationRangeStepSize       = tryEvaluateNumberAsConstant(*stmtAsLoopStatement->step);
+        if (iterationRangeStartEvaluated.has_value() && iterationRangEndEvaluated.has_value() && iterationRangeStepSize.has_value()) {
+            if (const auto& numberOfIterations = utils::determineNumberOfLoopIterations(*iterationRangeStartEvaluated, *iterationRangEndEvaluated, *iterationRangeStepSize); numberOfIterations.has_value()) {
+                return !*numberOfIterations;
+            }
+        }
+        return isAnyModifiableParameterOrLocalModifiedInStatements(transformCollectionOfSharedPointersToReferences(stmtAsLoopStatement->statements), parameterAndLocalLookup);
+    }
+    if (const auto& stmtAsIfStmt = dynamic_cast<const syrec::IfStatement*>(&statement); stmtAsIfStmt != nullptr) {
+        return isAnyModifiableParameterOrLocalModifiedInStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->thenStatements), parameterAndLocalLookup)
+            || isAnyModifiableParameterOrLocalModifiedInStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->elseStatements), parameterAndLocalLookup);
+    }
+    if (const auto& stmtAsAssignmentStmt = dynamic_cast<const syrec::AssignStatement*>(&statement); stmtAsAssignmentStmt != nullptr) {
+        if (const auto& assignmentRhsOperandAsConstant = tryEvaluateExpressionToConstant(*stmtAsAssignmentStmt->rhs); assignmentRhsOperandAsConstant.has_value() && syrec_operation::tryMapAssignmentOperationFlagToEnum(stmtAsAssignmentStmt->op).has_value()) {
+            if (syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*syrec_operation::tryMapAssignmentOperationFlagToEnum(stmtAsAssignmentStmt->op), *assignmentRhsOperandAsConstant)) {
+                return false;
+            }
+        }
+        return parameterAndLocalLookup.count(stmtAsAssignmentStmt->lhs->var->name) != 0;
+    }
+    if (const auto& stmtAsUnaryStmt = dynamic_cast<const syrec::UnaryStatement*>(&statement); stmtAsUnaryStmt != nullptr) {
+        return parameterAndLocalLookup.count(stmtAsUnaryStmt->var->var->name) != 0;
+    }
+    if (const auto& stmtAsSwapStmt = dynamic_cast<const syrec::SwapStatement*>(&statement); stmtAsSwapStmt != nullptr) {
+        return parameterAndLocalLookup.count(stmtAsSwapStmt->lhs->var->name) != 0 || parameterAndLocalLookup.count(stmtAsSwapStmt->rhs->var->name);
+    }
+    if (const auto& stmtAsCallStmt = dynamic_cast<const syrec::CallStatement*>(&statement); stmtAsCallStmt != nullptr) {
+        if (const auto& matchingSymbolTableEntryForModule = symbolTable->tryGetOptimizedSignatureForModuleCall(stmtAsCallStmt->target->name, stmtAsCallStmt->parameters); matchingSymbolTableEntryForModule.has_value()) {
+            std::unordered_set<std::size_t> indicesOfRemainingParameters;
+            matchingSymbolTableEntryForModule->determineOptimizedCallSignature(&indicesOfRemainingParameters);
+            return std::any_of(
+                    indicesOfRemainingParameters.cbegin(),
+                    indicesOfRemainingParameters.cend(),
+                    [&parameterAndLocalLookup, &matchingSymbolTableEntryForModule, &stmtAsCallStmt](const std::size_t remainingParameterIndex) {
+                        const auto& formalParameter      = matchingSymbolTableEntryForModule->declaredParameters.at(remainingParameterIndex);
+                        const auto& actualParameterIdent = stmtAsCallStmt->parameters.at(remainingParameterIndex);
+                        return isVariableReadOnly(*formalParameter) && parameterAndLocalLookup.count(actualParameterIdent) != 0;
+                    });
+        }
+    }
+    return false;
+}
+
+bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements, const std::map<std::string, std::reference_wrapper<const syrec::Variable>>& parameterAndLocalLookup) const {
+    return std::any_of(statements.cbegin(), statements.cend(), [&](const syrec::Statement& statement) {
+        return isAnyModifiableParameterOrLocalModifiedInStatement(statement, parameterAndLocalLookup);
+    });
+}
+
+inline bool optimizations::Optimizer::isVariableReadOnly(const syrec::Variable& variable) {
+    return variable.type == syrec::Variable::Types::In;
+}
+

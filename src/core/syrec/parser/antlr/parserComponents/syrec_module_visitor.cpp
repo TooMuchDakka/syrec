@@ -49,7 +49,7 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
                 }
                 alreadyClosedOpenedSymbolTableScope = true;
                 SymbolTable::closeScope(sharedData->currentSymbolTableScope);
-                sharedData->currentSymbolTableScope->addEntry(unoptimizedModuleVersion, indicesOfOptimizedAwayParameters);
+                sharedData->currentSymbolTableScope->addEntry(*unoptimizedModuleVersion, nullptr);
                 unoptimizedModules.emplace_back(unoptimizedModuleVersion);
                 foundModules.emplace_back(optimizedModuleVersion);   
             }
@@ -153,7 +153,7 @@ std::any SyReCModuleVisitor::visitParameter(SyReCParser::ParameterContext* conte
     }
 
     (*declaredParameter)->type = *parameterType;
-    sharedData->currentSymbolTableScope->addEntry(*declaredParameter);
+    sharedData->currentSymbolTableScope->addEntry(**declaredParameter);
     return declaredParameter;
 }
 
@@ -173,7 +173,7 @@ std::any SyReCModuleVisitor::visitSignalList(SyReCParser::SignalListContext* con
         if (isValidSignalListDeclaration) {
             (*declaredSignal)->type = *declaredSignalsType;
             declaredSignalsOfType.emplace_back(*declaredSignal);
-            sharedData->currentSymbolTableScope->addEntry(*declaredSignal);
+            sharedData->currentSymbolTableScope->addEntry(**declaredSignal);
         }
     }
 

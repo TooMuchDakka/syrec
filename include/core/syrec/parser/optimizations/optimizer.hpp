@@ -232,6 +232,12 @@ namespace optimizations {
         [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Statement>> transformCollectionOfSharedPointersToReferences(const syrec::Statement::vec& statements);
         void                                                                             decrementReferenceCountsOfLoopHeaderComponents(const syrec::Number& iterationRangeStart, const std::optional<std::reference_wrapper<const syrec::Number>>& iterationRangeEnd, const syrec::Number& stepSize) const;
         [[nodiscard]] static syrec::Statement::vec                                       createStatementListFrom(const syrec::Statement::vec& originalStmtList, std::vector<std::unique_ptr<syrec::Statement>> simplifiedStmtList);
+        void                                                                             updateValueOfLoopVariable(const std::string_view& loopVariableIdent, std::optional<unsigned int> value) const;
+        void                                                                             removeLoopVariableFromSymbolTable(const std::string_view& loopVariableIdent) const;
+        [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInModuleBody(const syrec::Module& module) const;
+        [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements, const std::map<std::string, std::reference_wrapper<const syrec::Variable>>& parameterAndLocalLookup) const;
+        [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::map<std::string, std::reference_wrapper<const syrec::Variable>>& parameterAndLocalLookup) const;
+        [[nodiscard]] static bool                                                        isVariableReadOnly(const syrec::Variable& variable);
     };
 }
 #endif

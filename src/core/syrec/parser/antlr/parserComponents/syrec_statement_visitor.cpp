@@ -1061,14 +1061,14 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
                 SymbolTable::openScope(sharedData->currentSymbolTableScope);
                 openedNewSymbolTableScopeForLoopVariable          = true;
                 // TODO: Since we are currently assuming that the value of a signal can be stored in at most 32 bits, we assume the latter as the bit width of the loop variable value
-                sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(*loopVariableIdent), 32, std::nullopt);
+                sharedData->currentSymbolTableScope->addEntry(syrec::Number({*loopVariableIdent}), 32, std::nullopt);
                 sharedData->lastDeclaredLoopVariable.emplace(*loopVariableIdent);
             }
         } else {
             if (!sharedData->currentSymbolTableScope->contains(*loopVariableIdent)) {
                 SymbolTable::openScope(sharedData->currentSymbolTableScope);
                 openedNewSymbolTableScopeForLoopVariable = true;
-                sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(*loopVariableIdent), 32, std::nullopt);
+                sharedData->currentSymbolTableScope->addEntry(syrec::Number({*loopVariableIdent}), 32, std::nullopt);
             }
             sharedData->lastDeclaredLoopVariable.emplace(*loopVariableIdent);
         }
@@ -1168,7 +1168,7 @@ std::optional<SyReCStatementVisitor::ParsedLoopHeaderInformation> SyReCStatement
         sharedData->lastDeclaredLoopVariable = *predefinedLoopHeader.loopVariableIdent;
         if (!sharedData->currentSymbolTableScope->contains(*predefinedLoopHeader.loopVariableIdent)) {
             SymbolTable::openScope(sharedData->currentSymbolTableScope);
-            sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(*predefinedLoopHeader.loopVariableIdent), 32, std::nullopt);
+            sharedData->currentSymbolTableScope->addEntry(syrec::Number({*predefinedLoopHeader.loopVariableIdent}), 32, std::nullopt);
             openedNewSymbolTableScopeForLoopVariable = true;
         }
     }
@@ -1460,10 +1460,10 @@ void SyReCStatementVisitor::addOrUpdateLoopVariableEntryAndOptionallyMakeItsValu
         wasNewSymbolTableScopeOpened = true;
 
         if (valueOfLoopVariable.has_value()) {
-            sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(loopVariableIdent), BitHelpers::getRequiredBitsToStoreValue(*valueOfLoopVariable), valueOfLoopVariable);   
+            sharedData->currentSymbolTableScope->addEntry(syrec::Number({loopVariableIdent}), BitHelpers::getRequiredBitsToStoreValue(*valueOfLoopVariable), valueOfLoopVariable);   
         }
         else {
-            sharedData->currentSymbolTableScope->addEntry(std::make_shared<syrec::Number>(loopVariableIdent), UINT_MAX, valueOfLoopVariable);
+            sharedData->currentSymbolTableScope->addEntry(syrec::Number({loopVariableIdent}), UINT_MAX, valueOfLoopVariable);
         }
     } else {
         if (valueOfLoopVariable.has_value()) {
