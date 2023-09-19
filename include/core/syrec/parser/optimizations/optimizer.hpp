@@ -16,10 +16,8 @@
 namespace optimizations {
     class Optimizer {
     public:
-        using ListOfStatementReferences = std::vector<std::unique_ptr<syrec::Statement>>;
-
-        explicit Optimizer(const parser::ParserConfig& parserConfig, parser::SymbolTable::ptr sharedSymbolTableReference):
-            parserConfig(parserConfig), symbolTable(std::move(sharedSymbolTableReference)), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(symbolTable)) {}
+        explicit Optimizer(const parser::ParserConfig& parserConfig, const parser::SymbolTable::ptr& sharedSymbolTableReference):
+            parserConfig(parserConfig), stackOfSymbolTableScopes({!sharedSymbolTableReference ? std::make_shared<parser::SymbolTable>() : sharedSymbolTableReference}), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(stackOfSymbolTableScopes.top())) {}
 
         
         enum OptimizationResultFlag {
@@ -89,7 +87,7 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::Number>       handleNumber(const syrec::Number& number) const;
     protected:
         parser::ParserConfig                                         parserConfig;
-        const parser::SymbolTable::ptr                               symbolTable;
+        std::stack<parser::SymbolTable::ptr>                         stackOfSymbolTableScopes;
         std::stack<std::unique_ptr<parser::SymbolTableBackupHelper>> symbolTableBackupScopeStack;
         std::unique_ptr<LoopBodyValuePropagationBlocker>             activeDataFlowValuePropagationRestrictions;
 
@@ -134,6 +132,11 @@ namespace optimizations {
         void updateReferenceCountOf(const std::string_view& signalIdent, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
+        [[nodiscard]] std::optional<syrec::Variable::ptr>     getSymbolTableEntryForVariable(const std::string_view& signalLiteralIdent) const;
+        [[nodiscard]] std::optional<syrec::Number::ptr>       getSymbolTableEntryForLoopVariable(const std::string_view& loopVariableIdent) const;
+        [[nodiscard]] std::optional<parser::SymbolTable::ptr> getActiveSymbolTableScope() const;
+        void                                                  openNewSymbolTableScope();
+        void                                                  closeActiveSymbolTableScope();
 
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForAccessedSignal(const syrec::VariableAccess& accessedSignal) const;
 
@@ -235,8 +238,8 @@ namespace optimizations {
         void                                                                             updateValueOfLoopVariable(const std::string_view& loopVariableIdent, std::optional<unsigned int> value) const;
         void                                                                             removeLoopVariableFromSymbolTable(const std::string_view& loopVariableIdent) const;
         [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInModuleBody(const syrec::Module& module) const;
-        [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements, const std::map<std::string, std::reference_wrapper<const syrec::Variable>>& parameterAndLocalLookup) const;
-        [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::map<std::string, std::reference_wrapper<const syrec::Variable>>& parameterAndLocalLookup) const;
+        [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements, const std::unordered_set<std::string>& parameterAndLocalLookup) const;
+        [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::unordered_set<std::string>& parameterAndLocalLookup) const;
         [[nodiscard]] static bool                                                        isVariableReadOnly(const syrec::Variable& variable);
     };
 }

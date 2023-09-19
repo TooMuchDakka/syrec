@@ -964,18 +964,31 @@ SymbolTableBackupHelper::ptr SyReCStatementVisitor::createCopiesOfCurrentValuesO
 void SyReCStatementVisitor::mergeChangesFromBranchesAndUpdateSymbolTable(const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInTrueBranch, const SymbolTableBackupHelper::ptr& valuesOfChangedSignalsInFalseBranch, bool canAnyBranchBeOmitted, bool canTrueBranchBeOmitted) const {
     const auto& changedSignalsInTrueBranch = valuesOfChangedSignalsInTrueBranch->getIdentsOfChangedSignals();
     const auto& changedSignalsInFalseBranch = valuesOfChangedSignalsInFalseBranch->getIdentsOfChangedSignals();
+    
+     std::unordered_set<std::string> unionOfChangedSignalsOfBothBranches;
+    for (const auto& modifiedSignalInFirstScope: changedSignalsInTrueBranch) {
+         unionOfChangedSignalsOfBothBranches.emplace(modifiedSignalInFirstScope);
+    }
+    if (changedSignalsInTrueBranch.size() != changedSignalsInFalseBranch.size()) {
+        for (const auto& modifiedSignalInSecondScope: changedSignalsInFalseBranch) {
+            unionOfChangedSignalsOfBothBranches.emplace(modifiedSignalInSecondScope);
+        }
+    }
+    
+    std::unordered_set<std::string> changedSignalsInBothBranches;
+    for (const auto& modifiedSignalInFirstScope: changedSignalsInTrueBranch) {
+        if (changedSignalsInFalseBranch.count(modifiedSignalInFirstScope)) {
+            changedSignalsInBothBranches.emplace(modifiedSignalInFirstScope);
+        }
+    }
+    if (changedSignalsInTrueBranch.size() != changedSignalsInFalseBranch.size()) {
+        for (const auto& modifiedSignalInSecondScope: changedSignalsInFalseBranch) {
+            if (changedSignalsInTrueBranch.count(modifiedSignalInSecondScope) && !changedSignalsInBothBranches.count(modifiedSignalInSecondScope)) {
+                changedSignalsInBothBranches.emplace(modifiedSignalInSecondScope);
+            }
+        }
+    }
 
-    std::set<std::string> unionOfChangedSignalsOfBothBranches;
-    std::set_union(
-    changedSignalsInTrueBranch.cbegin(), changedSignalsInTrueBranch.cend(),
-    changedSignalsInFalseBranch.cbegin(), changedSignalsInFalseBranch.cend(),
-            std::inserter(unionOfChangedSignalsOfBothBranches, unionOfChangedSignalsOfBothBranches.begin()));
-
-    std::set<std::string> changedSignalsInBothBranches;
-    std::set_intersection(
-    changedSignalsInTrueBranch.cbegin(), changedSignalsInTrueBranch.cend(),
-    changedSignalsInFalseBranch.cbegin(), changedSignalsInFalseBranch.cend(),
-    std::inserter(changedSignalsInBothBranches, changedSignalsInBothBranches.begin()));   
 
     for (const auto& changedSignal: unionOfChangedSignalsOfBothBranches) {
         const valueLookup::SignalValueLookup::ptr originalValueOfSignal = *sharedData->currentSymbolTableScope->createBackupOfValueOfSignal(changedSignal);
@@ -1310,80 +1323,7 @@ void SyReCStatementVisitor::visitForStatementWithOptimizationsEnabled(SyReCParse
     loopStatement->step         = parsedLoopHeader->stepSize;
     loopStatement->statements   = iterationInvariantLoopBody.statements;
 
-    if (sharedData->loopNestingLevel > 1) {
-        if (doesLoopOnlyPerformOneIterationInTotal) {
-            for (const auto& stmt: iterationInvariantLoopBody.statements) {
-                addStatementToOpenContainer(stmt);
-            }
-        } else {
-            addStatementToOpenContainer(loopStatement);
-        }
-    }
-    if (const auto& loopUnrollConfig = getUserDefinedLoopUnrollConfigOrDefault(doesLoopOnlyPerformOneIterationInTotal);
-        loopUnrollConfig.has_value() && !preDeterminedLoopHeaderInformation.has_value()) {
-        // TODO: Loop unroller should consider nesting level
-        const auto  loopUnrollerInstance    = std::make_unique<optimizations::LoopUnroller>(sharedData->loopVariableMappingLookup);
-        const auto& unrolledLoopInformation = sharedData->parserConfig->deadCodeEliminationEnabled
-            ? loopUnrollerInstance->tryUnrollLoop(*loopUnrollConfig, loopStatement)
-            : optimizations::LoopUnroller::UnrollInformation(optimizations::LoopUnroller::NotModifiedLoopInformation({loopStatement}));
-
-    } else {
-        
-    }
-    /*
-     * We can perform an unroll of the loop even if constant propagation is disabled if only one loop iteration is performed since in this case the value of the loop variable will be made available for optimizations
-     */
-    //const auto unrollLoopWhenConstantPropagationIsDisabled = !sharedData->parserConfig->performConstantPropagation ? doesLoopOnlyPerformOneIterationInTotal : true;
-
-    /*
-     * We should only perform an unroll if the dead code elimination optimization is enabled and no predetermined loop header from a previous unroll exists for the current loop.
-     * If no unrolling of the loop takes place, we need to make the following distinction:
-     * - If the loop will only perform one iteration any optimization and value updates will already be done during the parsing of the loop body.
-     * - If multiple iterations will be performed or if the iteration count cannot be determined, invalidate the assigned to signals in the non nested loops.
-     */
-    if (const auto& loopUnrollConfig = getUserDefinedLoopUnrollConfigOrDefault(doesLoopOnlyPerformOneIterationInTotal); 
-        loopUnrollConfig.has_value() && !preDeterminedLoopHeaderInformation.has_value()) {
-        // TODO: Loop unroller should consider nesting level
-        const auto  loopUnrollerInstance    = std::make_unique<optimizations::LoopUnroller>(sharedData->loopVariableMappingLookup);
-        const auto& unrolledLoopInformation = sharedData->parserConfig->deadCodeEliminationEnabled
-            ? loopUnrollerInstance->tryUnrollLoop(*loopUnrollConfig, loopStatement)
-            : optimizations::LoopUnroller::UnrollInformation(optimizations::LoopUnroller::NotModifiedLoopInformation({loopStatement}));
-
-        /*
-         * TODO: If we invalidate the values of the assignments in the non nested loops when parsing a nested loop we destroy values that could be made available when unrolling the parent loop
-         */
-        if (std::holds_alternative<optimizations::LoopUnroller::NotModifiedLoopInformation>(unrolledLoopInformation.data)) {
-            /*if (sharedData->loopNestingLevel > 1) {
-                addStatementToOpenContainer(loopStatement);
-            }
-            else {
-                incrementReferenceCountsOfVariablesUsedInStatementsAndInvalidateAssignedToSignals(loopStatement->statements);
-            }*/
-        }
-        else {
-            if (doesLoopOnlyPerformOneIterationInTotal) {
-                for (const auto& stmt: iterationInvariantLoopBody.statements) {
-                    addStatementToOpenContainer(stmt);
-                }
-            }
-            else {
-                unrollAndProcessLoopBody(context, unrolledLoopInformation);
-            }
-        }
-    }
-    else {
-        //if (sharedData->loopNestingLevel > 1) {
-        //    addStatementToOpenContainer(loopStatement);
-        //} else {
-        //    /*
-        //     *
-        //     */
-
-        //    incrementReferenceCountsOfVariablesUsedInStatementsAndInvalidateAssignedToSignals(loopStatement->statements);
-        //}
-    }
-
-     // TODO: Instead of opening and closing a new scope simply insert and remove the entry from the symbol table
+       // TODO: Instead of opening and closing a new scope simply insert and remove the entry from the symbol table
     if (needToCloseOpenedSymbolTableScopeForLoopVariable) {
         removeLoopVariableAndMakeItsValueUnavailableForEvaluations(*loopVariableIdent, needToCloseOpenedSymbolTableScopeForLoopVariable);
     }
@@ -1391,6 +1331,7 @@ void SyReCStatementVisitor::visitForStatementWithOptimizationsEnabled(SyReCParse
     if (sharedData->loopNestingLevel > 0) {
         sharedData->loopNestingLevel--;
     }
+    addStatementToOpenContainer(loopStatement);
 }
 
 void SyReCStatementVisitor::unrollAndProcessLoopBody(SyReCParser::ForStatementContext* context, const optimizations::LoopUnroller::UnrollInformation& unrolledLoopInformation) {

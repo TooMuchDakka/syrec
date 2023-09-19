@@ -194,14 +194,17 @@ void SymbolTable::updateReferenceCountOfModulesMatchingSignature(const std::stri
 
 
 void SymbolTable::openScope(SymbolTable::ptr& currentScope) {
-    // TODO: Implement me
-    SymbolTable::ptr       newScope = std::make_shared<SymbolTable>(SymbolTable());
-    newScope->outer           = currentScope;
-    currentScope                    = newScope;
+    if (currentScope) {
+        const auto newScope = std::make_shared<SymbolTable>();
+        newScope->outer     = currentScope;
+        currentScope        = newScope;   
+    } else {
+        currentScope = std::make_shared<SymbolTable>();
+    }
 }
 
 void SymbolTable::closeScope(SymbolTable::ptr& currentScope) {
-    if (nullptr != currentScope) {
+    if (currentScope) {
         currentScope = currentScope->outer;
     } 
 }

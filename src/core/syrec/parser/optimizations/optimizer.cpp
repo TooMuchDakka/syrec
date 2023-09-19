@@ -38,10 +38,15 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
 // TODO:
 optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::handleModule(const syrec::Module& module) {
     auto copyOfModule = createCopyOfModule(module);
-    
+    // TODO: Add entries for module parameters
+
+    openNewSymbolTableScope();
+    const auto& activeSymbolTableScope         = *getActiveSymbolTableScope();
+
     bool wereAnyStatementsOptimizedAway = false;
     if (auto optimizationResultOfModuleStatements = handleStatements(transformCollectionOfSharedPointersToReferences(module.statements)); optimizationResultOfModuleStatements.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         if (optimizationResultOfModuleStatements.getStatusOfResult() == OptimizationResultFlag::RemovedByOptimization) {
+            closeActiveSymbolTableScope();
             return OptimizationResult<syrec::Module>::asOptimizedAwayContainer();
         }
         if (auto resultOfModuleBodyOptimization = optimizationResultOfModuleStatements.tryTakeOwnershipOfOptimizationResult(); resultOfModuleBodyOptimization.has_value()) {
@@ -52,27 +57,28 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
 
     const auto& numberOfDeclaredModuleStatements = copyOfModule->statements.size();
     if (parserConfig.deadStoreEliminationEnabled) {
-        const auto deadStoreEliminator = std::make_unique<deadStoreElimination::DeadStoreEliminator>(symbolTable);
+        const auto deadStoreEliminator = std::make_unique<deadStoreElimination::DeadStoreEliminator>(activeSymbolTableScope);
         deadStoreEliminator->removeDeadStoresFrom(copyOfModule->statements);
     }
     wereAnyStatementsOptimizedAway &= numberOfDeclaredModuleStatements == copyOfModule->statements.size();
 
     std::size_t generatedInternalIdForModule = 0;
-    symbolTable->addEntry(*copyOfModule, &generatedInternalIdForModule);
+    activeSymbolTableScope->addEntry(*copyOfModule, &generatedInternalIdForModule);
 
     if (!parserConfig.deadCodeEliminationEnabled) {
+        closeActiveSymbolTableScope();
         if (wereAnyStatementsOptimizedAway) {
             return OptimizationResult<syrec::Module>::asUnchangedOriginal();
         }
         return OptimizationResult<syrec::Module>::fromOptimizedContainer(std::move(copyOfModule));
     }
     
-    const auto& indicesOfRemovedLocalVariablesOfModule = symbolTable->fetchUnusedLocalModuleVariables(module.name, generatedInternalIdForModule);
+    const auto& indicesOfRemovedLocalVariablesOfModule = activeSymbolTableScope->fetchUnusedLocalModuleVariables(module.name, generatedInternalIdForModule);
     for (const std::size_t i : indicesOfRemovedLocalVariablesOfModule) {
         copyOfModule->variables.erase(std::next(copyOfModule->variables.begin(), i + 1));
     }
 
-    const auto& indicesOfUnusedParameters = symbolTable->updateOptimizedModuleSignatureByMarkingAndReturningUnusedParametersOfModule(module.name, generatedInternalIdForModule);
+    const auto& indicesOfUnusedParameters = activeSymbolTableScope->updateOptimizedModuleSignatureByMarkingAndReturningUnusedParametersOfModule(module.name, generatedInternalIdForModule);
     for (const std::size_t& i: indicesOfUnusedParameters) {
         copyOfModule->parameters.erase(std::next(copyOfModule->parameters.begin(), i + 1));
     }    
@@ -83,6 +89,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
             return declaredParameter->type != syrec::Variable::Types::In;
         });
 
+    closeActiveSymbolTableScope();
     const auto doesModulePerformAssignmentToAnyModifiableParameterOrLocal = isAnyModifiableParameterOrLocalModifiedInModuleBody(*copyOfModule);
 
     if ((wereAnyStatementsOptimizedAway && !doesOptimizedModuleBodyContainAnyStatement) 
@@ -179,8 +186,8 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         performAssignment(*evaluatedAssignedToSignal, *mappedToAssignmentOperationFromFlag, *rhsOperandEvaluatedAsConstant);
     }
 
-    if (!skipCheckForSplitOfAssignmentInSubAssignments) {
-        const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::MainAdditionalLineForAssignmentSimplifier>(symbolTable, nullptr, nullptr);
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); !skipCheckForSplitOfAssignmentInSubAssignments && activeSymbolTableScope.has_value()) {
+        const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::MainAdditionalLineForAssignmentSimplifier>(*activeSymbolTableScope, nullptr, nullptr);
         const auto assignmentStmtToSimplify = assignedToSignalPartsAfterSimplification != assignmentStmt.lhs || rhsExprAfterSimplification != assignmentStmt.rhs
             ? std::make_unique<syrec::AssignStatement>(assignedToSignalPartsAfterSimplification, assignmentStmt.op, rhsExprAfterSimplification)
             : std::make_shared<syrec::AssignStatement>(assignmentStmt);
@@ -211,16 +218,18 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 // TODO: Should the semantic checks that we assume to be already done in the parser be repeated again, i.e. does a matching module exist, etc.
 // TODO: Since we have optimized the call statement, we also need to optimize the corresponding uncall statement
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleCallStmt(const syrec::CallStatement& callStatement) const {
-    if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(symbolTable, callStatement.target->name); moduleCallGuessResolver.has_value()) {
+    const auto& symbolTableScope = getActiveSymbolTableScope();
+    if (!symbolTableScope.has_value()) {
+        return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
+    }
+
+    if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(*symbolTableScope, callStatement.target->name); moduleCallGuessResolver.has_value()) {
         const auto moduleIdsOfInitialGuess = moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess();
 
-        bool                              callerArgumentsOk = true;
-        std::vector<syrec::Variable::ptr> symbolTableEntryForCallerArguments(callStatement.parameters.size());
-        for (std::size_t i = 0; i < symbolTableEntryForCallerArguments.size(); ++i) {
-            if (const auto& symbolTableEntryForCallerArgument = symbolTable->getVariable(callStatement.parameters.at(i)); symbolTableEntryForCallerArgument.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument)) {
-                const auto matchingSignalForCallerArgument = std::get<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument);
-                symbolTableEntryForCallerArguments.emplace_back(matchingSignalForCallerArgument);
-                moduleCallGuessResolver->get()->refineGuessWithNextParameter(*matchingSignalForCallerArgument);
+        bool callerArgumentsOk = true;
+        for (std::size_t i = 0; i < callStatement.parameters.size(); ++i) {
+            if (const auto& symbolTableEntryForCallerArgument = getSymbolTableEntryForVariable(callStatement.parameters.at(i)); symbolTableEntryForCallerArgument.has_value()) {
+                moduleCallGuessResolver->get()->refineGuessWithNextParameter(**symbolTableEntryForCallerArgument);
                 callerArgumentsOk &= true;
             }
         }
@@ -232,12 +241,12 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
              */
             const auto modulesMatchingCallSignature = moduleCallGuessResolver->get()->getMatchesForGuess();
             if (modulesMatchingCallSignature.empty() || modulesMatchingCallSignature.size() > 1) {
-                for (const auto& callerArgument : symbolTableEntryForCallerArguments) {
-                    invalidateValueOfWholeSignal(callerArgument->name);
+                for (const auto& callerArgumentSignalIdent : callStatement.parameters) {
+                    invalidateValueOfWholeSignal(callerArgumentSignalIdent);
                 }
-                symbolTable->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), parser::SymbolTable::ReferenceCountUpdate::Increment);
+                symbolTableScope->get()->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), parser::SymbolTable::ReferenceCountUpdate::Increment);
             } else {
-                if (const auto& signatureOfCalledModule = symbolTable->tryGetOptimizedSignatureForModuleCall(callStatement.target->name, callStatement.parameters); signatureOfCalledModule.has_value()) {
+                if (const auto& signatureOfCalledModule = symbolTableScope->get()->tryGetOptimizedSignatureForModuleCall(callStatement.target->name, callStatement.parameters); signatureOfCalledModule.has_value()) {
                     std::vector<std::string>        callerArgumentsForOptimizedModuleCall;
                     std::unordered_set<std::size_t> indicesOfRemainingParameters;
                     if (const auto& optimizedModuleSignature = signatureOfCalledModule->determineOptimizedCallSignature(&indicesOfRemainingParameters); !optimizedModuleSignature.empty()) {
@@ -257,7 +266,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
                     if (indicesOfRemainingParameters.empty()) {
                         return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
                     }
-                    symbolTable->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, {signatureOfCalledModule->internalModuleId}, parser::SymbolTable::ReferenceCountUpdate::Increment);
+                    symbolTableScope->get()->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, {signatureOfCalledModule->internalModuleId}, parser::SymbolTable::ReferenceCountUpdate::Increment);
                     if (indicesOfRemainingParameters.size() == signatureOfCalledModule->declaredParameters.size()) {
                         return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
                     }
@@ -271,7 +280,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
              * and thus our guesses are not further refined (based only on the data of the valid callee arguments and the number of actually defined parameters).
              * TODO: Check whether this branch is required
              */
-            symbolTable->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), parser::SymbolTable::ReferenceCountUpdate::Increment);
+            symbolTableScope->get()->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), parser::SymbolTable::ReferenceCountUpdate::Increment);
         }
 
         /*
@@ -286,20 +295,24 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleUncallStmt(const syrec::UncallStatement& uncallStatement) const {
+    const auto& symbolTableScope = getActiveSymbolTableScope();
+    if (!symbolTableScope.has_value()) {
+        return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
+    }
+
     /*
      * Similarly to the handling of the guard expression in the if-statement, we do not update the reference counts of neither the caller arguments nor the called module.
      * This also holds if the assumed precondition, all ambiguities regarding the call are resolved (i.e. the given arguments are all defined and refer to exactly one module), does not hold.
      */
-    if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(symbolTable, uncallStatement.target->name); moduleCallGuessResolver.has_value()) {
+    if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(*symbolTableScope, uncallStatement.target->name); moduleCallGuessResolver.has_value()) {
         const auto moduleIdsOfInitialGuess = moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess();
 
         bool                              callerArgumentsOk = true;
         std::vector<syrec::Variable::ptr> symbolTableEntryForCalleeArguments(uncallStatement.parameters.size());
         for (std::size_t i = 0; i < symbolTableEntryForCalleeArguments.size(); ++i) {
-            if (const auto& symbolTableEntryForCallerArgument = symbolTable->getVariable(uncallStatement.parameters.at(i)); symbolTableEntryForCallerArgument.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument)) {
-                const auto matchingSignalForCallerArgument = std::get<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument);
-                symbolTableEntryForCalleeArguments.emplace_back(matchingSignalForCallerArgument);
-                moduleCallGuessResolver->get()->refineGuessWithNextParameter(*matchingSignalForCallerArgument);
+            if (const auto& symbolTableEntryForCallerArgument = getSymbolTableEntryForVariable(uncallStatement.parameters.at(i)); symbolTableEntryForCallerArgument.has_value()) {
+                symbolTableEntryForCalleeArguments.emplace_back(*symbolTableEntryForCallerArgument);
+                moduleCallGuessResolver->get()->refineGuessWithNextParameter(**symbolTableEntryForCallerArgument);
                 callerArgumentsOk &= true;
             }
         }
@@ -307,7 +320,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         if (callerArgumentsOk) {
             const auto modulesMatchingCallSignature = moduleCallGuessResolver->get()->getMatchesForGuess();
             if (modulesMatchingCallSignature.size() == 1) {
-                if (const auto& signatureOfCalledModule = symbolTable->tryGetOptimizedSignatureForModuleCall(uncallStatement.target->name, uncallStatement.parameters); signatureOfCalledModule.has_value()) {
+                if (const auto& signatureOfCalledModule = symbolTableScope->get()->tryGetOptimizedSignatureForModuleCall(uncallStatement.target->name, uncallStatement.parameters); signatureOfCalledModule.has_value()) {
                     std::vector<std::string>        callerArgumentsForOptimizedModuleCall;
                     std::unordered_set<std::size_t> indicesOfRemainingParameters;
                     if (const auto& optimizedModuleSignature = signatureOfCalledModule->determineOptimizedCallSignature(&indicesOfRemainingParameters); !optimizedModuleSignature.empty()) {
@@ -661,9 +674,11 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
     }
 
     std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
-    if (auto simplificationResultOfExpr = trySimplifyExpr(*simplifiedBinaryExpr, *symbolTable, parserConfig.reassociateExpressionsEnabled, parserConfig.operationStrengthReductionEnabled, &optimizedAwaySignalAccesses); simplificationResultOfExpr != nullptr) {
-        simplifiedBinaryExpr = std::move(simplificationResultOfExpr);
-        wasOriginalExprModified = true;
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        if (auto simplificationResultOfExpr = trySimplifyExpr(*simplifiedBinaryExpr, **activeSymbolTableScope, parserConfig.reassociateExpressionsEnabled, parserConfig.operationStrengthReductionEnabled, &optimizedAwaySignalAccesses); simplificationResultOfExpr != nullptr) {
+            simplifiedBinaryExpr    = std::move(simplificationResultOfExpr);
+            wasOriginalExprModified = true;
+        }   
     }
 
     for (const auto& optimizedAwaySignalAccess : optimizedAwaySignalAccesses) {
@@ -743,24 +758,30 @@ optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optim
         return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
     if (number.isLoopVariable()) {
-        if (const auto& fetchedValueOfLoopVariable = symbolTable->tryFetchValueOfLoopVariable(number.variableName()); parserConfig.performConstantPropagation && fetchedValueOfLoopVariable.has_value()) {
-            updateReferenceCountOf(number.variableName(), parser::SymbolTable::ReferenceCountUpdate::Decrement);
-            return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::make_unique<syrec::Number>(*fetchedValueOfLoopVariable));   
+        if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value() && parserConfig.performConstantPropagation) {
+            if (const auto& fetchedValueOfLoopVariable = activeSymbolTableScope->get()->tryFetchValueOfLoopVariable(number.variableName()); fetchedValueOfLoopVariable.has_value()) {
+                updateReferenceCountOf(number.variableName(), parser::SymbolTable::ReferenceCountUpdate::Decrement);
+                return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::make_unique<syrec::Number>(*fetchedValueOfLoopVariable));   
+            }
         }
+
         updateReferenceCountOf(number.variableName(), parser::SymbolTable::ReferenceCountUpdate::Increment);
         return OptimizationResult<syrec::Number>::asUnchangedOriginal();
     }
     if (number.isCompileTimeConstantExpression()) {
-        if (auto simplificationResult = trySimplifyNumber(number, *symbolTable, parserConfig.reassociateExpressionsEnabled, parserConfig.operationStrengthReductionEnabled, nullptr); simplificationResult.has_value()) {
-            if (std::holds_alternative<unsigned int>(*simplificationResult)) {
-                return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::make_unique<syrec::Number>(std::get<unsigned int>(*simplificationResult)));
-            }
-            if (std::holds_alternative<std::unique_ptr<syrec::Number>>(*simplificationResult)) {
-                auto containerForSimplifiedNumber = std::move(std::get<std::unique_ptr<syrec::Number>>(*simplificationResult));
-                updateReferenceCountsOfSignalIdentsUsedIn(*containerForSimplifiedNumber, parser::SymbolTable::ReferenceCountUpdate::Increment);
-                return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::move(containerForSimplifiedNumber));
-            }
+        if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+            if (auto simplificationResult = trySimplifyNumber(number, **activeSymbolTableScope, parserConfig.reassociateExpressionsEnabled, parserConfig.operationStrengthReductionEnabled, nullptr); simplificationResult.has_value()) {
+                if (std::holds_alternative<unsigned int>(*simplificationResult)) {
+                    return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::make_unique<syrec::Number>(std::get<unsigned int>(*simplificationResult)));
+                }
+                if (std::holds_alternative<std::unique_ptr<syrec::Number>>(*simplificationResult)) {
+                    auto containerForSimplifiedNumber = std::move(std::get<std::unique_ptr<syrec::Number>>(*simplificationResult));
+                    updateReferenceCountsOfSignalIdentsUsedIn(*containerForSimplifiedNumber, parser::SymbolTable::ReferenceCountUpdate::Increment);
+                    return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::move(containerForSimplifiedNumber));
+                }
+            }    
         }
+        
     }
     updateReferenceCountsOfSignalIdentsUsedIn(number, parser::SymbolTable::ReferenceCountUpdate::Increment);
     return OptimizationResult<syrec::Number>::asUnchangedOriginal();
@@ -955,7 +976,9 @@ std::optional<syrec::Number::CompileTimeConstantExpression::Operation> optimizat
 }
 
 void optimizations::Optimizer::updateReferenceCountOf(const std::string_view& signalIdent, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const {
-    symbolTable->updateReferenceCountOfLiteral(signalIdent, typeOfUpdate);
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        activeSymbolTableScope->get()->updateReferenceCountOfLiteral(signalIdent, typeOfUpdate);
+    }
 }
 
 std::optional<unsigned> optimizations::Optimizer::tryFetchValueForAccessedSignal(const syrec::VariableAccess& accessedSignal) const {
@@ -974,7 +997,7 @@ optimizations::Optimizer::DimensionAccessEvaluationResult optimizations::Optimiz
         return DimensionAccessEvaluationResult({false, std::vector<SignalAccessIndexEvaluationResult<syrec::expression>>()});
     }
 
-    const auto& signalData = std::get<syrec::Variable::ptr>(*symbolTable->getVariable(accessedSignalIdent));
+    const auto& signalData = *getSymbolTableEntryForVariable(accessedSignalIdent);
     const auto wasUserDefinedAccessTrimmed = accessedValuePerDimension.size() > signalData->dimensions.size();
     const auto numEntriesToTransform       = wasUserDefinedAccessTrimmed ? signalData->dimensions.size() : accessedValuePerDimension.size();
     
@@ -1010,8 +1033,8 @@ std::optional<unsigned> optimizations::Optimizer::tryEvaluateNumberAsConstant(co
 }
 
 std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations::Optimizer::evaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const {
-    const auto& signalData = std::get<syrec::Variable::ptr>(*symbolTable->getVariable(accessedSignalIdent));
-    if (!accessedBitRange.has_value()) {
+    const auto& signalData = getSymbolTableEntryForVariable(accessedSignalIdent);
+    if (!signalData.has_value() || !accessedBitRange.has_value()) {
         return std::nullopt;
     }
     
@@ -1020,11 +1043,11 @@ std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations:
 
     auto bitRangeStartEvaluationStatus = IndexValidityStatus::Unknown;
     if (bitRangeStartEvaluated.has_value()) {
-        bitRangeStartEvaluationStatus = parser::isValidBitAccess(signalData, *bitRangeStartEvaluated) ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange;
+        bitRangeStartEvaluationStatus = parser::isValidBitAccess(*signalData, *bitRangeStartEvaluated) ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange;
     }
     auto bitRangeEndEvaluationStatus = IndexValidityStatus::Unknown;
     if (bitRangeEndEvaluated.has_value()) {
-        bitRangeEndEvaluationStatus = parser::isValidBitAccess(signalData, *bitRangeEndEvaluated) ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange;
+        bitRangeEndEvaluationStatus = parser::isValidBitAccess(*signalData, *bitRangeEndEvaluated) ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange;
     }
 
     auto rangeStartEvaluationResult = bitRangeStartEvaluationStatus == IndexValidityStatus::Unknown
@@ -1065,6 +1088,46 @@ void optimizations::Optimizer::updateReferenceCountsOfSignalIdentsUsedIn(const s
     }
 }
 
+std::optional<syrec::Variable::ptr> optimizations::Optimizer::getSymbolTableEntryForVariable(const std::string_view& signalLiteralIdent) const {
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        if (const auto& matchingSymbolTableEntryForIdent = activeSymbolTableScope->get()->getVariable(signalLiteralIdent); matchingSymbolTableEntryForIdent.has_value() && std::holds_alternative<syrec::Variable::ptr>(*matchingSymbolTableEntryForIdent)) {
+            return std::get<syrec::Variable::ptr>(*matchingSymbolTableEntryForIdent);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<syrec::Number::ptr> optimizations::Optimizer::getSymbolTableEntryForLoopVariable(const std::string_view& loopVariableIdent) const {
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        if (const auto& matchingSymbolTableEntryForIdent = activeSymbolTableScope->get()->getVariable(loopVariableIdent); matchingSymbolTableEntryForIdent.has_value() && std::holds_alternative<syrec::Number::ptr>(*matchingSymbolTableEntryForIdent)) {
+            return std::get<syrec::Number::ptr>(*matchingSymbolTableEntryForIdent);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<parser::SymbolTable::ptr> optimizations::Optimizer::getActiveSymbolTableScope() const {
+    return stackOfSymbolTableScopes.empty() ? std::nullopt : std::make_optional(stackOfSymbolTableScopes.top());
+}
+
+void optimizations::Optimizer::openNewSymbolTableScope() {
+    const auto& newSymbolTableScope = std::make_shared<parser::SymbolTable>();
+    if (stackOfSymbolTableScopes.empty()) {
+        stackOfSymbolTableScopes.push(newSymbolTableScope);
+        return;
+    }
+    parser::SymbolTable::openScope(stackOfSymbolTableScopes.top());
+}
+
+void optimizations::Optimizer::closeActiveSymbolTableScope() {
+    if (stackOfSymbolTableScopes.empty()) {
+        return;
+    }
+    stackOfSymbolTableScopes.pop();
+}
+
+
+
 std::unique_ptr<syrec::BinaryExpression> optimizations::Optimizer::createBinaryExprFromCompileTimeConstantExpr(const syrec::Number& number) {
     return nullptr;
 }
@@ -1103,7 +1166,7 @@ void optimizations::Optimizer::addSignalIdentToLookup(const std::string_view& si
 
 // TODO: Conversion from smart pointers to reference wrappers for dimension as well as bit range access
 std::optional<optimizations::Optimizer::EvaluatedSignalAccess> optimizations::Optimizer::tryEvaluateDefinedSignalAccess(const syrec::VariableAccess& accessedSignalParts) const {
-    if (const auto& symbolTableEntryForAccessedSignal = symbolTable->getVariable(accessedSignalParts.var->name); symbolTableEntryForAccessedSignal.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForAccessedSignal)) {
+    if (const auto& symbolTableEntryForAccessedSignal = getSymbolTableEntryForVariable(accessedSignalParts.var->name); symbolTableEntryForAccessedSignal.has_value()) {
         const std::string_view& accessedSignalIdent = accessedSignalParts.var->name;
 
         std::vector<std::reference_wrapper<const syrec::expression>> accessedValueOfDimensionWithoutOwnership;
@@ -1126,7 +1189,7 @@ std::optional<optimizations::Optimizer::EvaluatedSignalAccess> optimizations::Op
 }
 
 std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvaluatedSignalAccess(EvaluatedSignalAccess& evaluatedSignalAccess, std::optional<bool>* wasAnyDefinedIndexOutOfRange, bool* didAllDefinedIndicesEvaluateToConstants) const {
-    if (const auto& matchingSymbolTableEntryForIdent = symbolTable->getVariable(evaluatedSignalAccess.accessedSignalIdent); matchingSymbolTableEntryForIdent.has_value() && std::holds_alternative<syrec::Variable::ptr>(*matchingSymbolTableEntryForIdent)) {
+    if (const auto& matchingSymbolTableEntryForIdent = getSymbolTableEntryForVariable(evaluatedSignalAccess.accessedSignalIdent); matchingSymbolTableEntryForIdent.has_value()) {
         std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> definedBitRangeAccess;
         std::vector<syrec::expression::ptr>                              definedDimensionAccess(evaluatedSignalAccess.accessedValuePerDimension.valuePerDimension.size(), nullptr);
 
@@ -1164,8 +1227,8 @@ std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvalua
             definedDimensionAccess.emplace_back(*tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(evaluatedValueOfDimension));
         }
 
-        auto transformedToSignalAccess = std::make_unique<syrec::VariableAccess>();
-        transformedToSignalAccess->var = std::get<syrec::Variable::ptr>(*matchingSymbolTableEntryForIdent);
+        auto transformedToSignalAccess     = std::make_unique<syrec::VariableAccess>();
+        transformedToSignalAccess->var     = *matchingSymbolTableEntryForIdent;
         transformedToSignalAccess->indexes = definedDimensionAccess;
         transformedToSignalAccess->range   = definedBitRangeAccess;
         return transformedToSignalAccess;
@@ -1184,9 +1247,9 @@ void optimizations::Optimizer::invalidateValueOfAccessedSignalParts(EvaluatedSig
 }
 
 void optimizations::Optimizer::invalidateValueOfWholeSignal(const std::string_view& signalIdent) const {
-    if (const auto& matchingSymbolTableEntry = symbolTable->getVariable(signalIdent); matchingSymbolTableEntry.has_value() && std::holds_alternative<syrec::Variable::ptr>(*matchingSymbolTableEntry)) {
+    if (const auto& matchingSymbolTableEntry = getSymbolTableEntryForVariable(signalIdent); matchingSymbolTableEntry.has_value()) {
         const auto& sharedTransformedSignalAccess = std::make_shared<syrec::VariableAccess>();
-        sharedTransformedSignalAccess->var        = std::get<syrec::Variable::ptr>(*matchingSymbolTableEntry);
+        sharedTransformedSignalAccess->var        = *matchingSymbolTableEntry;
         invalidateStoredValueFor(sharedTransformedSignalAccess);
     }
 }
@@ -1252,30 +1315,37 @@ void optimizations::Optimizer::performSwap(EvaluatedSignalAccess& swapOperationL
 }
 
 void optimizations::Optimizer::updateStoredValueOf(const syrec::VariableAccess::ptr& assignedToSignal, unsigned int newValueOfAssignedToSignal) const {
-    createBackupOfAssignedToSignal(*assignedToSignal);
-    symbolTable->updateStoredValueFor(assignedToSignal, newValueOfAssignedToSignal);
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        createBackupOfAssignedToSignal(*assignedToSignal);
+        activeSymbolTableScope->get()->updateStoredValueFor(assignedToSignal, newValueOfAssignedToSignal);   
+    }
 }
 
 void optimizations::Optimizer::invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignal) const {
-    createBackupOfAssignedToSignal(*assignedToSignal);
-    symbolTable->invalidateStoredValuesFor(assignedToSignal);
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        createBackupOfAssignedToSignal(*assignedToSignal);
+        activeSymbolTableScope->get()->invalidateStoredValuesFor(assignedToSignal);
+    }
 }
 
 void optimizations::Optimizer::performSwapAndCreateBackupOfOperands(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const {
-    createBackupOfAssignedToSignal(*swapLhsOperand);
-    createBackupOfAssignedToSignal(*swapRhsOperand);
-    symbolTable->swap(swapLhsOperand, swapRhsOperand);
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        createBackupOfAssignedToSignal(*swapLhsOperand);
+        createBackupOfAssignedToSignal(*swapRhsOperand);
+        activeSymbolTableScope->get()->swap(swapLhsOperand, swapRhsOperand);
+    }
 }
 
 std::optional<unsigned> optimizations::Optimizer::tryFetchValueFromEvaluatedSignalAccess(EvaluatedSignalAccess& accessedSignalParts) const {
-    std::optional<bool> areAnyComponentsOfAssignedToSignalAccessOutOfRange;
-    bool                didAllDefinedIndicesEvaluateToConstants;
-    if (auto transformedSignalAccess = transformEvaluatedSignalAccess(accessedSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &didAllDefinedIndicesEvaluateToConstants); transformedSignalAccess != nullptr) {
-        if (!areAnyComponentsOfAssignedToSignalAccessOutOfRange.has_value() && !*areAnyComponentsOfAssignedToSignalAccessOutOfRange && didAllDefinedIndicesEvaluateToConstants 
-            && !activeDataFlowValuePropagationRestrictions->isAccessBlockedFor(*transformedSignalAccess)) {
-            const std::shared_ptr<syrec::VariableAccess> sharedTransformedSignalAccess = std::move(transformedSignalAccess);
-            return symbolTable->tryFetchValueForLiteral(sharedTransformedSignalAccess);
-        }
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        std::optional<bool> areAnyComponentsOfAssignedToSignalAccessOutOfRange;
+        bool                didAllDefinedIndicesEvaluateToConstants;
+        if (auto transformedSignalAccess = transformEvaluatedSignalAccess(accessedSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &didAllDefinedIndicesEvaluateToConstants); transformedSignalAccess != nullptr) {
+            if (!areAnyComponentsOfAssignedToSignalAccessOutOfRange.has_value() && !*areAnyComponentsOfAssignedToSignalAccessOutOfRange && didAllDefinedIndicesEvaluateToConstants && !activeDataFlowValuePropagationRestrictions->isAccessBlockedFor(*transformedSignalAccess)) {
+                const std::shared_ptr<syrec::VariableAccess> sharedTransformedSignalAccess = std::move(transformedSignalAccess);
+                return activeSymbolTableScope->get()->tryFetchValueForLiteral(sharedTransformedSignalAccess);
+            }
+        }        
     }
     return std::nullopt;
 }
@@ -1380,28 +1450,41 @@ void optimizations::Optimizer::discardChangesMadeInCurrentSymbolTableBackupScope
     if (symbolTableBackupScopeStack.empty()) {
         return;
     }
-    for (const auto& [signalIdent, valueAndRestrictionBackup]: symbolTableBackupScopeStack.top()->getBackedUpEntries()) {
-        symbolTable->restoreValuesFromBackup(signalIdent, valueAndRestrictionBackup);
+
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        for (const auto& [signalIdent, valueAndRestrictionBackup]: symbolTableBackupScopeStack.top()->getBackedUpEntries()) {
+            activeSymbolTableScope->get()->restoreValuesFromBackup(signalIdent, valueAndRestrictionBackup);
+        }   
     }
 }
 
 void optimizations::Optimizer::mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupContainingOriginalSignalValues, const parser::SymbolTableBackupHelper& backupOfSignalValuesAfterFirstScope) const {
-    const auto& modifiedSignalInFirstScope   = backupContainingOriginalSignalValues.getIdentsOfChangedSignals();
-    const auto& modifiedSignalsInSecondScope = backupOfSignalValuesAfterFirstScope.getIdentsOfChangedSignals();
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        const auto& modifiedSignalsInFirstScope  = backupContainingOriginalSignalValues.getIdentsOfChangedSignals();
+        const auto& modifiedSignalsInSecondScope = backupOfSignalValuesAfterFirstScope.getIdentsOfChangedSignals();
 
-    std::unordered_set<std::string> setOfSignalsRequiringMergeOfChanges;
-    std::set_intersection(
-            modifiedSignalInFirstScope.cbegin(), modifiedSignalInFirstScope.cend(),
-            modifiedSignalsInSecondScope.cbegin(), modifiedSignalsInSecondScope.cend(),
-            std::inserter(setOfSignalsRequiringMergeOfChanges, setOfSignalsRequiringMergeOfChanges.begin()));
+        std::unordered_set<std::string> setOfSignalsRequiringMergeOfChanges;
+        for (const auto& modifiedSignalInFirstScope: modifiedSignalsInFirstScope) {
+            if (modifiedSignalsInSecondScope.count(modifiedSignalInFirstScope)) {
+                setOfSignalsRequiringMergeOfChanges.emplace(modifiedSignalInFirstScope);
+            }
+        }
+        if (modifiedSignalsInFirstScope.size() != modifiedSignalsInSecondScope.size()) {
+            for (const auto& modifiedSignalInSecondScope: modifiedSignalsInSecondScope) {
+                if (modifiedSignalsInFirstScope.count(modifiedSignalInSecondScope)) {
+                    setOfSignalsRequiringMergeOfChanges.emplace(modifiedSignalInSecondScope);
+                }
+            }
+        }
 
-    for (const auto& signalRequiringMergeOfChanges : setOfSignalsRequiringMergeOfChanges) {
-        const auto& initialValueAtStartOfFirstScope        = *backupContainingOriginalSignalValues.getBackedUpEntryFor(signalRequiringMergeOfChanges);
-        const auto& currentValueOfSignalAtEndOfFirstScope  = *backupOfSignalValuesAfterFirstScope.getBackedUpEntryFor(signalRequiringMergeOfChanges);
-        const auto& currentValueOfSignalAtEndOfSecondScope = *symbolTable->createBackupOfValueOfSignal(signalRequiringMergeOfChanges);
+        for (const auto& signalRequiringMergeOfChanges: setOfSignalsRequiringMergeOfChanges) {
+            const auto& initialValueAtStartOfFirstScope        = *backupContainingOriginalSignalValues.getBackedUpEntryFor(signalRequiringMergeOfChanges);
+            const auto& currentValueOfSignalAtEndOfFirstScope  = *backupOfSignalValuesAfterFirstScope.getBackedUpEntryFor(signalRequiringMergeOfChanges);
+            const auto& currentValueOfSignalAtEndOfSecondScope = *activeSymbolTableScope->get()->createBackupOfValueOfSignal(signalRequiringMergeOfChanges);
 
-        initialValueAtStartOfFirstScope->copyRestrictionsAndMergeValuesFromAlternatives(currentValueOfSignalAtEndOfFirstScope, currentValueOfSignalAtEndOfSecondScope);
-        symbolTable->restoreValuesFromBackup(signalRequiringMergeOfChanges, initialValueAtStartOfFirstScope);
+            initialValueAtStartOfFirstScope->copyRestrictionsAndMergeValuesFromAlternatives(currentValueOfSignalAtEndOfFirstScope, currentValueOfSignalAtEndOfSecondScope);
+            activeSymbolTableScope->get()->restoreValuesFromBackup(signalRequiringMergeOfChanges, initialValueAtStartOfFirstScope);
+        }    
     }
 }
 
@@ -1418,8 +1501,10 @@ void optimizations::Optimizer::createBackupOfAssignedToSignal(const syrec::Varia
         return;
     }
 
-    if (const auto& backupOfAssignedToSignal = symbolTable->createBackupOfValueOfSignal(assignedToSignalIdent); backupOfAssignedToSignal.has_value()) {
-        symbolTableBackupScopeStack.top()->storeBackupOf(std::string(assignedToSignalIdent), *backupOfAssignedToSignal);
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        if (const auto& backupOfAssignedToSignal = activeSymbolTableScope->get()->createBackupOfValueOfSignal(assignedToSignalIdent); backupOfAssignedToSignal.has_value()) {
+            symbolTableBackupScopeStack.top()->storeBackupOf(std::string(assignedToSignalIdent), *backupOfAssignedToSignal);
+        }        
     }
 }
 
@@ -1472,14 +1557,15 @@ void optimizations::Optimizer::updateValueOfLoopVariable(const std::string_view&
         return;
     }
 
-    if (!symbolTable->contains(loopVariableIdent)) {
-        symbolTable->addEntry(syrec::Number({std::string(loopVariableIdent)}), BitHelpers::getRequiredBitsToStoreValue(*value), value);
-    }
-    else {
-        if (!value.has_value()) {
-            symbolTable->invalidateStoredValueForLoopVariable(loopVariableIdent);
-        }
-        symbolTable->updateStoredValueForLoopVariable(loopVariableIdent, *value);        
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        if (!activeSymbolTableScope->get()->contains(loopVariableIdent)) {
+            activeSymbolTableScope->get()->addEntry(syrec::Number({std::string(loopVariableIdent)}), BitHelpers::getRequiredBitsToStoreValue(*value), value);
+        } else {
+            if (!value.has_value()) {
+                activeSymbolTableScope->get()->invalidateStoredValueForLoopVariable(loopVariableIdent);
+            }
+            activeSymbolTableScope->get()->updateStoredValueForLoopVariable(loopVariableIdent, *value);
+        }    
     }
 }
 
@@ -1487,7 +1573,10 @@ void optimizations::Optimizer::removeLoopVariableFromSymbolTable(const std::stri
     if (loopVariableIdent.empty()) {
         return;
     }
-    symbolTable->removeVariable(std::string(loopVariableIdent));
+
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+        activeSymbolTableScope->get()->removeVariable(std::string(loopVariableIdent));   
+    }
 }
 
 bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInModuleBody(const syrec::Module& module) const {
@@ -1495,16 +1584,16 @@ bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInModuleBo
         return false;
     }
 
-    std::map<std::string, std::reference_wrapper<const syrec::Variable>> lookupOfModifiableParametersAndLocals;
+    std::unordered_set<std::string> lookupOfModifiableParametersAndLocals;
     for (const auto& moduleParameter : module.parameters) {
         if (isVariableReadOnly(*moduleParameter) && lookupOfModifiableParametersAndLocals.count(moduleParameter->name) == 0) {
-            lookupOfModifiableParametersAndLocals.insert(std::make_pair(moduleParameter->name, *moduleParameter));
+            lookupOfModifiableParametersAndLocals.insert(moduleParameter->name);
         }
     }
 
     for (const auto& moduleLocalVariable: module.variables) {
         if (isVariableReadOnly(*moduleLocalVariable) && lookupOfModifiableParametersAndLocals.count(moduleLocalVariable->name) == 0) {
-            lookupOfModifiableParametersAndLocals.insert(std::make_pair(moduleLocalVariable->name, *moduleLocalVariable));
+            lookupOfModifiableParametersAndLocals.insert(moduleLocalVariable->name);
         }
     }
 
@@ -1518,7 +1607,7 @@ bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInModuleBo
 }
 
 // TODO: Swap with lhs and rhs operand being equal does not count as a signal modification
-bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::map<std::string, std::reference_wrapper<const syrec::Variable>>& parameterAndLocalLookup) const {
+bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::unordered_set<std::string>& parameterAndLocalLookup) const {
     if (const auto& stmtAsLoopStatement = dynamic_cast<const syrec::ForStatement*>(&statement); stmtAsLoopStatement != nullptr) {
         const auto& iterationRangeStartEvaluated = tryEvaluateNumberAsConstant(*stmtAsLoopStatement->range.first);
         const auto& iterationRangEndEvaluated    = tryEvaluateNumberAsConstant(*stmtAsLoopStatement->range.second);
@@ -1549,23 +1638,25 @@ bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInStatemen
         return parameterAndLocalLookup.count(stmtAsSwapStmt->lhs->var->name) != 0 || parameterAndLocalLookup.count(stmtAsSwapStmt->rhs->var->name);
     }
     if (const auto& stmtAsCallStmt = dynamic_cast<const syrec::CallStatement*>(&statement); stmtAsCallStmt != nullptr) {
-        if (const auto& matchingSymbolTableEntryForModule = symbolTable->tryGetOptimizedSignatureForModuleCall(stmtAsCallStmt->target->name, stmtAsCallStmt->parameters); matchingSymbolTableEntryForModule.has_value()) {
-            std::unordered_set<std::size_t> indicesOfRemainingParameters;
-            matchingSymbolTableEntryForModule->determineOptimizedCallSignature(&indicesOfRemainingParameters);
-            return std::any_of(
-                    indicesOfRemainingParameters.cbegin(),
-                    indicesOfRemainingParameters.cend(),
-                    [&parameterAndLocalLookup, &matchingSymbolTableEntryForModule, &stmtAsCallStmt](const std::size_t remainingParameterIndex) {
-                        const auto& formalParameter      = matchingSymbolTableEntryForModule->declaredParameters.at(remainingParameterIndex);
-                        const auto& actualParameterIdent = stmtAsCallStmt->parameters.at(remainingParameterIndex);
-                        return isVariableReadOnly(*formalParameter) && parameterAndLocalLookup.count(actualParameterIdent) != 0;
-                    });
+        if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+            if (const auto& matchingSymbolTableEntryForModule = activeSymbolTableScope->get()->tryGetOptimizedSignatureForModuleCall(stmtAsCallStmt->target->name, stmtAsCallStmt->parameters); matchingSymbolTableEntryForModule.has_value()) {
+                std::unordered_set<std::size_t> indicesOfRemainingParameters;
+                matchingSymbolTableEntryForModule->determineOptimizedCallSignature(&indicesOfRemainingParameters);
+                return std::any_of(
+                        indicesOfRemainingParameters.cbegin(),
+                        indicesOfRemainingParameters.cend(),
+                        [&parameterAndLocalLookup, &matchingSymbolTableEntryForModule, &stmtAsCallStmt](const std::size_t remainingParameterIndex) {
+                            const auto& formalParameter      = matchingSymbolTableEntryForModule->declaredParameters.at(remainingParameterIndex);
+                            const auto& actualParameterIdent = stmtAsCallStmt->parameters.at(remainingParameterIndex);
+                            return isVariableReadOnly(*formalParameter) && parameterAndLocalLookup.count(actualParameterIdent) != 0;
+                        });
+            }    
         }
     }
     return false;
 }
 
-bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements, const std::map<std::string, std::reference_wrapper<const syrec::Variable>>& parameterAndLocalLookup) const {
+bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements, const std::unordered_set<std::string>& parameterAndLocalLookup) const {
     return std::any_of(statements.cbegin(), statements.cend(), [&](const syrec::Statement& statement) {
         return isAnyModifiableParameterOrLocalModifiedInStatement(statement, parameterAndLocalLookup);
     });
