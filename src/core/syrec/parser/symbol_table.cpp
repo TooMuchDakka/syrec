@@ -414,31 +414,25 @@ SymbolTable::VariableSymbolTableEntry* SymbolTable::getEntryForVariable(const st
     return nullptr;
 }
 
-bool SymbolTable::doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const {
-    const auto isAssignedToVariableLoopVariable = std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation);
-    if (isAssignedToVariableLoopVariable && (variableAccess->range.has_value() || !variableAccess->indexes.empty())) {
-        return false;
+bool               SymbolTable::doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const {
+    if (std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation)) {
+        return !variableAccess->range.has_value() && (variableAccess->indexes.empty() || variableAccess->indexes.size() == 1);
     }
 
+    const auto& declaredDimensionsOfSignal    = std::get<syrec::Variable::ptr>(symbolTableEntryForVariable->variableInformation)->dimensions;
     if (!variableAccess->indexes.empty()) {
-        if (std::any_of(
-                    variableAccess->indexes.cbegin(),
-                    variableAccess->indexes.cend(),
-                    [](const syrec::expression::ptr& accessedValueOfDimensionExpr) {
-                        if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr != nullptr) {
-                            return !numericExpr->value->isConstant();
-                        }
-                        return true;
-                    })) {
-            return false;
-        }
-    } else {
-        if (variableAccess->var->dimensions.size() > 1 || variableAccess->var->dimensions.front() > 1) {
-            return false;
-        }
+        return declaredDimensionsOfSignal.size() == variableAccess->indexes.size()
+            && std::none_of(
+                variableAccess->indexes.cbegin(),
+                variableAccess->indexes.cend(),
+                [](const syrec::expression::ptr& accessedValueOfDimensionExpr) {
+                    if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr != nullptr) {
+                        return !numericExpr->value->isConstant();
+                    }
+                    return true;
+        });
     }
-
-    return true;
+    return declaredDimensionsOfSignal.size() == 1 && declaredDimensionsOfSignal.front() == 1;
 }
 
 std::optional<SymbolTable::DeclaredModuleSignature> SymbolTable::tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, std::size_t& internalModuleId) const {

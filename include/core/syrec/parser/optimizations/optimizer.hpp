@@ -65,8 +65,10 @@ namespace optimizations {
             OptimizationResult(OptimizationResultFlag resultFlag, std::unique_ptr<ToBeOptimizedContainerType> optimizationResult):
                 status(resultFlag) {
                 if (optimizationResult) {
-                    result->reserve(1);
-                    result->push_back(std::move(optimizationResult));
+                    std::vector<std::unique_ptr<ToBeOptimizedContainerType>> container;
+                    container.resize(1);
+                    container.emplace_back(std::move(optimizationResult));
+                    result = std::move(container);
                 }
             }
 
@@ -92,8 +94,10 @@ namespace optimizations {
         std::unique_ptr<LoopBodyValuePropagationBlocker>             activeDataFlowValuePropagationRestrictions;
 
         void openNewSymbolTableBackupScope();
-        void discardChangesMadeInCurrentSymbolTableBackupScope() const;
-        void mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupContainingOriginalSignalValues, const parser::SymbolTableBackupHelper& backupOfSignalValuesAfterFirstScope) const;
+        void updateBackupOfValuesChangedInScopeAndResetMadeChanges() const;
+        [[nodiscard]] std::optional<std::reference_wrapper<const parser::SymbolTableBackupHelper>> peekCurrentSymbolTableBackupScope() const;
+
+        void mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfSignalsChangedInFirstBranch, const parser::SymbolTableBackupHelper& backupOfSignalsChangedInSecondBranch) const;
         void destroySymbolTableBackupScope();
         void createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess) const;
         [[nodiscard]] std::optional<std::unique_ptr<parser::SymbolTableBackupHelper>> popCurrentSymbolTableBackupScope();
@@ -132,6 +136,9 @@ namespace optimizations {
         void updateReferenceCountOf(const std::string_view& signalIdent, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
+
+        void                                                  createSymbolTableEntryForVariable(const syrec::Variable& variable) const;
+        void                                                  createSymbolTableEntriesForModuleParametersAndLocalVariables(const syrec::Module& module) const;
         [[nodiscard]] std::optional<syrec::Variable::ptr>     getSymbolTableEntryForVariable(const std::string_view& signalLiteralIdent) const;
         [[nodiscard]] std::optional<syrec::Number::ptr>       getSymbolTableEntryForLoopVariable(const std::string_view& loopVariableIdent) const;
         [[nodiscard]] std::optional<parser::SymbolTable::ptr> getActiveSymbolTableScope() const;
@@ -241,6 +248,23 @@ namespace optimizations {
         [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements, const std::unordered_set<std::string>& parameterAndLocalLookup) const;
         [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::unordered_set<std::string>& parameterAndLocalLookup) const;
         [[nodiscard]] static bool                                                        isVariableReadOnly(const syrec::Variable& variable);
+        [[nodiscard]] static bool                                                        isOperationUnaryAssignmentOperation(syrec_operation::operation operation);
+
+        template<typename T>
+        void removeElementsAtIndices(std::vector<T>& vectorToModify, const std::unordered_set<std::size_t>& indicesOfElementsToRemove) {
+            if (indicesOfElementsToRemove.empty() || vectorToModify.empty()) {
+                return;
+            }
+
+            std::vector<std::size_t> containerOfSortedIndices;
+            containerOfSortedIndices.reserve(indicesOfElementsToRemove.size());
+            containerOfSortedIndices.insert(containerOfSortedIndices.end(), indicesOfElementsToRemove.begin(), indicesOfElementsToRemove.end());
+            std::sort(containerOfSortedIndices.begin(), containerOfSortedIndices.end());
+
+            for (auto indicesIterator = containerOfSortedIndices.rbegin(); indicesIterator != containerOfSortedIndices.rend(); ++indicesIterator) {
+                vectorToModify.erase(std::next(vectorToModify.begin(), *indicesIterator));
+            }
+        }
     };
 }
 #endif

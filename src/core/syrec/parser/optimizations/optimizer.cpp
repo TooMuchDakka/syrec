@@ -10,6 +10,7 @@
 #include "core/syrec/parser/utils/bit_helpers.hpp"
 #include "core/syrec/parser/utils/loop_range_utils.hpp"
 
+#include <functional>
 #include <unordered_set>
 
 // TODO: Refactoring if case switches with visitor pattern as its available in std::visit call
@@ -42,6 +43,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
 
     openNewSymbolTableScope();
     const auto& activeSymbolTableScope         = *getActiveSymbolTableScope();
+    createSymbolTableEntriesForModuleParametersAndLocalVariables(module);
 
     bool wereAnyStatementsOptimizedAway = false;
     if (auto optimizationResultOfModuleStatements = handleStatements(transformCollectionOfSharedPointersToReferences(module.statements)); optimizationResultOfModuleStatements.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
@@ -74,14 +76,10 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
     }
     
     const auto& indicesOfRemovedLocalVariablesOfModule = activeSymbolTableScope->fetchUnusedLocalModuleVariables(module.name, generatedInternalIdForModule);
-    for (const std::size_t i : indicesOfRemovedLocalVariablesOfModule) {
-        copyOfModule->variables.erase(std::next(copyOfModule->variables.begin(), i + 1));
-    }
+    removeElementsAtIndices(copyOfModule->variables, indicesOfRemovedLocalVariablesOfModule);
 
     const auto& indicesOfUnusedParameters = activeSymbolTableScope->updateOptimizedModuleSignatureByMarkingAndReturningUnusedParametersOfModule(module.name, generatedInternalIdForModule);
-    for (const std::size_t& i: indicesOfUnusedParameters) {
-        copyOfModule->parameters.erase(std::next(copyOfModule->parameters.begin(), i + 1));
-    }    
+    removeElementsAtIndices(copyOfModule->parameters, indicesOfUnusedParameters);
 
     const auto doesOptimizedModuleBodyContainAnyStatement = copyOfModule->statements.size();
     const auto doesOptimizedModuleOnlyHaveReadOnlyParameters = copyOfModule->parameters.empty()
@@ -111,23 +109,23 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     std::vector<std::unique_ptr<syrec::Statement>> optimizedStmts;
     bool optimizedAnyStmt = false;
     for (const auto& stmt: statements) {
-        auto&& optimizedStatement = handleStatement(stmt);
-
-        const auto& stmtOptimizationResultFlag = optimizedStatement.getStatusOfResult();
-        optimizedAnyStmt                       = stmtOptimizationResultFlag == OptimizationResultFlag::WasOptimized;
-        if (stmtOptimizationResultFlag == OptimizationResultFlag::WasOptimized) {
-            if (auto optimizationResultOfStatement = optimizedStatement.tryTakeOwnershipOfOptimizationResult(); optimizationResultOfStatement.has_value()) {
-                for (auto&& optimizedStmt : *optimizationResultOfStatement) {
+        if (auto simplificationResultOfStatement = handleStatement(stmt); simplificationResultOfStatement.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+            optimizedAnyStmt = true;
+            if (auto generatedSubStatements = simplificationResultOfStatement.tryTakeOwnershipOfOptimizationResult(); generatedSubStatements.has_value()) {
+                for (auto&& optimizedStmt : *generatedSubStatements) {
                     optimizedStmts.emplace_back(std::move(optimizedStmt));
                 }
             }
-        } else if (stmtOptimizationResultFlag == OptimizationResultFlag::IsUnchanged) {
+        }
+        else {
             optimizedStmts.emplace_back(createCopyOfStmt(stmt));
         }
     }
 
     if (optimizedAnyStmt) {
-        return !optimizedStmts.empty() ? OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(optimizedStmts)) : OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
+        return optimizedStmts.empty()
+            ? OptimizationResult<syrec::Statement>::asOptimizedAwayContainer()
+            : OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(optimizedStmts));
     }
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
@@ -162,15 +160,15 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt) const {
-    auto simplificationResultOfAssignedToSignal = handleSignalAccess(*assignmentStmt.lhs, false, nullptr);
-    const auto& assignedToSignalPartsAfterSimplification = simplificationResultOfAssignedToSignal.getStatusOfResult() == OptimizationResultFlag::WasOptimized
-        ? std::make_shared<syrec::VariableAccess>(*simplificationResultOfAssignedToSignal.tryTakeOwnershipOfOptimizationResult()->front())
-        : assignmentStmt.lhs;
-
-    auto simplificationResultOfRhsExpr = handleExpr(*assignmentStmt.rhs);
-    syrec::expression::ptr rhsExprAfterSimplification    = assignmentStmt.rhs;
-    if (simplificationResultOfRhsExpr.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
-        rhsExprAfterSimplification = std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front());
+    syrec::VariableAccess::ptr lhsOperand = assignmentStmt.lhs;
+    if (auto simplificationResultOfAssignedToSignal = handleSignalAccess(*assignmentStmt.lhs, false, nullptr); simplificationResultOfAssignedToSignal.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        auto lhsSignalAccessAfterOptimization = std::move(simplificationResultOfAssignedToSignal.tryTakeOwnershipOfOptimizationResult()->front());
+        lhsOperand = std::make_shared<syrec::VariableAccess>(*lhsSignalAccessAfterOptimization);    
+    }
+    
+    syrec::expression::ptr rhsOperand = assignmentStmt.rhs;
+    if (auto simplificationResultOfRhsExpr = handleExpr(*assignmentStmt.rhs); simplificationResultOfRhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        rhsOperand = std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front());
     }
 
     const auto& rhsOperandEvaluatedAsConstant = tryEvaluateExpressionToConstant(*assignmentStmt.rhs);
@@ -182,14 +180,14 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     const auto skipCheckForSplitOfAssignmentInSubAssignments = !parserConfig.noAdditionalLineOptimizationEnabled || rhsOperandEvaluatedAsConstant.has_value();
-    if (auto evaluatedAssignedToSignal = tryEvaluateDefinedSignalAccess(*assignedToSignalPartsAfterSimplification); evaluatedAssignedToSignal.has_value()) {
+    if (auto evaluatedAssignedToSignal = tryEvaluateDefinedSignalAccess(*lhsOperand); evaluatedAssignedToSignal.has_value()) {
         performAssignment(*evaluatedAssignedToSignal, *mappedToAssignmentOperationFromFlag, *rhsOperandEvaluatedAsConstant);
     }
 
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); !skipCheckForSplitOfAssignmentInSubAssignments && activeSymbolTableScope.has_value()) {
         const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::MainAdditionalLineForAssignmentSimplifier>(*activeSymbolTableScope, nullptr, nullptr);
-        const auto assignmentStmtToSimplify = assignedToSignalPartsAfterSimplification != assignmentStmt.lhs || rhsExprAfterSimplification != assignmentStmt.rhs
-            ? std::make_unique<syrec::AssignStatement>(assignedToSignalPartsAfterSimplification, assignmentStmt.op, rhsExprAfterSimplification)
+        const auto assignmentStmtToSimplify = lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs
+            ? std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand)
             : std::make_shared<syrec::AssignStatement>(assignmentStmt);
 
         const auto isValueOfAssignedToSignalBlockedPriorToAssignmentByDataFlowAnalysis = false;
@@ -209,8 +207,8 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         }
     }
 
-    if (assignedToSignalPartsAfterSimplification != assignmentStmt.lhs || rhsExprAfterSimplification != assignmentStmt.rhs) {
-        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::AssignStatement>(assignedToSignalPartsAfterSimplification, assignmentStmt.op, rhsExprAfterSimplification));
+    if (lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs) {
+        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand));
     }
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
@@ -359,53 +357,43 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     auto                                 wereAnyStmtsInFalseBranchModified = false;
 
     if (parserConfig.deadCodeEliminationEnabled) {
-        if (const auto& constantValueOfGuardCondition = tryEvaluateExpressionToConstant(*simplifiedGuardExpr); constantValueOfGuardCondition.has_value()) {
+        if (const auto& constantValueOfGuardCondition = tryEvaluateExpressionToConstant(simplifiedGuardExpr ? *simplifiedGuardExpr : *ifStatement.condition); constantValueOfGuardCondition.has_value()) {
             canTrueBranchBeOmitted = *constantValueOfGuardCondition == 0;
             canFalseBranchBeOmitted = *constantValueOfGuardCondition;
         }
     }
 
     std::optional<std::vector<std::unique_ptr<syrec::Statement>>> simplifiedTrueBranchStmtsContainer;
+    auto                                                          isTrueBranchEmptyAfterOptimization = false;
     if (!canTrueBranchBeOmitted) {
         openNewSymbolTableBackupScope();
-        auto simplificationResultOfTrueBranchStmts        = handleStatements(transformCollectionOfSharedPointersToReferences(ifStatement.thenStatements));
-        simplifiedTrueBranchStmtsContainer            = simplificationResultOfTrueBranchStmts.tryTakeOwnershipOfOptimizationResult();
-        const auto  isTrueBranchEmptyAfterOptimization    = (simplificationResultOfTrueBranchStmts.getStatusOfResult() == OptimizationResultFlag::WasOptimized && simplifiedTrueBranchStmtsContainer.has_value() && simplifiedTrueBranchStmtsContainer->empty())
-            || simplificationResultOfTrueBranchStmts.getStatusOfResult() == OptimizationResultFlag::RemovedByOptimization;
-        wereAnyStmtsInTrueBranchModified                 = simplificationResultOfTrueBranchStmts.getStatusOfResult() == OptimizationResultFlag::IsUnchanged;
-
-        if (isTrueBranchEmptyAfterOptimization) {
-            simplifiedTrueBranchStmtsContainer.reset();
-            if (!canFalseBranchBeOmitted) {
-                simplifiedTrueBranchStmtsContainer->emplace_back(std::make_unique<syrec::SkipStatement>());
-            }
+        if (auto simplificationResultOfTrueBranchStmt = handleStatements(transformCollectionOfSharedPointersToReferences(ifStatement.thenStatements)); simplificationResultOfTrueBranchStmt.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+            simplifiedTrueBranchStmtsContainer = simplificationResultOfTrueBranchStmt.tryTakeOwnershipOfOptimizationResult();
+            wereAnyStmtsInTrueBranchModified   = true;
         }
 
+        isTrueBranchEmptyAfterOptimization = (simplifiedTrueBranchStmtsContainer.has_value() && simplifiedTrueBranchStmtsContainer->empty()) || ifStatement.thenStatements.empty();
         if (canFalseBranchBeOmitted) {
             destroySymbolTableBackupScope();
         }
         else {
-            discardChangesMadeInCurrentSymbolTableBackupScope();
+            // TODO: Check how changes made in current branch are safed, currently the changes are reset as the method suggests
+            updateBackupOfValuesChangedInScopeAndResetMadeChanges();
         }
     }
 
     std::optional<std::vector<std::unique_ptr<syrec::Statement>>> simplifiedFalseBranchStmtsContainer;
+    auto                                                          isFalseBranchEmptyAfterOptimization = false;
     if (!canFalseBranchBeOmitted) {
         openNewSymbolTableBackupScope();
-        auto        simplificationResultOfFalseBranchStmts = handleStatements(transformCollectionOfSharedPointersToReferences(ifStatement.elseStatements));
-        simplifiedFalseBranchStmtsContainer    = simplificationResultOfFalseBranchStmts.tryTakeOwnershipOfOptimizationResult();
-        const auto isFalseBranchEmptyAfterOptimization     = (simplificationResultOfFalseBranchStmts.getStatusOfResult() == OptimizationResultFlag::WasOptimized && simplifiedFalseBranchStmtsContainer.has_value() && simplifiedFalseBranchStmtsContainer->empty())
-            || simplificationResultOfFalseBranchStmts.getStatusOfResult() == OptimizationResultFlag::RemovedByOptimization;
-        wereAnyStmtsInFalseBranchModified                  = simplificationResultOfFalseBranchStmts.getStatusOfResult() == OptimizationResultFlag::IsUnchanged;
+        if (auto simplificationResultOfFalseBranchStmt = handleStatements(transformCollectionOfSharedPointersToReferences(ifStatement.elseStatements)); simplificationResultOfFalseBranchStmt.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+            simplifiedFalseBranchStmtsContainer = simplificationResultOfFalseBranchStmt.tryTakeOwnershipOfOptimizationResult();
+            wereAnyStmtsInFalseBranchModified   = true;
+        }
 
-        if (isFalseBranchEmptyAfterOptimization) {
-            simplifiedFalseBranchStmtsContainer.reset();
-            if (!canTrueBranchBeOmitted) {
-                simplifiedFalseBranchStmtsContainer->emplace_back(std::make_unique<syrec::SkipStatement>());
-            }
-            else {
-                destroySymbolTableBackupScope();   
-            }
+        isFalseBranchEmptyAfterOptimization = (simplifiedFalseBranchStmtsContainer.has_value() && simplifiedFalseBranchStmtsContainer->empty()) || ifStatement.elseStatements.empty();
+        if (canFalseBranchBeOmitted) {
+            destroySymbolTableBackupScope();
         }
     }
 
@@ -437,48 +425,89 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
         return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(simplifiedIfStatement));
     }
+    
     if (!simplifiedTrueBranchStmtsContainer.has_value() && !simplifiedFalseBranchStmtsContainer.has_value()) {
         return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
     }
-    if (canTrueBranchBeOmitted || canFalseBranchBeOmitted) {
-        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(canTrueBranchBeOmitted ? *simplifiedFalseBranchStmtsContainer : *simplifiedTrueBranchStmtsContainer));
+
+    if (parserConfig.deadCodeEliminationEnabled) {
+        if ((canTrueBranchBeOmitted && isFalseBranchEmptyAfterOptimization)
+            || (canFalseBranchBeOmitted && isTrueBranchEmptyAfterOptimization)
+            || (isTrueBranchEmptyAfterOptimization && isFalseBranchEmptyAfterOptimization)) {
+            return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
+        }
+
+        if (canTrueBranchBeOmitted) {
+            return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(*simplifiedFalseBranchStmtsContainer));
+        }
+        if (canFalseBranchBeOmitted) {
+            return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(*simplifiedTrueBranchStmtsContainer));
+        }
     }
 
     auto simplifiedIfStatement     = std::make_unique<syrec::IfStatement>();
     simplifiedIfStatement->condition      = simplifiedGuardExpr;
     simplifiedIfStatement->fiCondition    = simplifiedGuardExpr;
-    simplifiedIfStatement->thenStatements = createStatementListFrom({}, std::move(*simplifiedTrueBranchStmtsContainer));
-    simplifiedIfStatement->elseStatements = createStatementListFrom({}, std::move(*simplifiedFalseBranchStmtsContainer));
+    simplifiedIfStatement->thenStatements = !simplifiedTrueBranchStmtsContainer.has_value()
+        ? createStatementListFrom(ifStatement.thenStatements, {})
+        : createStatementListFrom({}, std::move(*simplifiedTrueBranchStmtsContainer));
+        
+    simplifiedIfStatement->elseStatements = !simplifiedFalseBranchStmtsContainer.has_value()
+        ? createStatementListFrom(ifStatement.elseStatements, {})
+        : createStatementListFrom({}, std::move(*simplifiedFalseBranchStmtsContainer));
 
     updateReferenceCountsOfSignalIdentsUsedIn(*simplifiedGuardExpr, parser::SymbolTable::ReferenceCountUpdate::Increment);
     return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(simplifiedIfStatement));
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleLoopStmt(const syrec::ForStatement& forStatement) {
-    auto iterationRangeStartSimplificationResult = handleNumber(*forStatement.range.first);
-    auto iterationRangeStartSimplified           = std::move(iterationRangeStartSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
+    std::unique_ptr<syrec::Number> iterationRangeStartSimplified;
+    std::unique_ptr<syrec::Number> iterationRangeEndSimplified;
+    std::unique_ptr<syrec::Number> iterationRangeStepSizeSimplified;
 
-    const auto iterationRangeStartConstantValue = tryEvaluateNumberAsConstant(*iterationRangeStartSimplified);
-    updateValueOfLoopVariable(forStatement.loopVariable, iterationRangeStartConstantValue);
+    std::optional<unsigned int> constantValueOfIterationRangeStart;
+    std::optional<unsigned int> constantValueOfIterationRangeEnd;
+    std::optional<unsigned int> constantValueOfIterationRangeStepsize;
+    auto                        doIterationRangeStartAndEndContainerMatch = false;
 
-    auto iterationRangeEndSimplificationResult = forStatement.range.first != forStatement.range.second ? std::make_optional(handleNumber(*forStatement.range.second)) : std::nullopt;
-    auto iterationRangeEndSimplified           = iterationRangeEndSimplificationResult.has_value() ? std::make_optional(std::move(iterationRangeEndSimplificationResult->tryTakeOwnershipOfOptimizationResult()->front())) : std::nullopt;
+    if (auto iterationRangeStartSimplificationResult = handleNumber(*forStatement.range.first); iterationRangeStartSimplificationResult.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        iterationRangeStartSimplified = std::move(iterationRangeStartSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
+        constantValueOfIterationRangeStart = tryEvaluateNumberAsConstant(*iterationRangeStartSimplified);
+    } else {
+        constantValueOfIterationRangeStart = tryEvaluateNumberAsConstant(*forStatement.range.first);
+    }
+    updateValueOfLoopVariable(forStatement.loopVariable, constantValueOfIterationRangeStart);
 
-    auto stepSizeSimplificationResult = handleNumber(*forStatement.step);
-    auto stepSizeSimplified        = std::move(stepSizeSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
-    
-    const auto iterationRangEndConstantValue    = iterationRangeEndSimplified.has_value() ? tryEvaluateNumberAsConstant(**iterationRangeEndSimplified) : iterationRangeStartConstantValue;
-    const auto stepSizeConstantValue            = tryEvaluateNumberAsConstant(*stepSizeSimplified);
+    if (forStatement.range.first != forStatement.range.second) {
+        doIterationRangeStartAndEndContainerMatch = true;
+        if (auto iterationRangeEndSimplificationResult = handleNumber(*forStatement.range.second); iterationRangeEndSimplificationResult.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+            iterationRangeEndSimplified = std::move(iterationRangeEndSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
+            constantValueOfIterationRangeEnd = tryEvaluateNumberAsConstant(*iterationRangeEndSimplified);
+        }
+    } else {
+        constantValueOfIterationRangeEnd = tryEvaluateNumberAsConstant(*forStatement.range.second);
+    }
+
+    if (auto iterationRangeStepSizeSimplificationResult = handleNumber(*forStatement.step); iterationRangeStepSizeSimplificationResult.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        iterationRangeStepSizeSimplified = std::move(iterationRangeStepSizeSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
+        constantValueOfIterationRangeStepsize = tryEvaluateNumberAsConstant(*iterationRangeStepSizeSimplified);
+    } else {
+        constantValueOfIterationRangeStepsize = tryEvaluateNumberAsConstant(*forStatement.step);
+    }
 
     std::optional<unsigned int> numLoopIterations;
-    if (iterationRangeStartConstantValue.has_value() && iterationRangeEndSimplified.has_value() && stepSizeConstantValue.has_value()) {
-        numLoopIterations = utils::determineNumberOfLoopIterations(*iterationRangeStartConstantValue, *iterationRangEndConstantValue, *stepSizeConstantValue);
+    if (constantValueOfIterationRangeStart.has_value() && constantValueOfIterationRangeEnd.has_value() && constantValueOfIterationRangeStepsize.has_value()) {
+        numLoopIterations = utils::determineNumberOfLoopIterations(*constantValueOfIterationRangeStart, *constantValueOfIterationRangeEnd, *constantValueOfIterationRangeStepsize);
     }
+
+    const auto& iterationRangeStartContainer    = !iterationRangeStartSimplified ? *forStatement.range.first : *iterationRangeStartSimplified;
+    const auto& iterationRangeEndContainer      = !iterationRangeEndSimplified ? (iterationRangeStartSimplified ? *iterationRangeStartSimplified : *forStatement.range.second) : *iterationRangeEndSimplified;
+    const auto& iterationRangeStepSizeContainer = !iterationRangeStepSizeSimplified ? *forStatement.step : *iterationRangeStepSizeSimplified;
 
     // TODO: Handling of loops with zero iterations when dead code elimination is disabled
     if (numLoopIterations.has_value() && !*numLoopIterations) {
         if (parserConfig.deadCodeEliminationEnabled) {
-            decrementReferenceCountsOfLoopHeaderComponents(*iterationRangeStartSimplified, iterationRangeEndSimplified.has_value() ? std::make_optional(**iterationRangeEndSimplified) : std::nullopt, *stepSizeSimplified);
+            decrementReferenceCountsOfLoopHeaderComponents(iterationRangeStartContainer, doIterationRangeStartAndEndContainerMatch ? std::nullopt : std::make_optional(iterationRangeEndContainer), iterationRangeStepSizeContainer);
             return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
         }
         return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
@@ -494,57 +523,61 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     
     // TODO: Correct setting of internal flags
     // TODO: General optimization of loop body
-    auto simplificationResultOfLoopBodyStmts = handleStatements(transformCollectionOfSharedPointersToReferences(forStatement.statements));
     std::optional<std::vector<std::unique_ptr<syrec::Statement>>> loopBodyStmtsSimplified;
-    if (auto simplifiedStmts = simplificationResultOfLoopBodyStmts.tryTakeOwnershipOfOptimizationResult(); simplifiedStmts.has_value()) {
-        loopBodyStmtsSimplified = std::move(*simplifiedStmts);
+    if (auto simplificationResultOfLoopBodyStmts = handleStatements(transformCollectionOfSharedPointersToReferences(forStatement.statements)); simplificationResultOfLoopBodyStmts.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        loopBodyStmtsSimplified = simplificationResultOfLoopBodyStmts.tryTakeOwnershipOfOptimizationResult();    
     }
     removeLoopVariableFromSymbolTable(forStatement.loopVariable);
+    if (shouldNewValuePropagationBlockerScopeOpened) {
+        activeDataFlowValuePropagationRestrictions->closeScopeAndDiscardDataFlowAnalysisResult();
+    }
 
-    if (!wereAnyAssignmentPerformInLoopBody || !loopBodyStmtsSimplified.has_value()) {
+    const auto& isLoopBodyAfterOptimizationsEmpty = (loopBodyStmtsSimplified.has_value() && loopBodyStmtsSimplified->empty()) || !(loopBodyStmtsSimplified.has_value() && forStatement.statements.empty());
+    if (!wereAnyAssignmentPerformInLoopBody || isLoopBodyAfterOptimizationsEmpty) {
         if (parserConfig.deadCodeEliminationEnabled) {
             return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
         }
-    }
-
-    if (shouldNewValuePropagationBlockerScopeOpened) {
-        activeDataFlowValuePropagationRestrictions->closeScopeAndDiscardDataFlowAnalysisResult();   
+        if (isLoopBodyAfterOptimizationsEmpty) {
+            std::vector<std::unique_ptr<syrec::SkipStatement>> containerForSingleSkipStmt;
+            containerForSingleSkipStmt.reserve(1);
+            containerForSingleSkipStmt.emplace_back( std::make_unique<syrec::SkipStatement>());
+            loopBodyStmtsSimplified = std::move(containerForSingleSkipStmt);
+        }
     }
 
     if (numLoopIterations.has_value() && *numLoopIterations == 1 && parserConfig.deadCodeEliminationEnabled) {
-        decrementReferenceCountsOfLoopHeaderComponents(*iterationRangeStartSimplified, iterationRangeEndSimplified.has_value() ? std::make_optional(**iterationRangeEndSimplified) : std::nullopt, *stepSizeSimplified);
+        decrementReferenceCountsOfLoopHeaderComponents(iterationRangeStartContainer, doIterationRangeStartAndEndContainerMatch ? std::nullopt : std::make_optional(iterationRangeEndContainer), iterationRangeStepSizeContainer);
+        
         if (loopBodyStmtsSimplified.has_value()) {
-            return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(*simplificationResultOfLoopBodyStmts.tryTakeOwnershipOfOptimizationResult()));   
+            return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(*loopBodyStmtsSimplified));
         }
-        return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
+
+        std::vector<std::unique_ptr<syrec::Statement>> copyOfStatementsOfOriginalLoopBody;
+        copyOfStatementsOfOriginalLoopBody.reserve(forStatement.statements.size());
+
+        for (const auto& stmt: forStatement.statements) {
+            copyOfStatementsOfOriginalLoopBody.emplace_back(createCopyOfStmt(*stmt));
+        }
+        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(copyOfStatementsOfOriginalLoopBody));
     }
 
-    const auto wasAnyComponentOfLoopModified = !(iterationRangeStartSimplificationResult.getStatusOfResult() == OptimizationResultFlag::IsUnchanged 
-        && iterationRangeEndSimplificationResult.has_value() && iterationRangeEndSimplificationResult->getStatusOfResult() == OptimizationResultFlag::IsUnchanged 
-        && stepSizeSimplificationResult.getStatusOfResult() == OptimizationResultFlag::IsUnchanged 
-        && simplificationResultOfLoopBodyStmts.getStatusOfResult() == OptimizationResultFlag::IsUnchanged);
+    const auto wasAnyComponentOfLoopModified = iterationRangeStartSimplified
+        || iterationRangeEndSimplified
+        || iterationRangeStepSizeSimplified
+        || loopBodyStmtsSimplified.has_value();
 
     if (!wasAnyComponentOfLoopModified) {
         return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
     }
-    if (!loopBodyStmtsSimplified.has_value()) {
-        if (parserConfig.deadCodeEliminationEnabled) {
-            return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
-        }
-        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::SkipStatement>());
-    }
-
+    
     auto simplifiedLoopStmt = std::make_unique<syrec::ForStatement>();
     // TODO: If loop only performs one iteration and the dead code elimination is not enabled, one could replace the declaration of for $i = X to Y step Z with for $X to Y step Z
     simplifiedLoopStmt->loopVariable = forStatement.loopVariable;
-    simplifiedLoopStmt->step         = std::move(stepSizeSimplified);
-    if (iterationRangeEndSimplified.has_value()) {
-        simplifiedLoopStmt->range = std::make_pair(std::move(iterationRangeStartSimplified), std::move(*iterationRangeEndSimplified));   
-    }
-    else {
-        auto copyOfSimplifiedRangeStartValue = createCopyOfNumber(*iterationRangeStartSimplified);
-        simplifiedLoopStmt->range            = std::make_pair(std::move(iterationRangeStartSimplified), std::move(copyOfSimplifiedRangeStartValue));
-    }
+    simplifiedLoopStmt->step         = iterationRangeStepSizeSimplified ? std::move(iterationRangeStepSizeSimplified) : createCopyOfNumber(*forStatement.step);
+    simplifiedLoopStmt->range        = std::make_pair(
+        iterationRangeStartSimplified ? std::move(iterationRangeStartSimplified) : createCopyOfNumber(*forStatement.range.first),
+        iterationRangeEndSimplified ? std::move(iterationRangeEndSimplified) : createCopyOfNumber(*forStatement.range.second)
+    );
 
     simplifiedLoopStmt->statements = !loopBodyStmtsSimplified.has_value()
         ? createStatementListFrom(forStatement.statements, {})
@@ -594,9 +627,8 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) const {
-    auto simplificationResultOfUnaryOperandSignalAccess = handleSignalAccess(*unaryStmt.var, false, nullptr);
-    syrec::VariableAccess::ptr signalAccessOperand                            = unaryStmt.var;
-    if (simplificationResultOfUnaryOperandSignalAccess.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
+    syrec::VariableAccess::ptr signalAccessOperand = unaryStmt.var;
+    if (auto simplificationResultOfUnaryOperandSignalAccess = handleSignalAccess(*unaryStmt.var, false, nullptr); simplificationResultOfUnaryOperandSignalAccess.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
         signalAccessOperand = std::move(simplificationResultOfUnaryOperandSignalAccess.tryTakeOwnershipOfOptimizationResult()->front());
     }
 
@@ -604,7 +636,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         updateReferenceCountOf(evaluatedUnaryOperandSignalAccess->accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Increment);
         const auto& fetchedValueForAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(*evaluatedUnaryOperandSignalAccess);
         const auto& mappedToUnaryOperationFromFlag  = syrec_operation::tryMapUnaryAssignmentOperationFlagToEnum(unaryStmt.op);
-
+        
         if (fetchedValueForAssignedToSignal.has_value() && mappedToUnaryOperationFromFlag.has_value()) {
             performAssignment(*evaluatedUnaryOperandSignalAccess, *mappedToUnaryOperationFromFlag, 1);
         } else {
@@ -612,7 +644,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         }
     }
 
-    if (simplificationResultOfUnaryOperandSignalAccess.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
+    if (signalAccessOperand != unaryStmt.var) {
         return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::UnaryStatement>(unaryStmt.op, signalAccessOperand));   
     }
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
@@ -635,42 +667,49 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleBinaryExpr(const syrec::BinaryExpression& expression) const {
-    auto simplificationResultOfLhsExpr = handleExpr(*expression.lhs);
-    auto simplificationResultOfRhsExpr = handleExpr(*expression.rhs);
-    auto wasOriginalExprModified       = simplificationResultOfLhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged || simplificationResultOfRhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged;
+    std::unique_ptr<syrec::expression> simplifiedLhsExpr;
+    std::unique_ptr<syrec::expression> simplifiedRhsExpr;
+    auto                               wasOriginalExprModified = false;
 
-    auto simplifiedLhsExpr = simplificationResultOfLhsExpr.getStatusOfResult() == OptimizationResultFlag::WasOptimized
-        ? std::move(simplificationResultOfLhsExpr.tryTakeOwnershipOfOptimizationResult()->front())
-        : createCopyOfExpression(*expression.lhs);
-
-    auto simplifiedRhsExpr = simplificationResultOfRhsExpr.getStatusOfResult() == OptimizationResultFlag::WasOptimized
-        ? std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front())
-        : createCopyOfExpression(*expression.rhs);
-
-    std::unique_ptr<syrec::expression> simplifiedBinaryExpr;
-    const auto& evaluatedSimplifiedLhsExpr = tryEvaluateExpressionToConstant(*simplifiedLhsExpr);
-    const auto& evaluatedSimplifiedRhsExpr = tryEvaluateExpressionToConstant(*simplifiedRhsExpr);
-
-    const auto mappedToBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(expression.op);
-    if (mappedToBinaryOperation.has_value()) {
-        if (evaluatedSimplifiedLhsExpr.has_value() && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(*mappedToBinaryOperation, *evaluatedSimplifiedLhsExpr)) {
-            simplifiedBinaryExpr =  std::move(simplifiedRhsExpr);
-            wasOriginalExprModified = true;
-        }
-        if (evaluatedSimplifiedRhsExpr.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToBinaryOperation, *evaluatedSimplifiedRhsExpr)) {
-            simplifiedBinaryExpr = std::move(simplifiedLhsExpr);
-            wasOriginalExprModified = true;
-        }
-        if (evaluatedSimplifiedLhsExpr.has_value() && evaluatedSimplifiedRhsExpr.has_value()) {
-            if (const auto evaluationResultOfBinaryOperation = syrec_operation::apply(*mappedToBinaryOperation, *evaluatedSimplifiedLhsExpr, *evaluatedSimplifiedRhsExpr); evaluationResultOfBinaryOperation.has_value()) {
-                simplifiedBinaryExpr = std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*evaluationResultOfBinaryOperation), expression.bitwidth());
-                wasOriginalExprModified = true;
-            }
-        }
+    if (auto simplificationResultOfLhsExpr = handleExpr(*expression.lhs); simplificationResultOfLhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        wasOriginalExprModified = true;
+        simplifiedLhsExpr       = std::move(simplificationResultOfLhsExpr.tryTakeOwnershipOfOptimizationResult()->front());
     }
 
-    if (!simplifiedBinaryExpr) {
-        simplifiedBinaryExpr = std::make_unique<syrec::BinaryExpression>(std::move(simplifiedLhsExpr), expression.op, std::move(simplifiedRhsExpr));   
+    if (auto simplificationResultOfRhsExpr = handleExpr(*expression.rhs); simplificationResultOfRhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        wasOriginalExprModified = true;
+        simplifiedLhsExpr       = std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front());
+    }
+
+    std::unique_ptr<syrec::expression> simplifiedBinaryExpr;
+    const auto constantValueOfLhsExpr = tryEvaluateExpressionToConstant(simplifiedLhsExpr ? *simplifiedLhsExpr : *expression.lhs);
+    const auto constantValueOfRhsExpr = tryEvaluateExpressionToConstant(simplifiedLhsExpr ? *simplifiedRhsExpr : *expression.rhs);
+    const auto mappedToBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(expression.op);
+
+    if (mappedToBinaryOperation.has_value()) {
+        if (constantValueOfLhsExpr.has_value() && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(*mappedToBinaryOperation, *constantValueOfLhsExpr)) {
+            simplifiedBinaryExpr = std::move(simplifiedRhsExpr);
+        }
+        if (constantValueOfRhsExpr.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToBinaryOperation, *constantValueOfRhsExpr)) {
+            simplifiedBinaryExpr = std::move(simplifiedLhsExpr);
+        }
+        if (constantValueOfLhsExpr.has_value() && constantValueOfRhsExpr.has_value()) {
+            if (const auto& evaluationResultOfBinaryOperation = syrec_operation::apply(*mappedToBinaryOperation, *constantValueOfLhsExpr, *constantValueOfRhsExpr); evaluationResultOfBinaryOperation.has_value()) {
+                simplifiedBinaryExpr = std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*evaluationResultOfBinaryOperation), expression.bitwidth());
+            }
+        }
+        wasOriginalExprModified |= simplifiedBinaryExpr != nullptr;
+    }
+    if ((simplifiedLhsExpr || simplifiedRhsExpr) && !simplifiedBinaryExpr) {
+        syrec::expression::ptr lhsOperandOfSimplifiedExpr = simplifiedLhsExpr ? std::move(simplifiedLhsExpr) : expression.lhs;
+        syrec::expression::ptr rhsOperandOfSimplifiedExpr = simplifiedRhsExpr ? std::move(simplifiedRhsExpr) : expression.rhs;
+        simplifiedBinaryExpr                              = std::make_unique<syrec::BinaryExpression>(
+                lhsOperandOfSimplifiedExpr,
+                expression.op,
+                rhsOperandOfSimplifiedExpr);
+        wasOriginalExprModified = true;
+    } else if (!simplifiedBinaryExpr) {
+        simplifiedBinaryExpr = createCopyOfExpression(expression);
     }
 
     std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
@@ -711,46 +750,50 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::Optimizer::handleShiftExpr(const syrec::ShiftExpression& expression) const {
-    auto simplificationResultOfToBeShiftedExpr = handleExpr(*expression.lhs);
-    auto simplificationResultOfShiftAmount     = handleNumber(*expression.rhs);
+    std::unique_ptr<syrec::expression> simplifiedToBeShiftedExpr;
+    std::unique_ptr<syrec::Number>     simplifiedShiftAmount;
 
-    auto simplifiedToBeShiftedExpr = simplificationResultOfToBeShiftedExpr.getStatusOfResult() == OptimizationResultFlag::WasOptimized
-        ? std::move(simplificationResultOfToBeShiftedExpr.tryTakeOwnershipOfOptimizationResult()->front())
-        : createCopyOfExpression(*expression.lhs);
+    if (auto simplificationResultOfToBeShiftedExpr = handleExpr(*expression.lhs); simplificationResultOfToBeShiftedExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        simplifiedToBeShiftedExpr = std::move(simplificationResultOfToBeShiftedExpr.tryTakeOwnershipOfOptimizationResult()->front());
+    }
 
-    const auto simplifiedShiftAmount = simplificationResultOfShiftAmount.getStatusOfResult() == OptimizationResultFlag::WasOptimized
-        ? std::move(simplificationResultOfShiftAmount.tryTakeOwnershipOfOptimizationResult()->front())
-        : createCopyOfNumber(*expression.rhs);
+    if (auto simplificationResultOfShiftAmount = handleNumber(*expression.rhs); simplificationResultOfShiftAmount.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+        simplifiedShiftAmount = std::move(simplificationResultOfShiftAmount.tryTakeOwnershipOfOptimizationResult()->front());
+    }
 
-    const auto evaluatedToValueOfToBeShiftedExpr = tryEvaluateExpressionToConstant(*simplifiedToBeShiftedExpr);
-    const auto evaluatedToValueOfShiftAmount     = tryEvaluateNumberAsConstant(*simplifiedShiftAmount);
+    if (const auto& mappedToShiftOperation = syrec_operation::tryMapShiftOperationFlagToEnum(expression.op); mappedToShiftOperation.has_value()) {
+        std::unique_ptr<syrec::expression> simplificationResultOfExpr;
+        const auto& constantValueOfToBeShiftedExpr = tryEvaluateExpressionToConstant(simplifiedToBeShiftedExpr ? *simplifiedToBeShiftedExpr : *expression.lhs);
+        const auto& constantValueOfShiftAmount     = tryEvaluateNumberAsConstant(simplifiedShiftAmount ? *simplifiedShiftAmount : *expression.rhs);
 
-    const auto& mappedToShiftOperation = syrec_operation::tryMapShiftOperationFlagToEnum(expression.op);
-    if (!mappedToShiftOperation.has_value()) {
+        if (constantValueOfToBeShiftedExpr.has_value() && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(*mappedToShiftOperation, *constantValueOfToBeShiftedExpr)) {
+            if (!simplifiedShiftAmount) {
+                simplificationResultOfExpr = std::make_unique<syrec::NumericExpression>(expression.rhs, expression.bitwidth());
+            }
+            else {
+                simplificationResultOfExpr = std::make_unique<syrec::NumericExpression>(std::move(simplifiedShiftAmount), expression.bitwidth());
+            }
+        } else if (constantValueOfShiftAmount.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToShiftOperation, *constantValueOfShiftAmount)) {
+            if (!simplifiedToBeShiftedExpr) {
+                simplificationResultOfExpr = createCopyOfExpression(*expression.lhs);
+            } else {
+                simplificationResultOfExpr = std::move(simplifiedToBeShiftedExpr);
+            }
+        }
+        return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::move(simplificationResultOfExpr));
+    }
+
+    if (!simplifiedToBeShiftedExpr && !simplifiedShiftAmount) {
         return OptimizationResult<syrec::expression>::asUnchangedOriginal();
     }
-    
-    std::unique_ptr<syrec::expression> finalSimplificationResult;
-    if (evaluatedToValueOfShiftAmount.has_value()) {
-        if (syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToShiftOperation, *evaluatedToValueOfShiftAmount)) {
-            finalSimplificationResult = std::move(simplifiedToBeShiftedExpr);
-            updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-        } else if (evaluatedToValueOfToBeShiftedExpr.has_value()) {
-            if (const auto& evaluatedShiftOperationResult = syrec_operation::apply(*mappedToShiftOperation, evaluatedToValueOfToBeShiftedExpr, evaluatedToValueOfShiftAmount)) {
-                finalSimplificationResult = std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*evaluatedShiftOperationResult), expression.bitwidth());
-            }
-            updateReferenceCountsOfSignalIdentsUsedIn(*expression.lhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-            updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-        }
-    } else if (evaluatedToValueOfToBeShiftedExpr.has_value() && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(*mappedToShiftOperation, *evaluatedToValueOfToBeShiftedExpr)) {
-        finalSimplificationResult = std::move(simplifiedToBeShiftedExpr);
-        updateReferenceCountsOfSignalIdentsUsedIn(*expression.rhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-    }
 
-    if (finalSimplificationResult) {
-        return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::move(finalSimplificationResult));   
-    }
-    return OptimizationResult<syrec::expression>::asUnchangedOriginal();
+    syrec::expression::ptr simplifiedLhsOperand = simplifiedToBeShiftedExpr ? std::move(simplifiedToBeShiftedExpr) : expression.lhs;
+    syrec::Number::ptr     simplifiedRhsOperand = simplifiedShiftAmount ? std::move(simplifiedShiftAmount) : expression.rhs;
+    auto                   simplifiedShiftExpr  = std::make_unique<syrec::ShiftExpression>(
+            simplifiedToBeShiftedExpr ? std::move(simplifiedToBeShiftedExpr) : expression.lhs,
+            expression.op,
+            simplifiedShiftAmount ? std::move(simplifiedShiftAmount) : expression.rhs);
+    return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::move(simplifiedShiftExpr));
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optimizer::handleNumber(const syrec::Number& number) const {
@@ -874,7 +917,8 @@ std::unique_ptr<syrec::expression> optimizations::Optimizer::trySimplifyExpr(con
     std::unique_ptr<syrec::expression> simplificationResult;
     const std::shared_ptr<syrec::expression> toBeSimplifiedExpr = createCopyOfExpression(expr);
     if (simplifyExprByReassociation) {
-        if (const auto& reassociateExpressionResult = optimizations::simplifyBinaryExpression(toBeSimplifiedExpr, performOperationStrengthReduction, std::nullopt, symbolTable, optimizedAwaySignalAccesses); reassociateExpressionResult != nullptr) {
+        // TODO: Rework return value to either return null if no simplification took place or return std::optional or return additional boolean flag
+        if (const auto& reassociateExpressionResult = optimizations::simplifyBinaryExpression(toBeSimplifiedExpr, performOperationStrengthReduction, std::nullopt, symbolTable, optimizedAwaySignalAccesses); reassociateExpressionResult != toBeSimplifiedExpr) {
             simplificationResult = createCopyOfExpression(*reassociateExpressionResult);
         }
     } else {
@@ -1088,6 +1132,23 @@ void optimizations::Optimizer::updateReferenceCountsOfSignalIdentsUsedIn(const s
     }
 }
 
+void optimizations::Optimizer::createSymbolTableEntryForVariable(const syrec::Variable& variable) const {
+    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value() && !activeSymbolTableScope->get()->contains(variable.name)) {
+        activeSymbolTableScope->get()->addEntry(variable);
+    }   
+}
+
+void optimizations::Optimizer::createSymbolTableEntriesForModuleParametersAndLocalVariables(const syrec::Module& module) const {
+    for (const auto& parameter : module.parameters) {
+        createSymbolTableEntryForVariable(*parameter);
+    }
+
+    for (const auto& localVariable : module.variables) {
+        createSymbolTableEntryForVariable(*localVariable);
+    }
+}
+
+
 std::optional<syrec::Variable::ptr> optimizations::Optimizer::getSymbolTableEntryForVariable(const std::string_view& signalLiteralIdent) const {
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
         if (const auto& matchingSymbolTableEntryForIdent = activeSymbolTableScope->get()->getVariable(signalLiteralIdent); matchingSymbolTableEntryForIdent.has_value() && std::holds_alternative<syrec::Variable::ptr>(*matchingSymbolTableEntryForIdent)) {
@@ -1172,7 +1233,7 @@ std::optional<optimizations::Optimizer::EvaluatedSignalAccess> optimizations::Op
         std::vector<std::reference_wrapper<const syrec::expression>> accessedValueOfDimensionWithoutOwnership;
         accessedValueOfDimensionWithoutOwnership.reserve(accessedSignalParts.indexes.size());
 
-        for (std::size_t i = 0; i < accessedValueOfDimensionWithoutOwnership.size(); ++i) {
+        for (std::size_t i = 0; i < accessedSignalParts.indexes.size(); ++i) {
             accessedValueOfDimensionWithoutOwnership.emplace_back(*accessedSignalParts.indexes.at(i));
         }
 
@@ -1190,8 +1251,13 @@ std::optional<optimizations::Optimizer::EvaluatedSignalAccess> optimizations::Op
 
 std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvaluatedSignalAccess(EvaluatedSignalAccess& evaluatedSignalAccess, std::optional<bool>* wasAnyDefinedIndexOutOfRange, bool* didAllDefinedIndicesEvaluateToConstants) const {
     if (const auto& matchingSymbolTableEntryForIdent = getSymbolTableEntryForVariable(evaluatedSignalAccess.accessedSignalIdent); matchingSymbolTableEntryForIdent.has_value()) {
+        if (didAllDefinedIndicesEvaluateToConstants) {
+            *didAllDefinedIndicesEvaluateToConstants = true;
+        }
+
         std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> definedBitRangeAccess;
-        std::vector<syrec::expression::ptr>                              definedDimensionAccess(evaluatedSignalAccess.accessedValuePerDimension.valuePerDimension.size(), nullptr);
+        std::vector<syrec::expression::ptr>                              definedDimensionAccess;
+        definedDimensionAccess.reserve(evaluatedSignalAccess.accessedValuePerDimension.valuePerDimension.size());
 
         if (evaluatedSignalAccess.accessedBitRange.has_value()) {
             syrec::Number::ptr bitRangeStart;
@@ -1206,6 +1272,10 @@ std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvalua
                 bitRangeStart = *tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeStartEvaluationResult);
             }
 
+            if (wasAnyDefinedIndexOutOfRange) {
+                *wasAnyDefinedIndexOutOfRange = evaluatedSignalAccess.accessedBitRange->rangeStartEvaluationResult.validityStatus == IndexValidityStatus::OutOfRange;
+            }
+
             if (const auto& constantValueOfBitRangeEnd = tryFetchConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeEndEvaluationResult); constantValueOfBitRangeEnd.has_value()) {
                 bitRangeEnd = std::make_shared<syrec::Number>(*constantValueOfBitRangeEnd);
                 if (didAllDefinedIndicesEvaluateToConstants) {
@@ -1214,17 +1284,32 @@ std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvalua
             } else {
                 bitRangeEnd = *tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeEndEvaluationResult);
             }
+
+            if (wasAnyDefinedIndexOutOfRange) {
+                const auto& wasBitRangeEndOutOfRange = evaluatedSignalAccess.accessedBitRange->rangeEndEvaluationResult.validityStatus == IndexValidityStatus::OutOfRange;
+                *wasAnyDefinedIndexOutOfRange        = wasAnyDefinedIndexOutOfRange->has_value() ? **wasAnyDefinedIndexOutOfRange | wasBitRangeEndOutOfRange : wasBitRangeEndOutOfRange;
+            }
+
             definedBitRangeAccess = std::make_pair(bitRangeStart, bitRangeEnd);
         }
-
+        
         for (auto& evaluatedValueOfDimension : evaluatedSignalAccess.accessedValuePerDimension.valuePerDimension) {
             if (const auto& constantValueOfValueOfDimension = tryFetchConstantValueOfIndex(evaluatedValueOfDimension); constantValueOfValueOfDimension.has_value()) {
                 definedDimensionAccess.emplace_back(std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(*constantValueOfValueOfDimension), BitHelpers::getRequiredBitsToStoreValue(*constantValueOfValueOfDimension)));
                 if (didAllDefinedIndicesEvaluateToConstants) {
                     *didAllDefinedIndicesEvaluateToConstants = true;
                 }
+            } else {
+                definedDimensionAccess.emplace_back(*tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(evaluatedValueOfDimension));
+                if (didAllDefinedIndicesEvaluateToConstants) {
+                    *didAllDefinedIndicesEvaluateToConstants = false;
+                }
             }
-            definedDimensionAccess.emplace_back(*tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(evaluatedValueOfDimension));
+
+            const auto& wasDefinedValueOfDimensionOutOfRange = evaluatedValueOfDimension.validityStatus == IndexValidityStatus::OutOfRange;
+            if (wasAnyDefinedIndexOutOfRange) {
+                *wasAnyDefinedIndexOutOfRange = wasAnyDefinedIndexOutOfRange->has_value() ? **wasAnyDefinedIndexOutOfRange | wasDefinedValueOfDimensionOutOfRange : wasDefinedValueOfDimensionOutOfRange;
+            }
         }
 
         auto transformedToSignalAccess     = std::make_unique<syrec::VariableAccess>();
@@ -1263,9 +1348,14 @@ void optimizations::Optimizer::performAssignment(EvaluatedSignalAccess& assigned
     if (auto transformedSignalAccess = transformEvaluatedSignalAccess(assignedToSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &didAllDefinedIndicesEvaluateToConstants); transformedSignalAccess != nullptr) {
         const std::shared_ptr<syrec::VariableAccess> sharedTransformedSignalAccess = std::move(transformedSignalAccess);
 
-        if (!(areAnyComponentsOfAssignedToSignalAccessOutOfRange.has_value() && *areAnyComponentsOfAssignedToSignalAccessOutOfRange) || !didAllDefinedIndicesEvaluateToConstants) {
+        if (!areAnyComponentsOfAssignedToSignalAccessOutOfRange.value_or(false) || didAllDefinedIndicesEvaluateToConstants) {
             if (const auto& currentValueOfAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(assignedToSignalParts); currentValueOfAssignedToSignal.has_value()) {
-                if (const auto evaluationResultOfOperation = syrec_operation::apply(assignmentOperation, currentValueOfAssignedToSignal, assignmentRhsValue); evaluationResultOfOperation.has_value()) {
+                if (isOperationUnaryAssignmentOperation(assignmentOperation) && currentValueOfAssignedToSignal.has_value()) {
+                    if (const auto evaluationResultOfOperation = syrec_operation::apply(assignmentOperation, *currentValueOfAssignedToSignal); evaluationResultOfOperation.has_value()) {
+                        updateStoredValueOf(sharedTransformedSignalAccess, *evaluationResultOfOperation);
+                        return;
+                    }
+                } else if (const auto evaluationResultOfOperation = syrec_operation::apply(assignmentOperation, currentValueOfAssignedToSignal, assignmentRhsValue); evaluationResultOfOperation.has_value()) {
                     updateStoredValueOf(sharedTransformedSignalAccess, *evaluationResultOfOperation);
                     return;
                 }
@@ -1341,7 +1431,7 @@ std::optional<unsigned> optimizations::Optimizer::tryFetchValueFromEvaluatedSign
         std::optional<bool> areAnyComponentsOfAssignedToSignalAccessOutOfRange;
         bool                didAllDefinedIndicesEvaluateToConstants;
         if (auto transformedSignalAccess = transformEvaluatedSignalAccess(accessedSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &didAllDefinedIndicesEvaluateToConstants); transformedSignalAccess != nullptr) {
-            if (!areAnyComponentsOfAssignedToSignalAccessOutOfRange.has_value() && !*areAnyComponentsOfAssignedToSignalAccessOutOfRange && didAllDefinedIndicesEvaluateToConstants && !activeDataFlowValuePropagationRestrictions->isAccessBlockedFor(*transformedSignalAccess)) {
+            if (!areAnyComponentsOfAssignedToSignalAccessOutOfRange.value_or(false) && didAllDefinedIndicesEvaluateToConstants && !activeDataFlowValuePropagationRestrictions->isAccessBlockedFor(*transformedSignalAccess)) {
                 const std::shared_ptr<syrec::VariableAccess> sharedTransformedSignalAccess = std::move(transformedSignalAccess);
                 return activeSymbolTableScope->get()->tryFetchValueForLiteral(sharedTransformedSignalAccess);
             }
@@ -1364,7 +1454,7 @@ optimizations::Optimizer::OptimizationResult<syrec::VariableAccess> optimization
                                                                                                                           evaluatedSignalAccess->accessedValuePerDimension.valuePerDimension.cbegin(),
                                                                                                                           evaluatedSignalAccess->accessedValuePerDimension.valuePerDimension.cend(),
                                                                                                                           [](const SignalAccessIndexEvaluationResult<syrec::expression>& valueOfDimensionEvaluationResult) {
-                                                                                                                          return valueOfDimensionEvaluationResult.validityStatus != IndexValidityStatus::OutOfRange;
+                                                                                                                          return valueOfDimensionEvaluationResult.validityStatus == IndexValidityStatus::OutOfRange;
                                                                                                                       });
 
     if (!(wasDefinedBitRangeAccessOk && wasDefinedBitRangeStartAccessOk && wasDefinedDimensionAccessOk)) {
@@ -1446,45 +1536,78 @@ void optimizations::Optimizer::openNewSymbolTableBackupScope() {
     symbolTableBackupScopeStack.push(std::make_unique<parser::SymbolTableBackupHelper>());
 }
 
-void optimizations::Optimizer::discardChangesMadeInCurrentSymbolTableBackupScope() const {
-    if (symbolTableBackupScopeStack.empty()) {
+void optimizations::Optimizer::updateBackupOfValuesChangedInScopeAndResetMadeChanges() const {
+    const auto& peekedActiveSymbolTableBackupScope = peekCurrentSymbolTableBackupScope();
+    if (!peekedActiveSymbolTableBackupScope.has_value() || peekedActiveSymbolTableBackupScope->get().getIdentsOfChangedSignals().empty()) {
         return;
     }
 
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
-        for (const auto& [signalIdent, valueAndRestrictionBackup]: symbolTableBackupScopeStack.top()->getBackedUpEntries()) {
-            activeSymbolTableScope->get()->restoreValuesFromBackup(signalIdent, valueAndRestrictionBackup);
-        }   
+        for (auto& [signalIdent, valueAndRestrictionBackup]: symbolTableBackupScopeStack.top()->getBackedUpEntries()) {
+            if (const auto& backupOfCurrentSignalValue = activeSymbolTableScope->get()->createBackupOfValueOfSignal(signalIdent); backupOfCurrentSignalValue.has_value()) {
+                activeSymbolTableScope->get()->restoreValuesFromBackup(signalIdent, valueAndRestrictionBackup);
+                valueAndRestrictionBackup->copyRestrictionsAndUnrestrictedValuesFrom(
+                        {}, std::nullopt,
+                        {}, std::nullopt,
+                        **backupOfCurrentSignalValue);    
+            }
+        }
     }
 }
 
-void optimizations::Optimizer::mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupContainingOriginalSignalValues, const parser::SymbolTableBackupHelper& backupOfSignalValuesAfterFirstScope) const {
-    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
-        const auto& modifiedSignalsInFirstScope  = backupContainingOriginalSignalValues.getIdentsOfChangedSignals();
-        const auto& modifiedSignalsInSecondScope = backupOfSignalValuesAfterFirstScope.getIdentsOfChangedSignals();
+std::optional<std::reference_wrapper<const parser::SymbolTableBackupHelper>> optimizations::Optimizer::peekCurrentSymbolTableBackupScope() const {
+    if (symbolTableBackupScopeStack.empty()) {
+        return std::nullopt;
+    }
+    return *symbolTableBackupScopeStack.top();
+}
 
-        std::unordered_set<std::string> setOfSignalsRequiringMergeOfChanges;
-        for (const auto& modifiedSignalInFirstScope: modifiedSignalsInFirstScope) {
-            if (modifiedSignalsInSecondScope.count(modifiedSignalInFirstScope)) {
-                setOfSignalsRequiringMergeOfChanges.emplace(modifiedSignalInFirstScope);
+void optimizations::Optimizer::mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfSignalsChangedInFirstBranch, const parser::SymbolTableBackupHelper& backupOfSignalsChangedInSecondBranch) const {
+    const auto& activeSymbolTableScope = getActiveSymbolTableScope();
+    if (!activeSymbolTableScope.has_value()) {
+        return;
+    }
+
+    const auto& modifiedSignalsInFirstScope  = backupOfSignalsChangedInFirstBranch.getIdentsOfChangedSignals();
+    const auto& modifiedSignalsInSecondScope = backupOfSignalsChangedInSecondBranch.getIdentsOfChangedSignals();
+
+    std::unordered_set<std::string> setOfSignalsRequiringMergeOfChanges;
+    std::unordered_set<std::string> setOfSignalsChangedOnlyInFirstScope;
+    for (const auto& modifiedSignalInFirstScope: modifiedSignalsInFirstScope) {
+        if (modifiedSignalsInSecondScope.count(modifiedSignalInFirstScope)) {
+            setOfSignalsRequiringMergeOfChanges.emplace(modifiedSignalInFirstScope);
+        }
+        else {
+            setOfSignalsChangedOnlyInFirstScope.emplace(modifiedSignalInFirstScope);
+        }
+    }
+    if (modifiedSignalsInFirstScope.size() != modifiedSignalsInSecondScope.size()) {
+        for (const auto& modifiedSignalInSecondScope: modifiedSignalsInSecondScope) {
+            if (modifiedSignalsInFirstScope.count(modifiedSignalInSecondScope)) {
+                setOfSignalsRequiringMergeOfChanges.emplace(modifiedSignalInSecondScope);
             }
         }
-        if (modifiedSignalsInFirstScope.size() != modifiedSignalsInSecondScope.size()) {
-            for (const auto& modifiedSignalInSecondScope: modifiedSignalsInSecondScope) {
-                if (modifiedSignalsInFirstScope.count(modifiedSignalInSecondScope)) {
-                    setOfSignalsRequiringMergeOfChanges.emplace(modifiedSignalInSecondScope);
-                }
-            }
-        }
+    }
 
-        for (const auto& signalRequiringMergeOfChanges: setOfSignalsRequiringMergeOfChanges) {
-            const auto& initialValueAtStartOfFirstScope        = *backupContainingOriginalSignalValues.getBackedUpEntryFor(signalRequiringMergeOfChanges);
-            const auto& currentValueOfSignalAtEndOfFirstScope  = *backupOfSignalValuesAfterFirstScope.getBackedUpEntryFor(signalRequiringMergeOfChanges);
-            const auto& currentValueOfSignalAtEndOfSecondScope = *activeSymbolTableScope->get()->createBackupOfValueOfSignal(signalRequiringMergeOfChanges);
+    for (const auto& signalRequiringMergeOfChanges: setOfSignalsRequiringMergeOfChanges) {
+        const auto& initialValueOfChangedSignalPriorToAnyScope = *backupOfSignalsChangedInSecondBranch.getBackedUpEntryFor(signalRequiringMergeOfChanges);
+        const auto& currentValueOfSignalAtEndOfFirstScope      = *backupOfSignalsChangedInFirstBranch.getBackedUpEntryFor(signalRequiringMergeOfChanges);
+        const auto& currentValueOfSignalAtEndOfSecondScope     = *activeSymbolTableScope->get()->createBackupOfValueOfSignal(signalRequiringMergeOfChanges);
 
-            initialValueAtStartOfFirstScope->copyRestrictionsAndMergeValuesFromAlternatives(currentValueOfSignalAtEndOfFirstScope, currentValueOfSignalAtEndOfSecondScope);
-            activeSymbolTableScope->get()->restoreValuesFromBackup(signalRequiringMergeOfChanges, initialValueAtStartOfFirstScope);
-        }    
+        initialValueOfChangedSignalPriorToAnyScope->copyRestrictionsAndMergeValuesFromAlternatives(currentValueOfSignalAtEndOfFirstScope, currentValueOfSignalAtEndOfSecondScope);
+        activeSymbolTableScope->get()->restoreValuesFromBackup(signalRequiringMergeOfChanges, initialValueOfChangedSignalPriorToAnyScope);
+    }
+
+    /*
+     * Our assumption is that the entries in the current symbol table scope have already all changes made in the second branch applied to them. Thus, we do not need to handle
+     * the assignments made only in the second branch. But, since the assignments defined only in the first branch signals were discarded at the start of the second branch, due
+     * to the requirement that the symbol table at the start of the second branch does not contain the changes from the first branch, we need to reapply the assignments local only to the first branch.
+     * Overlapping assignments made in both branches were already merged at this point.
+     *
+     */
+    for (const auto& signalChangedOnlyInFirstScope : setOfSignalsChangedOnlyInFirstScope) {
+        const auto& currentValueOfSignalAtEndOfFirstScope = *backupOfSignalsChangedInFirstBranch.getBackedUpEntryFor(signalChangedOnlyInFirstScope);
+        activeSymbolTableScope->get()->restoreValuesFromBackup(signalChangedOnlyInFirstScope, currentValueOfSignalAtEndOfFirstScope);
     }
 }
 
@@ -1560,12 +1683,11 @@ void optimizations::Optimizer::updateValueOfLoopVariable(const std::string_view&
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
         if (!activeSymbolTableScope->get()->contains(loopVariableIdent)) {
             activeSymbolTableScope->get()->addEntry(syrec::Number({std::string(loopVariableIdent)}), BitHelpers::getRequiredBitsToStoreValue(*value), value);
-        } else {
-            if (!value.has_value()) {
-                activeSymbolTableScope->get()->invalidateStoredValueForLoopVariable(loopVariableIdent);
-            }
-            activeSymbolTableScope->get()->updateStoredValueForLoopVariable(loopVariableIdent, *value);
-        }    
+        }
+        if (!value.has_value()) {
+            activeSymbolTableScope->get()->invalidateStoredValueForLoopVariable(loopVariableIdent);
+        }
+        activeSymbolTableScope->get()->updateStoredValueForLoopVariable(loopVariableIdent, *value);
     }
 }
 
@@ -1666,3 +1788,15 @@ inline bool optimizations::Optimizer::isVariableReadOnly(const syrec::Variable& 
     return variable.type == syrec::Variable::Types::In;
 }
 
+bool optimizations::Optimizer::isOperationUnaryAssignmentOperation(syrec_operation::operation operation) {
+    switch (operation) {
+        case syrec_operation::operation::BitwiseNegation:
+        case syrec_operation::operation::LogicalNegation:
+        case syrec_operation::operation::IncrementAssign:
+        case syrec_operation::operation::DecrementAssign:
+        case syrec_operation::operation::InvertAssign:
+            return true;
+        default:
+            return false;
+    }
+}
