@@ -6,9 +6,12 @@
 #include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/symbol_table.hpp"
-#include <stack>
 #include "core/syrec/parser/symbol_table_backup_helper.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
+#include "core/syrec/parser/utils/signal_access_utils.hpp"
+
+//#include <functional>
+#include <stack>
 
 /*
  * TODO: Support for VHDL like signal access (i.e. bit range structured as .bitRangeEnd:bitRangeStart instead of .bitRangeStart:bitRangeEnd)
@@ -97,9 +100,10 @@ namespace optimizations {
         void updateBackupOfValuesChangedInScopeAndResetMadeChanges() const;
         [[nodiscard]] std::optional<std::reference_wrapper<const parser::SymbolTableBackupHelper>> peekCurrentSymbolTableBackupScope() const;
 
-        void mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfSignalsChangedInFirstBranch, const parser::SymbolTableBackupHelper& backupOfSignalsChangedInSecondBranch) const;
-        void destroySymbolTableBackupScope();
-        void createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess) const;
+        void                                                                          mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfSignalsChangedInFirstBranch, const parser::SymbolTableBackupHelper& backupOfSignalsChangedInSecondBranch) const;
+        void                                                                          makeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfCurrentValuesOfSignalsAtEndOfBranch, const parser::SymbolTableBackupHelper& backupCurrentValuesOfSignalsInToBeOmittedBranch) const;
+        void                                                                          destroySymbolTableBackupScope();
+        void                                                                          createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess) const;
         [[nodiscard]] std::optional<std::unique_ptr<parser::SymbolTableBackupHelper>> popCurrentSymbolTableBackupScope();
 
         [[nodiscard]] OptimizationResult<syrec::Module> handleModule(const syrec::Module& module);
@@ -186,6 +190,17 @@ namespace optimizations {
         }
 
         template<class T>
+        [[nodiscard]] static std::optional<std::reference_wrapper<const T>> tryFetchNonOwningReferenceOfNonConstantValueOfIndex(const SignalAccessIndexEvaluationResult<T>& index) {
+            if (index.simplifiedNonConstantValue) {
+                return std::make_optional(std::cref(*index.simplifiedNonConstantValue));
+            }
+            if (index.originalValue) {
+                return std::make_optional(std::cref(*index.originalValue));
+            }
+            return std::nullopt;
+        }
+
+        template<class T>
         [[nodiscard]] static bool couldUserDefinedIndexBySimplified(const SignalAccessIndexEvaluationResult<T>& index) {
             return index.constantValue.has_value() || index.simplifiedNonConstantValue != nullptr;
         }
@@ -217,18 +232,22 @@ namespace optimizations {
             const bool                                    wereAnyIndicesSimplified;
         };
         [[nodiscard]] std::optional<EvaluatedSignalAccess>   tryEvaluateDefinedSignalAccess(const syrec::VariableAccess& accessedSignalParts) const;
-        [[nodiscard]] std::unique_ptr<syrec::VariableAccess> transformEvaluatedSignalAccess(EvaluatedSignalAccess& evaluatedSignalAccess, std::optional<bool>* wasAnyDefinedIndexOutOfRange, bool* didAllDefinedIndicesEvaluateToConstants) const;
+        [[nodiscard]] std::unique_ptr<syrec::VariableAccess> transformEvaluatedSignalAccess(const EvaluatedSignalAccess& evaluatedSignalAccess, std::optional<bool>* wasAnyDefinedIndexOutOfRange, bool* didAllDefinedIndicesEvaluateToConstants) const;
 
-        void                                                        invalidateValueOfAccessedSignalParts(EvaluatedSignalAccess& accessedSignalParts) const;
+        void                                                        invalidateValueOfAccessedSignalParts(const EvaluatedSignalAccess& accessedSignalParts) const;
         void                                                        invalidateValueOfWholeSignal(const std::string_view& signalIdent) const;
-        void                                                        performAssignment(EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, unsigned int assignmentRhsValue) const;
+        void                                                        performAssignment(const EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, const std::optional<unsigned int>& assignmentRhsValue) const;
         void                                                        performAssignment(EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, EvaluatedSignalAccess& assignmentRhsOperand) const;
-        void                                                        performSwap(EvaluatedSignalAccess& swapOperationLhsOperand, EvaluatedSignalAccess& swapOperationRhsOperand) const;
+        void                                                        performSwap(const EvaluatedSignalAccess& swapOperationLhsOperand, const EvaluatedSignalAccess& swapOperationRhsOperand) const;
         void                                                        invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignal) const;
         void                                                        updateStoredValueOf(const syrec::VariableAccess::ptr& assignedToSignal, unsigned int newValueOfAssignedToSignal) const;
         void                                                        performSwapAndCreateBackupOfOperands(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const;
 
-        [[nodiscard]] std::optional<unsigned int>                   tryFetchValueFromEvaluatedSignalAccess(EvaluatedSignalAccess& accessedSignalParts) const;
+        [[nodiscard]] std::optional<unsigned int>                      tryFetchValueFromEvaluatedSignalAccess(const EvaluatedSignalAccess& accessedSignalParts) const;
+        [[nodiscard]] bool                                             isValueLookupBlockedByDataFlowAnalysisRestriction(const syrec::VariableAccess& accessedSignalParts) const;
+        [[nodiscard]] SignalAccessUtils::SignalAccessEquivalenceResult areEvaluatedSignalAccessEqualAtCompileTime(const EvaluatedSignalAccess& thisAccessedSignalParts, const EvaluatedSignalAccess& thatAccessedSignalParts) const;
+        [[nodiscard]] bool                                             checkIfOperandsOfBinaryExpressionAreSignalAccessesAndEqual(const syrec::expression& lhsOperand, const syrec::expression& rhsOperand) const;
+
 
         [[nodiscard]] OptimizationResult<syrec::VariableAccess> handleSignalAccess(const syrec::VariableAccess& signalAccess, bool performConstantPropagationForAccessedSignal, std::optional<unsigned int>* fetchedValue) const;
         static void filterAssignmentsThatDoNotChangeAssignedToSignal(syrec::Statement::vec& assignmentsToCheck);
@@ -249,6 +268,9 @@ namespace optimizations {
         [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::unordered_set<std::string>& parameterAndLocalLookup) const;
         [[nodiscard]] static bool                                                        isVariableReadOnly(const syrec::Variable& variable);
         [[nodiscard]] static bool                                                        isOperationUnaryAssignmentOperation(syrec_operation::operation operation);
+        [[nodiscard]] static bool                                                        isRelationalOperation(syrec_operation::operation operationToCheck);
+        [[nodiscard]] static bool                                                        isEquivalenceOperation(syrec_operation::operation operationCheck);
+        [[nodiscard]] static std::optional<bool>                                         checkWhetherOperandsOfBinaryExpressionAreEqual(const syrec::BinaryExpression& binaryExpression);
 
         template<typename T>
         void removeElementsAtIndices(std::vector<T>& vectorToModify, const std::unordered_set<std::size_t>& indicesOfElementsToRemove) {

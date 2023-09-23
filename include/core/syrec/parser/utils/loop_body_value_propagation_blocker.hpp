@@ -41,7 +41,10 @@ namespace optimizations {
             return dynamic_cast<const T*>(&stmt);
         }
         [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Statement>> transformCollectionOfSharedPointersToReferences(const syrec::Statement::vec& statements);
+        [[nodiscard]] static std::optional<unsigned int>                                 tryEvaluateNumberToConstant(const syrec::Number& number);
         void                                                                             storeUniqueAssignmentForCurrentScope(const std::string& assignedToSignalIdent, const ScopeLocalAssignmentParts& uniqueAssignment);
+        void                                                                             restrictAccessTo(const syrec::VariableAccess& assignedToSignalParts);
+        void                                                                             restrictAccessTo(const syrec::Variable& assignedToSignal);
     };
 }
 #endif
