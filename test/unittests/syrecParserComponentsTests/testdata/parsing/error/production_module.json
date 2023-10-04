@@ -160,13 +160,13 @@
       },
       {
         "line": 1,
-        "column": 22,
-        "message": "extraneous input ')' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
+        "column": 21,
+        "message": "invalid parameter type"
       },
       {
         "line": 1,
-        "column": 21,
-        "message": "invalid parameter type"
+        "column": 22,
+        "message": "extraneous input ')' expecting {'for', 'if', 'skip', '++=', '--=', '~=', 'call', 'uncall', 'wire', 'state', IDENT}"
       }
     ]
   },

@@ -1,13 +1,31 @@
 #include "core/syrec/parser/utils/message_utils.hpp"
-#include "core/syrec/parser/infix_iterator.hpp"
-
 #include <sstream>
 
-messageUtils::Message messageUtils::MessageFactory::createMessage(const Message::Position position, const Message::Severity severity, const std::string& message) {
-    return Message({position, severity, message});
+int messageUtils::Message::Position::compare(const Position& otherPosition) const {
+    if (line < otherPosition.line) {
+        return -1;
+    }
+    if (line - otherPosition.line) {
+        return 1;
+    }
+
+    if (column < otherPosition.column) {
+        return -1;
+    }
+    return static_cast<int>(column - otherPosition.column);
 }
 
-std::optional<std::string> messageUtils::tryStringifyMessage(const messageUtils::Message& message, const std::string& messageFormat) {
+
+messageUtils::Message messageUtils::MessageFactory::createMessage(const Message::ErrorCategory errorCategory, const Message::Position position, const Message::Severity severity, const std::string_view& message) {
+    return Message({errorCategory, position, severity, std::string(message)});
+}
+
+messageUtils::Message messageUtils::MessageFactory::createError(const Message::ErrorCategory errorCategory, Message::Position position, const std::string_view& message) {
+    return createMessage(errorCategory, position, Message::Severity::Error, message);
+}
+
+
+std::optional<std::string> messageUtils::tryStringifyMessage(const Message& message, const std::string_view& messageFormat) {
     if (messageFormat != Message::defaultStringifiedMessageFormat) {
         return std::nullopt;
     }
@@ -15,24 +33,35 @@ std::optional<std::string> messageUtils::tryStringifyMessage(const messageUtils:
 }
 
 std::optional<std::string> messageUtils::tryStringifyMessages(const std::vector<Message>& messages, char const* messageDelimiter) {
-    std::vector<std::string> stringifiedMessages(messages.size(), "");
+    if (messages.empty()) {
+        return std::nullopt;
+    }
 
-    bool stringificationOk = true;
-    for (std::size_t i = 0; i < messages.size() && stringificationOk; ++i) {
+    if (messages.size() == 1) {
+        return tryStringifyMessage(messages.front());
+    }
+
+    std::ostringstream containerForConcatinatedErrors;
+    
+    auto       stringificationOk                     = true;
+    const auto idxOfLastMessageWithTrailingDelimiter = messages.size() - 2;
+    for (std::size_t i = 0; i <= idxOfLastMessageWithTrailingDelimiter && stringificationOk; ++i) {
         if (const auto& stringifiedMsg = tryStringifyMessage(messages.at(i)); stringifiedMsg.has_value()) {
-            stringifiedMessages.at(i) = *stringifiedMsg;
+            containerForConcatinatedErrors << *stringifiedMsg << messageDelimiter;
+            continue;
+        }
+        stringificationOk = false;
+    }
+
+    if (stringificationOk) {
+        if (const auto& stringificationResultOfMessageWithoutTrailingDelimiter = tryStringifyMessage(messages.back()); stringificationResultOfMessageWithoutTrailingDelimiter.has_value()) {
+            containerForConcatinatedErrors << *stringificationResultOfMessageWithoutTrailingDelimiter;
         } else {
             stringificationOk = false;
         }
     }
 
-    if (!stringificationOk) {
-        return std::nullopt;
-    }
-
-    std::ostringstream errorsConcatinatedBuffer;
-    std::copy(stringifiedMessages.cbegin(), stringifiedMessages.cend(), InfixIterator<std::string>(errorsConcatinatedBuffer, messageDelimiter));
-    return errorsConcatinatedBuffer.str();
+    return stringificationOk ? std::make_optional(containerForConcatinatedErrors.str()) : std::nullopt;
 }
 
 std::vector<std::string> messageUtils::tryDeserializeStringifiedMessagesFromString(const std::string_view& stringifiedMessages, char const* expectedMessageDelimiter) {

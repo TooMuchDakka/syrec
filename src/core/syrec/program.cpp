@@ -59,14 +59,16 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
                                                            config.multiplicationSimplificationMethod,
                                                            config.optionalLoopUnrollConfig,
                                                            config.expectedMainModuleName);
-    const char*                  bufferCasted = (char *)(buffer);
-    const auto  parsingResult     = ::parser::SyrecParserInterface::parseProgram(
-                 bufferCasted,
-                 bufferSizeInBytes,
-                 parserConfigToUse);
+    const auto  bufferCasted      = reinterpret_cast<const char*>(buffer);
+    const auto  parsingResult     = ::parser::SyrecParserInterface::parseProgram(bufferCasted, bufferSizeInBytes,parserConfigToUse);
     if (parsingResult.wasParsingSuccessful) {
+        const auto& optionalUserDefinedMainModuleName = config.expectedMainModuleName.empty() ? std::nullopt : std::make_optional(config.expectedMainModuleName);
+
+        /*this->modulesVec = parsingResult.foundModules;
+        return "";*/
+
         const auto& optimizer = std::make_unique<optimizations::Optimizer>(parserConfigToUse, nullptr);
-        auto optimizationResultOfProgram = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsingResult.foundModules));
+        auto        optimizationResultOfProgram = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsingResult.foundModules), optionalUserDefinedMainModuleName);
         if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::IsUnchanged) {
             this->modulesVec = parsingResult.foundModules;
         } else if(optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::WasOptimized) {

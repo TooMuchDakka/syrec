@@ -1,17 +1,19 @@
 {
   "rangeAsOnlyInitialValue": {
     "circuit": "module main() for 2 do skip rof",
-    "expectedCircuit": "module main() for 2 step 1 do skip rof"
+    "expectedCircuit": "module main() for 0 to 2 step 1 do skip rof"
   },
   "rangeAsInitialValueWithPositiveStepSize": {
-    "circuit": "module main() for 2 step 2 do skip rof"
+    "circuit": "module main() for 2 step 2 do skip rof",
+    "expectedCircuit": "module main() for 0 to 2 step 2 do skip rof"
   },
   "rangeAsInitialValueWithNegativeStepSize": {
-    "circuit": "module main() for 2 step -2 do skip rof"
+    "circuit": "module main() for 2 step -2 do skip rof",
+    "expectedCircuit": "module main() for 2 to 0 step -2 do skip rof"
   },
   "rangeWithInitialValueAsExpression": {
     "circuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for ($i - (6 + 10)) do skip rof rof",
-    "expectedCircuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for ($i - 16) step 1 do skip rof rof"
+    "expectedCircuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for 0 to ($i - 16) step 1 do skip rof rof"
   },
   "rangeWithEndValueAsExpression": {
     "circuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for $j = 0 to ($i - (6 + 10)) do skip rof rof",
@@ -39,7 +41,7 @@
   },
   "stepSizeAsExpression": {
     "circuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for 2 step (2 + ($i - #a)) do skip rof rof",
-    "expectedCircuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for 2 step (2 + ($i - 16)) do skip rof rof"
+    "expectedCircuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for 0 to 2 step (2 + ($i - 16)) do skip rof rof"
   },
   "parentLoopVariableUsedInNestedLoop": {
     "circuit": "module main(in a(16)) for $i = 0 to 5 step 1 do for $j = ($i + 1) to ($i + (2 * $i)) step 1 do skip rof rof"
@@ -48,10 +50,12 @@
     "circuit": "module main() for $i = 0 to ($i + (2 + $i)) step ($i + 1) do skip rof"
   },
   "singleStatementInBody": {
-    "circuit": "module main() for 2 step 1 do skip rof"
+    "circuit": "module main() for 2 step 1 do skip rof",
+    "expectedCircuit": "module main() for 0 to 2 step 1 do skip rof"
   },
   "multipleStatementsInBody": {
-    "circuit": "module main(in a[2](8), in b[2](16), out c[2](16)) for 2 step 1 do c[0] += (a[0].0:3 + b[0].5:8); skip; ++= c[0]; c[0] <=> c[1] rof"
+    "circuit": "module main(in a[2](8), in b[2](16), out c[2](16)) for 2 step 1 do c[0] += (a[0].0:3 + b[0].5:8); skip; ++= c[0]; c[0] <=> c[1] rof",
+    "expectedCircuit": "module main(in a[2](8), in b[2](16), out c[2](16)) for 0 to 2 step 1 do c[0] += (a[0].0:3 + b[0].5:8); skip; ++= c[0]; c[0] <=> c[1] rof"
   },
   "reusingLoopVariableNameInAnotherLoopAfterPreviousOneWasLeft": {
     "circuit": "module main() for $a = 0 to 2 step 1 do skip rof; for $a = 0 to 5 step 1 do skip; skip rof"

@@ -49,6 +49,9 @@ namespace parser {
     extern const std::string MissmatchedNumberOfDimensionsBetweenOperands;
     extern const std::string MissmatchedNumberOfValuesForDimension;
     extern const std::string MissmatchedNumberOfValuesForDimensionsBetweenOperands;
+    extern const std::string UnaryAssignmentOperandNot1DSignal;
+    extern const std::string UnaryAssignmentOperandMoreThanOneValueOfDimensionAccessed;
+    extern const std::string FallbackBroadcastCheckFailedErrorBasedOnDimensionAccess;
 
     /* Call | uncall error messages */
     extern const std::string PreviousCallWasNotUncalled;

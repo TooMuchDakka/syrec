@@ -3,7 +3,6 @@
 #pragma once
 
 #include <vector>
-#include <string>
 
 #include "CommonTokenStream.h"
 #include "SyReCLexer.h"
@@ -18,16 +17,18 @@ namespace parser {
     class SyrecParserInterface {
     public:
         struct ParsingResult {
-            bool                     wasParsingSuccessful;
-            std::vector<messageUtils::Message> errors;
-            std::vector<messageUtils::Message> warnings;
-            syrec::Module::vec       foundModules;
+            const bool                               wasParsingSuccessful;
+            const std::vector<messageUtils::Message> errors;
+            const std::vector<messageUtils::Message> warnings;
+            const syrec::Module::vec                 foundModules;
 
-            explicit ParsingResult(std::vector<messageUtils::Message> errors, std::vector<messageUtils::Message> warnings):
-                wasParsingSuccessful(false), errors(std::move(errors)), warnings(std::move(warnings)), foundModules({}) {}
+            [[nodiscard]] static ParsingResult asNotSuccessful(std::vector<messageUtils::Message> errors, std::vector<messageUtils::Message> warnings) {
+                return ParsingResult({.wasParsingSuccessful = false, .errors = errors, .warnings = warnings, .foundModules = {}});
+            }
 
-            explicit ParsingResult(syrec::Module::vec foundModules):
-                wasParsingSuccessful(true), errors({}), warnings({}), foundModules(std::move(foundModules)) {}
+            [[nodiscard]] static ParsingResult asSuccessWithResult(syrec::Module::vec foundModules) {
+                return ParsingResult({.wasParsingSuccessful = true, .errors = {}, .warnings = {}, .foundModules = foundModules});
+            }
         };
 
         [[nodiscard]] static ParsingResult parseProgram(const char* programContent, int programContentSizeInBytes, ParserConfig parserConfig) {
@@ -46,11 +47,11 @@ namespace parser {
 
             lexer.removeErrorListener(antlrParserErrorListener.get());
             antlrParser.removeErrorListener(antlrParserErrorListener.get());
-            
+
             if (customVisitor->getErrors().empty()) {
-                return ParsingResult(customVisitor->getFoundModules());
+                return ParsingResult::asSuccessWithResult(customVisitor->getFoundModules());
             }
-            return ParsingResult(customVisitor->getErrors(), customVisitor->getWarnings());
+            return ParsingResult::asNotSuccessful(customVisitor->getErrors(), customVisitor->getWarnings());
         }
     };
 }

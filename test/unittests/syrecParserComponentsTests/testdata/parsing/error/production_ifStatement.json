@@ -59,13 +59,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 64,
-        "message": "missing ')' at '<EOF>'"
+        "column": 24,
+        "message": "Expressions used in if and corresponding fi condition did not match"
       },
       {
         "line": 1,
-        "column": 24,
-        "message": "Expressions used in if and corresponding fi condition did not match"
+        "column": 64,
+        "message": "missing ')' at '<EOF>'"
       }
     ]
   },
@@ -114,13 +114,13 @@
       },
       {
         "line": 1,
-        "column": 60,
-        "message": "extraneous input '(' expecting {<EOF>, 'module'}"
+        "column": 55,
+        "message": "undeclared ident 'test'"
       },
       {
         "line": 1,
-        "column": 55,
-        "message": "undeclared ident 'test'"
+        "column": 60,
+        "message": "extraneous input '(' expecting {<EOF>, 'module'}"
       }
     ]
   },

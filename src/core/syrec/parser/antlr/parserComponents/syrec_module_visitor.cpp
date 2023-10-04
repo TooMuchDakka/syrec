@@ -1,14 +1,16 @@
 #include "core/syrec/parser/antlr/parserComponents/syrec_module_visitor.hpp"
-
-#include "core/syrec/variable.hpp"
 #include "core/syrec/parser/custom_semantic_errors.hpp"
-#include "core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp"
-
-#include <fmt/format.h>
 
 using namespace parser;
 
+void SyReCModuleVisitor::sortErrorAccordingToPosition(std::vector<messageUtils::Message>& errors) {
+    std::sort(errors.begin(), errors.end(), [](const messageUtils::Message& thisMsg, const messageUtils::Message& thatMsg) {
+        return thisMsg.position.compare(thatMsg.position) < 0;
+    });
+}
+
 std::vector<messageUtils::Message> SyReCModuleVisitor::getErrors() const {
+    sortErrorAccordingToPosition(sharedData->errors);
     return sharedData->errors;
 }
 
@@ -24,53 +26,28 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
     SymbolTable::openScope(sharedData->currentSymbolTableScope);
 
     syrec::Module::vec unoptimizedModules;
-    for (std::size_t i = 0; i < context->module().size(); ++i) {
-        const auto module = context->module().at(i);
-        /*
-         * We have moved the opening and closing of a new symbol table scope from the module visitor here, into the parent,
-         * to not lose information about the declared symbols of the module that is required for some optimizations
-         */
+    bool               wereSemanticChecksForCurrentModuleOk = true;
+    for (const auto& moduleContextInformation: context->module()) {
         SymbolTable::openScope(sharedData->currentSymbolTableScope);
-        const auto moduleParseResult = tryVisitAndConvertProductionReturnValue<syrec::Module::ptr>(module);
-        bool       alreadyClosedOpenedSymbolTableScope = false;
 
-        if (moduleParseResult.has_value()) {
+        if (const auto moduleParseResult = tryVisitAndConvertProductionReturnValue<syrec::Module::ptr>(moduleContextInformation); moduleParseResult.has_value()) {
             if (sharedData->currentSymbolTableScope->contains(*moduleParseResult)) {
-                createMessage(mapAntlrTokenPosition(module->IDENT()->getSymbol()), messageUtils::Message::Severity::Error, DuplicateModuleIdentDeclaration, (*moduleParseResult)->name);
-            } else {
-                const auto& unoptimizedModuleVersion       = *moduleParseResult;
-                auto        optimizedModuleVersion         = unoptimizedModuleVersion;
-                std::vector<std::size_t> indicesOfOptimizedAwayParameters;
-                if (sharedData->parserConfig->deadCodeEliminationEnabled) {
-                    optimizedModuleVersion = createCopyOfModule(unoptimizedModuleVersion);
-                    // TODO: UNUSED_REFERENCE - Marked as used
-                    removeUnusedVariablesAndParametersFromModule(optimizedModuleVersion);
-                    indicesOfOptimizedAwayParameters = determineUnusedParametersBetweenModuleVersions(unoptimizedModuleVersion, optimizedModuleVersion);
-                }
-                alreadyClosedOpenedSymbolTableScope = true;
+                createError(mapAntlrTokenPosition(moduleContextInformation->IDENT()->getSymbol()),  DuplicateModuleIdentDeclaration, (*moduleParseResult)->name);
+                wereSemanticChecksForCurrentModuleOk = false;
+            }
+            else {
                 SymbolTable::closeScope(sharedData->currentSymbolTableScope);
-                sharedData->currentSymbolTableScope->addEntry(*unoptimizedModuleVersion, nullptr);
-                unoptimizedModules.emplace_back(unoptimizedModuleVersion);
-                foundModules.emplace_back(optimizedModuleVersion);   
+                sharedData->currentSymbolTableScope->addEntry(**moduleParseResult, nullptr);
+                foundModules.emplace_back(*moduleParseResult);
             }
         }
 
-        if (!alreadyClosedOpenedSymbolTableScope) {
+        if (!wereSemanticChecksForCurrentModuleOk) {
             SymbolTable::closeScope(sharedData->currentSymbolTableScope);
         }
     }
     
     const auto& nameOfTopLevelModule = determineExpectedNameOfTopLevelModule();
-    // TODO: UNUSED_REFERENCE - Marked as used
-    if (sharedData->parserConfig->deadCodeEliminationEnabled) {
-        removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(unoptimizedModules, foundModules, nameOfTopLevelModule);
-        /*
-         * If a module consists of only dead stores, all parameters as well as locals should already be removed and thus the module should be removed by this call
-         * and thus no extra check is required after the dead store optimization
-         */
-        removeModulesWithoutParameters(foundModules, nameOfTopLevelModule);
-        // TODO: Remove now empty modules after dead code elimination (either here or at pos P1)?
-    }
     addSkipStatementToMainModuleIfEmpty(foundModules, nameOfTopLevelModule);
     return 0;
 }
@@ -78,73 +55,68 @@ std::any SyReCModuleVisitor::visitProgram(SyReCParser::ProgramContext* context) 
 std::any SyReCModuleVisitor::visitModule(SyReCParser::ModuleContext* context) {
     sharedData->currentModuleCallNestingLevel++;
 
-    // TODO: Wrap into optional, since token could be null if no alternative rule is found and the moduleProduction is choosen instead (as the first alternative from the list of possible ones if nothing else matches)
-    const std::string  moduleIdent = context->IDENT()->getText();
-    syrec::Module::ptr module      = std::make_shared<syrec::Module>(moduleIdent);
-
-    const auto declaredParameters    = tryVisitAndConvertProductionReturnValue<syrec::Variable::vec>(context->parameterList());
-    bool       isDeclaredModuleValid = context->parameterList() != nullptr ? declaredParameters.has_value() : true;
-
-    if (isDeclaredModuleValid && declaredParameters.has_value()) {
-        for (const auto& declaredParameter: declaredParameters.value()) {
-            module->addParameter(declaredParameter);
-        }
+    syrec::Module::ptr module;
+    bool               isDeclaredModuleValid = true;
+    if (const auto& moduleIdentToken = context->IDENT(); moduleIdentToken != nullptr) {
+        module = std::make_shared<syrec::Module>(moduleIdentToken->getText());
+        isDeclaredModuleValid = true;
     }
 
-    for (const auto& declaredSignals: context->signalList()) {
-        const auto parsedDeclaredSignals = tryVisitAndConvertProductionReturnValue<syrec::Variable::vec>(declaredSignals);
-        isDeclaredModuleValid &= parsedDeclaredSignals.has_value();
+    if (const auto numDeclaredParametersInAST = context->parameterList() ? context->parameterList()->parameter().size() : 0) {
+        const auto declaredParameters = tryVisitAndConvertProductionReturnValue<syrec::Variable::vec>(context->parameterList());
+        std::for_each(
+                declaredParameters->cbegin(),
+                declaredParameters->cend(),
+                [&module](const syrec::Variable::ptr& parsedParameter) { module->addParameter(parsedParameter); }
+        );
+        isDeclaredModuleValid &= declaredParameters.has_value() && declaredParameters->size() >= numDeclaredParametersInAST;
+    }
+
+    for (const auto& signalListAntlrContext : context->signalList()) {
+        const auto& parsedSignalList = tryVisitAndConvertProductionReturnValue<syrec::Variable::vec>(signalListAntlrContext);
+        isDeclaredModuleValid &= parsedSignalList.has_value();
         if (isDeclaredModuleValid) {
-            for (const auto& declaredSignal: *parsedDeclaredSignals) {
-                module->addVariable(declaredSignal);
-            }
+            std::for_each(
+            parsedSignalList->cbegin(),
+            parsedSignalList->cend(),
+            [&module](const syrec::Variable::ptr& signal) {
+                module->addVariable(signal);
+            });
         }
     }
 
-    auto validUserDefinedModuleStatements = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList());
-    //isDeclaredModuleValid &= validUserDefinedModuleStatements.has_value() && !validUserDefinedModuleStatements->empty();
-    
+    if (const auto& validUserDefinedModuleStatements = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->statementList()); validUserDefinedModuleStatements.has_value()) {
+        module->statements = *validUserDefinedModuleStatements;    
+    }
     sharedData->currentModuleCallNestingLevel--;
-
-    if (isDeclaredModuleValid) {
-        lastDeclaredModuleIdent = moduleIdent;
-        if (validUserDefinedModuleStatements.has_value()) {
-            if (sharedData->parserConfig->deadStoreEliminationEnabled && sharedData->optionalDeadStoreEliminator.has_value()) {
-                auto        statementsToProcess = *std::move(validUserDefinedModuleStatements);
-                validUserDefinedModuleStatements.reset();
-                sharedData->optionalDeadStoreEliminator.value()->removeDeadStoresFrom(statementsToProcess);
-
-                // TODO: What if there are no remaining statements in the module body after the dead store elimination, currently we opt to simply insert a skip statement
-                if (statementsToProcess.empty()) {
-                    statementsToProcess.emplace_back(std::make_shared<syrec::SkipStatement>());
-                }
-                module->statements = statementsToProcess;
-            } else {
-                module->statements = *validUserDefinedModuleStatements;      
-            }
-        }
-        return std::make_optional(module);
-    }
-    return std::nullopt;
+    return isDeclaredModuleValid ? std::make_optional(module) : std::nullopt;
 }
 
 std::any SyReCModuleVisitor::visitParameterList(SyReCParser::ParameterListContext* context) {
-    syrec::Variable::vec                parametersContainer;
+    const auto&          numParameterAstNodes = context->parameter().size();
+    syrec::Variable::vec parametersContainer(numParameterAstNodes, nullptr);
 
-    for (const auto& parameter: context->parameter()) {
-        const auto parsedParameterDefinition = tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(parameter);
-        if (parsedParameterDefinition.has_value()) {
-            parametersContainer.emplace_back(*parsedParameterDefinition);
-        }
-    }
-    const bool areAllParametersValid = parametersContainer.size() == context->parameter().size();
-    return areAllParametersValid ? std::make_optional(parametersContainer) : std::nullopt;
+    const auto& parameterAstNodesContainer = context->parameter();
+    transformAndFilter(
+        parameterAstNodesContainer.cbegin(),
+        parameterAstNodesContainer.cend(),
+        parametersContainer.begin(),
+        [&](SyReCParser::ParameterContext* parameterAstNode) {
+            return tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(parameterAstNode);
+        },
+        [](const std::optional<syrec::Variable::ptr>& parsedParameter) {
+            return parsedParameter.has_value();
+        });
+
+    return parametersContainer.size() == numParameterAstNodes
+        ? std::make_optional(parametersContainer)
+        : std::nullopt;
 }
 
 std::any SyReCModuleVisitor::visitParameter(SyReCParser::ParameterContext* context) {
     const auto parameterType = getParameterType(context->start);
     if (!parameterType.has_value()) {
-        createMessage(mapAntlrTokenPosition(context->start), messageUtils::Message::Severity::Error, InvalidParameterType);
+        createError(mapAntlrTokenPosition(context->start),  InvalidParameterType);
     }
 
     auto declaredParameter = tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(context->signalDeclaration());
@@ -158,124 +130,82 @@ std::any SyReCModuleVisitor::visitParameter(SyReCParser::ParameterContext* conte
 }
 
 std::any SyReCModuleVisitor::visitSignalList(SyReCParser::SignalListContext* context) {
-    const auto declaredSignalsType          = getSignalType(context->start);
-    bool       isValidSignalListDeclaration = true;
+    const auto declaredSignalsType = getSignalType(context->start);
+    auto       wasSignalListDeclarationValid = true;
     if (!declaredSignalsType.has_value()) {
-        createMessage(mapAntlrTokenPosition(context->start), messageUtils::Message::Severity::Error, InvalidLocalType);
-        isValidSignalListDeclaration = false;
+        createError(mapAntlrTokenPosition(context->start),  InvalidLocalType);
+        wasSignalListDeclarationValid = false;
     }
 
-    syrec::Variable::vec declaredSignalsOfType{};
-    for (const auto& signal: context->signalDeclaration()) {
-        const auto declaredSignal = tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(signal);
-        isValidSignalListDeclaration &= declaredSignal.has_value();
-
-        if (isValidSignalListDeclaration) {
-            (*declaredSignal)->type = *declaredSignalsType;
-            declaredSignalsOfType.emplace_back(*declaredSignal);
-            sharedData->currentSymbolTableScope->addEntry(**declaredSignal);
+    syrec::Variable::vec containerForSignalsOfType;
+    if (declaredSignalsType.has_value()) {
+        containerForSignalsOfType.reserve(context->signalDeclaration().size());
+    }
+    
+    for (const auto& signalAstNode : context->signalDeclaration()) {
+        if (const auto& parsedSignalDeclaration = tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(signalAstNode); parsedSignalDeclaration.has_value()) {
+            if (declaredSignalsType.has_value()) {
+                parsedSignalDeclaration->get()->type = *declaredSignalsType;
+                containerForSignalsOfType.emplace_back(*parsedSignalDeclaration);
+                sharedData->currentSymbolTableScope->addEntry(**parsedSignalDeclaration);
+            }
+        } else {
+            wasSignalListDeclarationValid = false;
         }
     }
 
-    return std::make_optional(declaredSignalsOfType);
+    return wasSignalListDeclarationValid ? std::make_optional(containerForSignalsOfType) : std::nullopt;
 }
 
 std::any SyReCModuleVisitor::visitSignalDeclaration(SyReCParser::SignalDeclarationContext* context) {
-    std::optional<syrec::Variable::ptr> signal;
-    std::vector<unsigned int>           dimensions{};
-    unsigned int                        signalWidth              = sharedData->parserConfig->cDefaultSignalWidth;
-    bool                                isValidSignalDeclaration = true;
+    const auto&               declaredSignalIdent                 = context->IDENT() ? std::make_optional(context->IDENT()->getText()) : std::nullopt;
+    auto        declaredSignalWidth                 = sharedData->parserConfig->cDefaultSignalWidth;
+    auto                      isUserDefinedSignalDeclarationValid = declaredSignalIdent.has_value();
 
-    const std::string signalIdent = context->IDENT()->getText();
-    if (sharedData->currentSymbolTableScope->contains(signalIdent)) {
-        isValidSignalDeclaration = false;
-        createMessage(mapAntlrTokenPosition(context->IDENT()->getSymbol()), messageUtils::Message::Severity::Error, DuplicateDeclarationOfIdent, signalIdent);
+    if (declaredSignalIdent.has_value() && sharedData->currentSymbolTableScope->contains(*declaredSignalIdent)) {
+        isUserDefinedSignalDeclarationValid = false;
+        createError(mapAntlrTokenPosition(context->IDENT()->getSymbol()),  DuplicateDeclarationOfIdent, *declaredSignalIdent);
     }
+
+    const auto& numDefinedValuesPerDimensionAstNodes = context->dimensionTokens.size();
+    std::vector<unsigned int> declaredNumValuesPerDimension;
+    declaredNumValuesPerDimension.reserve(numDefinedValuesPerDimensionAstNodes);
     
-    for (const auto& dimensionToken : context->dimensionTokens) {
-        const auto dimensionTokenValueAsNumber = dimensionToken != nullptr
-            ? convertToNumber(dimensionToken->getText())
-            : std::nullopt;
-
-        isValidSignalDeclaration = dimensionTokenValueAsNumber.has_value();
-        if (isValidSignalDeclaration) {
-            dimensions.emplace_back(*dimensionTokenValueAsNumber);
-        }
-    }
-
-    if (isValidSignalDeclaration && dimensions.empty()) {
-        dimensions.emplace_back(1);
-    }
-
-    if (context->signalWidthToken != nullptr) {
-        const std::optional<unsigned int> customSignalWidth = convertToNumber(context->signalWidthToken->getText());
-        if (customSignalWidth.has_value()) {
-            signalWidth = (*customSignalWidth);
+    for (const auto& numValuesPerDimensionToken : context->dimensionTokens) {
+        if (const auto& parsedNumValuesPerDimension = numValuesPerDimensionToken ? tryConvertTextToNumber(numValuesPerDimensionToken->getText()) : std::nullopt;
+            parsedNumValuesPerDimension.has_value()) {
+            declaredNumValuesPerDimension.emplace_back(*parsedNumValuesPerDimension);
         } else {
-            isValidSignalDeclaration = false;
+            isUserDefinedSignalDeclarationValid = false;
         }
     }
 
-    if (isValidSignalDeclaration) {
-        signal.emplace(std::make_shared<syrec::Variable>(0, signalIdent, dimensions, signalWidth));
+    if (isUserDefinedSignalDeclarationValid && !numDefinedValuesPerDimensionAstNodes && declaredNumValuesPerDimension.empty()) {
+        declaredNumValuesPerDimension.emplace_back(1);
     }
-    return signal;
+
+    if (context->signalWidthToken) {
+        if (const auto& userDefinedSignalWidth = tryConvertTextToNumber(context->signalWidthToken->getText()); userDefinedSignalWidth.has_value()) {
+            declaredSignalWidth = *userDefinedSignalWidth;
+        } else {
+            isUserDefinedSignalDeclarationValid = false;
+        }
+    }
+
+    if (isUserDefinedSignalDeclarationValid) {
+        // Variable type is assumed to be IN and should be fixed up by the caller of this function
+        const auto& declaredSignalContainer = std::make_shared<syrec::Variable>(
+                syrec::Variable::Types::In,
+                *declaredSignalIdent,
+                declaredNumValuesPerDimension,
+                declaredSignalWidth);
+        return std::make_optional(declaredSignalContainer);
+    }
+    return std::nullopt;
 }
 
 std::any SyReCModuleVisitor::visitStatementList(SyReCParser::StatementListContext* context) {
     return statementVisitor->visitStatementList(context);
-}
-
-void SyReCModuleVisitor::removeUnusedVariablesAndParametersFromModule(const syrec::Module::ptr& module) const {
-    // TODO: UNUSED_REFERENCE - Marked as used
-    const auto&                        unusedModuleLocalsOrVariables = sharedData->currentSymbolTableScope->getUnusedLiterals();
-
-    // Use the erase/remove idiom
-    module->parameters.erase(
-        std::remove_if(
-                module->parameters.begin(),
-                module->parameters.end(),
-                [&unusedModuleLocalsOrVariables](const syrec::Variable::ptr& moduleParameter) {
-                        return unusedModuleLocalsOrVariables.find(moduleParameter->name) != unusedModuleLocalsOrVariables.end();
-                }),
-        module->parameters.end());
-
-    module->variables.erase(
-    std::remove_if(
-            module->variables.begin(),
-            module->variables.end(),
-            [&unusedModuleLocalsOrVariables](const syrec::Variable::ptr& moduleParameter) {
-                return unusedModuleLocalsOrVariables.find(moduleParameter->name) != unusedModuleLocalsOrVariables.end();
-            }),
-    module->variables.end());
-}
-
-// TODO: UNUSED_REFERENCE - Marked as used
-void SyReCModuleVisitor::removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(const syrec::Module::vec& unoptimizedModules, syrec::Module::vec& optimizedModules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const {
-    const auto& wasUsedStatusPerFoundModule = sharedData->currentSymbolTableScope->determineIfModuleWasUsed(unoptimizedModules);
-    std::size_t moduleIdx                   = 0;
-
-    for (auto foundModule = optimizedModules.begin(); foundModule != optimizedModules.end(); moduleIdx++) {
-        if (foundModule->get()->name == expectedIdentOfTopLevelModuleToNotRemove 
-            || wasUsedStatusPerFoundModule.at(moduleIdx)) {
-            ++foundModule;
-        }
-        else {
-            foundModule = optimizedModules.erase(foundModule);   
-        }
-    }
-}
-
-// TODO: UNUSED_REFERENCE - Marked as used
-void SyReCModuleVisitor::removeModulesWithoutParameters(syrec::Module::vec& modules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const {
-    modules.erase(
-    std::remove_if(
-            modules.begin(),
-            modules.end(),
-            [&expectedIdentOfTopLevelModuleToNotRemove](const syrec::Module::ptr& module) {
-                return module->name != expectedIdentOfTopLevelModuleToNotRemove && module->parameters.empty();
-            }),
-    modules.end());
 }
 
 std::string SyReCModuleVisitor::determineExpectedNameOfTopLevelModule() const {
@@ -289,45 +219,8 @@ std::string SyReCModuleVisitor::determineExpectedNameOfTopLevelModule() const {
     return doesModuleWithExpectedDefaultTopLevelNameExist && !lastDeclaredModuleIdent.empty() ? defaultExpectedTopLevelModuleName : lastDeclaredModuleIdent;
 }
 
-syrec::Module::ptr SyReCModuleVisitor::createCopyOfModule(const syrec::Module::ptr& moduleToCreateCopyFrom) const {
-    const syrec::Module::ptr createCopyOfModule = std::make_shared<syrec::Module>(moduleToCreateCopyFrom->name);
-    for (const auto& parameterToCopy : moduleToCreateCopyFrom->parameters) {
-        createCopyOfModule->addParameter(parameterToCopy);
-    }
-
-    for (const auto& localToCopy : moduleToCreateCopyFrom->variables) {
-        createCopyOfModule->addVariable(localToCopy);
-    }
-
-    for (const auto& statement : moduleToCreateCopyFrom->statements) {
-        createCopyOfModule->addStatement(statement);
-    }
-    return createCopyOfModule;
-}
-
-std::vector<std::size_t> SyReCModuleVisitor::determineUnusedParametersBetweenModuleVersions(const syrec::Module::ptr& unoptimizedModule, const syrec::Module::ptr& optimizedModule) const {
-    std::set<std::string> setOfParameterNamesOfOptimizedModule;
-    std::transform(
-    optimizedModule->parameters.cbegin(),
-    optimizedModule->parameters.cend(),
-    std::inserter(setOfParameterNamesOfOptimizedModule, setOfParameterNamesOfOptimizedModule.begin()),
-    [](const syrec::Variable::ptr& variable) {
-        return variable->name;
-    });
-
-    std::vector<std::size_t> droppedParametersInOptimizedModule;
-    for (std::size_t i = 0; i < unoptimizedModule->parameters.size(); ++i) {
-        const auto& parameterName                        = unoptimizedModule->parameters.at(i)->name;
-        if(setOfParameterNamesOfOptimizedModule.count(parameterName) == 0) {
-            droppedParametersInOptimizedModule.emplace_back(i);
-        }
-    }
-    return droppedParametersInOptimizedModule;
-}
-
-
 std::optional<syrec::Variable::Types> SyReCModuleVisitor::getParameterType(const antlr4::Token* token) {
-    if (token == nullptr) {
+    if (!token) {
         return std::nullopt;
     }
 
@@ -349,7 +242,7 @@ std::optional<syrec::Variable::Types> SyReCModuleVisitor::getParameterType(const
 }
 
 std::optional<syrec::Variable::Types> SyReCModuleVisitor::getSignalType(const antlr4::Token* token) {
-    if (token == nullptr) {
+    if (!token) {
         return std::nullopt;
     }
 

@@ -69,7 +69,7 @@ namespace optimizations {
                 status(resultFlag) {
                 if (optimizationResult) {
                     std::vector<std::unique_ptr<ToBeOptimizedContainerType>> container;
-                    container.resize(1);
+                    container.reserve(1);
                     container.emplace_back(std::move(optimizationResult));
                     result = std::move(container);
                 }
@@ -85,7 +85,7 @@ namespace optimizations {
             std::optional<std::vector<std::unique_ptr<ToBeOptimizedContainerType>>> result;
         };
 
-        [[nodiscard]] OptimizationResult<syrec::Module>       optimizeProgram(const std::vector<std::reference_wrapper<const syrec::Module>>& modules);
+        [[nodiscard]] OptimizationResult<syrec::Module>       optimizeProgram(const std::vector<std::reference_wrapper<const syrec::Module>>& modules, const std::optional<std::string>& userDefinedExpectedMainModuleIdent);
         [[nodiscard]] OptimizationResult<syrec::Statement>    handleStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements);
         [[nodiscard]] OptimizationResult<syrec::Statement>    handleStatement(const syrec::Statement& stmt);
         [[nodiscard]] OptimizationResult<syrec::expression>   handleExpr(const syrec::expression& expression) const;
@@ -106,7 +106,7 @@ namespace optimizations {
         void                                                                          createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess) const;
         [[nodiscard]] std::optional<std::unique_ptr<parser::SymbolTableBackupHelper>> popCurrentSymbolTableBackupScope();
 
-        [[nodiscard]] OptimizationResult<syrec::Module> handleModule(const syrec::Module& module);
+        [[nodiscard]] OptimizationResult<syrec::Module> handleModule(const syrec::Module& module, const std::optional<std::string>& optionalMainModuleIdent);
 
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) const;
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt) const;
@@ -267,10 +267,8 @@ namespace optimizations {
         [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements, const std::unordered_set<std::string>& parameterAndLocalLookup) const;
         [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::unordered_set<std::string>& parameterAndLocalLookup) const;
         [[nodiscard]] static bool                                                        isVariableReadOnly(const syrec::Variable& variable);
-        [[nodiscard]] static bool                                                        isOperationUnaryAssignmentOperation(syrec_operation::operation operation);
-        [[nodiscard]] static bool                                                        isRelationalOperation(syrec_operation::operation operationToCheck);
-        [[nodiscard]] static bool                                                        isEquivalenceOperation(syrec_operation::operation operationCheck);
-        [[nodiscard]] static std::optional<bool>                                         checkWhetherOperandsOfBinaryExpressionAreEqual(const syrec::BinaryExpression& binaryExpression);
+        [[nodiscard]] static std::optional<bool>                                         determineEquivalenceOfOperandsOfBinaryExpr(const syrec::BinaryExpression& binaryExpression);
+        [[nodiscard]] static bool                                                        doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(const std::string_view& currentModuleIdent, const std::optional<std::string>& userDefinedMainModuleIdent);
 
         template<typename T>
         void removeElementsAtIndices(std::vector<T>& vectorToModify, const std::unordered_set<std::size_t>& indicesOfElementsToRemove) {

@@ -1,26 +1,31 @@
 #ifndef VALUE_BROADCASTER_HPP
 #define VALUE_BROADCASTER_HPP
+#pragma once
 
+#include <optional>
 #include <vector>
 
-#include "core/syrec/variable.hpp"
-
-namespace parser
+namespace valueBroadcastCheck
 {
-    struct NumberOfValuesForDimensionMissmatch {
-        const unsigned int dimensionIdx;
-        const unsigned int expectedNumberOfValues;
-        const unsigned int actualNumberOfValues;
-
-        NumberOfValuesForDimensionMissmatch(const unsigned int dimensionIdx, const unsigned int expectedNumberOfValues, const unsigned int actualNumberOfValues):
-            dimensionIdx(dimensionIdx), expectedNumberOfValues(expectedNumberOfValues), actualNumberOfValues(actualNumberOfValues) {}
-        // disable changing the object through assignment
-        NumberOfValuesForDimensionMissmatch& operator=(const NumberOfValuesForDimensionMissmatch&) = delete;
+    struct AccessedValuesOfDimensionMissmatch {
+        std::size_t dimensionIdx;
+        unsigned int expectedNumberOfValues;
+        unsigned int actualNumberOfValues;
     };
 
-    [[nodiscard]] bool requiresBroadcasting(const std::vector<unsigned int>& numVariablesPerDimensionOfOperandOne, const std::vector<unsigned int>& numVariablesPerDimensionOfOperandTwo);
-    [[nodiscard]] std::vector<NumberOfValuesForDimensionMissmatch> getDimensionsWithMissmatchedNumberOfValues(const std::vector<unsigned int>& numVariablesPerDimensionOfOperandOne, const std::vector<unsigned int>& numVariablesPerDimensionOfOperandTwo);
-    [[nodiscard]] std::vector<unsigned int>                        getSizeOfSignalAfterAccess(const syrec::VariableAccess::ptr& variableAccess);
+    struct DimensionAccessMissmatchResult {
+        enum MissmatchReason {
+            SizeOfResult,
+            AccessedValueOfAnyDimension
+        };
+
+        MissmatchReason                                 missmatchReason;
+        std::pair<std::size_t, std::size_t>             numNotExplicitlyAccessedDimensionPerOperand;
+        std::vector<AccessedValuesOfDimensionMissmatch> valuePerNotExplicitlyAccessedDimensionMissmatch;
+    };
+
+    [[nodiscard]] std::optional<const DimensionAccessMissmatchResult> determineMissmatchesInAccessedValuesPerDimension(std::size_t numDeclaredDimensionsOfLhsOperand, std::size_t indexOfFirstNotExplicitlyAccessedDimensionOfLhsOperand, const std::vector<unsigned int>& numAccessedValuesPerDimensionOfLhsOperand,
+                                                                                                                       std::size_t numDeclaredDimensionsOfRhsOperand, std::size_t indexOfFirstNotExplicitlyAccessedDimensionOfRhsOperand, const std::vector<unsigned int>& numAccessedValuesPerDimensionOfRhsOperand);
 }
 
 #endif

@@ -46,6 +46,10 @@ namespace parser {
     extern const std::string MissmatchedNumberOfValuesForDimension           = "<{0:d} | {1:d} | {2:d}>";
     // TODO: Wording of error text, index of dimensions starts after any previous access (i.e. a[0][1][3] and b[0][1][0] would result in an error at dimension 0)
     extern const std::string MissmatchedNumberOfValuesForDimensionsBetweenOperands = "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): {0:s}";
+    extern const std::string UnaryAssignmentOperandNot1DSignal                     = "Expected unary assignment operand to be a 1-d signal but was actually a {0:d}-d signal";
+    extern const std::string UnaryAssignmentOperandMoreThanOneValueOfDimensionAccessed = "Expected dimension access of unary assignment operand to only target at most one value per dimension but {0:d} values were accessed at the dimension {1:d} (dimension index is relative to last explicitly accessed dimension)";
+    extern const std::string FallbackBroadcastCheckFailedErrorBasedOnDimensionAccess   = "Broadcast check based on dimension access failed for unknown reason";
+
 
     /* Call | uncall error messages */
     extern const std::string PreviousCallWasNotUncalled              = "Tried to issue a call with one/many previous calls not being uncalled";

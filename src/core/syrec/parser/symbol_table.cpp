@@ -1,6 +1,7 @@
 #include "core/syrec/parser/symbol_table.hpp"
 
 #include <functional>
+#include <set>
 
 using namespace parser;
 
@@ -148,7 +149,7 @@ bool SymbolTable::addEntry(const syrec::Number& number, const unsigned int bitsR
 
 bool SymbolTable::addEntry(const syrec::Module& module, std::size_t* internalModuleId) {
     const auto symbolTableEntryForModulesMatchingName = getEntryForModulesWithMatchingName(module.name);
-    std::size_t generatedIdForModule                   = 0;
+    std::size_t generatedIdForModule;
     if (symbolTableEntryForModulesMatchingName == nullptr) {
         const auto& createdSymbolTableEntryForModulesMatchingName = std::make_shared<ModuleSymbolTableEntry>();
         generatedIdForModule = createdSymbolTableEntryForModulesMatchingName->addModule(module);
@@ -168,9 +169,9 @@ void SymbolTable::removeVariable(const std::string& literalIdent) {
         return;
     }
 
-    if (locals.count(literalIdent) == 0 && outer != nullptr) {
+    if (!locals.count(literalIdent) && outer) {
         outer->removeVariable(literalIdent);
-    } else if (locals.count(literalIdent) != 0) {
+    } else if (locals.count(literalIdent)) {
         locals.erase(literalIdent);
     }
 }

@@ -1,13 +1,12 @@
 #ifndef SYMBOL_TABLE_HPP
 #define SYMBOL_TABLE_HPP
-
-#include <memory>
-#include <set>
+#pragma once
 
 #include "core/syrec/module.hpp"
 #include "core/syrec/variable.hpp"
 #include "optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp"
 
+#include <memory>
 #include <unordered_set>
 
 namespace parser {
@@ -39,10 +38,10 @@ namespace parser {
         [[nodiscard]] std::optional<DeclaredModuleSignature>        tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, const std::vector<std::string>& calleeArguments) const;
         [[nodiscard]] std::optional<std::unique_ptr<syrec::Module>> getFullDeclaredModuleInformation(const std::string_view& moduleName, std::size_t internalModuleId) const;
 
-        bool                                                                                addEntry(const syrec::Variable& variable);
-        bool                                                                                addEntry(const syrec::Number& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
-        bool                                                                                addEntry(const syrec::Module& module, std::size_t* internalModuleId);
-        void                                                                                removeVariable(const std::string& literalIdent);
+        [[maybe_unused]] bool addEntry(const syrec::Variable& variable);
+        [[maybe_unused]] bool addEntry(const syrec::Number& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
+        [[maybe_unused]] bool addEntry(const syrec::Module& module, std::size_t* internalModuleId);
+        void removeVariable(const std::string& literalIdent);
 
         enum ReferenceCountUpdate {
             Increment,

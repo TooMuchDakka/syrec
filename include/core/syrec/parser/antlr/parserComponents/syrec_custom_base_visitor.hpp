@@ -6,35 +6,35 @@
 #include "SyReCBaseVisitor.h"
 #include "core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor_shared_data.hpp"
 #include "core/syrec/parser/expression_evaluation_result.hpp"
+#include <core/syrec/parser/utils/message_utils.hpp>
 #include "core/syrec/parser/operation.hpp"
-#include "core/syrec/parser/signal_access_restriction.hpp"
+#include "core/syrec/parser/value_broadcaster.hpp"
 
 #include <optional>
 #include <string>
-#include <core/syrec/parser/utils/message_utils.hpp>
 
 namespace parser {
     class SyReCCustomBaseVisitor : public SyReCBaseVisitor {
     public:
-        explicit SyReCCustomBaseVisitor(std::shared_ptr<SharedVisitorData> sharedVisitorData) :
+        explicit SyReCCustomBaseVisitor(SharedVisitorData::ptr sharedVisitorData) :
             sharedData(std::move(sharedVisitorData))
         {}
-
-    // TODO: We need one shared object holding all shared information (i.e. symbol table, etc.)
+        
     protected:
-        std::shared_ptr<SharedVisitorData> sharedData;
+        SharedVisitorData::ptr sharedData;
         
         [[nodiscard]] static messageUtils::Message::Position determineContextStartTokenPositionOrUseDefaultOne(const antlr4::ParserRuleContext* context);
         [[nodiscard]] static messageUtils::Message::Position mapAntlrTokenPosition(const antlr4::Token* token);
 
+
         template<typename ...T>
-        void createMessage(messageUtils::Message::Position position, messageUtils::Message::Severity severity, const std::string& formatString, T&&... args) {
+        void createMessage(const messageUtils::Message::Position& position, messageUtils::Message::Severity severity, const std::string_view& formatString, T&&... args) {
             switch (severity) {
                 case messageUtils::Message::Error:
-                    sharedData->errors.emplace_back(sharedData->messageFactory.createMessage(position, severity, formatString, std::forward<T>(args)...));
+                    sharedData->errors.emplace_back(sharedData->messageFactory.createMessage(messageUtils::Message::ErrorCategory::Semantic, position, severity, formatString, std::forward<T>(args)...));
                     break;
                 case messageUtils::Message::Warning:
-                    sharedData->warnings.emplace_back(sharedData->messageFactory.createMessage(position, severity, formatString, std::forward<T>(args)...));
+                    sharedData->warnings.emplace_back(sharedData->messageFactory.createMessage(messageUtils::Message::ErrorCategory::Semantic, position, severity, formatString, std::forward<T>(args)...));
                     break;
                 default:
                     break;
@@ -42,28 +42,34 @@ namespace parser {
         }
 
         template<typename ...T>
+        void createError(const messageUtils::Message::Position& position, const std::string_view& formatString, T&&... args) {
+            createMessage(position, messageUtils::Message::Severity::Error, formatString, std::forward<T>(args)...);
+        }
+
+        template<typename ...T>
         void createMessageAtUnknownPosition(messageUtils::Message::Severity severity, const std::string& formatString, T&&... args) {
             createMessage(determineContextStartTokenPositionOrUseDefaultOne(nullptr), severity, formatString, std::forward<T>(args)...);
         }
         
-        bool                                                    checkIfSignalWasDeclaredOrLogError(const std::string& signalIdent, const bool isLoopVariable, const messageUtils::Message::Position& signalIdentTokenPosition);
-        [[nodiscard]] bool                                      isSignalAssignableOtherwiseCreateError(const antlr4::Token* signalIdentToken, const syrec::VariableAccess::ptr& assignedToVariable);
+        [[maybe_unused]] bool                                   checkIfSignalWasDeclaredOrLogError(const std::string_view& signalIdent, const messageUtils::Message::Position& signalIdentTokenPosition);
+        [[nodiscard]] bool                                      isSignalAssignableOtherwiseCreateError(unsigned int signalType, const std::string_view& signalIdent, const messageUtils::Message::Position& signalIdentTokenPosition);
         [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
-        bool                                                    checkIfNumberOfValuesPerDimensionMatchOrLogError(const messageUtils::Message::Position& positionOfOptionalError, const std::vector<unsigned int>& lhsOperandNumValuesPerDimension, const std::vector<unsigned int>& rhsOperandNumValuesPerDimension);
-        [[nodiscard]] std::optional<unsigned int>               tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess::ptr& variableAccess, const messageUtils::Message::Position& evaluationErrorPositionHelper);
-        [[nodiscard]] std::optional<unsigned int>               tryDetermineExpressionBitwidth(const syrec::expression::ptr& expression, const messageUtils::Message::Position& evaluationErrorPosition);
+        [[nodiscard]] std::optional<unsigned int>               tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess& variableAccess, const messageUtils::Message::Position* evaluationErrorPositionHelper);
+        [[nodiscard]] std::optional<unsigned int>               tryDetermineExpressionBitwidth(const syrec::expression& expression, const messageUtils::Message::Position& evaluationErrorPosition);
 
-        [[nodiscard]] bool                                      canEvaluateNumber(const syrec::Number::ptr& number) const;
-        [[nodiscard]] std::optional<unsigned int>               tryEvaluateNumber(const syrec::Number::ptr& numberContainer, const messageUtils::Message::Position& evaluationErrorPositionHelper);
-        [[nodiscard]] std::optional<unsigned int>               tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, const messageUtils::Message::Position& evaluationErrorPositionHelper);
+        [[nodiscard]] bool                                      canEvaluateNumber(const syrec::Number& number) const;
+        [[nodiscard]] std::optional<unsigned int>               tryEvaluateNumber(const syrec::Number& numberContainer, const messageUtils::Message::Position* evaluationErrorPositionHelper);
+        [[nodiscard]] std::optional<unsigned int>               tryEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression, const messageUtils::Message::Position* evaluationErrorPositionHelper);
         [[nodiscard]] std::optional<unsigned int>               applyBinaryOperation(syrec_operation::operation operation, unsigned int leftOperand, unsigned int rightOperand, const messageUtils::Message::Position& potentialErrorPosition);
         void                                                    insertSkipStatementIfStatementListIsEmpty(syrec::Statement::vec& statementList) const;
-
-        std::optional<SignalAccessRestriction::SignalAccess> tryEvaluateBitOrRangeAccess(const std::pair<syrec::Number::ptr, syrec::Number::ptr>& accessedBits, const messageUtils::Message::Position& optionalEvaluationErrorPosition);
         
-        void updateReferenceCountOfSignal(const std::string_view& signalIdent, SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
-        [[nodiscard]] std::optional<unsigned int> tryPerformConstantPropagationForSignalAccess(const syrec::VariableAccess::ptr& accessedSignal) const;
-        [[nodiscard]] static std::optional<unsigned int> convertToNumber(const std::string& text);
+        [[nodiscard]] static std::optional<unsigned int> tryConvertTextToNumber(const std::string_view& text);
+        [[nodiscard]] std::vector<std::optional<unsigned int>> determineAccessedValuePerDimensionFromSignalAccess(const syrec::VariableAccess& signalAccess);
+        [[nodiscard]] static std::pair<std::vector<unsigned int>, std::size_t> determineNumAccessedValuesPerDimensionAndFirstNotExplicitlyAccessedDimensionIndex(const syrec::VariableAccess& signalAccess);
+        [[nodiscard]] bool                                                     doOperandsRequireBroadcastingBasedOnDimensionAccessAndLogError(std::size_t numDeclaredDimensionsOfLhsOperand, std::size_t firstNoExplicitlyAccessedDimensionOfLhsOperand, const std::vector<unsigned int>& numAccessedValuesPerDimensionOfLhsOperand,
+                                                                                                                       std::size_t numDeclaredDimensionsOfRhsOperand, std::size_t firstNoExplicitlyAccessedDimensionOfRhsOperand, const std::vector<unsigned int>& numAccessedValuesPerDimensionOfRhsOperand, const messageUtils::Message::Position* broadcastingErrorPosition, valueBroadcastCheck::DimensionAccessMissmatchResult* missmatchResult);
+
+        [[nodiscard]] bool doOperandsRequiredBroadcastingBasedOnBitwidthAndLogError(std::size_t accessedBitRangeWidthOfLhsOperand, std::size_t accessedBitRangeWidthOfRhsOperand, const messageUtils::Message::Position* broadcastingErrorPosition);
 
         std::any visitSignal(SyReCParser::SignalContext* context) override;
         std::any visitNumberFromConstant(SyReCParser::NumberFromConstantContext* context) override;
@@ -99,31 +105,30 @@ namespace parser {
          */
         template<typename T>
         [[nodiscard]] std::optional<T> tryVisitAndConvertProductionReturnValue(antlr4::tree::ParseTree* production) {
-            if (production == nullptr) {
-                return std::nullopt;
-            }
-            return tryConvertProductionReturnValue<T>(visit(production));
+            return production ? tryConvertProductionReturnValue<T>(visit(production)) : std::nullopt;
         }
 
         template<class InputIt, class OutputIt, class Pred, class Fct>
-        static void transform_if(InputIt first, InputIt last, OutputIt dest, Pred pred, Fct transform) {
-            while (first != last) {
-                if (pred(*first))
-                    *dest++ = transform(*first);
-
-                ++first;
+        static void transformAndFilter(InputIt first, InputIt last, OutputIt dest, Fct inputTransformer, Pred transformedResultPredicate) {
+            for (auto iterator = first; iterator != last; ++iterator) {
+                if (const auto& transformedEntry = inputTransformer(*iterator); transformedResultPredicate(transformedEntry)) {
+                    *dest++ = *transformedEntry;
+                }
             }
         }
+
     private:
-        [[nodiscard]] bool canEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression) const;
-        [[nodiscard]] bool validateSemanticChecksIfDimensionExpressionIsConstant(const antlr4::Token* dimensionToken, size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const std::optional<ExpressionEvaluationResult::ptr>& expressionEvaluationResult);
+        [[nodiscard]] bool                                                             wasSyntaxErrorDetectedBetweenTokens(const messageUtils::Message::Position& rangeOfInterestStartPosition, const messageUtils::Message::Position& rangeOfInterestEndPosition) const;
+        [[nodiscard]] bool                                                             canEvaluateCompileTimeExpression(const syrec::Number::CompileTimeConstantExpression& compileTimeExpression) const;
+        [[nodiscard]] std::optional<bool>                                              isAccessedValueOfDimensionWithinRange(const messageUtils::Message::Position& valueOfDimensionTokenPosition, size_t accessedDimensionIdx, const syrec::Variable::ptr& accessedSignal, const ExpressionEvaluationResult& expressionEvaluationResult);
         [[nodiscard]] std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>> isBitOrRangeAccessDefined(SyReCParser::NumberContext* bitRangeStartToken, SyReCParser::NumberContext* bitRangeEndToken);
         [[nodiscard]] bool                                                             validateBitOrRangeAccessOnSignal(const antlr4::Token* bitOrRangeStartToken, const syrec::Variable::ptr& accessedVariable, const std::pair<syrec::Number::ptr, syrec::Number::ptr>& bitOrRangeAccess);
-        [[nodiscard]] bool                                                             isAccessToAccessedSignalPartRestricted(const syrec::VariableAccess::ptr& accessedSignalPart, const messageUtils::Message::Position& optionalEvaluationErrorPosition) const;
+        [[nodiscard]] bool                                                             existsRestrictionForAccessedSignalParts(const syrec::VariableAccess& accessedSignalPart, const messageUtils::Message::Position* optionalEvaluationErrorPosition);
         [[nodiscard]] static std::string                                               stringifyCompileTimeConstantExpressionOperation(syrec::Number::CompileTimeConstantExpression::Operation ctcOperation);
-        [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr>               tryConvertCompileTimeConstantExpressionToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression, const parser::SymbolTable::ptr& symbolTable);
-        [[nodiscard]] static std::optional<syrec::Number::ptr>                         tryConvertExpressionToCompileTimeConstantOne(const syrec::expression::ptr& expr);
-        [[nodiscard]] static std::optional<syrec::expression::ptr>                     tryConvertNumberToExpr(const syrec::Number::ptr& number, const parser::SymbolTable::ptr& symbolTable);
+        [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr>               tryConvertCompileTimeConstantExpressionToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static std::optional<syrec::Number::ptr>                         tryConvertExpressionToCompileTimeConstantOne(const syrec::expression& expr);
+        [[nodiscard]] static std::optional<syrec::expression::ptr>                     tryConvertNumberToExpr(const syrec::Number& number, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static std::string                                               combineValuePerDimensionMissmatch(const std::vector<valueBroadcastCheck::AccessedValuesOfDimensionMissmatch>& valuePerNotExplicitlyAccessedDimensionMissmatch);
     };
 }
 #endif

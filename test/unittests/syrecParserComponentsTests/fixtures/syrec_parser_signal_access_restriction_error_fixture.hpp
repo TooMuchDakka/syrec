@@ -32,7 +32,7 @@ namespace SignalAccessRestrictionParserTests {
             line(line), column(column), expectedErrorMessage(expectedErrorMessage) {}
 
         [[nodiscard]] std::string stringifiy() const {
-            return *messageUtils::tryStringifyMessage(messageUtils::Message({messageUtils::Message::Position(line, column), messageUtils::Message::Severity::Error, expectedErrorMessage}));
+            return *messageUtils::tryStringifyMessage(messageUtils::Message({messageUtils::Message::ErrorCategory::Semantic, messageUtils::Message::Position(line, column), messageUtils::Message::Severity::Error, expectedErrorMessage}));
         }
     };
 

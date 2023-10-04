@@ -460,3 +460,43 @@ std::optional<unsigned int> syrec_operation::tryMapUnaryAssignmentOperationEnumT
             return std::nullopt;
     }
 }
+
+bool syrec_operation::isOperationAssignmentOperation(operation operationToCheck) noexcept {
+    switch (operationToCheck) {
+        case operation::AddAssign:
+        case operation::MinusAssign:
+        case operation::XorAssign:
+                return true;
+        default:
+            return false;
+    }
+}
+
+bool syrec_operation::isOperationEquivalenceOperation(operation operationToCheck) noexcept {
+    return operationToCheck == operation::Equals || operationToCheck == operation::NotEquals;
+}
+
+bool syrec_operation::isOperationRelationalOperation(operation operationToCheck) noexcept {
+    switch (operationToCheck) {
+        case operation::GreaterEquals:
+        case operation::GreaterThan:
+        case operation::LessEquals:
+        case operation::LessThan:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool syrec_operation::isOperationUnaryAssignmentOperation(operation operationToCheck) noexcept {
+    switch (operationToCheck) {
+        case operation::BitwiseNegation:
+        case operation::LogicalNegation:
+        case operation::IncrementAssign:
+        case operation::DecrementAssign:
+        case operation::InvertAssign:
+            return true;
+        default:
+            return false;
+    }
+}

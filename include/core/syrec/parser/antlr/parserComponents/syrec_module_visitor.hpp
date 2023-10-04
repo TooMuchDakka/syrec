@@ -11,16 +11,15 @@
 namespace parser {
     class SyReCModuleVisitor: public SyReCCustomBaseVisitor {
     public:
-        explicit SyReCModuleVisitor(const std::shared_ptr<SharedVisitorData>& sharedVisitorData) : SyReCCustomBaseVisitor(sharedVisitorData),
-            foundModules(syrec::Module::vec()),
-            statementVisitor(std::make_unique<SyReCStatementVisitor>(SyReCStatementVisitor(sharedVisitorData)))
+        explicit SyReCModuleVisitor(const SharedVisitorData::ptr& sharedVisitorData)
+            : SyReCCustomBaseVisitor(sharedVisitorData), foundModules(syrec::Module::vec()), statementVisitor(std::make_unique<SyReCStatementVisitor>(SyReCStatementVisitor(sharedVisitorData)))
         {}
 
         std::any visitProgram(SyReCParser::ProgramContext* context) override;
 
         [[nodiscard]] std::vector<messageUtils::Message> getErrors() const;
         [[nodiscard]] std::vector<messageUtils::Message> getWarnings() const;
-        [[nodiscard]] syrec::Module::vec       getFoundModules() const;
+        [[nodiscard]] syrec::Module::vec                 getFoundModules() const;
 
     private:
         syrec::Module::vec                     foundModules;
@@ -33,18 +32,13 @@ namespace parser {
         std::any visitSignalList(SyReCParser::SignalListContext* context) override;
         std::any visitSignalDeclaration(SyReCParser::SignalDeclarationContext* context) override;
         std::any visitStatementList(SyReCParser::StatementListContext* context) override;
-
-        void removeUnusedVariablesAndParametersFromModule(const syrec::Module::ptr& module) const;
-        void removeUnusedOptimizedModulesWithHelpOfInformationOfUnoptimized(const syrec::Module::vec& unoptimizedModules, syrec::Module::vec& optimizedModules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const;
-        void removeModulesWithoutParameters(syrec::Module::vec& modules, const std::string_view& expectedIdentOfTopLevelModuleToNotRemove) const;
+        
         void addSkipStatementToMainModuleIfEmpty(const syrec::Module::vec& modules, const std::string_view& expectedIdentOfTopLevelModule) const;
 
         [[nodiscard]] std::string determineExpectedNameOfTopLevelModule() const;
-        [[nodiscard]] syrec::Module::ptr createCopyOfModule(const syrec::Module::ptr& moduleToCreateCopyFrom) const;
-        [[nodiscard]] std::vector<std::size_t> determineUnusedParametersBetweenModuleVersions(const syrec::Module::ptr& unoptimizedModule, const syrec::Module::ptr& optimizedModule) const;
-
-        static std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
-        static std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);
+        [[nodiscard]] static std::optional<syrec::Variable::Types> getParameterType(const antlr4::Token* token);
+        [[nodiscard]] static std::optional<syrec::Variable::Types> getSignalType(const antlr4::Token* token);
+        static void                                                sortErrorAccordingToPosition(std::vector<messageUtils::Message>& errors);
     };
 }
 #endif

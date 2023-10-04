@@ -62,6 +62,11 @@ namespace syrec_operation {
     [[nodiscard]] std::optional<unsigned int> tryMapUnaryAssignmentOperationEnumToFlag(operation unaryAssignmentOperation) noexcept;
     // TODO: Add mappings for unary expression if support for it is added within syrec
     //[[nodiscard]] std::optional<unsigned int> tryMapUnaryAssignmentOperationEnumToFlag(operation unaryAssignmentOperation) noexcept;
+
+    [[nodiscard]] bool isOperationAssignmentOperation(operation operationToCheck) noexcept;
+    [[nodiscard]] bool isOperationUnaryAssignmentOperation(operation operationToCheck) noexcept;
+    [[nodiscard]] bool isOperationRelationalOperation(operation operationToCheck) noexcept;
+    [[nodiscard]] bool isOperationEquivalenceOperation(operation operationToCheck) noexcept;
 };
 
 #endif

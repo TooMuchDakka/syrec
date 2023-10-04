@@ -15,13 +15,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 58,
-        "message": "extraneous input 'test' expecting {<EOF>, 'module'}"
+        "column": 48,
+        "message": "missing uncall for module 'toCall' called with arguments 'b'"
       },
       {
         "line": 1,
-        "column": 48,
-        "message": "missing uncall for module 'toCall' called with arguments 'b'"
+        "column": 58,
+        "message": "extraneous input 'test' expecting {<EOF>, 'module'}"
       }
     ]
   },
@@ -30,23 +30,23 @@
     "errors": [
       {
         "line": 1,
-        "column": 67,
-        "message": "mismatched input ',' expecting '('"
-      },
-      {
-        "line": 1,
         "column": 60,
         "message": "undeclared ident 'toCallc'"
       },
       {
         "line": 1,
-        "column": 80,
-        "message": "Missmatch between module ident 'toCallc' used in call does not match the uncalled one 'toCall'"
+        "column": 60,
+        "message": "missing uncall for module 'toCallc' called with arguments ''"
       },
       {
         "line": 1,
-        "column": 60,
-        "message": "missing uncall for module 'toCallc' called with arguments ''"
+        "column": 67,
+        "message": "mismatched input ',' expecting '('"
+      },
+      {
+        "line": 1,
+        "column": 80,
+        "message": "Missmatch between module ident 'toCallc' used in call does not match the uncalled one 'toCall'"
       }
     ]
   },
@@ -110,13 +110,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 74,
-        "message": "mismatched input '<' expecting {')', ','}"
+        "column": 66,
+        "message": "None of the overloads for module 'toCall' accepts 1 parameters"
       },
       {
         "line": 1,
-        "column": 66,
-        "message": "None of the overloads for module 'toCall' accepts 1 parameters"
+        "column": 74,
+        "message": "mismatched input '<' expecting {')', ','}"
       },
       {
         "line": 1,
@@ -130,11 +130,6 @@
     "errors": [
       {
         "line": 1,
-        "column": 95,
-        "message": "mismatched input '<' expecting {')', ','}"
-      },
-      {
-        "line": 1,
         "column": 87,
         "message": "Module 'toCall' was called with 2 parameters while the uncall was called with 1"
       },
@@ -142,6 +137,11 @@
         "line": 1,
         "column": 87,
         "message": "None of the overloads for module 'toCall' accepts 1 parameters"
+      },
+      {
+        "line": 1,
+        "column": 95,
+        "message": "mismatched input '<' expecting {')', ','}"
       }
     ]
   },
@@ -160,13 +160,13 @@
     "errors": [
       {
         "line": 1,
-        "column": 85,
-        "message": "Tried to issue a call with one/many previous calls not being uncalled"
+        "column": 66,
+        "message": "missing uncall for module 'toCall' called with arguments 'c,a'"
       },
       {
         "line": 1,
-        "column": 66,
-        "message": "missing uncall for module 'toCall' called with arguments 'c,a'"
+        "column": 85,
+        "message": "Tried to issue a call with one/many previous calls not being uncalled"
       },
       {
         "line": 1,

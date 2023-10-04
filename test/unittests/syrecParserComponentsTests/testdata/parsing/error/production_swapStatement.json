@@ -149,32 +149,32 @@
     ]
   },
   "invalidSwapOfLhsSignalWithRhsSignalWithLessDimensions": {
-    "circuit": "module main(out a[2][4](5), out b[2](16)) a <=> b",
+    "circuit": "module main(out a[2][4](16), out b[2](16)) a <=> b",
     "errors": [
       {
         "line": 1,
-        "column": 42,
-        "message": "invalid swap number of dimension missmatch, first operand had 2 while the other had 1"
+        "column": 43,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 2-d signal while the right one was a 1-d signal"
       }
     ]
   },
   "invalidSwapOfLhsSignalWithRhsSignalWithTooManyDimensions": {
-    "circuit": "module main(out a[2](5), out b[2][4](16)) a <=> b",
+    "circuit": "module main(out a[2](16), out b[2][4](16)) a <=> b",
     "errors": [
       {
         "line": 1,
-        "column": 42,
-        "message": "invalid swap number of dimension missmatch, first operand had 1 while the other had 2"
+        "column": 43,
+        "message": "Missmatch of number of dimensions of operands, left operand was a 1-d signal while the right one was a 2-d signal"
       }
     ]
   },
   "invalidSwapOfLhsSignalWithRhsSignalWithValueForDimensionTooSmall": {
-    "circuit": "module main(out a[2](5), out b[1](16)) a <=> b",
+    "circuit": "module main(out a[2](16), out b[1](16)) a <=> b",
     "errors": [
       {
         "line": 1,
-        "column": 39,
-        "message": "invalid swap missmatch in value for dimension 0, first operand had a value of 2 while the other had a value of 1"
+        "column": 40,
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 2 | 1>"
       }
     ]
   },
@@ -184,7 +184,7 @@
       {
         "line": 1,
         "column": 40,
-        "message": "invalid swap missmatch in value for dimension 0, first operand had a value of 2 while the other had a value of 5"
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <0 | 2 | 5>"
       }
     ]
   },
@@ -194,7 +194,7 @@
       {
         "line": 1,
         "column": 46,
-        "message": "invalid swap missmatch in value for dimension 1, first operand had a value of 4 while the other had a value of 1"
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <1 | 4 | 1>"
       }
     ]
   },
@@ -204,7 +204,7 @@
       {
         "line": 1,
         "column": 46,
-        "message": "invalid swap missmatch in value for dimension 1, first operand had a value of 4 while the other had a value of 5"
+        "message": "Missmatch between number of values for some dimensions for the given operands (dimensionIdx is relative to last accessed dimension of signal, format <dimensionIdx | leftOperandNumValues | rightOperandNumValues>): <1 | 4 | 5>"
       }
     ]
   },

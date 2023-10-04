@@ -15,16 +15,24 @@
 
 // TODO: Refactoring if case switches with visitor pattern as its available in std::visit call
 
-optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::optimizeProgram(const std::vector<std::reference_wrapper<const syrec::Module>>& modules) {
+optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::optimizeProgram(const std::vector<std::reference_wrapper<const syrec::Module>>& modules, const std::optional<std::string>& userDefinedExpectedMainModuleIdent) {
     std::vector<std::unique_ptr<syrec::Module>> optimizedModules;
     bool                                        optimizedAnyModule = false;
+
+    std::optional<std::string> mainModuleIdent = userDefinedExpectedMainModuleIdent;
+    if (!userDefinedExpectedMainModuleIdent.has_value() && !modules.empty()) {
+        mainModuleIdent = modules.end()->get().name;
+    }
+
     for (const auto& module: modules) {
-        auto&& optimizedModule = handleModule(module);
+        auto&&     optimizedModule          = handleModule(module, mainModuleIdent);
         const auto optimizationResultStatus = optimizedModule.getStatusOfResult();
         optimizedAnyModule                  = optimizationResultStatus == OptimizationResultFlag::WasOptimized;
 
         if (optimizationResultStatus == OptimizationResultFlag::WasOptimized) {
-            optimizedModules.emplace_back(std::move(optimizedModule.tryTakeOwnershipOfOptimizationResult()->front()));
+            if (auto optimizedModuleData = optimizedModule.tryTakeOwnershipOfOptimizationResult(); optimizedModuleData.has_value()) {
+                optimizedModules.emplace_back(std::move(optimizedModuleData->front()));
+            }
         } else if (optimizedModule.getStatusOfResult() == OptimizationResultFlag::IsUnchanged) {
             optimizedModules.emplace_back(createCopyOfModule(module));
         }
@@ -37,7 +45,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
 }
 
 // TODO:
-optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::handleModule(const syrec::Module& module) {
+optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::handleModule(const syrec::Module& module, const std::optional<std::string>& optionalMainModuleIdent) {
     auto copyOfModule = createCopyOfModule(module);
     // TODO: Add entries for module parameters
 
@@ -48,8 +56,10 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
     bool wereAnyStatementsOptimizedAway = false;
     if (auto optimizationResultOfModuleStatements = handleStatements(transformCollectionOfSharedPointersToReferences(module.statements)); optimizationResultOfModuleStatements.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         if (optimizationResultOfModuleStatements.getStatusOfResult() == OptimizationResultFlag::RemovedByOptimization) {
-            closeActiveSymbolTableScope();
-            return OptimizationResult<syrec::Module>::asOptimizedAwayContainer();
+            if (!doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(module.name, optionalMainModuleIdent)) {
+                closeActiveSymbolTableScope();
+                return OptimizationResult<syrec::Module>::asOptimizedAwayContainer();   
+            }
         }
         if (auto resultOfModuleBodyOptimization = optimizationResultOfModuleStatements.tryTakeOwnershipOfOptimizationResult(); resultOfModuleBodyOptimization.has_value()) {
             copyOfModule->statements       = createStatementListFrom({}, std::move(*resultOfModuleBodyOptimization));
@@ -69,7 +79,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
 
     if (!parserConfig.deadCodeEliminationEnabled) {
         closeActiveSymbolTableScope();
-        if (wereAnyStatementsOptimizedAway) {
+        if (!wereAnyStatementsOptimizedAway) {
             return OptimizationResult<syrec::Module>::asUnchangedOriginal();
         }
         return OptimizationResult<syrec::Module>::fromOptimizedContainer(std::move(copyOfModule));
@@ -81,7 +91,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
     const auto& indicesOfUnusedParameters = activeSymbolTableScope->updateOptimizedModuleSignatureByMarkingAndReturningUnusedParametersOfModule(module.name, generatedInternalIdForModule);
     removeElementsAtIndices(copyOfModule->parameters, indicesOfUnusedParameters);
 
-    const auto doesOptimizedModuleBodyContainAnyStatement = copyOfModule->statements.size();
+    auto doesOptimizedModuleBodyContainAnyStatement = copyOfModule->statements.size();
     const auto doesOptimizedModuleOnlyHaveReadOnlyParameters = copyOfModule->parameters.empty()
         || std::all_of(copyOfModule->parameters.cbegin(), copyOfModule->parameters.cend(), [](const syrec::Variable::ptr& declaredParameter) {
             return declaredParameter->type != syrec::Variable::Types::In;
@@ -90,11 +100,22 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
     closeActiveSymbolTableScope();
     const auto doesModulePerformAssignmentToAnyModifiableParameterOrLocal = isAnyModifiableParameterOrLocalModifiedInModuleBody(*copyOfModule);
 
-    if ((wereAnyStatementsOptimizedAway && !doesOptimizedModuleBodyContainAnyStatement) 
+    /*
+     * The declared main module body cannot be empty as defined by the SyReC grammar, thus we append a single skip statement in this case.
+     */
+    if (wereAnyStatementsOptimizedAway && !doesOptimizedModuleBodyContainAnyStatement 
+        && doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(module.name, optionalMainModuleIdent)) {
+        const auto& generatedSkipStmtForMainModuleWithEmptyBody = std::make_shared<syrec::SkipStatement>();
+        copyOfModule->statements.emplace_back(generatedSkipStmtForMainModuleWithEmptyBody);
+        doesOptimizedModuleBodyContainAnyStatement = true;
+    }
+
+    if (!doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(module.name, optionalMainModuleIdent) 
+        && ((wereAnyStatementsOptimizedAway && !doesOptimizedModuleBodyContainAnyStatement) 
         || !doesOptimizedModuleBodyContainAnyStatement 
         || (doesOptimizedModuleOnlyHaveReadOnlyParameters && copyOfModule->variables.empty())
         || (copyOfModule->parameters.empty() && copyOfModule->variables.empty())
-        || !doesModulePerformAssignmentToAnyModifiableParameterOrLocal) {
+        || !doesModulePerformAssignmentToAnyModifiableParameterOrLocal)) {
         return OptimizationResult<syrec::Module>::asOptimizedAwayContainer();
     }
 
@@ -367,7 +388,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     if (const auto& guardConditionAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(simplifiedGuardExpr ? simplifiedGuardExpr : ifStatement.condition); guardConditionAsBinaryExpr != nullptr) {
-        if (const auto& equivalenceResultOfBinaryExprOperands = checkWhetherOperandsOfBinaryExpressionAreEqual(*guardConditionAsBinaryExpr); equivalenceResultOfBinaryExprOperands.has_value()) {
+        if (const auto& equivalenceResultOfBinaryExprOperands = determineEquivalenceOfOperandsOfBinaryExpr(*guardConditionAsBinaryExpr); equivalenceResultOfBinaryExprOperands.has_value()) {
             canChangesMadeInTrueBranchBeIgnored = !*equivalenceResultOfBinaryExprOperands;
             canChangesMadeInFalseBranchBeIgnored = *equivalenceResultOfBinaryExprOperands;
         }
@@ -717,12 +738,12 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
 
     if (auto simplificationResultOfRhsExpr = handleExpr(*expression.rhs); simplificationResultOfRhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         wasOriginalExprModified = true;
-        simplifiedLhsExpr       = std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front());
+        simplifiedRhsExpr       = std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front());
     }
 
     std::unique_ptr<syrec::expression> simplifiedBinaryExpr;
     const auto constantValueOfLhsExpr = tryEvaluateExpressionToConstant(simplifiedLhsExpr ? *simplifiedLhsExpr : *expression.lhs);
-    const auto constantValueOfRhsExpr = tryEvaluateExpressionToConstant(simplifiedLhsExpr ? *simplifiedRhsExpr : *expression.rhs);
+    const auto constantValueOfRhsExpr = tryEvaluateExpressionToConstant(simplifiedRhsExpr ? *simplifiedRhsExpr : *expression.rhs);
     const auto mappedToBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(expression.op);
 
     if (mappedToBinaryOperation.has_value()) {
@@ -767,14 +788,14 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
      * Check whether the both operands of the binary expression are signal accesses that are equal at compile time if the dead code elimination optimization is enabled.
      * Furthermore, if the operation is either a relational or equivalence operation (=, !=), the binary expression can be replaced with the result of the operation given the two equal operands
      */
-    if (const auto& finalExprAsBinaryExpr = wasOriginalExprModified ? dynamic_cast<const syrec::BinaryExpression*>(&*simplifiedBinaryExpr) : &expression; parserConfig.deadCodeEliminationEnabled) {
-        if (const auto& equivalenceCheckResultOfOperands = checkWhetherOperandsOfBinaryExpressionAreEqual(*finalExprAsBinaryExpr); equivalenceCheckResultOfOperands.has_value()) {
+    if (const auto& finalExprAsBinaryExpr = wasOriginalExprModified ? dynamic_cast<const syrec::BinaryExpression*>(&*simplifiedBinaryExpr) : &expression; finalExprAsBinaryExpr != nullptr && parserConfig.deadCodeEliminationEnabled) {
+        if (const auto& equivalenceCheckResultOfOperands = determineEquivalenceOfOperandsOfBinaryExpr(*finalExprAsBinaryExpr); equivalenceCheckResultOfOperands.has_value()) {
             const auto& containerForSimplifiedResult = std::make_shared<syrec::Number>(*equivalenceCheckResultOfOperands);
             simplifiedBinaryExpr                     = std::make_unique<syrec::NumericExpression>(containerForSimplifiedResult, 1);
             wasOriginalExprModified                  = true;
 
-            updateReferenceCountOf(std::dynamic_pointer_cast<syrec::VariableExpression>(finalExprAsBinaryExpr->lhs)->var->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-            updateReferenceCountOf(std::dynamic_pointer_cast<syrec::VariableExpression>(finalExprAsBinaryExpr->rhs)->var->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
+            updateReferenceCountsOfSignalIdentsUsedIn(*finalExprAsBinaryExpr->lhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
+            updateReferenceCountsOfSignalIdentsUsedIn(*finalExprAsBinaryExpr->rhs, parser::SymbolTable::ReferenceCountUpdate::Decrement);
         }
     }
 
@@ -834,7 +855,17 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
                 simplificationResultOfExpr = std::move(simplifiedToBeShiftedExpr);
             }
         }
-        return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::move(simplificationResultOfExpr));
+
+        if (constantValueOfToBeShiftedExpr.has_value() && constantValueOfShiftAmount.has_value()) {
+            if (const auto& evaluationResultOfShiftExprAtCompileTime = syrec_operation::apply(*mappedToShiftOperation, *constantValueOfToBeShiftedExpr, *constantValueOfShiftAmount); evaluationResultOfShiftExprAtCompileTime.has_value()) {
+                const auto& containerForResult = std::make_shared<syrec::Number>(*evaluationResultOfShiftExprAtCompileTime);
+                simplificationResultOfExpr     = std::make_unique<syrec::NumericExpression>(containerForResult, expression.bitwidth());
+            }
+        }
+
+        if(simplificationResultOfExpr) {
+            return OptimizationResult<syrec::expression>::fromOptimizedContainer(std::move(simplificationResultOfExpr));   
+        }
     }
 
     if (!simplifiedToBeShiftedExpr && !simplifiedShiftAmount) {
@@ -1238,7 +1269,10 @@ void optimizations::Optimizer::closeActiveSymbolTableScope() {
     if (stackOfSymbolTableScopes.empty()) {
         return;
     }
-    stackOfSymbolTableScopes.pop();
+    parser::SymbolTable::closeScope(stackOfSymbolTableScopes.top());
+    if (!stackOfSymbolTableScopes.top()) {
+        stackOfSymbolTableScopes.pop();    
+    }
 }
 
 
@@ -1808,12 +1842,16 @@ void optimizations::Optimizer::updateValueOfLoopVariable(const std::string_view&
 
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
         if (!activeSymbolTableScope->get()->contains(loopVariableIdent)) {
-            activeSymbolTableScope->get()->addEntry(syrec::Number({std::string(loopVariableIdent)}), BitHelpers::getRequiredBitsToStoreValue(*value), value);
+            activeSymbolTableScope->get()->addEntry(syrec::Number({std::string(loopVariableIdent)}), value.has_value() ? BitHelpers::getRequiredBitsToStoreValue(*value) : UINT_MAX, value);
         }
-        if (!value.has_value()) {
-            activeSymbolTableScope->get()->invalidateStoredValueForLoopVariable(loopVariableIdent);
+        else {
+            if (!value.has_value()) {
+                activeSymbolTableScope->get()->invalidateStoredValueForLoopVariable(loopVariableIdent);
+            }
+            else {
+                activeSymbolTableScope->get()->updateStoredValueForLoopVariable(loopVariableIdent, *value);        
+            }
         }
-        activeSymbolTableScope->get()->updateStoredValueForLoopVariable(loopVariableIdent, *value);
     }
 }
 
@@ -1914,45 +1952,12 @@ inline bool optimizations::Optimizer::isVariableReadOnly(const syrec::Variable& 
     return variable.type == syrec::Variable::Types::In;
 }
 
-bool optimizations::Optimizer::isOperationUnaryAssignmentOperation(syrec_operation::operation operation) {
-    switch (operation) {
-        case syrec_operation::operation::BitwiseNegation:
-        case syrec_operation::operation::LogicalNegation:
-        case syrec_operation::operation::IncrementAssign:
-        case syrec_operation::operation::DecrementAssign:
-        case syrec_operation::operation::InvertAssign:
-            return true;
-        default:
-            return false;
-    }
-}
-
-bool optimizations::Optimizer::isRelationalOperation(syrec_operation::operation operationToCheck) {
-    switch (operationToCheck) {
-        case syrec_operation::operation::GreaterEquals:
-        case syrec_operation::operation::GreaterThan:
-        case syrec_operation::operation::LessEquals:
-        case syrec_operation::operation::LessThan:
-            return true;
-        default:
-            return false;
-    }
-}
-
-bool optimizations::Optimizer::isEquivalenceOperation(syrec_operation::operation operationCheck) {
-    switch (operationCheck) {
-        case syrec_operation::operation::Equals:
-        case syrec_operation::operation::NotEquals:
-            return true;
-        default:
-            return false;
-    }
-}
-
-std::optional<bool> optimizations::Optimizer::checkWhetherOperandsOfBinaryExpressionAreEqual(const syrec::BinaryExpression& binaryExpression) {
+// TODO: 
+std::optional<bool> optimizations::Optimizer::determineEquivalenceOfOperandsOfBinaryExpr(const syrec::BinaryExpression& binaryExpression) {
     if (const auto& definedBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(binaryExpression.op);
-        definedBinaryOperation.has_value() && (isRelationalOperation(*definedBinaryOperation) || isEquivalenceOperation(*definedBinaryOperation))) {
-        switch (*definedBinaryOperation) {
+        definedBinaryOperation.has_value() && (syrec_operation::isOperationRelationalOperation(*definedBinaryOperation) || syrec_operation::isOperationEquivalenceOperation(*definedBinaryOperation))) {
+        return std::nullopt;
+        /*switch (*definedBinaryOperation) {
             case syrec_operation::operation::GreaterEquals:
             case syrec_operation::operation::LessEquals:
             case syrec_operation::operation::Equals:
@@ -1963,7 +1968,11 @@ std::optional<bool> optimizations::Optimizer::checkWhetherOperandsOfBinaryExpres
                 return false;
             default:
                 break;
-        }
+        }*/
     }
     return std::nullopt;
+}
+
+bool optimizations::Optimizer::doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(const std::string_view& currentModuleIdent, const std::optional<std::string>& userDefinedMainModuleIdent) {
+    return userDefinedMainModuleIdent.value_or("") == currentModuleIdent;
 }
