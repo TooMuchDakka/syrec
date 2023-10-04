@@ -50,7 +50,6 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
     // TODO: Add entries for module parameters
 
     openNewSymbolTableScope();
-    const auto& activeSymbolTableScope         = *getActiveSymbolTableScope();
     createSymbolTableEntriesForModuleParametersAndLocalVariables(module);
 
     bool wereAnyStatementsOptimizedAway = false;
@@ -60,15 +59,17 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
                 closeActiveSymbolTableScope();
                 return OptimizationResult<syrec::Module>::asOptimizedAwayContainer();   
             }
+            copyOfModule->statements.clear();
         }
         if (auto resultOfModuleBodyOptimization = optimizationResultOfModuleStatements.tryTakeOwnershipOfOptimizationResult(); resultOfModuleBodyOptimization.has_value()) {
             copyOfModule->statements       = createStatementListFrom({}, std::move(*resultOfModuleBodyOptimization));
-            wereAnyStatementsOptimizedAway = true;
         }
+        wereAnyStatementsOptimizedAway = true;
     }
 
+    const auto& activeSymbolTableScope           = *getActiveSymbolTableScope();
     const auto& numberOfDeclaredModuleStatements = copyOfModule->statements.size();
-    if (parserConfig.deadStoreEliminationEnabled) {
+    if (parserConfig.deadStoreEliminationEnabled && !copyOfModule->statements.empty()) {
         const auto deadStoreEliminator = std::make_unique<deadStoreElimination::DeadStoreEliminator>(activeSymbolTableScope);
         deadStoreEliminator->removeDeadStoresFrom(copyOfModule->statements);
     }
@@ -1253,26 +1254,15 @@ std::optional<syrec::Number::ptr> optimizations::Optimizer::getSymbolTableEntryF
 }
 
 std::optional<parser::SymbolTable::ptr> optimizations::Optimizer::getActiveSymbolTableScope() const {
-    return stackOfSymbolTableScopes.empty() ? std::nullopt : std::make_optional(stackOfSymbolTableScopes.top());
+    return activeSymbolTableScope ? std::make_optional(activeSymbolTableScope) : std::nullopt;
 }
 
 void optimizations::Optimizer::openNewSymbolTableScope() {
-    const auto& newSymbolTableScope = std::make_shared<parser::SymbolTable>();
-    if (stackOfSymbolTableScopes.empty()) {
-        stackOfSymbolTableScopes.push(newSymbolTableScope);
-        return;
-    }
-    parser::SymbolTable::openScope(stackOfSymbolTableScopes.top());
+    parser::SymbolTable::openScope(activeSymbolTableScope);
 }
 
 void optimizations::Optimizer::closeActiveSymbolTableScope() {
-    if (stackOfSymbolTableScopes.empty()) {
-        return;
-    }
-    parser::SymbolTable::closeScope(stackOfSymbolTableScopes.top());
-    if (!stackOfSymbolTableScopes.top()) {
-        stackOfSymbolTableScopes.pop();    
-    }
+    parser::SymbolTable::closeScope(activeSymbolTableScope);
 }
 
 

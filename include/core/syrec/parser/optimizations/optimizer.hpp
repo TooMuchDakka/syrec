@@ -10,9 +10,6 @@
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
 #include "core/syrec/parser/utils/signal_access_utils.hpp"
 
-//#include <functional>
-#include <stack>
-
 /*
  * TODO: Support for VHDL like signal access (i.e. bit range structured as .bitRangeEnd:bitRangeStart instead of .bitRangeStart:bitRangeEnd)
  */
@@ -20,7 +17,7 @@ namespace optimizations {
     class Optimizer {
     public:
         explicit Optimizer(const parser::ParserConfig& parserConfig, const parser::SymbolTable::ptr& sharedSymbolTableReference):
-            parserConfig(parserConfig), stackOfSymbolTableScopes({!sharedSymbolTableReference ? std::make_shared<parser::SymbolTable>() : sharedSymbolTableReference}), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(stackOfSymbolTableScopes.top())) {}
+            parserConfig(parserConfig), activeSymbolTableScope({!sharedSymbolTableReference ? std::make_shared<parser::SymbolTable>() : sharedSymbolTableReference}), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(activeSymbolTableScope)) {}
 
         
         enum OptimizationResultFlag {
@@ -92,7 +89,7 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::Number>       handleNumber(const syrec::Number& number) const;
     protected:
         parser::ParserConfig                                         parserConfig;
-        std::stack<parser::SymbolTable::ptr>                         stackOfSymbolTableScopes;
+        parser::SymbolTable::ptr                                     activeSymbolTableScope;
         std::stack<std::unique_ptr<parser::SymbolTableBackupHelper>> symbolTableBackupScopeStack;
         std::unique_ptr<LoopBodyValuePropagationBlocker>             activeDataFlowValuePropagationRestrictions;
 
