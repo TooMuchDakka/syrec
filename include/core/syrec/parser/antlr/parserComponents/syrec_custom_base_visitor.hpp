@@ -70,6 +70,7 @@ namespace parser {
                                                                                                                        std::size_t numDeclaredDimensionsOfRhsOperand, std::size_t firstNoExplicitlyAccessedDimensionOfRhsOperand, const std::vector<unsigned int>& numAccessedValuesPerDimensionOfRhsOperand, const messageUtils::Message::Position* broadcastingErrorPosition, valueBroadcastCheck::DimensionAccessMissmatchResult* missmatchResult);
 
         [[nodiscard]] bool doOperandsRequiredBroadcastingBasedOnBitwidthAndLogError(std::size_t accessedBitRangeWidthOfLhsOperand, std::size_t accessedBitRangeWidthOfRhsOperand, const messageUtils::Message::Position* broadcastingErrorPosition);
+        void fixExpectedBitwidthToValueIfLatterIsLargerThanCurrentOne(unsigned int potentialNewExpectedExpressionBitwidth) const;
 
         std::any visitSignal(SyReCParser::SignalContext* context) override;
         std::any visitNumberFromConstant(SyReCParser::NumberFromConstantContext* context) override;

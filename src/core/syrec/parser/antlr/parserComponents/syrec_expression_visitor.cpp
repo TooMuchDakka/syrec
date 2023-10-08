@@ -69,19 +69,21 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
     if (!userDefinedOperation.has_value() || !isValidBinaryOperation(userDefinedOperation.value())) {
         createMessage(mapAntlrTokenPosition(context->binaryOperation), messageUtils::Message::Severity::Error, InvalidBinaryOperation);
     }
-
-    const auto isExpectedExpressionSignalWidthAlreadySet = sharedData->optionalExpectedExpressionSignalWidth.has_value();
+    
     if (lhsOperand.has_value()) {
-        if (const auto& bitWidthOfLhsOperand = tryDetermineExpressionBitwidth(**lhsOperand->get()->getAsExpression(), determineContextStartTokenPositionOrUseDefaultOne(context)); bitWidthOfLhsOperand.has_value() && !isExpectedExpressionSignalWidthAlreadySet) {
-            sharedData->optionalExpectedExpressionSignalWidth = *bitWidthOfLhsOperand;
+        if (const auto& bitWidthOfLhsOperand = tryDetermineExpressionBitwidth(**lhsOperand->get()->getAsExpression(), determineContextStartTokenPositionOrUseDefaultOne(context)); bitWidthOfLhsOperand.has_value()) {
+            fixExpectedBitwidthToValueIfLatterIsLargerThanCurrentOne(*bitWidthOfLhsOperand);
         }
     }
 
     const auto& rhsOperand = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->rhsOperand);
     if (!lhsOperand.has_value() || !userDefinedOperation.has_value() || !rhsOperand.has_value()) {
-        if (!isExpectedExpressionSignalWidthAlreadySet && sharedData->optionalExpectedExpressionSignalWidth.has_value()) {
+        /*
+         * TODO: Is this reset necessary
+         */
+        /*if (wasExpectedExpressionBitwidthModified) {
             sharedData->optionalExpectedExpressionSignalWidth.reset();
-        }
+        }*/
         return std::nullopt;
     }
 
@@ -112,10 +114,6 @@ std::any SyReCExpressionVisitor::visitBinaryExpression(SyReCParser::BinaryExpres
             // TODO: Size of result
             generatedBinaryExpr                = ExpressionEvaluationResult::createFromExpression(containerForBinaryExpr, lhsOperandSizeInformation.explicitlyAccessedValuesPerDimension);
         }
-    }
-
-    if (!isExpectedExpressionSignalWidthAlreadySet && sharedData->optionalExpectedExpressionSignalWidth.has_value()) {
-        sharedData->optionalExpectedExpressionSignalWidth.reset();
     }
     return generatedBinaryExpr;
 }
@@ -160,7 +158,7 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
     const auto  shiftAmountEvaluated                           = tryEvaluateNumber(**shiftAmount, &potentialErrorPositionForShiftAmountEvaluation);
     if (const auto& expressionToShiftEvaluated = expressionToShift->get()->getAsConstant(); expressionToShiftEvaluated.has_value() && shiftAmountEvaluated.has_value()) {
         if (const auto& shiftOperationEvaluationResult = syrec_operation::apply(*definedShiftOperation, *expressionToShiftEvaluated, *shiftAmountEvaluated); shiftOperationEvaluationResult.has_value()) {
-            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*shiftOperationEvaluationResult, std::nullopt));
+            return std::make_optional(ExpressionEvaluationResult::createFromConstantValue(*shiftOperationEvaluationResult, sharedData->optionalExpectedExpressionSignalWidth));
         }
         return std::nullopt;
     }

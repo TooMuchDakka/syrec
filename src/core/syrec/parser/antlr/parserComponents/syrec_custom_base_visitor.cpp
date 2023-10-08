@@ -150,7 +150,7 @@ std::any SyReCCustomBaseVisitor::visitSignal(SyReCParser::SignalContext* context
         if (const auto& fetchedSymbolTableEntry = sharedData->currentSymbolTableScope->getVariable(signalIdent); fetchedSymbolTableEntry.has_value() && std::holds_alternative<syrec::Variable::ptr>(*fetchedSymbolTableEntry)) {
             isValidSignalAccess = true;
             referenceToAccessedSignalFromSymbolTable = std::get<syrec::Variable::ptr>(*fetchedSymbolTableEntry);
-            generatedSignalAccess->var               = referenceToAccessedSignalFromSymbolTable;
+            generatedSignalAccess->setVar(referenceToAccessedSignalFromSymbolTable);
         }
     }
 
@@ -750,6 +750,12 @@ bool SyReCCustomBaseVisitor::doOperandsRequiredBroadcastingBasedOnBitwidthAndLog
         return true;
     }
     return false;
+}
+
+void SyReCCustomBaseVisitor::fixExpectedBitwidthToValueIfLatterIsLargerThanCurrentOne(unsigned potentialNewExpectedExpressionBitwidth) const {
+    if (!sharedData->optionalExpectedExpressionSignalWidth.has_value() || *sharedData->optionalExpectedExpressionSignalWidth < potentialNewExpectedExpressionBitwidth) {
+        sharedData->optionalExpectedExpressionSignalWidth = potentialNewExpectedExpressionBitwidth;
+    }
 }
 
 

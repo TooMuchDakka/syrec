@@ -119,14 +119,23 @@ std::any SyReCModuleVisitor::visitParameter(SyReCParser::ParameterContext* conte
         createError(mapAntlrTokenPosition(context->start),  InvalidParameterType);
     }
 
-    auto declaredParameter = tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(context->signalDeclaration());
+    const auto& declaredParameter = tryVisitAndConvertProductionReturnValue<syrec::Variable::ptr>(context->signalDeclaration());
     if (!parameterType.has_value() || !declaredParameter.has_value()) {
         return std::nullopt;
     }
 
     (*declaredParameter)->type = *parameterType;
     sharedData->currentSymbolTableScope->addEntry(**declaredParameter);
-    return declaredParameter;
+
+    /*
+     * Due to a "potential" bug in the synthesizer in which the pointer address of the reference variable is used instead of the variable name,
+     * we need to reuse the smart pointer reference for the parameter from the symbol table instead of the generated smart pointer of the signal production.
+     * If said bug is resolve, we can reuse the production value again.
+     */
+    if (const auto& refetchedSymbolTableEntry = sharedData->currentSymbolTableScope->getVariable(declaredParameter->get()->name); refetchedSymbolTableEntry.has_value() && std::holds_alternative<syrec::Variable::ptr>(*refetchedSymbolTableEntry)) {
+        return std::make_optional(std::get<syrec::Variable::ptr>(*refetchedSymbolTableEntry));
+    }
+    return std::nullopt;
 }
 
 std::any SyReCModuleVisitor::visitSignalList(SyReCParser::SignalListContext* context) {

@@ -73,11 +73,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
 
     if (assignedToSignal.has_value()) {
         const auto& bitWidthEvaluationError = mapAntlrTokenPosition(context->start);
-        if (const auto& bitWidthOfAssignedToSignalParts = tryDetermineBitwidthAfterVariableAccess(**assignedToSignal, &bitWidthEvaluationError); bitWidthOfAssignedToSignalParts.has_value()) {
-            sharedData->optionalExpectedExpressionSignalWidth.emplace(*bitWidthOfAssignedToSignalParts);
-        } else {
-            sharedData->optionalExpectedExpressionSignalWidth.emplace(assignedToSignal->get()->var->bitwidth);
-        }
+        fixExpectedBitwidthToValueIfLatterIsLargerThanCurrentOne(tryDetermineBitwidthAfterVariableAccess(**assignedToSignal, &bitWidthEvaluationError).value_or(assignedToSignal->get()->var->bitwidth));
         sharedData->createSignalAccessRestriction(*assignedToSignal);
     }
 
@@ -121,9 +117,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
         }
     }
 
-    if (sharedData->optionalExpectedExpressionSignalWidth.has_value()) {
-        sharedData->optionalExpectedExpressionSignalWidth.reset();
-    }
+    sharedData->optionalExpectedExpressionSignalWidth.reset();
     sharedData->resetSignalAccessRestriction();
     return 0;
 }
