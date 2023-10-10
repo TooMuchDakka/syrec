@@ -52,6 +52,8 @@ namespace parser {
     extern const std::string UnaryAssignmentOperandNot1DSignal;
     extern const std::string UnaryAssignmentOperandMoreThanOneValueOfDimensionAccessed;
     extern const std::string FallbackBroadcastCheckFailedErrorBasedOnDimensionAccess;
+    extern const std::string OperandIsNot1DSignal;
+    extern const std::string OneDimensionalOperandDoesAccessMoreThanOneValueOfDimension;
 
     /* Call | uncall error messages */
     extern const std::string PreviousCallWasNotUncalled;

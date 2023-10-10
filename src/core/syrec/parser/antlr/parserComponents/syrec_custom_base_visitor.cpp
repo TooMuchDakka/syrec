@@ -742,6 +742,29 @@ bool SyReCCustomBaseVisitor::doOperandsRequireBroadcastingBasedOnDimensionAccess
     return true;
 }
 
+std::optional<bool> SyReCCustomBaseVisitor::isSizeOfSignalAcessResult1DSignalOrLogError(std::size_t numDeclaredDimensionsOfLhsOperand, std::size_t firstNoExplicitlyAccessedDimensionOfLhsOperand, const std::vector<unsigned int>& numAccessedValuesPerDimension, const messageUtils::Message::Position* errorPosition) {
+    if (numAccessedValuesPerDimension.size() > numDeclaredDimensionsOfLhsOperand || firstNoExplicitlyAccessedDimensionOfLhsOperand > numDeclaredDimensionsOfLhsOperand) {
+        return std::nullopt;
+    }
+
+    if (const auto& sizeOfOperandAfterSignalAccess = std::max((!firstNoExplicitlyAccessedDimensionOfLhsOperand ? numDeclaredDimensionsOfLhsOperand : numDeclaredDimensionsOfLhsOperand - firstNoExplicitlyAccessedDimensionOfLhsOperand), static_cast<std::size_t>(1))
+        ; sizeOfOperandAfterSignalAccess != 1) {
+        if (errorPosition) {
+            createError(*errorPosition, OperandIsNot1DSignal, sizeOfOperandAfterSignalAccess);
+        }
+        return false;
+    }
+
+    if (const auto& numAccessedValuesOfLastAccessedDimension = !firstNoExplicitlyAccessedDimensionOfLhsOperand ? numAccessedValuesPerDimension.front() : numAccessedValuesPerDimension.at(firstNoExplicitlyAccessedDimensionOfLhsOperand - 1); numAccessedValuesOfLastAccessedDimension != 1) {
+        if (errorPosition) {
+            createError(*errorPosition, OneDimensionalOperandDoesAccessMoreThanOneValueOfDimension, numAccessedValuesOfLastAccessedDimension);
+        }
+    }
+    
+    return true;
+}
+
+
 bool SyReCCustomBaseVisitor::doOperandsRequiredBroadcastingBasedOnBitwidthAndLogError(std::size_t accessedBitRangeWidthOfLhsOperand, std::size_t accessedBitRangeWidthOfRhsOperand, const messageUtils::Message::Position* broadcastingErrorPosition) {
     if (accessedBitRangeWidthOfLhsOperand != accessedBitRangeWidthOfRhsOperand) {
         if (broadcastingErrorPosition) {

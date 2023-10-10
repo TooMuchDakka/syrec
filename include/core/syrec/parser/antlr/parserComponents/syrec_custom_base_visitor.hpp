@@ -68,6 +68,8 @@ namespace parser {
         [[nodiscard]] static std::pair<std::vector<unsigned int>, std::size_t> determineNumAccessedValuesPerDimensionAndFirstNotExplicitlyAccessedDimensionIndex(const syrec::VariableAccess& signalAccess);
         [[nodiscard]] bool                                                     doOperandsRequireBroadcastingBasedOnDimensionAccessAndLogError(std::size_t numDeclaredDimensionsOfLhsOperand, std::size_t firstNoExplicitlyAccessedDimensionOfLhsOperand, const std::vector<unsigned int>& numAccessedValuesPerDimensionOfLhsOperand,
                                                                                                                        std::size_t numDeclaredDimensionsOfRhsOperand, std::size_t firstNoExplicitlyAccessedDimensionOfRhsOperand, const std::vector<unsigned int>& numAccessedValuesPerDimensionOfRhsOperand, const messageUtils::Message::Position* broadcastingErrorPosition, valueBroadcastCheck::DimensionAccessMissmatchResult* missmatchResult);
+        [[nodiscard]] std::optional<bool>                                      isSizeOfSignalAcessResult1DSignalOrLogError(std::size_t numDeclaredDimensionsOfLhsOperand, std::size_t firstNoExplicitlyAccessedDimensionOfLhsOperand, const std::vector<unsigned int>& numAccessedValuesPerDimension, const messageUtils::Message::Position* errorPosition);
+
 
         [[nodiscard]] bool doOperandsRequiredBroadcastingBasedOnBitwidthAndLogError(std::size_t accessedBitRangeWidthOfLhsOperand, std::size_t accessedBitRangeWidthOfRhsOperand, const messageUtils::Message::Position* broadcastingErrorPosition);
         void fixExpectedBitwidthToValueIfLatterIsLargerThanCurrentOne(unsigned int potentialNewExpectedExpressionBitwidth) const;

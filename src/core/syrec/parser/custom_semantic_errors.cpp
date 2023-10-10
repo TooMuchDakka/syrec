@@ -49,6 +49,8 @@ namespace parser {
     extern const std::string UnaryAssignmentOperandNot1DSignal                     = "Expected unary assignment operand to be a 1-d signal but was actually a {0:d}-d signal";
     extern const std::string UnaryAssignmentOperandMoreThanOneValueOfDimensionAccessed = "Expected dimension access of unary assignment operand to only target at most one value per dimension but {0:d} values were accessed at the dimension {1:d} (dimension index is relative to last explicitly accessed dimension)";
     extern const std::string FallbackBroadcastCheckFailedErrorBasedOnDimensionAccess   = "Broadcast check based on dimension access failed for unknown reason";
+    extern const std::string OperandIsNot1DSignal                                      = "Expected size of operand to be 1D signal after but was actually a {0:d}D signal";
+    extern const std::string OneDimensionalOperandDoesAccessMoreThanOneValueOfDimension = "Expected 1D signal operand to access at most one value per dimension";
 
 
     /* Call | uncall error messages */
