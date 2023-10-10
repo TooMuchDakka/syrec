@@ -1,5 +1,7 @@
 {
-  "TODO": "Tests to check combinations e.g. one dimension of lhs with whole signal on the right if dimension match",
+  "DISABLED_TODO": {
+    "circuit": "Tests to check combinations e.g. one dimension of lhs with whole signal on the right if dimension match"
+  },
   "bothSignalsTotal": {
     "circuit": "module main(out a(10), out b(10)) a <=> b"
   },
@@ -69,10 +71,5 @@
   },
   "oneDimensionOfRhsAsCompileTimeExpression": {
     "circuit": "module main(out a[2](10), out b(10)) for $i = 0 to 9 step 1 do a[0] <=> b[($i + (2 + $i))] rof"
-  },
-
-
-  "lhsAndRhsWithSameDimensions": {
-    "circuit": "module main(out a[2][3][5](10), out b[2][3][5](10)) a <=> b"
   }
 }

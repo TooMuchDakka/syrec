@@ -3,6 +3,7 @@
 #pragma once
 
 #include "core/syrec/program.hpp"
+#include "core/syrec/parser/utils/message_utils.hpp"
 #include "core/syrec/parser/utils/syrec_ast_dump_utils.hpp"
 
 #include "gtest/gtest.h"
@@ -11,35 +12,41 @@
 #include <cstdlib>
 #include <cerrno>
 #include <nlohmann/json.hpp>
+#include <fmt/core.h>
 
 using json = nlohmann::json;
 
 class BaseSyrecCircuitComparisonTestFixture: public testing::Test {
 protected:
-    const unsigned int defaultSignalBitwidth         = 16;
-    const std::string cJsonKeyCircuit               = "circuit";
-    const std::string cJsonKeyExpectedCircuitOutput = "expectedCircuit";
-    const std::string cJsonKeyExpectedCircuitOutputs = "expectedCircuits";
-    const std::string cJsonKeyEnabledOptimizations  = "optimizations";
+    static constexpr unsigned int defaultSignalBitwidth               = 16;
+    static constexpr auto         cJsonKeyCircuit                     = "circuit";
+    static constexpr auto         cJsonKeyExpectedCircuitOutput       = "expectedCircuit";
+    static constexpr auto         cJsonKeyExpectedCircuitOutputs      = "expectedCircuits";
+    static constexpr auto         cJsonKeyEnabledOptimizations        = "optimizations";
+    static constexpr auto         cJsonKeyExpectedErrors              = "errors";
+    static constexpr auto         expectedErrorMessageFormat          = "-- line {0:d} col {1:d}: {2:s}";
+    static constexpr auto         cJsonErrorLineJsonKey               = "line";
+    static constexpr auto         cJsonErrorColumnJsonKey             = "column";
+    static constexpr auto         cJsonErrorExpectedMessageKey        = "message";
 
-    const std::string cJsonKeySupportingBroadcastingExpressionOperands = "exprOperandsBroadcastingON";
-    const std::string cJsonKeySupportingBroadCastingAssignmentOperands = "assignmentOperandsBroadcastingON";
-    const std::string cJsonKeyDeadCodeEliminationFlag                  = "deadCodeElimON";
-    const std::string cJsonKeyPerformConstantPropagationFlag           = "constantPropON";
-    const std::string cJsonKeyNoAdditionalLineSynthesisFlag            = "noAddLineSynON";
-    const std::string cJsonKeyOperationStrengthReductionEnabled        = "opStrengthReductionON";
-    const std::string cJsonKeyDeadStoreEliminationEnabled              = "deadStoreElimON";
-    const std::string cJsonKeyCombineRedundantInstructionsEnabled      = "combineInstructionsON";
-    const std::string cJsonKeyReassociateExpressionFlag                = "reassociateExprON";
-    const std::string cJsonKeyMultiplicationSimplificationMethod       = "multiplySimplifyON";
-    const std::string cJsonKeyLoopUnrollMaxNestingLevel                = "loopUnrollMaxNestingLvl";
-    const std::string cJsonKeyLoopUnrollMaxUnrollCountPerLoop          = "loopUnrollMaxUnrollCnt";
-    const std::string cJsonKeyLoopUnrollMaxAllowedTotalSize            = "loopUnrollMaxTotalSize";
-    const std::string cJsonKeyLoopUnrollForceUnrollFlag                = "loopUnrollForceUnrollON";
-    const std::string cJsonKeyLoopUnrollAllowRemainderFlag             = "loopUnrollAllowRemainderON";
+    static constexpr auto cJsonKeySupportingBroadcastingExpressionOperands = "exprOperandsBroadcastingON";
+    static constexpr auto cJsonKeySupportingBroadCastingAssignmentOperands = "assignmentOperandsBroadcastingON";
+    static constexpr auto cJsonKeyDeadCodeEliminationFlag                  = "deadCodeElimON";
+    static constexpr auto cJsonKeyPerformConstantPropagationFlag           = "constantPropON";
+    static constexpr auto cJsonKeyNoAdditionalLineSynthesisFlag            = "noAddLineSynON";
+    static constexpr auto cJsonKeyOperationStrengthReductionEnabled        = "opStrengthReductionON";
+    static constexpr auto cJsonKeyDeadStoreEliminationEnabled              = "deadStoreElimON";
+    static constexpr auto cJsonKeyCombineRedundantInstructionsEnabled      = "combineInstructionsON";
+    static constexpr auto cJsonKeyReassociateExpressionFlag                = "reassociateExprON";
+    static constexpr auto cJsonKeyMultiplicationSimplificationMethod       = "multiplySimplifyON";
+    static constexpr auto cJsonKeyLoopUnrollMaxNestingLevel                = "loopUnrollMaxNestingLvl";
+    static constexpr auto cJsonKeyLoopUnrollMaxUnrollCountPerLoop          = "loopUnrollMaxUnrollCnt";
+    static constexpr auto cJsonKeyLoopUnrollMaxAllowedTotalSize            = "loopUnrollMaxTotalSize";
+    static constexpr auto cJsonKeyLoopUnrollForceUnrollFlag                = "loopUnrollForceUnrollON";
+    static constexpr auto cJsonKeyLoopUnrollAllowRemainderFlag             = "loopUnrollAllowRemainderON";
 
-    const std::string cJsonKeyMultiplicationSimplificationViaBinaryMethod = "binaryMethod";
-    const std::string cJsonKeyMultiplicationSimplificationViaBinaryFactoringMethod = "binaryFactoringMethod";
+    static constexpr auto cJsonKeyMultiplicationSimplificationViaBinaryMethod = "binaryMethod";
+    static constexpr auto cJsonKeyMultiplicationSimplificationViaBinaryFactoringMethod = "binaryFactoringMethod";
 
     syrecAstDumpUtils::SyrecASTDumper astDumper;
     syrec::ReadProgramSettings        config;
@@ -48,8 +55,42 @@ protected:
     std::string circuitToOptimize;
     std::vector<std::string> expectedOptimizedCircuits;
 
+    struct ExpectedError {
+        std::size_t line;
+        std::size_t column;
+        std::string message;
+    };
+    std::vector<std::string> expectedErrors;
+
     BaseSyrecCircuitComparisonTestFixture():
         astDumper(true) {}
+
+    void determineExpectedErrorsFromJson(const nlohmann::json& testCaseJsonData) {
+        if (!testCaseJsonData.contains(cJsonKeyExpectedErrors)) {
+            return;
+        }
+
+        const auto& errorJsonArrayObject = testCaseJsonData.at(cJsonKeyExpectedErrors);
+        ASSERT_TRUE(errorJsonArrayObject.is_array()) << "Expected entry with key '" << cJsonKeyExpectedErrors << "' to by an array";
+
+        for (auto& errorJsonObject: errorJsonArrayObject) {
+            ASSERT_TRUE(errorJsonObject.is_object()) << "Expected test case data to a json object";
+            ASSERT_TRUE(errorJsonObject.contains(cJsonErrorLineJsonKey)) << "Required entry with key '" << cJsonErrorLineJsonKey << "' was not found";
+            ASSERT_TRUE(errorJsonObject.contains(cJsonErrorColumnJsonKey)) << "Required entry with key '" << cJsonErrorColumnJsonKey << "' was not found";
+            ASSERT_TRUE(errorJsonObject.contains(cJsonErrorExpectedMessageKey)) << "Required entry with key '" << cJsonErrorExpectedMessageKey << "' was not found";
+
+            ASSERT_TRUE(errorJsonObject.at(cJsonErrorLineJsonKey).is_number_unsigned()) << "Expected entry with key '" << cJsonErrorLineJsonKey << "' to be an unsigned integer";
+            ASSERT_TRUE(errorJsonObject.at(cJsonErrorColumnJsonKey).is_number_unsigned()) << "Expected entry with key '" << cJsonErrorColumnJsonKey << "' to be an unsigned integer";
+            ASSERT_TRUE(errorJsonObject.at(cJsonErrorExpectedMessageKey).is_string()) << "Expected entry with key '" << cJsonErrorExpectedMessageKey << "' to be a string";
+
+            const auto& expectedError = ExpectedError({
+                    errorJsonObject.at(cJsonErrorLineJsonKey).get<unsigned int>(),
+                    errorJsonObject.at(cJsonErrorColumnJsonKey).get<unsigned int>(),
+                    errorJsonObject.at(cJsonErrorExpectedMessageKey).get<std::string>()
+            });
+            ASSERT_NO_THROW(expectedErrors.emplace_back(fmt::format(expectedErrorMessageFormat, expectedError.line, expectedError.column, expectedError.message)));
+        }
+    }
 
     void determineExpectedCircuitsFromJson(const nlohmann::json& testCaseJsonData, std::vector<std::string>& expectedOptimizedCircuits) {
         if (testCaseJsonData.contains(cJsonKeyExpectedCircuitOutput)) {
@@ -76,11 +117,28 @@ protected:
         }
     }
 
+     static void compareExpectedAndActualErrors(const std::vector<std::string>& expectedErrors, const std::vector<std::string>& actualErrorsInUnifiedFormat) {
+        if (expectedErrors.size() != actualErrorsInUnifiedFormat.size()) {
+            std::ostringstream expectedErrorsBuffer;
+            std::ostringstream actualErrorsBuffer;
+
+            std::copy(expectedErrors.cbegin(), expectedErrors.cend(), InfixIterator<std::string>(expectedErrorsBuffer, "\n"));
+            std::copy(actualErrorsInUnifiedFormat.cbegin(), actualErrorsInUnifiedFormat.cend(), InfixIterator<std::string>(actualErrorsBuffer, "\n"));
+
+            FAIL() << "Expected " << expectedErrors.size() << " errors but only " << actualErrorsInUnifiedFormat.size() << " were found!\nExpected: " << expectedErrorsBuffer.str() << "\nActual: " << actualErrorsBuffer.str();
+        }
+        
+        for (size_t errorIdx = 0; errorIdx < expectedErrors.size(); ++errorIdx) {
+            ASSERT_EQ(expectedErrors.at(errorIdx), actualErrorsInUnifiedFormat.at(errorIdx)) << "Expected error: " << expectedErrors.at(errorIdx) << "| Actual Error: " << actualErrorsInUnifiedFormat.at(errorIdx);
+        }
+    }
+
     void SetUp() override {
-        const std::string testCaseJsonKey = getTestCaseJsonKey();
-        std::ifstream configFileStream(getTestDataFilePath(), std::ios_base::in);
+        const std::string testCaseJsonKey  = extractTestCaseNameFromParameter(getTestCaseJsonKey());
+        const auto&       testDataFilePath = lookupTestCaseFilePathFromTestCaseName(getTestCaseJsonKey());
+        std::ifstream configFileStream(testDataFilePath, std::ios_base::in);
         ASSERT_TRUE(configFileStream.good()) << "Could not open test data json file @ "
-                                             << getTestDataFilePath();
+                                             << testDataFilePath;
 
         const nlohmann::json parsedJson = nlohmann::json::parse(configFileStream);
         ASSERT_TRUE(parsedJson.contains(testCaseJsonKey)) << "Required entry for given test case with key '" << testCaseJsonKey << "' was not found";
@@ -92,7 +150,8 @@ protected:
         ASSERT_TRUE(testcaseJsonData.at(cJsonKeyCircuit).is_string()) << "Expected entry with key '" << cJsonKeyCircuit << "' to by a string";
         circuitToOptimize = testcaseJsonData.at(cJsonKeyCircuit).get<std::string>();
         ASSERT_NO_FATAL_FAILURE(determineExpectedCircuitsFromJson(testcaseJsonData, expectedOptimizedCircuits));
-        
+        ASSERT_NO_FATAL_FAILURE(determineExpectedErrorsFromJson(testcaseJsonData));
+
         std::map<OptimizerOption, std::string> userDefinedOptions;
         if (testcaseJsonData.contains(cJsonKeyEnabledOptimizations)) {
             ASSERT_TRUE(testcaseJsonData.at(cJsonKeyEnabledOptimizations).is_object()) << "Expected entry with key '" << cJsonKeyEnabledOptimizations << "' to be an object";
@@ -110,9 +169,10 @@ protected:
         config                                    = mergeDefaultAndUserDefinedParserConfigOptions(getDefaultParserConfig(), *loadedUserOptimizationOptions, userDefinedOptions);
     }
 
-    [[nodiscard]] virtual std::string                getTestCaseJsonKey()  = 0;
-    [[nodiscard]] virtual std::string                getTestDataFilePath() = 0;
-    [[nodiscard]] virtual syrec::ReadProgramSettings getDefaultParserConfig() {
+    [[nodiscard]] virtual std::string                getTestCaseJsonKey() const = 0;
+    [[nodiscard]] virtual std::string                getTestDataFilePath() const = 0;
+    [[nodiscard]] virtual std::vector<std::string>   getTestDataFilePaths() const { return { getTestDataFilePath()}; }
+    [[nodiscard]] virtual syrec::ReadProgramSettings getDefaultParserConfig() const {
         return syrec::ReadProgramSettings(defaultSignalBitwidth);
     }
 
@@ -289,11 +349,16 @@ protected:
     void performParsingAndCompareExpectedAndActualCircuit() {
         std::string errorsFromParsedCircuit;
         ASSERT_NO_THROW(errorsFromParsedCircuit = parserPublicInterface.readFromString(circuitToOptimize, config));
-        ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors";
+        if (expectedErrors.empty()) {
+            ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors";
 
-        std::string stringifiedProgram;
-        ASSERT_NO_THROW(stringifiedProgram = astDumper.stringifyModules(parserPublicInterface.modules())) << "Failed to stringify parsed modules";
-        ASSERT_THAT(stringifiedProgram, testing::AnyOfArray(expectedOptimizedCircuits));
+            std::string stringifiedProgram;
+            ASSERT_NO_THROW(stringifiedProgram = astDumper.stringifyModules(parserPublicInterface.modules())) << "Failed to stringify parsed modules";
+            ASSERT_THAT(stringifiedProgram, testing::AnyOfArray(expectedOptimizedCircuits));
+        }
+        else {
+            ASSERT_NO_THROW(compareExpectedAndActualErrors(expectedErrors, messageUtils::tryDeserializeStringifiedMessagesFromString(errorsFromParsedCircuit))) << "Missmatch between expected and actual errors";
+        }
     }
 
     [[nodiscard]] std::optional<OptimizerOption> tryMapOptimizationJsonKeyToOptimizerOption(const std::string& jsonKeyOfOptimizationOption) const {
@@ -337,6 +402,14 @@ protected:
         }
 
         return std::nullopt;
+    }
+
+    [[nodiscard]] virtual std::string lookupTestCaseFilePathFromTestCaseName(const std::string_view&) const {
+        return getTestDataFilePath();
+    }
+
+    [[nodiscard]] virtual std::string extractTestCaseNameFromParameter(const std::string& parameter) const {
+        return std::string(parameter);
     }
 
     template<typename T>

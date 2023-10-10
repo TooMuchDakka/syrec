@@ -1,6 +1,7 @@
 {
-  "TODO": "Exhaustive testing like leftShiftNumberByConstant, leftShiftSignalByConstant, leftShiftBinaryExpressionByConstant, leftShiftUnaryExpressionByConstant, leftShiftShiftExpressionByConstant",
-
+  "DISABLED_TODO": {
+    "circuit": "Exhaustive testing like leftShiftNumberByConstant, leftShiftSignalByConstant, leftShiftBinaryExpressionByConstant, leftShiftUnaryExpressionByConstant, leftShiftShiftExpressionByConstant"
+  },
   "leftShift": {
     "circuit": "module main() wire test(16), other(32) test += (other >> 10)"
   },
