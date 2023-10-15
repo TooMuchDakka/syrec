@@ -6,46 +6,47 @@
 using namespace syrec;
 
 std::string program::read(const std::string& filename, const ReadProgramSettings settings) {
-    std::size_t fileContentLength = 0;
-    auto const*     fileContentBuffer  = readAndBufferFileContent(filename, &fileContentLength);
-    if (nullptr == fileContentBuffer) {
-        return "Cannot open given circuit file @ " + filename;
+    std::string foundErrorBuffer;
+    const auto& readFileContent = tryReadFileContent(filename, &foundErrorBuffer);
+    if (!foundErrorBuffer.empty() || !readFileContent.has_value()) {
+        return foundErrorBuffer;
     }
-
-    return parseBufferContent(fileContentBuffer, fileContentLength, settings);
+    return readFromString(*readFileContent, settings);
 }
 
 // TODO: Replace ReadProgramSettings with ParserConfig
 std::string program::readFromString(const std::string& circuitStringified, const ReadProgramSettings settings) {
-    return parseBufferContent(reinterpret_cast<const unsigned char*>(circuitStringified.c_str()), circuitStringified.size(), settings);
+    std::string foundErrorBuffer;
+    parseFileContent(circuitStringified, settings, &foundErrorBuffer);
+    return foundErrorBuffer;
 }
 
-bool program::readFile(const std::string& filename, const ReadProgramSettings settings, std::string* error) {
-    *error = read(filename, settings);
-    return error->empty();
-}
+std::optional<std::string> program::tryReadFileContent(const std::string_view& fileName, std::string* foundFileHandlingErrors) {
+    if (std::ifstream inputFileStream(fileName.data(), std::ifstream::in | std::ifstream::binary); inputFileStream.is_open()) {
+        inputFileStream.ignore(std::numeric_limits<std::streamsize>::max());
+        const auto fileContentLength = inputFileStream.gcount();
+        inputFileStream.clear(); //  Since ignore will have set eof.
+        inputFileStream.seekg(0, std::ios_base::beg);
 
-unsigned char* program::readAndBufferFileContent(const std::string& filename, std::size_t* fileContentLength) {
-    unsigned char*                     fileContentBuffer = nullptr;
-
-    std::basic_ifstream<unsigned char> is(filename.c_str(), std::ifstream::in | std::ifstream::binary);
-    if (is.is_open()) {
-        is.seekg(0, is.end);
-        *fileContentLength = is.tellg();
-        is.seekg(0, is.beg);
-        
-        fileContentBuffer = new unsigned char[*fileContentLength];
-        is.read(fileContentBuffer, *fileContentLength);
-    }
-    return fileContentBuffer;
-}
-
-// TODO: Added erros from parser to return value
-std::string program::parseBufferContent(const unsigned char* buffer, const int bufferSizeInBytes, const ReadProgramSettings& config) {
-    if (nullptr == buffer) {
-        return "Cannot parse invalid buffer";
+        std::string fileContentBuffer(fileContentLength, ' ');
+        inputFileStream.read(fileContentBuffer.data(), fileContentLength);
+        if (inputFileStream.bad()) {
+            if (foundFileHandlingErrors) {
+                *foundFileHandlingErrors = "Error while reading content from file @ " + std::string(fileName);
+            }
+            return std::nullopt;
+        }
+        return std::make_optional(fileContentBuffer);
     }
 
+    if (foundFileHandlingErrors) {
+        *foundFileHandlingErrors = "Cannot open given circuit file @ " + std::string(fileName);
+    }
+    return std::nullopt;
+}
+
+
+bool program::parseFileContent(std::string_view programToBeParsed, const ReadProgramSettings& config, std::string* foundErrors) {
     const auto& parserConfigToUse = ::parser::ParserConfig(config.defaultBitwidth,
                                                            false,
                                                            false,
@@ -59,19 +60,14 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
                                                            config.multiplicationSimplificationMethod,
                                                            config.optionalLoopUnrollConfig,
                                                            config.expectedMainModuleName);
-    const auto  bufferCasted      = reinterpret_cast<const char*>(buffer);
-    const auto  parsingResult     = ::parser::SyrecParserInterface::parseProgram(bufferCasted, bufferSizeInBytes,parserConfigToUse);
+    const auto  parsingResult     = ::parser::SyrecParserInterface::parseProgram(programToBeParsed, parserConfigToUse);
     if (parsingResult.wasParsingSuccessful) {
         const auto& optionalUserDefinedMainModuleName = config.expectedMainModuleName.empty() ? std::nullopt : std::make_optional(config.expectedMainModuleName);
-
-        /*this->modulesVec = parsingResult.foundModules;
-        return "";*/
-
-        const auto& optimizer = std::make_unique<optimizations::Optimizer>(parserConfigToUse, nullptr);
-        auto        optimizationResultOfProgram = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsingResult.foundModules), optionalUserDefinedMainModuleName);
+        const auto& optimizer                         = std::make_unique<optimizations::Optimizer>(parserConfigToUse, nullptr);
+        auto        optimizationResultOfProgram       = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsingResult.foundModules), optionalUserDefinedMainModuleName);
         if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::IsUnchanged) {
             this->modulesVec = parsingResult.foundModules;
-        } else if(optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::WasOptimized) {
+        } else if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::WasOptimized) {
             auto&& optimizedModules = optimizationResultOfProgram.tryTakeOwnershipOfOptimizationResult();
             if (!optimizedModules.has_value()) {
                 // TODO: This should not happen
@@ -84,14 +80,20 @@ std::string program::parseBufferContent(const unsigned char* buffer, const int b
             // TODO: What should happen in this case
             this->modulesVec = parsingResult.foundModules;
         }
-        return "";
+        return true;
     }
 
-    if (const auto& stringifiedMessages = messageUtils::tryStringifyMessages(parsingResult.errors); stringifiedMessages.has_value()) {
-        return *stringifiedMessages;
+    const auto& concatinatedFoundErrors = messageUtils::tryStringifyMessages(parsingResult.errors);
+    if (foundErrors && concatinatedFoundErrors.has_value()) {
+        *foundErrors = *concatinatedFoundErrors;
     }
-    // TODO: Syntax errors will be inserted before semantic errors (i.e. the errors are not sorted according to their position)
-    return "Failed to combine the found error messages";
+    return false;
+}
+
+
+bool program::readFile(const std::string& filename, const ReadProgramSettings settings, std::string* error) {
+    *error = read(filename, settings);
+    return error->empty();
 }
 
 std::vector<std::reference_wrapper<const syrec::Module>> program::prepareParsingResultForOptimizations(const syrec::Module::vec& foundModules) {

@@ -47,11 +47,11 @@
   },
   "deadStoreInTrueBranchWithNoOtherStatementsReplacedWithSkipIfElseBranchIsNotEmpty": {
     "circuit": "module main(in a(4), out b(4)) wire c(4) if (a = b) then ++= c else skip fi (a = b)",
-    "expectedCircuit": "module main(in a(4), out b(4)) if (a = b) then skip else skip fi (a = b)"
+    "expectedCircuit": "module main() skip"
   },
   "deadStoreInFalseBranchWithNoOtherStatementsReplacedWithSkipIfTrueBranchIsNotEmpty": {
     "circuit": "module main(in a(4), out b(4)) wire c(4) if (a = b) then skip else ++= c fi (a = b)",
-    "expectedCircuit": "module main(in a(4), out b(4)) if (a = b) then skip else skip fi (a = b)"
+    "expectedCircuit": "module main() skip"
   },
   "ifStatementRemovedIfDeadStoreInTrueBranchIsRemovedWithEmptyElseBranch": {
     "circuit": "module main(in a(4), out b(4)) wire c(4) if (a = b) then ++= c else --= c fi (a = b)",
@@ -75,8 +75,9 @@
   "loopWithSingleStatementLeftUnchangedIfStatementWasDeadStoreAndLoopPerformsMoreThanOneIteration": {
     "circuit": "module main(out b(4)) wire c(4) ++= b; for 0 to 2 step 2 do ++= c rof"
   },
-  "loopwithSingleStatementLeftunchangedIfStatementWasDeadStoreAndLoopIterationRangeContainsUnknownValue": {
-    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; for $i = 0 to 5 step 1 do for 0 to $i step 1 do ++= c rof rof"
+  "loopWithSingleStatementLeftunchangedIfStatementWasDeadStoreAndLoopIterationRangeContainsUnknownValue": {
+    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; for $i = 0 to 5 step 1 do for 0 to $i step 1 do ++= c rof rof",
+    "expectedCircuit": "module main(out b(4)) wire c(4) ++= b; for $i = 0 to 5 step 1 do for 0 to $i step 1 do ++= c rof rof"
   },
 
 

@@ -17,7 +17,7 @@ protected:
     }
 
     syrec::ReadProgramSettings getDefaultParserConfig() const override {
-        return syrec::ReadProgramSettings(16, false, false, true, true);
+        return syrec::ReadProgramSettings(defaultSignalBitwidth, false, false, true, true);
     }
 };
 

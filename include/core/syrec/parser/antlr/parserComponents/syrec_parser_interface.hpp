@@ -31,8 +31,8 @@ namespace parser {
             }
         };
 
-        [[nodiscard]] static ParsingResult parseProgram(const char* programContent, int programContentSizeInBytes, ParserConfig parserConfig) {
-            antlr4::ANTLRInputStream  input(programContent, programContentSizeInBytes);
+        [[nodiscard]] static ParsingResult parseProgram(std::string_view programContent, ParserConfig parserConfig) {
+            antlr4::ANTLRInputStream input(programContent);
             SyReCLexer      lexer(&input);
             antlr4::CommonTokenStream tokens(&lexer);
             SyReCParser     antlrParser(&tokens);

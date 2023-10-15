@@ -111,11 +111,11 @@ namespace syrec {
         *
         * @return true if parsing was successful, otherwise false
         */
-        bool readFile(const std::string& filename, ReadProgramSettings settings, std::string* error = nullptr);
-        std::string    parseBufferContent(const unsigned char* buffer, int bufferSizeInBytes, const ReadProgramSettings& config);
-        unsigned char* readAndBufferFileContent(const std::string& filename, std::size_t* fileContentLength);
+        bool                                                                          readFile(const std::string& filename, ReadProgramSettings settings, std::string* error = nullptr);
+        [[nodiscard]] static std::optional<std::string>                               tryReadFileContent(const std::string_view& fileName, std::string* foundFileHandlingErrors);
+        [[maybe_unused]] bool                                                         parseFileContent(std::string_view programToBeParsed, const ReadProgramSettings& config, std::string* foundErrors);
         [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Module>> prepareParsingResultForOptimizations(const syrec::Module::vec& foundModules);
-        [[nodiscard]] static syrec::Module::vec                                 transformProgramOptimizationResult(std::vector<std::unique_ptr<syrec::Module>>&& optimizedProgram);
+        [[nodiscard]] static syrec::Module::vec                                       transformProgramOptimizationResult(std::vector<std::unique_ptr<syrec::Module>>&& optimizedProgram);
     };
 
 } // namespace syrec
