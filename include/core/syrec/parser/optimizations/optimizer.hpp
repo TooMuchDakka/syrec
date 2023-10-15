@@ -119,6 +119,7 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::expression>     handleVariableExpr(const syrec::VariableExpression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::expression>     handleNumericExpr(const syrec::NumericExpression& numericExpr) const;
 
+        [[nodiscard]] static std::vector<std::unique_ptr<syrec::Statement>> createCopyOfStatements(const syrec::Statement::vec& statements);
         [[nodiscard]] static std::unique_ptr<syrec::Statement>  createCopyOfStmt(const syrec::Statement& stmt);
         [[nodiscard]] static std::unique_ptr<syrec::expression> createCopyOfExpression(const syrec::expression& expr);
         [[nodiscard]] static std::unique_ptr<syrec::Number>     createCopyOfNumber(const syrec::Number& number);
@@ -137,6 +138,7 @@ namespace optimizations {
         void updateReferenceCountOf(const std::string_view& signalIdent, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
+        //void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Statement& statement, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
 
         void                                                  createSymbolTableEntryForVariable(const syrec::Variable& variable) const;
         void                                                  createSymbolTableEntriesForModuleParametersAndLocalVariables(const syrec::Module& module) const;
@@ -266,6 +268,7 @@ namespace optimizations {
         [[nodiscard]] static bool                                                        isVariableReadOnly(const syrec::Variable& variable);
         [[nodiscard]] static std::optional<bool>                                         determineEquivalenceOfOperandsOfBinaryExpr(const syrec::BinaryExpression& binaryExpression);
         [[nodiscard]] static bool                                                        doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(const std::string_view& currentModuleIdent, const std::optional<std::string>& userDefinedMainModuleIdent);
+        [[nodiscard]] bool                                                               doesStatementDefineAssignmentThatChangesAssignedToSignal(const syrec::Statement& statement);
 
         template<typename T>
         void removeElementsAtIndices(std::vector<T>& vectorToModify, const std::unordered_set<std::size_t>& indicesOfElementsToRemove) {

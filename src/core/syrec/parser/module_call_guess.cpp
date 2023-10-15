@@ -18,7 +18,8 @@ std::vector<SymbolTable::DeclaredModuleSignature> ModuleCallGuess::getMatchesFor
 }
 
 std::vector<std::size_t> ModuleCallGuess::getInternalIdsOfModulesMatchingGuess() const {
-    std::vector<std::size_t> internalModuleIds(this->modulesMatchingRequestedSignature.size(), 0);
+    std::vector<std::size_t> internalModuleIds;
+    internalModuleIds.reserve(this->modulesMatchingRequestedSignature.size());
     std::transform(
             this->modulesMatchingRequestedSignature.cbegin(),
             this->modulesMatchingRequestedSignature.cend(),

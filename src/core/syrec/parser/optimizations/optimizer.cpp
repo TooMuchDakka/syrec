@@ -14,7 +14,6 @@
 #include <unordered_set>
 
 // TODO: Refactoring if case switches with visitor pattern as its available in std::visit call
-
 optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::optimizeProgram(const std::vector<std::reference_wrapper<const syrec::Module>>& modules, const std::optional<std::string>& userDefinedExpectedMainModuleIdent) {
     std::vector<std::unique_ptr<syrec::Module>> optimizedModules;
     bool                                        optimizedAnyModule = false;
@@ -27,7 +26,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
     for (const auto& module: modules) {
         auto&&     optimizedModule          = handleModule(module, mainModuleIdent);
         const auto optimizationResultStatus = optimizedModule.getStatusOfResult();
-        optimizedAnyModule                  = optimizationResultStatus == OptimizationResultFlag::WasOptimized;
+        optimizedAnyModule                  |= optimizationResultStatus != OptimizationResultFlag::IsUnchanged;
 
         if (optimizationResultStatus == OptimizationResultFlag::WasOptimized) {
             if (auto optimizedModuleData = optimizedModule.tryTakeOwnershipOfOptimizationResult(); optimizedModuleData.has_value()) {
@@ -47,24 +46,22 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
 // TODO:
 optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::handleModule(const syrec::Module& module, const std::optional<std::string>& optionalMainModuleIdent) {
     auto copyOfModule = createCopyOfModule(module);
-    // TODO: Add entries for module parameters
+
+    std::size_t generatedInternalIdForModule = 0;
+    activeSymbolTableScope->addEntry(*copyOfModule, &generatedInternalIdForModule);
 
     openNewSymbolTableScope();
     createSymbolTableEntriesForModuleParametersAndLocalVariables(module);
-
-    bool wereAnyStatementsOptimizedAway = false;
+    
     if (auto optimizationResultOfModuleStatements = handleStatements(transformCollectionOfSharedPointersToReferences(module.statements)); optimizationResultOfModuleStatements.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
-        if (optimizationResultOfModuleStatements.getStatusOfResult() == OptimizationResultFlag::RemovedByOptimization) {
-            if (!doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(module.name, optionalMainModuleIdent)) {
-                closeActiveSymbolTableScope();
-                return OptimizationResult<syrec::Module>::asOptimizedAwayContainer();   
-            }
+        if (optimizationResultOfModuleStatements.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
+           if (auto resultOfModuleBodyOptimization = optimizationResultOfModuleStatements.tryTakeOwnershipOfOptimizationResult(); resultOfModuleBodyOptimization.has_value()) {
+               copyOfModule->statements = createStatementListFrom({}, std::move(*resultOfModuleBodyOptimization));
+           }   
+        }
+        else {
             copyOfModule->statements.clear();
         }
-        if (auto resultOfModuleBodyOptimization = optimizationResultOfModuleStatements.tryTakeOwnershipOfOptimizationResult(); resultOfModuleBodyOptimization.has_value()) {
-            copyOfModule->statements       = createStatementListFrom({}, std::move(*resultOfModuleBodyOptimization));
-        }
-        wereAnyStatementsOptimizedAway = true;
     }
 
     const auto& activeSymbolTableScope           = *getActiveSymbolTableScope();
@@ -73,57 +70,74 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
         const auto deadStoreEliminator = std::make_unique<deadStoreElimination::DeadStoreEliminator>(activeSymbolTableScope);
         deadStoreEliminator->removeDeadStoresFrom(copyOfModule->statements);
     }
-    wereAnyStatementsOptimizedAway &= numberOfDeclaredModuleStatements == copyOfModule->statements.size();
 
-    std::size_t generatedInternalIdForModule = 0;
-    activeSymbolTableScope->addEntry(*copyOfModule, &generatedInternalIdForModule);
+    bool wereAnyParametersOrLocalSignalsRemoved = false;
+    if (parserConfig.deadCodeEliminationEnabled) {
+        const auto& indicesOfRemovedLocalVariablesOfModule = activeSymbolTableScope->fetchUnusedLocalModuleVariablesAndRemoveFromSymbolTable(module.name, generatedInternalIdForModule);
+        removeElementsAtIndices(copyOfModule->variables, indicesOfRemovedLocalVariablesOfModule);
 
-    if (!parserConfig.deadCodeEliminationEnabled) {
-        closeActiveSymbolTableScope();
-        if (!wereAnyStatementsOptimizedAway) {
-            return OptimizationResult<syrec::Module>::asUnchangedOriginal();
-        }
-        return OptimizationResult<syrec::Module>::fromOptimizedContainer(std::move(copyOfModule));
+        const auto& indicesOfUnusedParameters = activeSymbolTableScope->updateOptimizedModuleSignatureByMarkingAndReturningIndicesOfUnusedParameters(module.name, generatedInternalIdForModule);
+        removeElementsAtIndices(copyOfModule->parameters, indicesOfUnusedParameters);
+
+        wereAnyParametersOrLocalSignalsRemoved = !indicesOfRemovedLocalVariablesOfModule.empty() || !indicesOfUnusedParameters.empty();
     }
     
-    const auto& indicesOfRemovedLocalVariablesOfModule = activeSymbolTableScope->fetchUnusedLocalModuleVariables(module.name, generatedInternalIdForModule);
-    removeElementsAtIndices(copyOfModule->variables, indicesOfRemovedLocalVariablesOfModule);
-
-    const auto& indicesOfUnusedParameters = activeSymbolTableScope->updateOptimizedModuleSignatureByMarkingAndReturningUnusedParametersOfModule(module.name, generatedInternalIdForModule);
-    removeElementsAtIndices(copyOfModule->parameters, indicesOfUnusedParameters);
-
-    auto doesOptimizedModuleBodyContainAnyStatement = copyOfModule->statements.size();
-    const auto doesOptimizedModuleOnlyHaveReadOnlyParameters = copyOfModule->parameters.empty()
+    auto doesOptimizedModuleBodyContainAnyStatement = !copyOfModule->statements.empty();
+    auto doesOptimizedModuleOnlyHaveReadOnlyParameters = copyOfModule->parameters.empty()
         || std::all_of(copyOfModule->parameters.cbegin(), copyOfModule->parameters.cend(), [](const syrec::Variable::ptr& declaredParameter) {
-            return declaredParameter->type != syrec::Variable::Types::In;
+                return isVariableReadOnly(*declaredParameter);
         });
 
-    closeActiveSymbolTableScope();
-    const auto doesModulePerformAssignmentToAnyModifiableParameterOrLocal = isAnyModifiableParameterOrLocalModifiedInModuleBody(*copyOfModule);
-
+    auto doesModulePerformAssignmentToAnyModifiableParameterOrLocal = isAnyModifiableParameterOrLocalModifiedInModuleBody(*copyOfModule);
+    /*
+     * If we can determine that the main module only contains read-only parameters or does not perform assignments to either local signals and modifiable parameters,
+     * the former can be removed but since the program must consist of some module, the main module will be stripped of all parameters, local signals as well as any
+     * declared statements and its module body will only consist of a signal skip statement (which is required so that the module matches the SyReC grammar).
+     */
+    if (parserConfig.deadCodeEliminationEnabled && doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(module.name, optionalMainModuleIdent) 
+            && ((doesOptimizedModuleOnlyHaveReadOnlyParameters && (copyOfModule->variables.empty() || !doesModulePerformAssignmentToAnyModifiableParameterOrLocal)) 
+                || !doesModulePerformAssignmentToAnyModifiableParameterOrLocal)) {
+        /*
+         * TODO: Check this assumption.
+         * Dead code elimination should have already removed calls/uncalls to modules with read-only parameters or without assignments to local signals and modifiable parameters,
+         * so no update of the reference counts for said calls/uncalls should be required here.
+         *
+         * Additionally, we can leave the symbol table entry of the module unchanged as the declared module signature should not change while the internal optimized module signature is already fixed
+         * beforehand while determining the unused parameters.
+         */
+        copyOfModule->statements.clear();
+        copyOfModule->parameters.clear();
+        copyOfModule->variables.clear();
+        doesOptimizedModuleBodyContainAnyStatement = false;
+        doesModulePerformAssignmentToAnyModifiableParameterOrLocal = false;
+        doesOptimizedModuleOnlyHaveReadOnlyParameters              = false;
+    }
+    
     /*
      * The declared main module body cannot be empty as defined by the SyReC grammar, thus we append a single skip statement in this case.
      */
-    if (wereAnyStatementsOptimizedAway && !doesOptimizedModuleBodyContainAnyStatement 
-        && doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(module.name, optionalMainModuleIdent)) {
+    if (!doesOptimizedModuleBodyContainAnyStatement && doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(module.name, optionalMainModuleIdent)) {
         const auto& generatedSkipStmtForMainModuleWithEmptyBody = std::make_shared<syrec::SkipStatement>();
         copyOfModule->statements.emplace_back(generatedSkipStmtForMainModuleWithEmptyBody);
         doesOptimizedModuleBodyContainAnyStatement = true;
     }
 
+    closeActiveSymbolTableScope();
+    const auto& globalSymbolTableScope = *getActiveSymbolTableScope();
     if (!doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(module.name, optionalMainModuleIdent) 
-        && ((wereAnyStatementsOptimizedAway && !doesOptimizedModuleBodyContainAnyStatement) 
-        || !doesOptimizedModuleBodyContainAnyStatement 
-        || (doesOptimizedModuleOnlyHaveReadOnlyParameters && copyOfModule->variables.empty())
-        || (copyOfModule->parameters.empty() && copyOfModule->variables.empty())
-        || !doesModulePerformAssignmentToAnyModifiableParameterOrLocal)) {
+        && (!doesOptimizedModuleBodyContainAnyStatement 
+            || (doesOptimizedModuleOnlyHaveReadOnlyParameters && copyOfModule->variables.empty())
+            || (copyOfModule->parameters.empty() && copyOfModule->variables.empty())
+            || !doesModulePerformAssignmentToAnyModifiableParameterOrLocal)) {
+        globalSymbolTableScope->changeStatementsOfModule(module.name, generatedInternalIdForModule, {});
         return OptimizationResult<syrec::Module>::asOptimizedAwayContainer();
     }
 
-    if (numberOfDeclaredModuleStatements == copyOfModule->statements.size() && indicesOfRemovedLocalVariablesOfModule.empty() && indicesOfUnusedParameters.empty()) {
+    if (numberOfDeclaredModuleStatements == copyOfModule->statements.size() && !wereAnyParametersOrLocalSignalsRemoved) {
         return OptimizationResult<syrec::Module>::asUnchangedOriginal();
     }
 
+    globalSymbolTableScope->changeStatementsOfModule(module.name, generatedInternalIdForModule, copyOfModule->statements);
     return OptimizationResult<syrec::Module>::fromOptimizedContainer(std::move(copyOfModule));
 }
 
@@ -198,11 +212,18 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
     if (mappedToAssignmentOperationFromFlag.has_value() && rhsOperandEvaluatedAsConstant.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToAssignmentOperationFromFlag, *rhsOperandEvaluatedAsConstant)
         && parserConfig.deadCodeEliminationEnabled) {
+        updateReferenceCountOf(lhsOperand->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
         return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
     }
 
     const auto skipCheckForSplitOfAssignmentInSubAssignments = !parserConfig.noAdditionalLineOptimizationEnabled || rhsOperandEvaluatedAsConstant.has_value();
     if (auto evaluatedAssignedToSignal = tryEvaluateDefinedSignalAccess(*lhsOperand); evaluatedAssignedToSignal.has_value()) {
+        /*
+         * TODO:
+         * When an assignment should be performed and only if we know that the size both operands after an dimension access is at most 1, we can use the perform assignment call
+         * Otherwise, we either need to perform a broadcast check (which should have been done in the parser already) which in case that no broadcasting is required still
+         * needs to handle assignments of N-d signals (for which we need to determine whether the synthesizer supports such statements).
+         */
         performAssignment(*evaluatedAssignedToSignal, *mappedToAssignmentOperationFromFlag, rhsOperandEvaluatedAsConstant);
     }
 
@@ -215,6 +236,8 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         if (auto generatedSimplifierAssignments = noAdditionalLineAssignmentSimplifier->tryReduceRequiredAdditionalLinesFor(assignmentStmtToSimplify, isValueLookupBlockedByDataFlowAnalysisRestriction(*assignmentStmtToSimplify->lhs)); !generatedSimplifierAssignments.empty()) {
             filterAssignmentsThatDoNotChangeAssignedToSignal(generatedSimplifierAssignments);
             if (generatedSimplifierAssignments.empty()) {
+                updateReferenceCountOf(lhsOperand->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
+                updateReferenceCountsOfSignalIdentsUsedIn(*rhsOperand, parser::SymbolTable::ReferenceCountUpdate::Decrement);
                 return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();        
             }
 
@@ -243,10 +266,11 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(*symbolTableScope, callStatement.target->name); moduleCallGuessResolver.has_value()) {
+        // TODO:
         const auto moduleIdsOfInitialGuess = moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess();
 
         bool callerArgumentsOk = true;
-        for (std::size_t i = 0; i < callStatement.parameters.size(); ++i) {
+        for (std::size_t i = 0; i < callStatement.parameters.size() && callerArgumentsOk; ++i) {
             if (const auto& symbolTableEntryForCallerArgument = getSymbolTableEntryForVariable(callStatement.parameters.at(i)); symbolTableEntryForCallerArgument.has_value()) {
                 moduleCallGuessResolver->get()->refineGuessWithNextParameter(**symbolTableEntryForCallerArgument);
                 callerArgumentsOk &= true;
@@ -265,32 +289,31 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
                 }
                 symbolTableScope->get()->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess(), parser::SymbolTable::ReferenceCountUpdate::Increment);
             } else {
-                if (const auto& signatureOfCalledModule = symbolTableScope->get()->tryGetOptimizedSignatureForModuleCall(callStatement.target->name, callStatement.parameters); signatureOfCalledModule.has_value()) {
-                    std::vector<std::string>        callerArgumentsForOptimizedModuleCall;
-                    std::unordered_set<std::size_t> indicesOfRemainingParameters;
-                    if (const auto& optimizedModuleSignature = signatureOfCalledModule->determineOptimizedCallSignature(&indicesOfRemainingParameters); !optimizedModuleSignature.empty()) {
-                        callerArgumentsForOptimizedModuleCall.resize(optimizedModuleSignature.size());
+                const auto&                     signatureOfCalledModule = modulesMatchingCallSignature.front();
+                std::vector<std::string>        callerArgumentsForOptimizedModuleCall;
+                std::unordered_set<std::size_t> indicesOfRemainingParameters;
+                if (const auto& optimizedModuleSignature = signatureOfCalledModule.determineOptimizedCallSignature(&indicesOfRemainingParameters); !optimizedModuleSignature.empty()) {
+                    callerArgumentsForOptimizedModuleCall.resize(optimizedModuleSignature.size());
 
-                        for (const auto& i: indicesOfRemainingParameters) {
-                            const auto& symbolTableEntryForCallerArgument = signatureOfCalledModule->declaredParameters.at(i);
+                    for (const auto& i: indicesOfRemainingParameters) {
+                        const auto& symbolTableEntryForCallerArgument = signatureOfCalledModule.declaredParameters.at(i);
 
-                            callerArgumentsForOptimizedModuleCall.emplace_back(symbolTableEntryForCallerArgument->name);
-                            if (!(symbolTableEntryForCallerArgument->type == syrec::Variable::Types::Out || symbolTableEntryForCallerArgument->type == syrec::Variable::Types::Inout)) {
-                                continue;
-                            }
-                            invalidateValueOfWholeSignal(symbolTableEntryForCallerArgument->name);
-                            updateReferenceCountOf(symbolTableEntryForCallerArgument->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
+                        callerArgumentsForOptimizedModuleCall.emplace_back(symbolTableEntryForCallerArgument->name);
+                        if (!(symbolTableEntryForCallerArgument->type == syrec::Variable::Types::Out || symbolTableEntryForCallerArgument->type == syrec::Variable::Types::Inout)) {
+                            continue;
                         }
+                        invalidateValueOfWholeSignal(symbolTableEntryForCallerArgument->name);
+                        updateReferenceCountOf(symbolTableEntryForCallerArgument->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
                     }
-                    if (indicesOfRemainingParameters.empty()) {
-                        return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
-                    }
-                    symbolTableScope->get()->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, {signatureOfCalledModule->internalModuleId}, parser::SymbolTable::ReferenceCountUpdate::Increment);
-                    if (indicesOfRemainingParameters.size() == signatureOfCalledModule->declaredParameters.size()) {
-                        return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
-                    }
-                    return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::CallStatement>(callStatement.target, callerArgumentsForOptimizedModuleCall));
                 }
+                if (indicesOfRemainingParameters.empty()) {
+                    return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
+                }
+                symbolTableScope->get()->updateReferenceCountOfModulesMatchingSignature(callStatement.target->name, {signatureOfCalledModule.internalModuleId}, parser::SymbolTable::ReferenceCountUpdate::Increment);
+                if (indicesOfRemainingParameters.size() == signatureOfCalledModule.declaredParameters.size()) {
+                    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
+                }
+                return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::CallStatement>(callStatement.target, callerArgumentsForOptimizedModuleCall));
             }
         } else {
             /*
@@ -327,10 +350,8 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         const auto moduleIdsOfInitialGuess = moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess();
 
         bool                              callerArgumentsOk = true;
-        std::vector<syrec::Variable::ptr> symbolTableEntryForCalleeArguments(uncallStatement.parameters.size());
-        for (std::size_t i = 0; i < symbolTableEntryForCalleeArguments.size(); ++i) {
+        for (std::size_t i = 0; i < uncallStatement.parameters.size() && callerArgumentsOk; ++i) {
             if (const auto& symbolTableEntryForCallerArgument = getSymbolTableEntryForVariable(uncallStatement.parameters.at(i)); symbolTableEntryForCallerArgument.has_value()) {
-                symbolTableEntryForCalleeArguments.emplace_back(*symbolTableEntryForCallerArgument);
                 moduleCallGuessResolver->get()->refineGuessWithNextParameter(**symbolTableEntryForCallerArgument);
                 callerArgumentsOk &= true;
             }
@@ -339,23 +360,22 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         if (callerArgumentsOk) {
             const auto modulesMatchingCallSignature = moduleCallGuessResolver->get()->getMatchesForGuess();
             if (modulesMatchingCallSignature.size() == 1) {
-                if (const auto& signatureOfCalledModule = symbolTableScope->get()->tryGetOptimizedSignatureForModuleCall(uncallStatement.target->name, uncallStatement.parameters); signatureOfCalledModule.has_value()) {
-                    std::vector<std::string>        callerArgumentsForOptimizedModuleCall;
-                    std::unordered_set<std::size_t> indicesOfRemainingParameters;
-                    if (const auto& optimizedModuleSignature = signatureOfCalledModule->determineOptimizedCallSignature(&indicesOfRemainingParameters); !optimizedModuleSignature.empty()) {
-                        callerArgumentsForOptimizedModuleCall.resize(optimizedModuleSignature.size());
-                        
-                        for (const auto& i: indicesOfRemainingParameters) {
-                            const auto& symbolTableEntryForCallerArgument = signatureOfCalledModule->declaredParameters.at(i);
-                            callerArgumentsForOptimizedModuleCall.emplace_back(symbolTableEntryForCallerArgument->name);
-                        }
+                const auto& signatureOfCalledModule = modulesMatchingCallSignature.front();
+                std::vector<std::string>        callerArgumentsForOptimizedModuleCall;
+                std::unordered_set<std::size_t> indicesOfRemainingParameters;
+                if (const auto& optimizedModuleSignature = signatureOfCalledModule.determineOptimizedCallSignature(&indicesOfRemainingParameters); !optimizedModuleSignature.empty()) {
+                    callerArgumentsForOptimizedModuleCall.resize(optimizedModuleSignature.size());
+
+                    for (const auto& i: indicesOfRemainingParameters) {
+                        const auto& symbolTableEntryForCallerArgument = signatureOfCalledModule.declaredParameters.at(i);
+                        callerArgumentsForOptimizedModuleCall.emplace_back(symbolTableEntryForCallerArgument->name);
                     }
-                    if (indicesOfRemainingParameters.empty()) {
-                        return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
-                    }
-                    if (indicesOfRemainingParameters.size() != signatureOfCalledModule->declaredParameters.size()) {
-                        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::UncallStatement>(uncallStatement.target, callerArgumentsForOptimizedModuleCall));
-                    }
+                }
+                if (indicesOfRemainingParameters.empty()) {
+                    return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
+                }
+                if (indicesOfRemainingParameters.size() != signatureOfCalledModule.declaredParameters.size()) {
+                    return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::UncallStatement>(uncallStatement.target, callerArgumentsForOptimizedModuleCall));
                 }
             }
         }
@@ -363,7 +383,12 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-
+/*
+ * In the current implementation, if a branch can be skipped due to the value of the guard condition, the whole omitted branch will not be optimized
+ * and any potential errors that would only be detected during optimizations (i.e. during constant propagation) will not be reported. Since error reporting
+ * is not implemented for the optimizer, the latter might be not an issues but since the optimizer does also no panic in case of an error, invalid programs could be
+ * detected as valid.
+ */
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleIfStmt(const syrec::IfStatement& ifStatement) {
     auto                   wasGuardExpressionSimplified = false;
     syrec::expression::ptr simplifiedGuardExpr = ifStatement.condition;
@@ -412,6 +437,10 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
             updateBackupOfValuesChangedInScopeAndResetMadeChanges();
         }
     }
+    else {
+        isTrueBranchEmptyAfterOptimization = true;
+        wereAnyStmtsInTrueBranchModified  = true;
+    }
 
     std::optional<std::vector<std::unique_ptr<syrec::Statement>>> simplifiedFalseBranchStmtsContainer;
     auto                                                          isFalseBranchEmptyAfterOptimization = false;
@@ -426,6 +455,10 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         if (canFalseBranchBeOmitted) {
             destroySymbolTableBackupScope();
         }
+    }
+    else {
+        isFalseBranchEmptyAfterOptimization = true;
+        wereAnyStmtsInFalseBranchModified   = true;
     }
 
     if (!canTrueBranchBeOmitted && !canFalseBranchBeOmitted) {
@@ -450,42 +483,30 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         }
     }
 
-    if (!wereAnyStmtsInTrueBranchModified && !wereAnyStmtsInFalseBranchModified) {
-        updateReferenceCountsOfSignalIdentsUsedIn(*simplifiedGuardExpr, parser::SymbolTable::ReferenceCountUpdate::Increment);
-        if (!wasGuardExpressionSimplified) {
-            return OptimizationResult<syrec::Statement>::asUnchangedOriginal();           
-        }
-
-        auto simplifiedIfStatement = std::make_unique<syrec::IfStatement>();
-        simplifiedIfStatement->condition   = simplifiedGuardExpr;
-        simplifiedIfStatement->fiCondition = simplifiedGuardExpr;
-        simplifiedIfStatement->thenStatements = !simplifiedTrueBranchStmtsContainer.has_value()
-            ? createStatementListFrom(ifStatement.thenStatements, {})
-            : createStatementListFrom({}, std::move(*simplifiedTrueBranchStmtsContainer));
-
-        simplifiedIfStatement->elseStatements = !simplifiedFalseBranchStmtsContainer.has_value()
-            ? createStatementListFrom(ifStatement.elseStatements, {})
-            : createStatementListFrom({}, std::move(*simplifiedFalseBranchStmtsContainer));
-
-        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(simplifiedIfStatement));
+    if (!wereAnyStmtsInTrueBranchModified && !wereAnyStmtsInFalseBranchModified && !wasGuardExpressionSimplified) {
+        return OptimizationResult<syrec::Statement>::asUnchangedOriginal();           
     }
     
-    if (!simplifiedTrueBranchStmtsContainer.has_value() && !simplifiedFalseBranchStmtsContainer.has_value()) {
-        return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
-    }
-
     if (parserConfig.deadCodeEliminationEnabled) {
         if ((canTrueBranchBeOmitted && isFalseBranchEmptyAfterOptimization)
             || (canFalseBranchBeOmitted && isTrueBranchEmptyAfterOptimization)
             || (isTrueBranchEmptyAfterOptimization && isFalseBranchEmptyAfterOptimization)) {
             return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
         }
-
+        
         if (canTrueBranchBeOmitted) {
-            return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(*simplifiedFalseBranchStmtsContainer));
+            auto remainingFalseBranchStatements = simplifiedFalseBranchStmtsContainer.has_value()
+                ? std::move(*simplifiedFalseBranchStmtsContainer)
+                : createCopyOfStatements(ifStatement.elseStatements);
+            
+            return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(remainingFalseBranchStatements));
         }
         if (canFalseBranchBeOmitted) {
-            return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(*simplifiedTrueBranchStmtsContainer));
+            auto remainingTrueBranchStatements = simplifiedTrueBranchStmtsContainer.has_value()
+                ? std::move(*simplifiedTrueBranchStmtsContainer)
+                : createCopyOfStatements(ifStatement.thenStatements);
+
+            return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(remainingTrueBranchStatements));
         }
     }
 
@@ -499,8 +520,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     simplifiedIfStatement->elseStatements = !simplifiedFalseBranchStmtsContainer.has_value()
         ? createStatementListFrom(ifStatement.elseStatements, {})
         : createStatementListFrom({}, std::move(*simplifiedFalseBranchStmtsContainer));
-
-    updateReferenceCountsOfSignalIdentsUsedIn(*simplifiedGuardExpr, parser::SymbolTable::ReferenceCountUpdate::Increment);
+    
     return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(simplifiedIfStatement));
 }
 
@@ -572,6 +592,9 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
     // TODO: Should constant propagation be perform again here
     if (shouldNewValuePropagationBlockerScopeOpened) {
+        /*
+         * Are assignments that do not change result removed / not considered
+         */
         activeDataFlowValuePropagationRestrictions->openNewScopeAndAppendDataDataFlowAnalysisResult(transformCollectionOfSharedPointersToReferences(forStatement.statements), &wereAnyAssignmentPerformInLoopBody);
     }
     
@@ -580,6 +603,28 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     std::optional<std::vector<std::unique_ptr<syrec::Statement>>> loopBodyStmtsSimplified;
     if (auto simplificationResultOfLoopBodyStmts = handleStatements(transformCollectionOfSharedPointersToReferences(forStatement.statements)); simplificationResultOfLoopBodyStmts.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         loopBodyStmtsSimplified = simplificationResultOfLoopBodyStmts.tryTakeOwnershipOfOptimizationResult();    
+    }
+
+    if (!wereAnyAssignmentPerformInLoopBody) {
+        std::vector<std::reference_wrapper<syrec::Statement>> statementsToCheck;
+        if (loopBodyStmtsSimplified.has_value()) {
+            statementsToCheck.reserve(loopBodyStmtsSimplified->size());
+            for (auto&& stmt : *loopBodyStmtsSimplified) {
+                wereAnyAssignmentPerformInLoopBody |= doesStatementDefineAssignmentThatChangesAssignedToSignal(*stmt);
+                if (wereAnyAssignmentPerformInLoopBody) {
+                    break;
+                }
+            }
+        }
+        else {
+            statementsToCheck.reserve(forStatement.statements.size());
+            for (const auto& stmt : forStatement.statements) {
+                wereAnyAssignmentPerformInLoopBody |= doesStatementDefineAssignmentThatChangesAssignedToSignal(*stmt);
+                if (wereAnyAssignmentPerformInLoopBody) {
+                    break;
+                }
+            }
+        }
     }
 
     if (shouldValueOfLoopVariableBeAvailableInLoopBody) {
@@ -924,6 +969,17 @@ std::unique_ptr<syrec::Module> optimizations::Optimizer::createCopyOfModule(cons
     return copyOfModule;
 }
 
+std::vector<std::unique_ptr<syrec::Statement>> optimizations::Optimizer::createCopyOfStatements(const syrec::Statement::vec& statements) {
+    std::vector<std::unique_ptr<syrec::Statement>> statementCopyContainer;
+    statementCopyContainer.reserve(statements.size());
+
+    for (const auto& stmt : statements) {
+        statementCopyContainer.emplace_back(createCopyOfStmt(*stmt));
+    }
+    return statementCopyContainer;
+}
+
+
 std::unique_ptr<syrec::Statement> optimizations::Optimizer::createCopyOfStmt(const syrec::Statement& stmt) {
     if (typeid(stmt) == typeid(syrec::SkipStatement)) {
         return std::make_unique<syrec::SkipStatement>();
@@ -1266,7 +1322,7 @@ void optimizations::Optimizer::closeActiveSymbolTableScope() {
 }
 
 
-
+// TODO:
 std::unique_ptr<syrec::BinaryExpression> optimizations::Optimizer::createBinaryExprFromCompileTimeConstantExpr(const syrec::Number& number) {
     return nullptr;
 }
@@ -1568,7 +1624,9 @@ bool optimizations::Optimizer::checkIfOperandsOfBinaryExpressionAreSignalAccesse
 }
 
 
-
+/*
+ * Reference counts of signals used in expressions of dimensio access are not updated correctly
+ */
 optimizations::Optimizer::OptimizationResult<syrec::VariableAccess> optimizations::Optimizer::handleSignalAccess(const syrec::VariableAccess& signalAccess, bool performConstantPropagationForAccessedSignal, std::optional<unsigned int>* fetchedValue) const {
     auto evaluatedSignalAccess = tryEvaluateDefinedSignalAccess(signalAccess);
     if (!evaluatedSignalAccess.has_value()) {
@@ -1818,8 +1876,10 @@ syrec::Statement::vec optimizations::Optimizer::createStatementListFrom(const sy
         return originalStmtList;
     }
 
-    syrec::Statement::vec stmtsContainer(simplifiedStmtList.size(), nullptr);
-    for (auto& simplifiedStmt : simplifiedStmtList) {
+    syrec::Statement::vec stmtsContainer;
+    stmtsContainer.reserve(simplifiedStmtList.size());
+
+    for (auto&& simplifiedStmt : simplifiedStmtList) {
         stmtsContainer.emplace_back(std::move(simplifiedStmt));
     }
     return stmtsContainer;
@@ -1862,13 +1922,13 @@ bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInModuleBo
 
     std::unordered_set<std::string> lookupOfModifiableParametersAndLocals;
     for (const auto& moduleParameter : module.parameters) {
-        if (isVariableReadOnly(*moduleParameter) && lookupOfModifiableParametersAndLocals.count(moduleParameter->name) == 0) {
+        if (!isVariableReadOnly(*moduleParameter) && !lookupOfModifiableParametersAndLocals.count(moduleParameter->name)) {
             lookupOfModifiableParametersAndLocals.insert(moduleParameter->name);
         }
     }
 
     for (const auto& moduleLocalVariable: module.variables) {
-        if (isVariableReadOnly(*moduleLocalVariable) && lookupOfModifiableParametersAndLocals.count(moduleLocalVariable->name) == 0) {
+        if (!isVariableReadOnly(*moduleLocalVariable) && !lookupOfModifiableParametersAndLocals.count(moduleLocalVariable->name)) {
             lookupOfModifiableParametersAndLocals.insert(moduleLocalVariable->name);
         }
     }
@@ -1877,7 +1937,7 @@ bool optimizations::Optimizer::isAnyModifiableParameterOrLocalModifiedInModuleBo
         return false;
     }
 
-    return std::none_of(module.statements.cbegin(), module.statements.cend(), [&](const syrec::Statement::ptr& stmt) {
+    return std::any_of(module.statements.cbegin(), module.statements.cend(), [&](const syrec::Statement::ptr& stmt) {
         return isAnyModifiableParameterOrLocalModifiedInStatement(*stmt, lookupOfModifiableParametersAndLocals);
     });
 }
@@ -1965,4 +2025,51 @@ std::optional<bool> optimizations::Optimizer::determineEquivalenceOfOperandsOfBi
 
 bool optimizations::Optimizer::doesCurrentModuleIdentMatchUserDefinedMainModuleIdent(const std::string_view& currentModuleIdent, const std::optional<std::string>& userDefinedMainModuleIdent) {
     return userDefinedMainModuleIdent.value_or("") == currentModuleIdent;
+}
+
+bool optimizations::Optimizer::doesStatementDefineAssignmentThatChangesAssignedToSignal(const syrec::Statement& statement) {
+    if (const auto& stmtAsLoopStatement = dynamic_cast<const syrec::ForStatement*>(&statement); stmtAsLoopStatement != nullptr) {
+        return std::any_of(stmtAsLoopStatement->statements.cbegin(), stmtAsLoopStatement->statements.cend(), [&](const syrec::Statement::ptr& loopBodyStatement) {
+            return doesStatementDefineAssignmentThatChangesAssignedToSignal(*loopBodyStatement);
+        });
+    }
+    if (const auto& stmtAsIfStmt = dynamic_cast<const syrec::IfStatement*>(&statement); stmtAsIfStmt != nullptr) {
+        return std::any_of(stmtAsIfStmt->thenStatements.cbegin(), stmtAsIfStmt->thenStatements.cend(), [&](const syrec::Statement::ptr& trueBranchStatement) {
+            return doesStatementDefineAssignmentThatChangesAssignedToSignal(*trueBranchStatement);
+        })
+        || std::any_of(stmtAsIfStmt->elseStatements.cbegin(), stmtAsIfStmt->elseStatements.cend(), [&](const syrec::Statement::ptr& falseBranchStatement) {
+            return doesStatementDefineAssignmentThatChangesAssignedToSignal(*falseBranchStatement);
+        });
+    }
+    if (const auto& stmtAsAssignmentStmt = dynamic_cast<const syrec::AssignStatement*>(&statement); stmtAsAssignmentStmt != nullptr) {
+        if (const auto& mappedToAssignmentOperationFromFlag = syrec_operation::tryMapAssignmentOperationFlagToEnum(stmtAsAssignmentStmt->op); mappedToAssignmentOperationFromFlag.has_value()) {
+            if (const auto& rhsValueEvaluatedAsConstant = tryEvaluateExpressionToConstant(*stmtAsAssignmentStmt->rhs); rhsValueEvaluatedAsConstant.has_value()) {
+                return !syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToAssignmentOperationFromFlag, *rhsValueEvaluatedAsConstant);
+            }   
+        }
+        return true;
+    }
+    if (const auto& stmtAsUnaryStmt = dynamic_cast<const syrec::UnaryStatement*>(&statement); stmtAsUnaryStmt != nullptr) {
+        return true;
+    }
+    if (const auto& stmtAsSwapStmt = dynamic_cast<const syrec::SwapStatement*>(&statement); stmtAsSwapStmt != nullptr) {
+        const auto& lhsOperandEvaluated = tryEvaluateDefinedSignalAccess(*stmtAsSwapStmt->lhs);
+        const auto& rhsOperandEvaluated = tryEvaluateDefinedSignalAccess(*stmtAsSwapStmt->rhs);
+        if (lhsOperandEvaluated.has_value() && rhsOperandEvaluated.has_value()) {
+            const auto& equivalenceCheckResultOfSwapOperands = areEvaluatedSignalAccessEqualAtCompileTime(*lhsOperandEvaluated, *rhsOperandEvaluated);
+            return !(equivalenceCheckResultOfSwapOperands.isResultCertain && equivalenceCheckResultOfSwapOperands.equality == SignalAccessUtils::SignalAccessEquivalenceResult::Equal);
+        }
+        return true;
+    }
+    if (const auto& stmtAsCallStmt = dynamic_cast<const syrec::CallStatement*>(&statement); stmtAsCallStmt != nullptr) {
+        if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
+            if (const auto& matchingSymbolTableEntryForModule = activeSymbolTableScope->get()->tryGetOptimizedSignatureForModuleCall(stmtAsCallStmt->target->name, stmtAsCallStmt->parameters); matchingSymbolTableEntryForModule.has_value()) {
+                const auto& parametersOfOptimizedModuleSignature = matchingSymbolTableEntryForModule->determineOptimizedCallSignature(nullptr);
+                return !std::any_of(parametersOfOptimizedModuleSignature.cbegin(), parametersOfOptimizedModuleSignature.cend(), [](const syrec::Variable::ptr& parameter) {
+                    return isVariableReadOnly(*parameter);
+                });
+            }
+        }
+    }
+    return false;
 }

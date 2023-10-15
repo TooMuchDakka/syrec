@@ -49,6 +49,7 @@ namespace parser {
         };
         void updateReferenceCountOfLiteral(const std::string_view& literalIdent, ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountOfModulesMatchingSignature(const std::string_view& moduleIdent, const std::vector<std::size_t>& internalModuleIds, ReferenceCountUpdate typeOfUpdate) const;
+        [[maybe_unused]] bool changeStatementsOfModule(const std::string_view& moduleIdent, std::size_t internalModuleId, const syrec::Statement::vec& updatedModuleBodyStatements) const;
 
         // TODO: CONSTANT_PROPAGATION
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
@@ -62,8 +63,8 @@ namespace parser {
         void swap(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const;
 
         [[nodiscard]] std::unordered_set<std::string>   getUnusedLiterals() const;
-        [[nodiscard]] std::unordered_set<std::size_t>   updateOptimizedModuleSignatureByMarkingAndReturningUnusedParametersOfModule(const std::string_view& moduleName, std::size_t internalModuleId) const;
-        [[nodiscard]] std::unordered_set<std::size_t>   fetchUnusedLocalModuleVariables(const std::string_view& moduleName, std::size_t internalModuleId) const;
+        [[nodiscard]] std::unordered_set<std::size_t>   updateOptimizedModuleSignatureByMarkingAndReturningIndicesOfUnusedParameters(const std::string_view& moduleName, std::size_t internalModuleId) const;
+        [[nodiscard]] std::unordered_set<std::size_t>   fetchUnusedLocalModuleVariablesAndRemoveFromSymbolTable(const std::string_view& moduleName, std::size_t internalModuleId) const;
         
         [[nodiscard]] std::vector<bool>                                  determineIfModuleWasUsed(const syrec::Module::vec& modules) const;
         [[nodiscard]] std::optional<valueLookup::SignalValueLookup::ptr> createBackupOfValueOfSignal(const std::string_view& literalIdent) const;
@@ -138,6 +139,7 @@ namespace parser {
         static std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts);
         static std::vector<std::optional<unsigned int>>                                  tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable);
         static void                                                                      performReferenceCountUpdate(std::size_t& currentReferenceCount, ReferenceCountUpdate typeOfUpdate);
+        static void                                                                      addIndexOfDroppedParameterToOptimizedModule(ModuleSymbolTableEntry::InternalModuleHelperData& optimizedModuleData, std::size_t indexOfOptimizedAwayParameter);
     };    
 }
 

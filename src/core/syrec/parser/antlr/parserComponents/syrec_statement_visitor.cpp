@@ -55,7 +55,6 @@ std::any SyReCStatementVisitor::visitStatementList(SyReCParser::StatementListCon
     return validUserDefinedStatements.empty() ? std::nullopt : std::make_optional(validUserDefinedStatements);
 }
 
-// TODO: Broadcasting checks
 std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatementContext* context) {
     sharedData->resetSignalAccessRestriction();
     const auto evaluationResultOfUserDefinedAssignedToSignal       = tryVisitAndConvertProductionReturnValue<SignalEvaluationResult::ptr>(context->signal());
@@ -331,8 +330,18 @@ std::optional<std::string> SyReCStatementVisitor::tryGetLoopVariableIdent(SyReCP
     return loopContext->loopVariableDefinition() && loopContext->loopVariableDefinition()->IDENT() ? std::make_optional("$" + loopContext->loopVariableDefinition()->IDENT()->getText()) : std::nullopt;
 }
 
+// TODO: Add tests that only 1D signals/expressions are allowed as operands in statements
 std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext* context) {
     const auto guardExpression        = tryVisitAndConvertProductionReturnValue<ExpressionEvaluationResult::ptr>(context->guardCondition);
+    bool       wasBroadcastingRequiredForGuardExpression = false;
+    if (guardExpression.has_value()) {
+        const auto& sizeInformationOfGuardExpression = guardExpression->get()->determineOperandSize();
+        const auto& potentialGuardExpressionBroadcastingError = determineContextStartTokenPositionOrUseDefaultOne(context->guardCondition);
+        wasBroadcastingRequiredForGuardExpression             = doOperandsRequireBroadcastingBasedOnDimensionAccessAndLogError(
+                            sizeInformationOfGuardExpression.numDeclaredDimensionOfOperand, sizeInformationOfGuardExpression.explicitlyAccessedValuesPerDimension.size(), sizeInformationOfGuardExpression.determineNumAccessedValuesPerDimension(),
+                            1, 1, {1}, &potentialGuardExpressionBroadcastingError, nullptr);
+    }
+
 
     const auto numUserDefinedStmtsInTrueBranch = context->trueBranchStmts ? context->trueBranchStmts->stmts.size() : 0;
     auto       trueBranchStmts                 = tryVisitAndConvertProductionReturnValue<syrec::Statement::vec>(context->trueBranchStmts);
@@ -347,6 +356,10 @@ std::any SyReCStatementVisitor::visitIfStatement(SyReCParser::IfStatementContext
 
     if (!areExpressionsEqual(**guardExpression, **closingGuardExpression)) {
         createError(mapAntlrTokenPosition(context->getStart()),  IfAndFiConditionMissmatch);
+        return 0;
+    }
+
+    if (wasBroadcastingRequiredForGuardExpression) {
         return 0;
     }
 

@@ -30,11 +30,11 @@ syrec::Variable::vec SymbolTable::DeclaredModuleSignature::determineOptimizedCal
 bool SymbolTable::contains(const std::string_view& literalIdent) const {
     return this->locals.find(literalIdent) != this->locals.end()
         || this->modules.find(literalIdent) != this->modules.end()
-        || (nullptr != outer && outer->contains(literalIdent));
+        || (outer && outer->contains(literalIdent));
 }
 
 bool SymbolTable::contains(const syrec::Module::ptr& module) const {
-    if (nullptr == module) {
+    if (!module) {
         return false;
     }
 
@@ -47,7 +47,7 @@ bool SymbolTable::contains(const syrec::Module::ptr& module) const {
         }
     }
 
-    return nullptr != outer && outer->contains(module);
+    return outer && outer->contains(module);
 }
 
 std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> SymbolTable::getVariable(const std::string_view& literalIdent) const {
@@ -56,14 +56,14 @@ std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> SymbolTabl
     if (this->locals.find(literalIdent) != this->locals.end()) {
         found_entry.emplace(this->locals.find(literalIdent)->second->variableInformation);
     }
-    else if (nullptr != outer) {
+    else if (outer) {
         return outer->getVariable(literalIdent);
     }
     return found_entry;
 }
 
 std::vector<SymbolTable::DeclaredModuleSignature> SymbolTable::getMatchingModuleSignaturesForName(const std::string_view& moduleName) const {
-    if (const auto& matchingModules = getEntryForModulesWithMatchingName(moduleName); matchingModules != nullptr && !matchingModules->internalDataLookup.empty()) {
+    if (const auto& matchingModules = getEntryForModulesWithMatchingName(moduleName); matchingModules && !matchingModules->internalDataLookup.empty()) {
         std::vector<SymbolTable::DeclaredModuleSignature> containerForMatchingSignatures;
         containerForMatchingSignatures.reserve(matchingModules->internalDataLookup.size());
         
@@ -84,7 +84,7 @@ std::optional<SymbolTable::DeclaredModuleSignature> SymbolTable::tryGetOptimized
     symbolTableEntriesForCallerArguments.reserve(calleeArguments.size());
 
     for (const auto& callerArgumentSignalIdent : calleeArguments) {
-        if (const auto& symbolTableEntry = getEntryForVariable(callerArgumentSignalIdent); symbolTableEntry != nullptr) {
+        if (const auto& symbolTableEntry = getEntryForVariable(callerArgumentSignalIdent); symbolTableEntry) {
             const auto& signalInformation = std::get<syrec::Variable::ptr>(symbolTableEntry->variableInformation).get();
             symbolTableEntriesForCallerArguments.emplace_back(*signalInformation);
         }
@@ -119,7 +119,7 @@ std::optional<SymbolTable::DeclaredModuleSignature> SymbolTable::tryGetOptimized
 
 
 std::optional<std::unique_ptr<syrec::Module>> SymbolTable::getFullDeclaredModuleInformation(const std::string_view& moduleName, std::size_t internalModuleId) const {
-    if (const auto& matchingModules = getEntryForModulesWithMatchingName(moduleName); matchingModules != nullptr && !matchingModules->internalDataLookup.empty()) {
+    if (const auto& matchingModules = getEntryForModulesWithMatchingName(moduleName); matchingModules && !matchingModules->internalDataLookup.empty()) {
         const auto moduleMatchingId = matchingModules->internalDataLookup.find(internalModuleId);
         if (moduleMatchingId != matchingModules->internalDataLookup.cend()) {
             return std::make_unique<syrec::Module>(*moduleMatchingId->second.declaredModule);    
@@ -150,7 +150,7 @@ bool SymbolTable::addEntry(const syrec::Number& number, const unsigned int bitsR
 bool SymbolTable::addEntry(const syrec::Module& module, std::size_t* internalModuleId) {
     const auto symbolTableEntryForModulesMatchingName = getEntryForModulesWithMatchingName(module.name);
     std::size_t generatedIdForModule;
-    if (symbolTableEntryForModulesMatchingName == nullptr) {
+    if (!symbolTableEntryForModulesMatchingName) {
         const auto& createdSymbolTableEntryForModulesMatchingName = std::make_shared<ModuleSymbolTableEntry>();
         generatedIdForModule = createdSymbolTableEntryForModulesMatchingName->addModule(module);
         modules.insert(std::make_pair(module.name, createdSymbolTableEntryForModulesMatchingName));
@@ -177,7 +177,7 @@ void SymbolTable::removeVariable(const std::string& literalIdent) {
 }
 
 void SymbolTable::updateReferenceCountOfLiteral(const std::string_view& literalIdent, ReferenceCountUpdate typeOfUpdate) const {
-    if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral != nullptr) {
+    if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral) {
         performReferenceCountUpdate(foundSymbolTableEntryForLiteral->referenceCount, typeOfUpdate);
     }
 }
@@ -192,6 +192,16 @@ void SymbolTable::updateReferenceCountOfModulesMatchingSignature(const std::stri
     }
 }
 
+bool SymbolTable::changeStatementsOfModule(const std::string_view& moduleIdent, std::size_t internalModuleId, const syrec::Statement::vec& updatedModuleBodyStatements) const {
+    if (const auto& symbolTableEntryForModulesMatchingIdent = getEntryForModulesWithMatchingName(moduleIdent); symbolTableEntryForModulesMatchingIdent != nullptr) {
+        if (const auto& internalDataOfModuleMatchingId = symbolTableEntryForModulesMatchingIdent->internalDataLookup.find(internalModuleId); internalDataOfModuleMatchingId != symbolTableEntryForModulesMatchingIdent->internalDataLookup.end()) {
+            const syrec::Module::ptr& referenceModuleData = internalDataOfModuleMatchingId->second.declaredModule;
+            referenceModuleData->statements               = updatedModuleBodyStatements;
+            return true;
+        }
+    }
+    return false;
+}
 
 
 void SymbolTable::openScope(SymbolTable::ptr& currentScope) {
@@ -303,31 +313,47 @@ void SymbolTable::invalidateStoredValueForLoopVariable(const std::string_view& l
     return unusedLiterals;
 }
 
-std::unordered_set<std::size_t> SymbolTable::updateOptimizedModuleSignatureByMarkingAndReturningUnusedParametersOfModule(const std::string_view& moduleName, std::size_t internalModuleId) const {
+std::unordered_set<std::size_t> SymbolTable::updateOptimizedModuleSignatureByMarkingAndReturningIndicesOfUnusedParameters(const std::string_view& moduleName, std::size_t internalModuleId) const {
     std::unordered_set<std::size_t> optimizedAwayParameterIndices;
-    if (const auto& matchingSymbolTableEntryForModule = tryGetOptimizedSignatureForModuleCall(moduleName, internalModuleId); matchingSymbolTableEntryForModule.has_value()) {
-        for (std::size_t i = 0; i < matchingSymbolTableEntryForModule->declaredParameters.size(); ++i) {
-            if (const auto& symbolTableEntryForParameter = getEntryForVariable(matchingSymbolTableEntryForModule->declaredParameters.at(i)->name); symbolTableEntryForParameter != nullptr && !symbolTableEntryForParameter->referenceCount) {
+    if (const auto& matchingSymbolTableEntryForModuleMatchingGivenModuleName = getEntryForModulesWithMatchingName(moduleName); matchingSymbolTableEntryForModuleMatchingGivenModuleName) {
+        if (!matchingSymbolTableEntryForModuleMatchingGivenModuleName->internalDataLookup.count(internalModuleId)) {
+            return optimizedAwayParameterIndices;
+        }
+
+        auto& matchingSymbolTableEntryForModule = matchingSymbolTableEntryForModuleMatchingGivenModuleName->internalDataLookup.at(internalModuleId);
+        const auto& moduleParameters                  = matchingSymbolTableEntryForModule.declaredModule->parameters;
+        for (std::size_t i = 0; i < moduleParameters.size(); i++) {
+            if (const auto& symbolTableEntryForParameter = getEntryForVariable(moduleParameters.at(i)->name); symbolTableEntryForParameter && !symbolTableEntryForParameter->referenceCount) {
                 optimizedAwayParameterIndices.emplace(i);
+                addIndexOfDroppedParameterToOptimizedModule(matchingSymbolTableEntryForModule, i);
             }
-        }       
+        }
     }
     return optimizedAwayParameterIndices;
 }
 
-std::unordered_set<std::size_t> SymbolTable::fetchUnusedLocalModuleVariables(const std::string_view& moduleName, std::size_t internalModuleId) const {
+std::unordered_set<std::size_t> SymbolTable::fetchUnusedLocalModuleVariablesAndRemoveFromSymbolTable(const std::string_view& moduleName, std::size_t internalModuleId) const {
     std::unordered_set<std::size_t> optimizedAwayLocalVariables;
-    if (const auto& matchingSymbolTableEntryForModuleMatchingGivenModuleName = getEntryForModulesWithMatchingName(moduleName); matchingSymbolTableEntryForModuleMatchingGivenModuleName != nullptr) {
-        if (matchingSymbolTableEntryForModuleMatchingGivenModuleName->internalDataLookup.count(internalModuleId) != 0) {
-            const auto& matchingSymbolTableEntryForModule = matchingSymbolTableEntryForModuleMatchingGivenModuleName->internalDataLookup.at(internalModuleId);
-            const auto& localVariablesOfModule = matchingSymbolTableEntryForModule.declaredModule->variables;
-
-            for (std::size_t i = 0; i < localVariablesOfModule.size(); ++i) {
-                if (const auto& symbolTableEntryForLocalVariable = getEntryForVariable(localVariablesOfModule.at(i)->name); symbolTableEntryForLocalVariable != nullptr && !symbolTableEntryForLocalVariable->referenceCount) {
-                    optimizedAwayLocalVariables.emplace(i);
-                }
-            }
+    if (const auto& matchingSymbolTableEntryForModuleMatchingGivenModuleName = getEntryForModulesWithMatchingName(moduleName); matchingSymbolTableEntryForModuleMatchingGivenModuleName) {
+        if (!matchingSymbolTableEntryForModuleMatchingGivenModuleName->internalDataLookup.count(internalModuleId)) {
+            return optimizedAwayLocalVariables;
         }
+
+        const auto& matchingSymbolTableEntryForModule = matchingSymbolTableEntryForModuleMatchingGivenModuleName->internalDataLookup.at(internalModuleId);
+        auto& localVariablesOfModule            = matchingSymbolTableEntryForModule.declaredModule->variables;
+
+        std::size_t localVariableIndex = 0;
+        for (auto localVariableOfModuleIterator = localVariablesOfModule.begin(); localVariableOfModuleIterator != localVariablesOfModule.end();) {
+            if (const auto& symbolTableEntryForLocalVariable = getEntryForVariable(localVariableOfModuleIterator->get()->name); symbolTableEntryForLocalVariable && !symbolTableEntryForLocalVariable->referenceCount) {
+                optimizedAwayLocalVariables.emplace(localVariableIndex);
+                localVariableOfModuleIterator = localVariablesOfModule.erase(localVariableOfModuleIterator);
+            }
+            else {
+                ++localVariableOfModuleIterator;
+            }
+            localVariableIndex++;
+        }
+
     }
     return optimizedAwayLocalVariables;
 }
@@ -363,7 +389,7 @@ std::vector<bool> SymbolTable::determineIfModuleWasUsed(const syrec::Module::vec
 }
 
 std::optional<valueLookup::SignalValueLookup::ptr> SymbolTable::createBackupOfValueOfSignal(const std::string_view& literalIdent) const {
-    if (const auto& symbolTableEntryForLiteral = getEntryForVariable(literalIdent); symbolTableEntryForLiteral != nullptr) {
+    if (const auto& symbolTableEntryForLiteral = getEntryForVariable(literalIdent); symbolTableEntryForLiteral) {
         if (symbolTableEntryForLiteral->optionalValueLookup.has_value()) {
             return std::make_optional((*symbolTableEntryForLiteral->optionalValueLookup)->clone());
         }
@@ -372,7 +398,7 @@ std::optional<valueLookup::SignalValueLookup::ptr> SymbolTable::createBackupOfVa
 }
 
 void SymbolTable::restoreValuesFromBackup(const std::string_view& literalIdent, const valueLookup::SignalValueLookup::ptr& newValues) const {
-    if (const auto& symbolTableEntryForLiteral = getEntryForVariable(literalIdent); symbolTableEntryForLiteral != nullptr) {
+    if (const auto& symbolTableEntryForLiteral = getEntryForVariable(literalIdent); symbolTableEntryForLiteral) {
         if (symbolTableEntryForLiteral->optionalValueLookup.has_value()) {
             const auto& currentValueOfLiteral = *symbolTableEntryForLiteral->optionalValueLookup;
             currentValueOfLiteral->copyRestrictionsAndUnrestrictedValuesFrom(
@@ -427,7 +453,7 @@ bool               SymbolTable::doesVariableAccessAllowValueLookup(const Variabl
                 variableAccess->indexes.cbegin(),
                 variableAccess->indexes.cend(),
                 [](const syrec::expression::ptr& accessedValueOfDimensionExpr) {
-                    if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr != nullptr) {
+                    if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr) {
                         return !numericExpr->value->isConstant();
                     }
                     return true;
@@ -478,7 +504,7 @@ std::vector<std::optional<unsigned>> SymbolTable::tryTransformAccessedDimensions
                 accessedSignalParts->indexes.cend(),
                 std::back_inserter(transformedDimensionAccess),
                 [](const syrec::expression::ptr& accessedValueOfDimensionExpr) -> std::optional<unsigned int> {
-                    if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr != nullptr) {
+                    if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr) {
                         if (numericExpr->value->isConstant()) {
                             return std::make_optional(numericExpr->value->evaluate({}));
                         }
@@ -582,5 +608,20 @@ void SymbolTable::performReferenceCountUpdate(std::size_t& currentReferenceCount
         if (currentReferenceCount) {
             currentReferenceCount--;
         }
+    }
+}
+
+void SymbolTable::addIndexOfDroppedParameterToOptimizedModule(ModuleSymbolTableEntry::InternalModuleHelperData& optimizedModuleData, std::size_t indexOfOptimizedAwayParameter) {
+    if (!optimizedModuleData.declaredModule || indexOfOptimizedAwayParameter > optimizedModuleData.declaredModule->parameters.size()) {
+        return;
+    }
+
+    if (std::find_if(
+            optimizedModuleData.indicesOfDroppedParametersInOptimizedVersion.cbegin(),
+            optimizedModuleData.indicesOfDroppedParametersInOptimizedVersion.cend(),
+            [&indexOfOptimizedAwayParameter](const std::size_t existingIndexOfOptimizedAwayParameter) {
+                return existingIndexOfOptimizedAwayParameter == indexOfOptimizedAwayParameter;
+            }) == optimizedModuleData.indicesOfDroppedParametersInOptimizedVersion.cend()) {
+        optimizedModuleData.indicesOfDroppedParametersInOptimizedVersion.emplace_back(indexOfOptimizedAwayParameter);
     }
 }
