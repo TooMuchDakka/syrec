@@ -177,9 +177,9 @@
     "circuit": "module add(in a(4), in b(4), out c(4), out d(4), in e(4)) c += (a + b) module main(out f(4), inout e(4), in a(4), in b(4), out c(4), out d(4)) call add(a, b, c, d, e); uncall add(a, b, c, d, e)",
     "expectedCircuit": "module add(in a(4), in b(4), out c(4)) c += (a + b) module main(in a(4), in b(4), out c(4)) call add(a, b, c); uncall add(a, b, c)"
   },
-  "testRemovalOfUnusedParametersOfModuleDoesNotInvalidateCallOfUnoptimizedModuleVersionAndDoesNotInvalidateValueOfParameter": {
-    "circuit": "module add(in a(4), in b(4), out c(4), out d(4), in e(4)) c += (a + b) module main(in a(4), in b(4), out c(4), out d(4), inout e(4), out f[3](4)) d += 10; e += 4; call add(a, b, c, d, e); uncall add(a, b, c, d, e); f[0].0 += c.0; f[0].1 += c.1; f[0].2 += c.2; f[0].3 += c.3; f[1].0 += d.0; f[1].1 += d.1; f[1].2 += d.2; f[1].3 += d.3; f[2].0 += e.0; f[2].1 += e.1; f[2].2 += e.2; f[2].3 += e.3",
-    "expectedCircuit": "module add(in a(4), in b(4), out c(4)) c += (a + b) module main(in a(4), in b(4), out c(4), out d(4), inout e(4), out f[3](4)) d += 10; e += 4; call add(a, b, c); uncall add(a, b, c); f[0].0 += c.0; f[0].1 += c.1; f[0].2 += c.2; f[0].3 += c.3; f[1].1 += 1; f[1].3 += 1; f[2].2 += 1",
+  "testRemovalOfUnusedParametersOfModuleDoesNotInvalidateCallOfUnoptimizedModuleVersionAndDoesNotInvalidateValueOfOptimizedAwayParameter": {
+    "circuit": "module add(in a(4), in b(4), out c(4), out d(4), in e(4)) c += (a + b) module main(in a(4), in b(4), out c(4), out d(4), out e(4), out f[3](4)) d += 10; e += 4; call add(a, b, c, d, e); uncall add(a, b, c, d, e); f[0].0 += c.0; f[0].1 += c.1; f[0].2 += c.2; f[0].3 += c.3; f[1].0 += d.0; f[1].1 += d.1; f[1].2 += d.2; f[1].3 += d.3; f[2].0 += e.0; f[2].1 += e.1; f[2].2 += e.2; f[2].3 += e.3",
+    "expectedCircuit": "module add(in a(4), in b(4), out c(4)) c += (a + b) module main(in a(4), in b(4), out c(4), out d(4), out e(4), out f[3](4)) d += 10; e += 4; call add(a, b, c); uncall add(a, b, c); f[0].0 += c.0; f[0].1 += c.1; f[0].2 += c.2; f[0].3 += c.3; f[1].1 += 1; f[1].3 += 1; f[2].2 += 1",
     "optimizations": {
       "loopUnrollMaxNestingLvl": "2",
       "loopUnrollMaxUnrollCnt": "2",
@@ -187,8 +187,8 @@
     }
   },
   "testRemovalOfUnusedParametersLeavesCallWithNoParametersAndWillBeRemoved": {
-    "circuit": "module test(out a(4)) skip module main(inout a(4), out b(4)) a += 10; call test(a); uncall test(a); b.0 += a.0; b.1 += a.1; b.2 += a.2; b.3 += a.3",
-    "expectedCircuit": "module main(inout a(4), out b(4)) a += 10; b.1 += 1; b.3 += 1",
+    "circuit": "module test(out a(4)) skip module main(out a(4), out b(4)) a += 10; call test(a); uncall test(a); b.0 += a.0; b.1 += a.1; b.2 += a.2; b.3 += a.3",
+    "expectedCircuit": "module main(out a(4), out b(4)) a += 10; b.1 += 1; b.3 += 1",
     "optimizations": {
       "loopUnrollMaxNestingLvl": "2",
       "loopUnrollMaxUnrollCnt": "2",

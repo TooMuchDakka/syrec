@@ -62,23 +62,32 @@ bool program::parseFileContent(std::string_view programToBeParsed, const ReadPro
                                                            config.expectedMainModuleName);
     const auto  parsingResult     = ::parser::SyrecParserInterface::parseProgram(programToBeParsed, parserConfigToUse);
     if (parsingResult.wasParsingSuccessful) {
-        const auto& optionalUserDefinedMainModuleName = config.expectedMainModuleName.empty() ? std::nullopt : std::make_optional(config.expectedMainModuleName);
         const auto& optimizer                         = std::make_unique<optimizations::Optimizer>(parserConfigToUse, nullptr);
-        auto        optimizationResultOfProgram       = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsingResult.foundModules), optionalUserDefinedMainModuleName);
+        const auto& userDefinedMainModuleName   = config.expectedMainModuleName.empty() ? ::parser::ParserConfig::defaultExpectedMainModuleName : config.expectedMainModuleName;
+        auto        optimizationResultOfProgram       = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsingResult.foundModules), userDefinedMainModuleName);
+
+        std::string reasonForFallbackToUnoptimizedResult;
         if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::IsUnchanged) {
             this->modulesVec = parsingResult.foundModules;
         } else if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::WasOptimized) {
             auto&& optimizedModules = optimizationResultOfProgram.tryTakeOwnershipOfOptimizationResult();
+            // This case should not happen and will default to returning the unoptimized result
             if (!optimizedModules.has_value()) {
-                // TODO: This should not happen
-                return "";
+                reasonForFallbackToUnoptimizedResult = "Expected program to not be completely optimized away, will assume unoptimized result";
+            } else {
+                this->modulesVec.reserve(optimizedModules->size());
+                std::move(optimizedModules->begin(), optimizedModules->end(), std::back_inserter(this->modulesVec));                
             }
-
-            this->modulesVec.reserve(optimizedModules->size());
-            std::move(optimizedModules->begin(), optimizedModules->end(), std::back_inserter(this->modulesVec));
+        // This case should not happen and will default to returning the unoptimized result
         } else {
-            // TODO: What should happen in this case
+            reasonForFallbackToUnoptimizedResult = "Expected program to not be completely optimized away, will assume unoptimized result";
+        }
+
+        if (!reasonForFallbackToUnoptimizedResult.empty()) {
             this->modulesVec = parsingResult.foundModules;
+            if (foundErrors) {
+                *foundErrors = reasonForFallbackToUnoptimizedResult;
+            }
         }
         return true;
     }
@@ -89,7 +98,6 @@ bool program::parseFileContent(std::string_view programToBeParsed, const ReadPro
     }
     return false;
 }
-
 
 bool program::readFile(const std::string& filename, const ReadProgramSettings settings, std::string* error) {
     *error = read(filename, settings);

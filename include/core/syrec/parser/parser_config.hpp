@@ -8,6 +8,8 @@
 
 namespace parser {
     struct ParserConfig {
+        static const inline std::string defaultExpectedMainModuleName = "main";
+
         unsigned int                                         cDefaultSignalWidth;
         bool                                                 supportBroadcastingExpressionOperands;
         bool                                                 supportBroadcastingAssignmentOperands;
@@ -35,7 +37,7 @@ namespace parser {
                 const bool combineRedundantInstructions = false,
                 const optimizations::MultiplicationSimplificationMethod multiplicationSimplificationMethod = optimizations::MultiplicationSimplificationMethod::None,
                 const std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig = std::nullopt,
-                std::string  expectedMainModuleName                      = "main"):
+                std::string  expectedMainModuleName                      = defaultExpectedMainModuleName):
                 cDefaultSignalWidth(defaultSignalWidth),
                 supportBroadcastingExpressionOperands(supportBroadcastingExpressionOperands),
                 supportBroadcastingAssignmentOperands(supportBroadcastingAssignmentOperands),

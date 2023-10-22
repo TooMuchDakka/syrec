@@ -26,6 +26,16 @@ namespace parser {
         [[nodiscard]] bool                                                                  contains(const syrec::Module::ptr& module) const;
         [[nodiscard]] std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> getVariable(const std::string_view& literalIdent) const;
 
+        struct ModuleCallSignature {
+            std::string moduleIdent;
+            syrec::Variable::vec parameters;
+        };
+
+        struct ModuleIdentifier {
+            std::string_view moduleIdent;
+            std::size_t      internalModuleId;
+        };
+
         struct DeclaredModuleSignature {
             std::size_t              internalModuleId;
             syrec::Variable::vec     declaredParameters;
@@ -34,9 +44,11 @@ namespace parser {
             [[maybe_unused]] syrec::Variable::vec determineOptimizedCallSignature(std::unordered_set<std::size_t>* indicesOfRemainingParameters) const;
         };
 
+        [[nodiscard]] std::optional<DeclaredModuleSignature>        getMatchingModuleForIdentifier(const ModuleIdentifier& moduleIdentifier) const;
         [[nodiscard]] std::vector<DeclaredModuleSignature>          getMatchingModuleSignaturesForName(const std::string_view& moduleName) const;
-        [[nodiscard]] std::optional<DeclaredModuleSignature>        tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, const std::vector<std::string>& calleeArguments) const;
-        [[nodiscard]] std::optional<std::unique_ptr<syrec::Module>> getFullDeclaredModuleInformation(const std::string_view& moduleName, std::size_t internalModuleId) const;
+        [[nodiscard]] std::optional<DeclaredModuleSignature>        tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, const std::vector<std::string>& calleeArguments, bool areCalleeArgumentsBasedOnOptimizedSignature) const;
+        [[nodiscard]] std::optional<DeclaredModuleSignature>        tryGetOptimizedSignatureForModuleCall(const syrec::Module& callTarget) const;
+        [[nodiscard]] std::optional<std::unique_ptr<syrec::Module>> getFullDeclaredModuleInformation(const ModuleIdentifier& moduleIdentifier) const;
 
         [[maybe_unused]] bool addEntry(const syrec::Variable& variable);
         [[maybe_unused]] bool addEntry(const syrec::Number& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);
@@ -47,9 +59,11 @@ namespace parser {
             Increment,
             Decrement
         };
-        void updateReferenceCountOfLiteral(const std::string_view& literalIdent, ReferenceCountUpdate typeOfUpdate) const;
-        void updateReferenceCountOfModulesMatchingSignature(const std::string_view& moduleIdent, const std::vector<std::size_t>& internalModuleIds, ReferenceCountUpdate typeOfUpdate) const;
-        [[maybe_unused]] bool changeStatementsOfModule(const std::string_view& moduleIdent, std::size_t internalModuleId, const syrec::Statement::vec& updatedModuleBodyStatements) const;
+
+        void                  markModuleVariableAsUnused(const ModuleIdentifier& moduleIdentifier, const std::string_view& literalIdent, bool doesIdentReferenceModuleParameter) const;
+        void                  updateReferenceCountOfLiteral(const std::string_view& literalIdent, ReferenceCountUpdate typeOfUpdate) const;
+        void                  updateReferenceCountOfModulesMatchingSignature(const std::vector<ModuleIdentifier>& moduleIdentifiers, ReferenceCountUpdate typeOfUpdate) const;
+        [[maybe_unused]] bool changeStatementsOfModule(const ModuleIdentifier& moduleIdentifier, const syrec::Statement::vec& updatedModuleBodyStatements) const;
 
         // TODO: CONSTANT_PROPAGATION
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
@@ -63,10 +77,10 @@ namespace parser {
         void swap(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const;
 
         [[nodiscard]] std::unordered_set<std::string>   getUnusedLiterals() const;
-        [[nodiscard]] std::unordered_set<std::size_t>   updateOptimizedModuleSignatureByMarkingAndReturningIndicesOfUnusedParameters(const std::string_view& moduleName, std::size_t internalModuleId) const;
-        [[nodiscard]] std::unordered_set<std::size_t>   fetchUnusedLocalModuleVariablesAndRemoveFromSymbolTable(const std::string_view& moduleName, std::size_t internalModuleId) const;
-        
-        [[nodiscard]] std::vector<bool>                                  determineIfModuleWasUsed(const syrec::Module::vec& modules) const;
+        [[nodiscard]] std::unordered_set<std::size_t>   updateOptimizedModuleSignatureByMarkingAndReturningIndicesOfUnusedParameters(const ModuleIdentifier& moduleIdentifier) const;
+        [[nodiscard]] std::unordered_set<std::size_t>   fetchUnusedLocalModuleVariableIndicesAndRemoveFromSymbolTable(const ModuleIdentifier& moduleIdentifier) const;
+
+        [[nodiscard]] std::optional<bool>                                determineIfModuleWasUnused(const ModuleCallSignature& moduleSignatureToCheck) const;
         [[nodiscard]] std::optional<valueLookup::SignalValueLookup::ptr> createBackupOfValueOfSignal(const std::string_view& literalIdent) const;
         void                                                             restoreValuesFromBackup(const std::string_view& literalIdent, const valueLookup::SignalValueLookup::ptr& newValues) const;
         // END

@@ -209,7 +209,7 @@ std::any SyReCStatementVisitor::visitCallStatement(SyReCParser::CallStatementCon
     }
 
     const auto               signatureDataOfModuleMatchingCalleeArguments = moduleCallGuessResolver->get()->getMatchesForGuess().front();
-    if (const auto& moduleMatchingCallerArguments = sharedData->currentSymbolTableScope->getFullDeclaredModuleInformation(*moduleIdent, signatureDataOfModuleMatchingCalleeArguments.internalModuleId); moduleMatchingCallerArguments.has_value()) {
+    if (const auto& moduleMatchingCallerArguments = sharedData->currentSymbolTableScope->getFullDeclaredModuleInformation(SymbolTable::ModuleIdentifier({*moduleIdent, signatureDataOfModuleMatchingCalleeArguments.internalModuleId})); moduleMatchingCallerArguments.has_value()) {
         syrec::Module::ptr calledModuleContainer = std::make_shared<syrec::Module>(**moduleMatchingCallerArguments);
         if (*isCallOperation) {
             const auto& generatedCallStmt = std::make_shared<syrec::CallStatement>(calledModuleContainer, callerArguments);

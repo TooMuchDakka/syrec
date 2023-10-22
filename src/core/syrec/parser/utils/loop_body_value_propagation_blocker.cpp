@@ -82,7 +82,7 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec
         }
     }
     else if (const auto& stmtAsCallStmt = stmtCastedAs<syrec::CallStatement>(stmt); stmtAsCallStmt != nullptr) {
-        if (const auto& matchingModulesForGivenSignature = symbolTableReference->tryGetOptimizedSignatureForModuleCall(stmtAsCallStmt->target->name, stmtAsCallStmt->parameters); matchingModulesForGivenSignature.has_value()) {
+        if (const auto& matchingModulesForGivenSignature = symbolTableReference->tryGetOptimizedSignatureForModuleCall(stmtAsCallStmt->target->name, stmtAsCallStmt->parameters, false); matchingModulesForGivenSignature.has_value()) {
             std::unordered_set<std::size_t> indicesOfRemainingCallerArguments;
             matchingModulesForGivenSignature->determineOptimizedCallSignature(&indicesOfRemainingCallerArguments);
 
