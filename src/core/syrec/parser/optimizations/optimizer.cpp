@@ -240,7 +240,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt) const {
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt) {
     syrec::VariableAccess::ptr lhsOperand = assignmentStmt.lhs;
     if (auto simplificationResultOfAssignedToSignal = handleSignalAccess(*assignmentStmt.lhs, false, nullptr); simplificationResultOfAssignedToSignal.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         auto lhsSignalAccessAfterOptimization = std::move(simplificationResultOfAssignedToSignal.tryTakeOwnershipOfOptimizationResult()->front());
@@ -305,7 +305,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 // TODO: Should the semantic checks that we assume to be already done in the parser be repeated again, i.e. does a matching module exist, etc.
 // TODO: Since we have optimized the call statement, we also need to optimize the corresponding uncall statement
 // TODO: Calls to readonly module or modules with no parameters can also be optimized away with the dead code elimination
-optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleCallStmt(const syrec::CallStatement& callStatement) const {
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleCallStmt(const syrec::CallStatement& callStatement) {
     const auto& symbolTableScope = getActiveSymbolTableScope();
     if (!symbolTableScope.has_value()) {
         return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
@@ -468,12 +468,14 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     auto                                 canChangesMadeInFalseBranchBeIgnored = false;
     auto                                 canChangesMadeInTrueBranchBeIgnored  = false;
 
-    if (parserConfig.deadCodeEliminationEnabled) {
-        if (const auto& constantValueOfGuardCondition = tryEvaluateExpressionToConstant(simplifiedGuardExpr ? *simplifiedGuardExpr : *ifStatement.condition, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr); constantValueOfGuardCondition.has_value()) {
-            canTrueBranchBeOmitted = *constantValueOfGuardCondition == 0;
-            canFalseBranchBeOmitted = *constantValueOfGuardCondition;
-            canChangesMadeInFalseBranchBeIgnored = canFalseBranchBeOmitted;
-            canChangesMadeInTrueBranchBeIgnored  = canTrueBranchBeOmitted;
+    if (const auto& constantValueOfGuardCondition = tryEvaluateExpressionToConstant(simplifiedGuardExpr ? *simplifiedGuardExpr : *ifStatement.condition, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr); constantValueOfGuardCondition.has_value()) {
+        if (!*constantValueOfGuardCondition) {
+            canTrueBranchBeOmitted = parserConfig.deadCodeEliminationEnabled;
+            canChangesMadeInTrueBranchBeIgnored = true;
+        }
+        else {
+            canFalseBranchBeOmitted = parserConfig.deadCodeEliminationEnabled;
+            canChangesMadeInFalseBranchBeIgnored = true;
         }
     }
 
@@ -486,8 +488,9 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
     std::optional<std::vector<std::unique_ptr<syrec::Statement>>> simplifiedTrueBranchStmtsContainer;
     auto                                                          isTrueBranchEmptyAfterOptimization = false;
+    const auto&                                                   internalNestingLevelOfIfStatementBranchSymbolTableBackupScope = incrementInternalIfStatementNestingLevelCounter();
     if (!canTrueBranchBeOmitted) {
-        openNewSymbolTableBackupScope();
+        openNewIfStatementBranchSymbolTableBackupScope(internalNestingLevelOfIfStatementBranchSymbolTableBackupScope);
         if (auto simplificationResultOfTrueBranchStmt = handleStatements(transformCollectionOfSharedPointersToReferences(ifStatement.thenStatements)); simplificationResultOfTrueBranchStmt.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
             simplifiedTrueBranchStmtsContainer = simplificationResultOfTrueBranchStmt.tryTakeOwnershipOfOptimizationResult();
             wereAnyStmtsInTrueBranchModified   = true;
@@ -495,22 +498,26 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
         const auto& wereAllTrueBranchStatementsOptimizedAway = wereAnyStmtsInTrueBranchModified && ((simplifiedTrueBranchStmtsContainer.has_value() && simplifiedTrueBranchStmtsContainer->empty()) || !simplifiedTrueBranchStmtsContainer.has_value());
         isTrueBranchEmptyAfterOptimization                   = wereAllTrueBranchStatementsOptimizedAway || ifStatement.thenStatements.empty();
+
+        if (!canFalseBranchBeOmitted) {
+            updateBackupOfValuesChangedInScopeAndOptionallyResetMadeChanges(true);
+        }
+        if (peekPredecessorOfCurrentSymbolTableBackupScope().has_value()) {
+            transferBackupOfValuesChangedInCurrentScopeToParentScope();
+        }
         if (canFalseBranchBeOmitted) {
             destroySymbolTableBackupScope();
-        }
-        else {
-            updateBackupOfValuesChangedInScopeAndResetMadeChanges();
         }
     }
     else {
         isTrueBranchEmptyAfterOptimization = true;
         wereAnyStmtsInTrueBranchModified  = true;
     }
-
+    
     std::optional<std::vector<std::unique_ptr<syrec::Statement>>> simplifiedFalseBranchStmtsContainer;
     auto                                                          isFalseBranchEmptyAfterOptimization = false;
     if (!canFalseBranchBeOmitted) {
-        openNewSymbolTableBackupScope();
+        openNewIfStatementBranchSymbolTableBackupScope(internalNestingLevelOfIfStatementBranchSymbolTableBackupScope);
         if (auto simplificationResultOfFalseBranchStmt = handleStatements(transformCollectionOfSharedPointersToReferences(ifStatement.elseStatements)); simplificationResultOfFalseBranchStmt.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
             simplifiedFalseBranchStmtsContainer = simplificationResultOfFalseBranchStmt.tryTakeOwnershipOfOptimizationResult();
             wereAnyStmtsInFalseBranchModified   = true;
@@ -518,7 +525,15 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
         const auto& wereAllFalseBranchStatementsOptimizedAway = wereAnyStmtsInFalseBranchModified && ((simplifiedFalseBranchStmtsContainer.has_value() && simplifiedFalseBranchStmtsContainer->empty()) || !simplifiedFalseBranchStmtsContainer.has_value());
         isFalseBranchEmptyAfterOptimization                   = wereAllFalseBranchStatementsOptimizedAway || ifStatement.elseStatements.empty();
-        if (canFalseBranchBeOmitted) {
+
+        if (!canTrueBranchBeOmitted) {
+            updateBackupOfValuesChangedInScopeAndOptionallyResetMadeChanges(true);
+        }
+        if (peekPredecessorOfCurrentSymbolTableBackupScope().has_value()) {
+            transferBackupOfValuesChangedInCurrentScopeToParentScope();   
+        }
+
+        if (canTrueBranchBeOmitted) {
             destroySymbolTableBackupScope();
         }
     }
@@ -527,6 +542,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         wereAnyStmtsInFalseBranchModified   = true;
     }
 
+    decrementInternalIfStatementNestingLevelCounter();
     if (!canTrueBranchBeOmitted && !canFalseBranchBeOmitted) {
         const auto backupScopeOfFalseBranch = popCurrentSymbolTableBackupScope();
         const auto backupScopeOfTrueBranch  = popCurrentSymbolTableBackupScope();
@@ -537,14 +553,14 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
          * with the changes made in the true branch
          */
         if (canChangesMadeInFalseBranchBeIgnored && backupScopeOfTrueBranch.has_value()) {
-            makeLocalChangesGlobal(**backupScopeOfTrueBranch, **backupScopeOfFalseBranch);
+            makeLocalChangesGlobal(*backupScopeOfTrueBranch->get()->backupScope, *backupScopeOfFalseBranch->get()->backupScope);
         }
         /*
          * If no branch can be omitted, we need to merge the changes made in both branches
          */
         if (!canChangesMadeInTrueBranchBeIgnored) {
             if (backupScopeOfFalseBranch.has_value() && backupScopeOfTrueBranch.has_value()) {
-                mergeAndMakeLocalChangesGlobal(**backupScopeOfTrueBranch, **backupScopeOfFalseBranch);
+                mergeAndMakeLocalChangesGlobal(*backupScopeOfTrueBranch->get()->backupScope, *backupScopeOfFalseBranch->get()->backupScope);
             }
         }
     }
@@ -773,7 +789,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleSwapStmt(const syrec::SwapStatement& swapStatement) const {
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleSwapStmt(const syrec::SwapStatement& swapStatement) {
     auto simplificationResultOfLhsOperand = handleSignalAccess(*swapStatement.lhs, false, nullptr);
     auto simplificationResultOfRhsOperand = handleSignalAccess(*swapStatement.rhs, false, nullptr);
 
@@ -813,7 +829,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
-optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) const {
+optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) {
     syrec::VariableAccess::ptr signalAccessOperand = unaryStmt.var;
     if (auto simplificationResultOfUnaryOperandSignalAccess = handleSignalAccess(*unaryStmt.var, false, nullptr); simplificationResultOfUnaryOperandSignalAccess.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
         signalAccessOperand = std::move(simplificationResultOfUnaryOperandSignalAccess.tryTakeOwnershipOfOptimizationResult()->front());
@@ -1559,14 +1575,14 @@ std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvalua
 /*
  * TODO: Removed additional pointer conversion when symbol table can be called with references instead of smart pointers
  */
-void optimizations::Optimizer::invalidateValueOfAccessedSignalParts(const EvaluatedSignalAccess& accessedSignalParts) const {
+void optimizations::Optimizer::invalidateValueOfAccessedSignalParts(const EvaluatedSignalAccess& accessedSignalParts) {
     if (auto transformedSignalAccess = transformEvaluatedSignalAccess(accessedSignalParts, nullptr, nullptr); transformedSignalAccess != nullptr) {
         const std::shared_ptr<syrec::VariableAccess> sharedTransformedSignalAccess = std::move(transformedSignalAccess);
         invalidateStoredValueFor(sharedTransformedSignalAccess);
     }
 }
 
-void optimizations::Optimizer::invalidateValueOfWholeSignal(const std::string_view& signalIdent) const {
+void optimizations::Optimizer::invalidateValueOfWholeSignal(const std::string_view& signalIdent) {
     if (const auto& matchingSymbolTableEntry = getSymbolTableEntryForVariable(signalIdent); matchingSymbolTableEntry.has_value()) {
         const auto& sharedTransformedSignalAccess = std::make_shared<syrec::VariableAccess>();
         sharedTransformedSignalAccess->var        = *matchingSymbolTableEntry;
@@ -1577,7 +1593,7 @@ void optimizations::Optimizer::invalidateValueOfWholeSignal(const std::string_vi
 /*
  * TODO: Removed additional pointer conversion when symbol table can be called with references instead of smart pointers
  */
-void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, const std::optional<unsigned int>& assignmentRhsValue) const {
+void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, const std::optional<unsigned int>& assignmentRhsValue) {
     std::optional<bool> areAnyComponentsOfAssignedToSignalAccessOutOfRange;
     bool                didAllDefinedIndicesEvaluateToConstants = false;
     if (auto transformedSignalAccess = transformEvaluatedSignalAccess(assignedToSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &didAllDefinedIndicesEvaluateToConstants); transformedSignalAccess != nullptr) {
@@ -1603,7 +1619,7 @@ void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& as
 /*
  * TODO: Removed additional pointer conversion when symbol table can be called with references instead of smart pointers
  */
-void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, const EvaluatedSignalAccess& assignmentRhsOperand) const {
+void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, const EvaluatedSignalAccess& assignmentRhsOperand) {
     if (const auto fetchedValueForAssignmentRhsOperand = tryFetchValueFromEvaluatedSignalAccess(assignmentRhsOperand); fetchedValueForAssignmentRhsOperand.has_value()) {
         performAssignment(assignmentLhsOperand, assignmentOperation, fetchedValueForAssignmentRhsOperand);
         updateReferenceCountOf(assignmentRhsOperand.accessedSignalIdent, parser::SymbolTable::ReferenceCountUpdate::Decrement);
@@ -1614,7 +1630,7 @@ void optimizations::Optimizer::performAssignment(const EvaluatedSignalAccess& as
     invalidateStoredValueFor(sharedTransformedLhsOperandSignalAccess);
 }
 
-void optimizations::Optimizer::performSwap(const EvaluatedSignalAccess& swapOperationLhsOperand, const EvaluatedSignalAccess& swapOperationRhsOperand) const {
+void optimizations::Optimizer::performSwap(const EvaluatedSignalAccess& swapOperationLhsOperand, const EvaluatedSignalAccess& swapOperationRhsOperand) {
     std::optional<bool> areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange;
     std::optional<bool> areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange;
     auto                didAllDefinedIndicesOfLhsSwapOperandEvaluateToConstants = false;
@@ -1639,21 +1655,21 @@ void optimizations::Optimizer::performSwap(const EvaluatedSignalAccess& swapOper
     }
 }
 
-void optimizations::Optimizer::updateStoredValueOf(const syrec::VariableAccess::ptr& assignedToSignal, unsigned int newValueOfAssignedToSignal) const {
+void optimizations::Optimizer::updateStoredValueOf(const syrec::VariableAccess::ptr& assignedToSignal, unsigned int newValueOfAssignedToSignal) {
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
         createBackupOfAssignedToSignal(*assignedToSignal);
         activeSymbolTableScope->get()->updateStoredValueFor(assignedToSignal, newValueOfAssignedToSignal);   
     }
 }
 
-void optimizations::Optimizer::invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignal) const {
+void optimizations::Optimizer::invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignal) {
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
         createBackupOfAssignedToSignal(*assignedToSignal);
         activeSymbolTableScope->get()->invalidateStoredValuesFor(assignedToSignal);
     }
 }
 
-void optimizations::Optimizer::performSwapAndCreateBackupOfOperands(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const {
+void optimizations::Optimizer::performSwapAndCreateBackupOfOperands(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) {
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
         createBackupOfAssignedToSignal(*swapLhsOperand);
         createBackupOfAssignedToSignal(*swapRhsOperand);
@@ -1819,20 +1835,24 @@ std::optional<std::unique_ptr<syrec::expression>> optimizations::Optimizer::tryC
     return tryFetchAndTakeOwnershipOfNonConstantValueOfIndex(index);
 }
 
-void optimizations::Optimizer::openNewSymbolTableBackupScope() {
-    symbolTableBackupScopeStack.push(std::make_unique<parser::SymbolTableBackupHelper>());
+void optimizations::Optimizer::openNewIfStatementBranchSymbolTableBackupScope(std::size_t internalNestingLevel) {
+    if (const auto& createdSymbolTableBackupScope = std::make_shared<parser::SymbolTableBackupHelper>(); createdSymbolTableBackupScope) {
+        symbolTableBackupScopeContainers.emplace_back(IfStatementBranchSymbolTableBackupScope({internalNestingLevel, createdSymbolTableBackupScope}));   
+    }
 }
 
-void optimizations::Optimizer::updateBackupOfValuesChangedInScopeAndResetMadeChanges() const {
+void optimizations::Optimizer::updateBackupOfValuesChangedInScopeAndOptionallyResetMadeChanges(bool resetLocalChanges) const {
     const auto& peekedActiveSymbolTableBackupScope = peekCurrentSymbolTableBackupScope();
-    if (!peekedActiveSymbolTableBackupScope.has_value() || peekedActiveSymbolTableBackupScope->get().getIdentsOfChangedSignals().empty()) {
+    if (!peekedActiveSymbolTableBackupScope.has_value() || peekedActiveSymbolTableBackupScope->get().backupScope->getIdentsOfChangedSignals().empty()) {
         return;
     }
 
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
-        for (auto& [signalIdent, valueAndRestrictionBackup]: symbolTableBackupScopeStack.top()->getBackedUpEntries()) {
+        for (auto& [signalIdent, valueAndRestrictionBackup]: peekedActiveSymbolTableBackupScope->get().backupScope->getBackedUpEntries()) {
             if (const auto& backupOfCurrentSignalValue = activeSymbolTableScope->get()->createBackupOfValueOfSignal(signalIdent); backupOfCurrentSignalValue.has_value()) {
-                activeSymbolTableScope->get()->restoreValuesFromBackup(signalIdent, valueAndRestrictionBackup);
+                if (resetLocalChanges) {
+                    activeSymbolTableScope->get()->restoreValuesFromBackup(signalIdent, valueAndRestrictionBackup);   
+                }
                 valueAndRestrictionBackup->copyRestrictionsAndUnrestrictedValuesFrom(
                         {}, std::nullopt,
                         {}, std::nullopt,
@@ -1842,12 +1862,59 @@ void optimizations::Optimizer::updateBackupOfValuesChangedInScopeAndResetMadeCha
     }
 }
 
-std::optional<std::reference_wrapper<const parser::SymbolTableBackupHelper>> optimizations::Optimizer::peekCurrentSymbolTableBackupScope() const {
-    if (symbolTableBackupScopeStack.empty()) {
+void optimizations::Optimizer::transferBackupOfValuesChangedInCurrentScopeToParentScope() {
+    const auto& peekedActiveSymbolTableBackupScope = peekCurrentSymbolTableBackupScope();
+    if (!peekedActiveSymbolTableBackupScope.has_value() || peekedActiveSymbolTableBackupScope->get().backupScope->getIdentsOfChangedSignals().empty()) {
+        return;
+    }
+
+    const auto& peekedAssumedParentSymbolTableBackupScope = peekPredecessorOfCurrentSymbolTableBackupScope();
+    if (!peekedAssumedParentSymbolTableBackupScope.has_value()) {
+        return;
+    }
+
+    for (auto& [signalIdent, valueAndRestrictionBackup]: peekedActiveSymbolTableBackupScope->get().backupScope->getBackedUpEntries()) {
+        if (!peekedAssumedParentSymbolTableBackupScope->get().backupScope->hasEntryFor(signalIdent)) {
+            peekedAssumedParentSymbolTableBackupScope->get().backupScope->storeBackupOf(signalIdent, valueAndRestrictionBackup);   
+        }
+    }
+}
+
+
+std::optional<std::reference_wrapper<const optimizations::Optimizer::IfStatementBranchSymbolTableBackupScope>> optimizations::Optimizer::peekCurrentSymbolTableBackupScope() const {
+    if (symbolTableBackupScopeContainers.empty()) {
         return std::nullopt;
     }
-    return *symbolTableBackupScopeStack.top();
+    return symbolTableBackupScopeContainers.back();
 }
+
+std::optional<const std::reference_wrapper<optimizations::Optimizer::IfStatementBranchSymbolTableBackupScope>> optimizations::Optimizer::peekModifiableCurrentSymbolTableBackupScope() {
+    if (symbolTableBackupScopeContainers.empty()) {
+        return std::nullopt;
+    }
+    return symbolTableBackupScopeContainers.back();
+}
+
+std::optional<const std::reference_wrapper<optimizations::Optimizer::IfStatementBranchSymbolTableBackupScope>> optimizations::Optimizer::peekPredecessorOfCurrentSymbolTableBackupScope() {
+    if (symbolTableBackupScopeContainers.size() < 2) {
+        return std::nullopt;
+    }
+
+    const auto& nestingLevelOfCurrentSymbolTableBackupScope = symbolTableBackupScopeContainers.back().ifStatementNestingLevel;
+    const auto& foundPredecessorOfCurrentSymbolTableScope = std::find_if(
+            std::next(symbolTableBackupScopeContainers.rbegin(), 1),
+            symbolTableBackupScopeContainers.rend(),
+            [&nestingLevelOfCurrentSymbolTableBackupScope](const optimizations::Optimizer::IfStatementBranchSymbolTableBackupScope& ifStatementBranchSymbolTableBackupScope) {
+                return ifStatementBranchSymbolTableBackupScope.ifStatementNestingLevel < nestingLevelOfCurrentSymbolTableBackupScope;
+            });
+    if (foundPredecessorOfCurrentSymbolTableScope != symbolTableBackupScopeContainers.rend()) {
+        return *foundPredecessorOfCurrentSymbolTableScope;
+    }
+    return std::nullopt;
+
+    //return symbolTableBackupScopeContainers.at(symbolTableBackupScopeContainers.size() - 2);
+}
+
 
 void optimizations::Optimizer::mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfSignalsChangedInFirstBranch, const parser::SymbolTableBackupHelper& backupOfSignalsChangedInSecondBranch) const {
     const auto& activeSymbolTableScope = getActiveSymbolTableScope();
@@ -1860,6 +1927,7 @@ void optimizations::Optimizer::mergeAndMakeLocalChangesGlobal(const parser::Symb
 
     std::unordered_set<std::string> setOfSignalsRequiringMergeOfChanges;
     std::unordered_set<std::string> setOfSignalsChangedOnlyInFirstScope;
+    std::unordered_set<std::string> setOfSignalsChangedOnlyInSecondScope;
     for (const auto& modifiedSignalInFirstScope: modifiedSignalsInFirstScope) {
         if (modifiedSignalsInSecondScope.count(modifiedSignalInFirstScope)) {
             setOfSignalsRequiringMergeOfChanges.emplace(modifiedSignalInFirstScope);
@@ -1868,33 +1936,47 @@ void optimizations::Optimizer::mergeAndMakeLocalChangesGlobal(const parser::Symb
             setOfSignalsChangedOnlyInFirstScope.emplace(modifiedSignalInFirstScope);
         }
     }
+
     if (modifiedSignalsInFirstScope.size() != modifiedSignalsInSecondScope.size()) {
         for (const auto& modifiedSignalInSecondScope: modifiedSignalsInSecondScope) {
             if (modifiedSignalsInFirstScope.count(modifiedSignalInSecondScope)) {
                 setOfSignalsRequiringMergeOfChanges.emplace(modifiedSignalInSecondScope);
             }
+            else {
+                setOfSignalsChangedOnlyInSecondScope.emplace(modifiedSignalInSecondScope);
+            }
         }
     }
-
+    
     for (const auto& signalRequiringMergeOfChanges: setOfSignalsRequiringMergeOfChanges) {
-        const auto& initialValueOfChangedSignalPriorToAnyScope = *backupOfSignalsChangedInSecondBranch.getBackedUpEntryFor(signalRequiringMergeOfChanges);
+        const auto& currentValueOfSignalAtEndOfSecondScope     = *backupOfSignalsChangedInSecondBranch.getBackedUpEntryFor(signalRequiringMergeOfChanges);
         const auto& currentValueOfSignalAtEndOfFirstScope      = *backupOfSignalsChangedInFirstBranch.getBackedUpEntryFor(signalRequiringMergeOfChanges);
-        const auto& currentValueOfSignalAtEndOfSecondScope     = activeSymbolTableScope->get()->createBackupOfValueOfSignal(signalRequiringMergeOfChanges);
+        currentValueOfSignalAtEndOfSecondScope->copyRestrictionsAndInvalidateChangedValuesFrom(currentValueOfSignalAtEndOfFirstScope);
+        activeSymbolTableScope->get()->restoreValuesFromBackup(signalRequiringMergeOfChanges, currentValueOfSignalAtEndOfSecondScope);
+    }
+    
+    for (const auto& signalChangedOnlyInFirstScope : setOfSignalsChangedOnlyInFirstScope) {
+        /*const auto& initialValueOfChangedSignalPriorToAnyScope = *backupOfSignalsChangedInFirstBranch.getBackedUpEntryFor(signalChangedOnlyInFirstScope);
+        const auto& currentValueOfSignalAtEndOfFirstScope = *backupOfSignalsChangedInFirstBranch.getBackedUpEntryFor(signalChangedOnlyInFirstScope);
+        currentValueOfSignalAtEndOfFirstScope->copyRestrictionsAndInvalidateChangedValuesFrom(initialValueOfChangedSignalPriorToAnyScope);
+        activeSymbolTableScope->get()->restoreValuesFromBackup(signalChangedOnlyInFirstScope, currentValueOfSignalAtEndOfFirstScope);*/
 
-        initialValueOfChangedSignalPriorToAnyScope->copyRestrictionsAndMergeValuesFromAlternatives(currentValueOfSignalAtEndOfFirstScope, *currentValueOfSignalAtEndOfSecondScope);
-        activeSymbolTableScope->get()->restoreValuesFromBackup(signalRequiringMergeOfChanges, initialValueOfChangedSignalPriorToAnyScope);
+        const auto& valueOfSignalInActiveSymbolTableScope  = activeSymbolTableScope->get()->createBackupOfValueOfSignal(signalChangedOnlyInFirstScope);
+        const auto& currentValueOfSignalAtEndOfSecondScope = *backupOfSignalsChangedInFirstBranch.getBackedUpEntryFor(signalChangedOnlyInFirstScope);
+        valueOfSignalInActiveSymbolTableScope->get()->copyRestrictionsAndInvalidateChangedValuesFrom(currentValueOfSignalAtEndOfSecondScope);
+        activeSymbolTableScope->get()->restoreValuesFromBackup(signalChangedOnlyInFirstScope, *valueOfSignalInActiveSymbolTableScope);
     }
 
-    /*
-     * Our assumption is that the entries in the current symbol table scope have already all changes made in the second branch applied to them. Thus, we do not need to handle
-     * the assignments made only in the second branch. But, since the assignments defined only in the first branch signals were discarded at the start of the second branch, due
-     * to the requirement that the symbol table at the start of the second branch does not contain the changes from the first branch, we need to reapply the assignments local only to the first branch.
-     * Overlapping assignments made in both branches were already merged at this point.
-     *
-     */
-    for (const auto& signalChangedOnlyInFirstScope : setOfSignalsChangedOnlyInFirstScope) {
-        const auto& currentValueOfSignalAtEndOfFirstScope = *backupOfSignalsChangedInFirstBranch.getBackedUpEntryFor(signalChangedOnlyInFirstScope);
-        activeSymbolTableScope->get()->restoreValuesFromBackup(signalChangedOnlyInFirstScope, currentValueOfSignalAtEndOfFirstScope);
+    for (const auto& signalChangedOnlyInSecondScope : setOfSignalsChangedOnlyInSecondScope) {
+       /* const auto& initialValueOfChangedSignalPriorToAnyScope = *backupOfSignalsChangedInSecondBranch.getBackedUpEntryFor(signalChangedOnlyInSecondScope);
+        const auto& currentValueOfSignalAtEndOfSecondScope = *backupOfSignalsChangedInSecondBranch.getBackedUpEntryFor(signalChangedOnlyInSecondScope);
+        currentValueOfSignalAtEndOfSecondScope->copyRestrictionsAndInvalidateChangedValuesFrom(initialValueOfChangedSignalPriorToAnyScope);
+        activeSymbolTableScope->get()->restoreValuesFromBackup(signalChangedOnlyInSecondScope, currentValueOfSignalAtEndOfSecondScope);*/
+        
+        const auto& valueOfSignalInActiveSymbolTableScope = activeSymbolTableScope->get()->createBackupOfValueOfSignal(signalChangedOnlyInSecondScope);
+        const auto& currentValueOfSignalAtEndOfSecondScope     = *backupOfSignalsChangedInSecondBranch.getBackedUpEntryFor(signalChangedOnlyInSecondScope);
+        valueOfSignalInActiveSymbolTableScope->get()->copyRestrictionsAndInvalidateChangedValuesFrom(currentValueOfSignalAtEndOfSecondScope);
+        activeSymbolTableScope->get()->restoreValuesFromBackup(signalChangedOnlyInSecondScope, *valueOfSignalInActiveSymbolTableScope);
     }
 }
 
@@ -1920,32 +2002,34 @@ void optimizations::Optimizer::makeLocalChangesGlobal(const parser::SymbolTableB
 
 
 void optimizations::Optimizer::destroySymbolTableBackupScope() {
-    if (symbolTableBackupScopeStack.empty()) {
+    if (symbolTableBackupScopeContainers.empty()) {
         return;
     }
-    symbolTableBackupScopeStack.pop();
+    symbolTableBackupScopeContainers.pop_back();
 }
 
-void optimizations::Optimizer::createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess) const {
+void optimizations::Optimizer::createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess) {
     const std::string_view& assignedToSignalIdent = assignedToVariableAccess.var->name;
-    if (symbolTableBackupScopeStack.empty() || symbolTableBackupScopeStack.top()->hasEntryFor(assignedToSignalIdent)) {
+    const auto&             peekedActiveSymbolTableBackupScope = peekModifiableCurrentSymbolTableBackupScope();
+    if (!peekedActiveSymbolTableBackupScope.has_value() || peekedActiveSymbolTableBackupScope->get().backupScope->hasEntryFor(assignedToSignalIdent)) {
         return;
     }
 
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
         if (const auto& backupOfAssignedToSignal = activeSymbolTableScope->get()->createBackupOfValueOfSignal(assignedToSignalIdent); backupOfAssignedToSignal.has_value()) {
-            symbolTableBackupScopeStack.top()->storeBackupOf(std::string(assignedToSignalIdent), *backupOfAssignedToSignal);
+            peekedActiveSymbolTableBackupScope->get().backupScope->storeBackupOf(std::string(assignedToSignalIdent), *backupOfAssignedToSignal);
         }        
     }
 }
 
-std::optional<std::unique_ptr<parser::SymbolTableBackupHelper>> optimizations::Optimizer::popCurrentSymbolTableBackupScope() {
-    if (symbolTableBackupScopeStack.empty()) {
+std::optional<std::unique_ptr<optimizations::Optimizer::IfStatementBranchSymbolTableBackupScope>> optimizations::Optimizer::popCurrentSymbolTableBackupScope() {
+    if (symbolTableBackupScopeContainers.empty()) {
         return std::nullopt;
     }
 
-    auto currentSymbolTableBackupScope = std::move(symbolTableBackupScopeStack.top());
-    symbolTableBackupScopeStack.pop();
+    auto currentSymbolTableBackupScope = std::make_unique<optimizations::Optimizer::IfStatementBranchSymbolTableBackupScope>(symbolTableBackupScopeContainers.back());
+    symbolTableBackupScopeContainers.pop_back();
+    decrementInternalIfStatementNestingLevelCounter();
     return std::make_optional(std::move(currentSymbolTableBackupScope));
 }
 
@@ -2182,6 +2266,22 @@ void optimizations::Optimizer::emplaceSingleSkipStatementIfContainerIsEmpty(std:
         statementsContainer.emplace(std::move(singleSkipStatementContainer));
     }
 }
+
+std::size_t optimizations::Optimizer::incrementInternalIfStatementNestingLevelCounter() {
+    if (internalIfStatementNestingLevel == UINT_MAX) {
+        return internalIfStatementNestingLevel;
+    }
+    return internalIfStatementNestingLevel++;
+}
+
+void optimizations::Optimizer::decrementInternalIfStatementNestingLevelCounter() {
+    if (!internalIfStatementNestingLevel) {
+        return;
+    }
+    internalIfStatementNestingLevel--;
+}
+
+
 
 //optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::removeUnusedUnoptimizedModules(const std::vector<std::reference_wrapper<const syrec::Module>>& unoptimizedModules, const std::string_view& assumedMainModuleName) const {
 //    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value() && parserConfig.deadCodeEliminationEnabled) {

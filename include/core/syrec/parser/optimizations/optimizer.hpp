@@ -93,31 +93,42 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::expression>   handleExpr(const syrec::expression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::Number>       handleNumber(const syrec::Number& number) const;
     protected:
-        parser::ParserConfig                                         parserConfig;
-        parser::SymbolTable::ptr                                     activeSymbolTableScope;
-        std::stack<std::unique_ptr<parser::SymbolTableBackupHelper>> symbolTableBackupScopeStack;
-        std::unique_ptr<LoopBodyValuePropagationBlocker>             activeDataFlowValuePropagationRestrictions;
-        std::unordered_set<std::string>                              evaluableLoopVariableLookup;
+        parser::ParserConfig                                          parserConfig;
+        parser::SymbolTable::ptr                                      activeSymbolTableScope;
 
-        void openNewSymbolTableBackupScope();
-        void updateBackupOfValuesChangedInScopeAndResetMadeChanges() const;
-        [[nodiscard]] std::optional<std::reference_wrapper<const parser::SymbolTableBackupHelper>> peekCurrentSymbolTableBackupScope() const;
+        std::size_t internalIfStatementNestingLevel = 0;
+        struct IfStatementBranchSymbolTableBackupScope {
+            std::size_t ifStatementNestingLevel;
+            std::shared_ptr<parser::SymbolTableBackupHelper> backupScope;
+        };
+        std::vector<IfStatementBranchSymbolTableBackupScope>          symbolTableBackupScopeContainers;
+        std::unique_ptr<LoopBodyValuePropagationBlocker>              activeDataFlowValuePropagationRestrictions;
+        std::unordered_set<std::string>                               evaluableLoopVariableLookup;
 
-        void                                                                          mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfSignalsChangedInFirstBranch, const parser::SymbolTableBackupHelper& backupOfSignalsChangedInSecondBranch) const;
-        void                                                                          makeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfCurrentValuesOfSignalsAtEndOfBranch, const parser::SymbolTableBackupHelper& backupCurrentValuesOfSignalsInToBeOmittedBranch) const;
-        void                                                                          destroySymbolTableBackupScope();
-        void                                                                          createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess) const;
-        [[nodiscard]] std::optional<std::unique_ptr<parser::SymbolTableBackupHelper>> popCurrentSymbolTableBackupScope();
+        void                                                                                       openNewIfStatementBranchSymbolTableBackupScope(std::size_t nestingLevel);
+        void                                                                                       updateBackupOfValuesChangedInScopeAndOptionallyResetMadeChanges(bool resetLocalChanges) const;
+        void                                                                                       transferBackupOfValuesChangedInCurrentScopeToParentScope();
+
+        // Return smart pointers instead ?
+        [[nodiscard]] std::optional<std::reference_wrapper<const IfStatementBranchSymbolTableBackupScope>> peekCurrentSymbolTableBackupScope() const;
+        [[nodiscard]] std::optional<const std::reference_wrapper<IfStatementBranchSymbolTableBackupScope>> peekModifiableCurrentSymbolTableBackupScope();
+        [[nodiscard]] std::optional<const std::reference_wrapper<IfStatementBranchSymbolTableBackupScope>> peekPredecessorOfCurrentSymbolTableBackupScope();
+
+        void                                                                                  mergeAndMakeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfSignalsChangedInFirstBranch, const parser::SymbolTableBackupHelper& backupOfSignalsChangedInSecondBranch) const;
+        void                                                                                  makeLocalChangesGlobal(const parser::SymbolTableBackupHelper& backupOfCurrentValuesOfSignalsAtEndOfBranch, const parser::SymbolTableBackupHelper& backupCurrentValuesOfSignalsInToBeOmittedBranch) const;
+        void                                                                                  destroySymbolTableBackupScope();
+        void                                                                                  createBackupOfAssignedToSignal(const syrec::VariableAccess& assignedToVariableAccess);
+        [[nodiscard]] std::optional<std::unique_ptr<IfStatementBranchSymbolTableBackupScope>> popCurrentSymbolTableBackupScope();
 
         [[nodiscard]] OptimizationResult<syrec::Module> handleModule(const syrec::Module& module, const ExpectedMainModuleCallSignature& expectedMainModuleSignature);
 
-        [[nodiscard]] OptimizationResult<syrec::Statement>               handleUnaryStmt(const syrec::UnaryStatement& unaryStmt) const;
-        [[nodiscard]] OptimizationResult<syrec::Statement>               handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt) const;
-        [[nodiscard]] OptimizationResult<syrec::Statement>               handleCallStmt(const syrec::CallStatement& callStatement) const;
+        [[nodiscard]] OptimizationResult<syrec::Statement>               handleUnaryStmt(const syrec::UnaryStatement& unaryStmt);
+        [[nodiscard]] OptimizationResult<syrec::Statement>               handleAssignmentStmt(const syrec::AssignStatement& assignmentStmt);
+        [[nodiscard]] OptimizationResult<syrec::Statement>               handleCallStmt(const syrec::CallStatement& callStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleUncallStmt(const syrec::UncallStatement& callStatement) const;
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleIfStmt(const syrec::IfStatement& ifStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleLoopStmt(const syrec::ForStatement& forStatement);
-        [[nodiscard]] OptimizationResult<syrec::Statement>               handleSwapStmt(const syrec::SwapStatement& swapStatement) const;
+        [[nodiscard]] OptimizationResult<syrec::Statement>               handleSwapStmt(const syrec::SwapStatement& swapStatement);
         [[nodiscard]] static OptimizationResult<syrec::Statement>        handleSkipStmt();
 
         [[nodiscard]] OptimizationResult<syrec::expression>     handleBinaryExpr(const syrec::BinaryExpression& expression) const;
@@ -144,8 +155,7 @@ namespace optimizations {
         void updateReferenceCountOf(const std::string_view& signalIdent, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
-        //void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Statement& statement, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
-
+        
         void                                                  createSymbolTableEntryForVariable(const syrec::Variable& variable) const;
         void                                                  createSymbolTableEntriesForModuleParametersAndLocalVariables(const syrec::Module& module) const;
         [[nodiscard]] std::optional<syrec::Variable::ptr>     getSymbolTableEntryForVariable(const std::string_view& signalLiteralIdent) const;
@@ -240,14 +250,14 @@ namespace optimizations {
         [[nodiscard]] std::optional<EvaluatedSignalAccess>   tryEvaluateDefinedSignalAccess(const syrec::VariableAccess& accessedSignalParts) const;
         [[nodiscard]] std::unique_ptr<syrec::VariableAccess> transformEvaluatedSignalAccess(const EvaluatedSignalAccess& evaluatedSignalAccess, std::optional<bool>* wasAnyDefinedIndexOutOfRange, bool* didAllDefinedIndicesEvaluateToConstants) const;
 
-        void                                                        invalidateValueOfAccessedSignalParts(const EvaluatedSignalAccess& accessedSignalParts) const;
-        void                                                        invalidateValueOfWholeSignal(const std::string_view& signalIdent) const;
-        void                                                        performAssignment(const EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, const std::optional<unsigned int>& assignmentRhsValue) const;
-        void                                                        performAssignment(const EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, const EvaluatedSignalAccess& assignmentRhsOperand) const;
-        void                                                        performSwap(const EvaluatedSignalAccess& swapOperationLhsOperand, const EvaluatedSignalAccess& swapOperationRhsOperand) const;
-        void                                                        invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignal) const;
-        void                                                        updateStoredValueOf(const syrec::VariableAccess::ptr& assignedToSignal, unsigned int newValueOfAssignedToSignal) const;
-        void                                                        performSwapAndCreateBackupOfOperands(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand) const;
+        void                                                        invalidateValueOfAccessedSignalParts(const EvaluatedSignalAccess& accessedSignalParts);
+        void                                                        invalidateValueOfWholeSignal(const std::string_view& signalIdent);
+        void                                                        performAssignment(const EvaluatedSignalAccess& assignedToSignalParts, syrec_operation::operation assignmentOperation, const std::optional<unsigned int>& assignmentRhsValue);
+        void                                                        performAssignment(const EvaluatedSignalAccess& assignmentLhsOperand, syrec_operation::operation assignmentOperation, const EvaluatedSignalAccess& assignmentRhsOperand);
+        void                                                        performSwap(const EvaluatedSignalAccess& swapOperationLhsOperand, const EvaluatedSignalAccess& swapOperationRhsOperand);
+        void                                                        invalidateStoredValueFor(const syrec::VariableAccess::ptr& assignedToSignal);
+        void                                                        updateStoredValueOf(const syrec::VariableAccess::ptr& assignedToSignal, unsigned int newValueOfAssignedToSignal);
+        void                                                        performSwapAndCreateBackupOfOperands(const syrec::VariableAccess::ptr& swapLhsOperand, const syrec::VariableAccess::ptr& swapRhsOperand);
 
         [[nodiscard]] std::optional<unsigned int>                      tryFetchValueFromEvaluatedSignalAccess(const EvaluatedSignalAccess& accessedSignalParts) const;
         [[nodiscard]] bool                                             isValueLookupBlockedByDataFlowAnalysisRestriction(const syrec::VariableAccess& accessedSignalParts) const;
@@ -276,7 +286,9 @@ namespace optimizations {
         [[nodiscard]] static std::optional<bool>                                         determineEquivalenceOfOperandsOfBinaryExpr(const syrec::BinaryExpression& binaryExpression);
         [[nodiscard]] bool                                                               doesStatementDefineAssignmentThatChangesAssignedToSignal(const syrec::Statement& statement, bool areCallerArgumentsBasedOnOptimizedSignature);
         void                                                                             emplaceSingleSkipStatementIfContainerIsEmpty(std::optional<std::vector<std::unique_ptr<syrec::Statement>>>& statementsContainer);
-        
+        [[nodiscard]] std::size_t                                                        incrementInternalIfStatementNestingLevelCounter();
+        void                                                                             decrementInternalIfStatementNestingLevelCounter();
+
         [[nodiscard]] std::unordered_set<std::size_t>                              determineIndicesOfUnusedModules(const std::vector<parser::SymbolTable::ModuleCallSignature>& unoptimizedModuleCallSignatures) const;
         [[nodiscard]] OptimizationResult<syrec::Module>                            removeUnusedModulesFrom(const std::vector<std::reference_wrapper<const syrec::Module>>& unoptimizedModules, const ExpectedMainModuleCallSignature& expectedMainModuleSignature) const;
         [[nodiscard]] OptimizationResult<syrec::Module>                            removeUnusedModulesFrom(const std::vector<parser::SymbolTable::ModuleCallSignature>& unoptimizedModuleCallSignatures, std::vector<std::unique_ptr<syrec::Module>>& optimizedModules, const ExpectedMainModuleCallSignature& expectedMainModuleSignature) const;
