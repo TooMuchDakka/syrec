@@ -479,7 +479,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         }
     }
 
-    if (const auto& guardConditionAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(simplifiedGuardExpr ? simplifiedGuardExpr : ifStatement.condition); guardConditionAsBinaryExpr != nullptr) {
+    if (const auto& guardConditionAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(simplifiedGuardExpr ? simplifiedGuardExpr : ifStatement.condition); guardConditionAsBinaryExpr) {
         if (const auto& equivalenceResultOfBinaryExprOperands = determineEquivalenceOfOperandsOfBinaryExpr(*guardConditionAsBinaryExpr); equivalenceResultOfBinaryExprOperands.has_value()) {
             canChangesMadeInTrueBranchBeIgnored = !*equivalenceResultOfBinaryExprOperands;
             canChangesMadeInFalseBranchBeIgnored = *equivalenceResultOfBinaryExprOperands;
@@ -499,13 +499,13 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         const auto& wereAllTrueBranchStatementsOptimizedAway = wereAnyStmtsInTrueBranchModified && ((simplifiedTrueBranchStmtsContainer.has_value() && simplifiedTrueBranchStmtsContainer->empty()) || !simplifiedTrueBranchStmtsContainer.has_value());
         isTrueBranchEmptyAfterOptimization                   = wereAllTrueBranchStatementsOptimizedAway || ifStatement.thenStatements.empty();
 
-        if (!canFalseBranchBeOmitted) {
+        if (!canChangesMadeInFalseBranchBeIgnored) {
             updateBackupOfValuesChangedInScopeAndOptionallyResetMadeChanges(true);
         }
         if (peekPredecessorOfCurrentSymbolTableBackupScope().has_value()) {
             transferBackupOfValuesChangedInCurrentScopeToParentScope();
         }
-        if (canFalseBranchBeOmitted) {
+        if (canChangesMadeInFalseBranchBeIgnored) {
             destroySymbolTableBackupScope();
         }
     }
@@ -526,14 +526,14 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         const auto& wereAllFalseBranchStatementsOptimizedAway = wereAnyStmtsInFalseBranchModified && ((simplifiedFalseBranchStmtsContainer.has_value() && simplifiedFalseBranchStmtsContainer->empty()) || !simplifiedFalseBranchStmtsContainer.has_value());
         isFalseBranchEmptyAfterOptimization                   = wereAllFalseBranchStatementsOptimizedAway || ifStatement.elseStatements.empty();
 
-        if (!canTrueBranchBeOmitted) {
+        if (!canChangesMadeInTrueBranchBeIgnored) {
             updateBackupOfValuesChangedInScopeAndOptionallyResetMadeChanges(true);
         }
         if (peekPredecessorOfCurrentSymbolTableBackupScope().has_value()) {
             transferBackupOfValuesChangedInCurrentScopeToParentScope();   
         }
 
-        if (canTrueBranchBeOmitted) {
+        if (canChangesMadeInTrueBranchBeIgnored) {
             destroySymbolTableBackupScope();
         }
     }
@@ -1645,6 +1645,7 @@ void optimizations::Optimizer::performSwap(const EvaluatedSignalAccess& swapOper
     if (areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange.has_value() && !*areAnyComponentsOfSignalAccessOfSwapLhsOperandOutOfRange && didAllDefinedIndicesOfLhsSwapOperandEvaluateToConstants
         && areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange.has_value() && !*areAnyComponentsOfSignalAccessOfSwapRhsOperandOutOfRange && didAllDefinedIndicesOfRhsSwapOperandEvaluateToConstants) {
         performSwapAndCreateBackupOfOperands(sharedTransformedSwapLhsOperand, sharedTransformedSwapRhsOperand);
+        return;
     }
 
     if (sharedTransformedSwapLhsOperand) {

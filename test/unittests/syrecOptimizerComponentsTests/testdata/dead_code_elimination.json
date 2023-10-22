@@ -88,6 +88,20 @@
     "circuit": "module main(out b(16), in a(10), inout c(16), out result(16), in other(16)) wire w1(8), w2(8) result += (#b + (#other - #w1)); w2 -= (other - #a)",
     "expectedCircuit": "module main(out result(16), in other(16)) wire w2(8) result += 24; w2 -= (other - 10)"
   },
+  "testChangesInOmittedTrueBranchAreIgnoredIfDeadCodeEliminationIsDisabledButGuardExpressionEvaluatedToZero": {
+    "circuit": "module main(in b(16), in a(16), out result(16), out other(16), out c(16)) result += 2; if (#b != #a) then result += 3; other += 5 else result -= 2; other += 3 fi (#b != #a); c += result; c += other",
+    "expectedCircuit": "module main(in b(16), in a(16), out result(16), out other(16), out c(16)) result += 2; if 0 then result += 3; other += 5 else result -= 2; other += 3 fi 0; c += 0; c += 3",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
+  "testChangesInOmittedFalseBranchAreIgnoredIfDeadCodeEliminationIsDisabledButGuardExpressionEvaluatedToZero": {
+    "circuit": "module main(in b(16), in a(16), out result(16), out other(16), out c(16)) result += 2; if (#b = #a) then result += 3; other += 5 else result -= 2; other += 3 fi (#b = #a); c += result; c += other",
+    "expectedCircuit": "module main(in b(16), in a(16), out result(16), out other(16), out c(16)) result += 2; if 1 then result += 3; other += 5 else result -= 2; other += 3 fi 1; c += 5; c += 5",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
 
   "testChangesDueToAssignmentsMadeInOmittedFalseBranchAreIgnoredIfGuardExpressionEvaluatesToConstantLargerThanZero": {
     "circuit": "module main(out b[2][2](4), in a[2](4)) wire test[2](4), output(4) if (b[0][0] >= 0) then b[0][0] += a[0]; b[0][1] += a[1]; b[1][0] += 5; b[1][1] += 10; test[0] += b[0][0]; test[1] += b[1][0] else b[1][0] += a[0]; b[1][1] += a[1]; b[0][1] += 5; b[0][0] += 10; test[1] += b[0][0]; test[0] += b[0][1] fi (b[0][0] >= 0); output.0 += b[0][0].0; output.1 += b[0][0].1; output.2 += b[0][0].2; output.3 += b[0][0].3; output.0 += b[0][1].0; output.1 += b[0][1].1; output.2 += b[0][1].2; output.3 += b[0][1].3; output.0 += b[1][0].0; output.1 += b[1][0].1; output.2 += b[1][0].2; output.3 += b[1][0].3; output.0 += b[1][1].0; output.1 += b[1][1].1; output.2 += b[1][1].2; output.3 += b[1][1].3; output.0 += test[0].0; output.1 += test[0].1; output.2 += test[0].2; output.3 += test[0].3; output.0 += test[1].0; output.1 += test[1].1; output.2 += test[1].2; output.3 += test[1].3",
@@ -124,7 +138,7 @@
 
   "testNestedIfStatementInTrueBranchOfParentIsOptimizedByOmittingTrueBranchWhenGuardConditionOfNestedIfStatementAllowsItWhenParentCannotBeOptimized": {
     "circuit": "module main(out a[2](4), out b[2](4), in c[2](4), in d[2](4), out o(4)) if (a = b) then a[0] += 2; b[1] += 4; if (#a != #b) then a[0] += 2 else b[1] += 2 fi (#a != #b) else a[0] += 4; a[1] += 2 fi (a = b); o.0 += a[0].0; o.1 += a[0].1; o.2 += a[0].2; o.3 += a[0].3; o.0 += a[1].0; o.1 += a[1].1; o.2 += a[1].2; o.3 += a[1].3; o.0 += b[0].0; o.1 += b[0].1; o.2 += b[0].2; o.3 += b[0].3; o.0 += b[1].0; o.1 += b[1].1; o.2 += b[1].2; o.3 += b[1].3",
-    "expectedCircuit": "module main(out a[2](4), out b[2](4), out o(4)) if (a = b) then a[0] += 2; b[1] += 4; b[1] += 2 else a[0] += 4; a[1] += 2 fi (a = b); o.2 += 1; o.1 += a[1].1; o.1 += b[1].1; o.2 += b[1].2"
+    "expectedCircuit": "module main(out a[2](4), out b[2](4), out o(4)) if (a = b) then a[0] += 2; b[1] += 4; b[1] += 2 else a[0] += 4; a[1] += 2 fi (a = b); o.1 += a[0].1; o.2 += a[0].2; o.1 += a[1].1; o.1 += b[1].1; o.2 += b[1].2"
   },
   "testNestedIfStatementInTrueBranchOfParentIsOptimizedByOmittingFalseBranchWhenGuardConditionOfNestedIfStatementAllowsItWhenParentCannotBeOptimized": {
     "circuit": "module main(out a[2](4), out b[2](4), in c[2](4), in d[2](4), out o(4)) if (a = b) then a[0] += 2; b[1] += 4; if (#a = #b) then a[0] += 2 else b[1] += 2 fi (#a = #b) else a[0] += 4; a[1] += 2 fi (a = b); o.0 += a[0].0; o.1 += a[0].1; o.2 += a[0].2; o.3 += a[0].3; o.0 += a[1].0; o.1 += a[1].1; o.2 += a[1].2; o.3 += a[1].3; o.0 += b[0].0; o.1 += b[0].1; o.2 += b[0].2; o.3 += b[0].3; o.0 += b[1].0; o.1 += b[1].1; o.2 += b[1].2; o.3 += b[1].3",
@@ -132,7 +146,7 @@
   },
   "testNestedIfStatementInFalseBranchOfParentIsOptimizedByOmittingTrueBranchWhenGuardConditionOfNestedIfStatementAllowsItWhenParentCannotBeOptimized": {
     "circuit": "module main(out a[2](4), out b[2](4), in c[2](4), in d[2](4), out o(4)) if (a = b) then a[0] += 4; a[1] += 2 else a[0] += 2; b[1] += 4; if (#a != #b) then a[0] += 2 else b[1] += 2 fi (#a != #b) fi (a = b); o.0 += a[0].0; o.1 += a[0].1; o.2 += a[0].2; o.3 += a[0].3; o.0 += a[1].0; o.1 += a[1].1; o.2 += a[1].2; o.3 += a[1].3; o.0 += b[0].0; o.1 += b[0].1; o.2 += b[0].2; o.3 += b[0].3; o.0 += b[1].0; o.1 += b[1].1; o.2 += b[1].2; o.3 += b[1].3",
-    "expectedCircuit": "module main(out a[2](4), out b[2](4), out o(4)) if (a = b) then a[0] += 4; a[1] += 2 else a[0] += 2; b[1] += 4; b[1] += 2 fi (a = b); o.2 += 1; o.1 += a[1].1; o.1 += b[1].1; o.2 += b[1].2"
+    "expectedCircuit": "module main(out a[2](4), out b[2](4), out o(4)) if (a = b) then a[0] += 4; a[1] += 2 else a[0] += 2; b[1] += 4; b[1] += 2 fi (a = b); o.1 += a[0].1; o.2 += a[0].2; o.1 += a[1].1; o.1 += b[1].1; o.2 += b[1].2"
   },
   "testNestedIfStatementInFalseBranchOfParentIsOptimizedByOmittingFalseBranchWhenGuardConditionOfNestedIfStatementAllowsItWhenParentCannotBeOptimized": {
     "circuit": "module main(out a[2](4), out b[2](4), in c[2](4), in d[2](4), out o(4)) if (a = b) then a[0] += 4; a[1] += 2 else a[0] += 2; b[1] += 4; if (#a = #b) then a[0] += 2 else b[1] += 2 fi (#a = #b) fi (a = b); o.0 += a[0].0; o.1 += a[0].1; o.2 += a[0].2; o.3 += a[0].3; o.0 += a[1].0; o.1 += a[1].1; o.2 += a[1].2; o.3 += a[1].3; o.0 += b[0].0; o.1 += b[0].1; o.2 += b[0].2; o.3 += b[0].3; o.0 += b[1].0; o.1 += b[1].1; o.2 += b[1].2; o.3 += b[1].3",
