@@ -86,6 +86,7 @@ add_library(
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/bit_helpers.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/binary_expression_simplifier.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/copy_utils.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/loop_body_value_propagation_blocker.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/loop_range_utils.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/message_utils.cpp
@@ -148,6 +149,7 @@ add_library(
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/bit_helpers.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/binary_expression_simplifier.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/copy_utils.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/loop_range_utils.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/message_utils.hpp

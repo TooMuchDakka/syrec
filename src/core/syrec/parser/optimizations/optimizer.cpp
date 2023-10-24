@@ -8,6 +8,7 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/main_additional_line_for_assignment_simplifier.hpp"
 #include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 #include "core/syrec/parser/utils/bit_helpers.hpp"
+#include "core/syrec/parser/utils/copy_utils.hpp"
 #include "core/syrec/parser/utils/loop_range_utils.hpp"
 
 #include <functional>
@@ -36,7 +37,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
                 indicesOfUnoptimizedModuleCounterPart.emplace_back(moduleIdx);
             }
         } else if (optimizedModule.getStatusOfResult() == OptimizationResultFlag::IsUnchanged) {
-            optimizedModules.emplace_back(createCopyOfModule(module));
+            optimizedModules.emplace_back(copyUtils::createCopyOfModule(module));
         }
         moduleIdx++;
     }
@@ -77,7 +78,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
 
 // TODO:
 optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optimizer::handleModule(const syrec::Module& module, const optimizations::Optimizer::ExpectedMainModuleCallSignature& expectedMainModuleSignature) {
-    auto copyOfModule = createCopyOfModule(module);
+    auto copyOfModule = copyUtils::createCopyOfModule(module);
 
     std::size_t generatedInternalIdForModule = 0;
     activeSymbolTableScope->addEntry(*copyOfModule, &generatedInternalIdForModule);
@@ -199,7 +200,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
             }
         }
         else {
-            optimizedStmts.emplace_back(createCopyOfStmt(stmt));
+            optimizedStmts.emplace_back(copyUtils::createCopyOfStmt(stmt));
         }
     }
 
@@ -579,14 +580,14 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         if (canTrueBranchBeOmitted) {
             auto remainingFalseBranchStatements = simplifiedFalseBranchStmtsContainer.has_value()
                 ? std::move(*simplifiedFalseBranchStmtsContainer)
-                : createCopyOfStatements(ifStatement.elseStatements);
+                : copyUtils::createCopyOfStatements(ifStatement.elseStatements);
             
             return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(remainingFalseBranchStatements));
         }
         if (canFalseBranchBeOmitted) {
             auto remainingTrueBranchStatements = simplifiedTrueBranchStmtsContainer.has_value()
                 ? std::move(*simplifiedTrueBranchStmtsContainer)
-                : createCopyOfStatements(ifStatement.thenStatements);
+                : copyUtils::createCopyOfStatements(ifStatement.thenStatements);
 
             return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(remainingTrueBranchStatements));
         }
@@ -755,7 +756,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         copyOfStatementsOfOriginalLoopBody.reserve(forStatement.statements.size());
 
         for (const auto& stmt: forStatement.statements) {
-            copyOfStatementsOfOriginalLoopBody.emplace_back(createCopyOfStmt(*stmt));
+            copyOfStatementsOfOriginalLoopBody.emplace_back(copyUtils::createCopyOfStmt(*stmt));
         }
         return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(copyOfStatementsOfOriginalLoopBody));
     }
@@ -772,10 +773,10 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     auto simplifiedLoopStmt = std::make_unique<syrec::ForStatement>();
     // TODO: If loop only performs one iteration and the dead code elimination is not enabled, one could replace the declaration of for $i = X to Y step Z with for $X to Y step Z
     simplifiedLoopStmt->loopVariable = forStatement.loopVariable;
-    simplifiedLoopStmt->step         = iterationRangeStepSizeSimplified ? std::move(iterationRangeStepSizeSimplified) : createCopyOfNumber(*forStatement.step);
+    simplifiedLoopStmt->step         = iterationRangeStepSizeSimplified ? std::move(iterationRangeStepSizeSimplified) : copyUtils::createCopyOfNumber(*forStatement.step);
     simplifiedLoopStmt->range        = std::make_pair(
-        iterationRangeStartSimplified ? std::move(iterationRangeStartSimplified) : createCopyOfNumber(*forStatement.range.first),
-        iterationRangeEndSimplified ? std::move(iterationRangeEndSimplified) : createCopyOfNumber(*forStatement.range.second)
+        iterationRangeStartSimplified ? std::move(iterationRangeStartSimplified) : copyUtils::createCopyOfNumber(*forStatement.range.first),
+        iterationRangeEndSimplified ? std::move(iterationRangeEndSimplified) : copyUtils::createCopyOfNumber(*forStatement.range.second)
     );
 
     simplifiedLoopStmt->statements = !loopBodyStmtsSimplified.has_value()
@@ -911,7 +912,7 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
                 rhsOperandOfSimplifiedExpr);
         wasOriginalExprModified = true;
     } else if (!simplifiedBinaryExpr) {
-        simplifiedBinaryExpr = createCopyOfExpression(expression);
+        simplifiedBinaryExpr = copyUtils::createCopyOfExpression(expression);
     }
 
     std::vector<syrec::VariableAccess::ptr> optimizedAwaySignalAccesses;
@@ -993,7 +994,7 @@ optimizations::Optimizer::OptimizationResult<syrec::expression> optimizations::O
             }
         } else if (constantValueOfShiftAmount.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToShiftOperation, *constantValueOfShiftAmount)) {
             if (!simplifiedToBeShiftedExpr) {
-                simplificationResultOfExpr = createCopyOfExpression(*expression.lhs);
+                simplificationResultOfExpr = copyUtils::createCopyOfExpression(*expression.lhs);
             } else {
                 simplificationResultOfExpr = std::move(simplifiedToBeShiftedExpr);
             }
@@ -1058,114 +1059,17 @@ optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optim
     return OptimizationResult<syrec::Number>::asUnchangedOriginal();
 }
 
-std::unique_ptr<syrec::Module> optimizations::Optimizer::createCopyOfModule(const syrec::Module& module) {
-    auto copyOfModule        = std::make_unique<syrec::Module>(module.name);
-    copyOfModule->parameters = module.parameters;
-    copyOfModule->variables  = module.variables;
-    copyOfModule->statements = module.statements;
-    return copyOfModule;
-}
-
-std::vector<std::unique_ptr<syrec::Statement>> optimizations::Optimizer::createCopyOfStatements(const syrec::Statement::vec& statements) {
-    std::vector<std::unique_ptr<syrec::Statement>> statementCopyContainer;
-    statementCopyContainer.reserve(statements.size());
-
-    for (const auto& stmt : statements) {
-        statementCopyContainer.emplace_back(createCopyOfStmt(*stmt));
-    }
-    return statementCopyContainer;
-}
-
-
-std::unique_ptr<syrec::Statement> optimizations::Optimizer::createCopyOfStmt(const syrec::Statement& stmt) {
-    if (typeid(stmt) == typeid(syrec::SkipStatement)) {
-        return std::make_unique<syrec::SkipStatement>();
-    }
-    if (const auto& statementAsAssignmentStmt = dynamic_cast<const syrec::AssignStatement*>(&stmt); statementAsAssignmentStmt) {
-        return std::make_unique<syrec::AssignStatement>(statementAsAssignmentStmt->lhs, statementAsAssignmentStmt->op, statementAsAssignmentStmt->rhs);
-    }
-    if (const auto& statementAsUnaryAssignmentStmt = dynamic_cast<const syrec::UnaryStatement*>(&stmt); statementAsUnaryAssignmentStmt) {
-        return std::make_unique<syrec::UnaryStatement>(statementAsUnaryAssignmentStmt->op, statementAsUnaryAssignmentStmt->var);
-    }
-    if (const auto& statementAsIfStatement = dynamic_cast<const syrec::IfStatement*>(&stmt); statementAsIfStatement) {
-        auto copyOfIfStatement = std::make_unique<syrec::IfStatement>();
-        copyOfIfStatement->condition = statementAsIfStatement->condition;
-        copyOfIfStatement->fiCondition = statementAsIfStatement->fiCondition;
-        copyOfIfStatement->thenStatements = statementAsIfStatement->thenStatements;
-        copyOfIfStatement->elseStatements = statementAsIfStatement->elseStatements;
-        return copyOfIfStatement;
-    }
-    if (const auto& statementAsLoopStatement = dynamic_cast<const syrec::ForStatement*>(&stmt); statementAsLoopStatement) {
-        auto copyOfLoopStatement = std::make_unique<syrec::ForStatement>();
-        copyOfLoopStatement->loopVariable = statementAsLoopStatement->loopVariable;
-        copyOfLoopStatement->range = statementAsLoopStatement->range;
-        copyOfLoopStatement->step       = statementAsLoopStatement->step;
-        copyOfLoopStatement->statements = statementAsLoopStatement->statements;
-        return copyOfLoopStatement;
-    }
-    if (const auto& statementAsSwapStatement = dynamic_cast<const syrec::SwapStatement*>(&stmt); statementAsSwapStatement) {
-        return std::make_unique<syrec::SwapStatement>(statementAsSwapStatement->lhs, statementAsSwapStatement->rhs);
-    }
-    if (const auto& statementAsCallStatement = dynamic_cast<const syrec::CallStatement*>(&stmt); statementAsCallStatement) {
-        return std::make_unique<syrec::CallStatement>(statementAsCallStatement->target, statementAsCallStatement->parameters);    
-    }
-    if (const auto& statementAsUncallStatement = dynamic_cast<const syrec::UncallStatement*>(&stmt); statementAsUncallStatement) {
-        return std::make_unique<syrec::UncallStatement>(statementAsUncallStatement->target, statementAsUncallStatement->parameters);
-    }
-    return nullptr;
-}
-
-std::unique_ptr<syrec::expression> optimizations::Optimizer::createCopyOfExpression(const syrec::expression& expr) {
-    if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr != nullptr) {
-        return std::make_unique<syrec::BinaryExpression>(
-            exprAsBinaryExpr->lhs,
-            exprAsBinaryExpr->op,
-            exprAsBinaryExpr->rhs
-        );
-    }
-    if (const auto& exprAsShiftExpr = dynamic_cast<const syrec::ShiftExpression*>(&expr); exprAsShiftExpr != nullptr) {
-        return std::make_unique<syrec::ShiftExpression>(
-            exprAsShiftExpr->lhs,
-            exprAsShiftExpr->op,
-            exprAsShiftExpr->rhs
-        );
-    }
-    if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr != nullptr) {
-        return std::make_unique<syrec::NumericExpression>(
-                createCopyOfNumber(*exprAsNumericExpr->value),
-                exprAsNumericExpr->bwidth
-        );
-    }
-    if (const auto& exprAsVariableExpr = dynamic_cast<const syrec::VariableExpression*>(&expr); exprAsVariableExpr != nullptr) {
-        return std::make_unique<syrec::VariableExpression>(exprAsVariableExpr->var);
-    }
-    return nullptr;
-}
-
-std::unique_ptr<syrec::Number> optimizations::Optimizer::createCopyOfNumber(const syrec::Number& number) {
-    if (number.isConstant()) {
-        return std::make_unique<syrec::Number>(number.evaluate({}));
-    }
-    if (number.isLoopVariable()) {
-        return std::make_unique<syrec::Number>(number.variableName());
-    }
-    if (number.isCompileTimeConstantExpression()) {
-        return std::make_unique<syrec::Number>(number.getExpression());
-    }
-    return nullptr;
-}
-
 std::unique_ptr<syrec::expression> optimizations::Optimizer::trySimplifyExpr(const syrec::expression& expr, const parser::SymbolTable& symbolTable, bool simplifyExprByReassociation, bool performOperationStrengthReduction, std::vector<syrec::VariableAccess::ptr>* optimizedAwaySignalAccesses) {
     std::unique_ptr<syrec::expression> simplificationResult;
-    const std::shared_ptr<syrec::expression> toBeSimplifiedExpr = createCopyOfExpression(expr);
+    const std::shared_ptr<syrec::expression> toBeSimplifiedExpr = copyUtils::createCopyOfExpression(expr);
     if (simplifyExprByReassociation) {
         // TODO: Rework return value to either return null if no simplification took place or return std::optional or return additional boolean flag
         if (const auto& reassociateExpressionResult = optimizations::simplifyBinaryExpression(toBeSimplifiedExpr, performOperationStrengthReduction, std::nullopt, symbolTable, optimizedAwaySignalAccesses); reassociateExpressionResult != toBeSimplifiedExpr) {
-            simplificationResult = createCopyOfExpression(*reassociateExpressionResult);
+            simplificationResult = copyUtils::createCopyOfExpression(*reassociateExpressionResult);
         }
     } else {
         if (const auto& generalBinaryExpressionSimplificationResult = optimizations::trySimplify(toBeSimplifiedExpr, performOperationStrengthReduction, symbolTable, optimizedAwaySignalAccesses); generalBinaryExpressionSimplificationResult.couldSimplify) {
-            simplificationResult = createCopyOfExpression(*generalBinaryExpressionSimplificationResult.simplifiedExpression);
+            simplificationResult = copyUtils::createCopyOfExpression(*generalBinaryExpressionSimplificationResult.simplifiedExpression);
         }
     }
     return simplificationResult;
@@ -1207,7 +1111,7 @@ std::unique_ptr<syrec::Number> optimizations::Optimizer::tryMapExprToCompileTime
         }
     }
     if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr != nullptr) {
-        return createCopyOfNumber(*exprAsNumericExpr->value);   
+        return copyUtils::createCopyOfNumber(*exprAsNumericExpr->value);   
     }
     return nullptr;
 }
@@ -1299,7 +1203,7 @@ optimizations::Optimizer::DimensionAccessEvaluationResult optimizations::Optimiz
             const auto isAccessedValueOfDimensionWithinRange = parser::isValidDimensionAccess(signalData, i, *valueOfDimensionEvaluated);
             evaluatedValuePerDimension.emplace_back(SignalAccessIndexEvaluationResult<syrec::expression>::createFromConstantValue(isAccessedValueOfDimensionWithinRange ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange, wasUserDefinedValueForDimensionSimplified, *valueOfDimensionEvaluated));
         } else {
-            evaluatedValuePerDimension.emplace_back(SignalAccessIndexEvaluationResult<syrec::expression>::createFromSimplifiedNonConstantValue(IndexValidityStatus::Unknown, false, createCopyOfExpression(userDefinedValueOfDimension)));
+            evaluatedValuePerDimension.emplace_back(SignalAccessIndexEvaluationResult<syrec::expression>::createFromSimplifiedNonConstantValue(IndexValidityStatus::Unknown, false, copyUtils::createCopyOfExpression(userDefinedValueOfDimension)));
         }
         wasAnyUserDefinedDimensionAccessSimplified |= wasUserDefinedValueForDimensionSimplified;
     }
@@ -1348,11 +1252,11 @@ std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations:
     }
 
     auto rangeStartEvaluationResult = bitRangeStartEvaluationStatus == IndexValidityStatus::Unknown
-        ? SignalAccessIndexEvaluationResult<syrec::Number>::createFromSimplifiedNonConstantValue(bitRangeStartEvaluationStatus, false, createCopyOfNumber(accessedBitRange->first))
+        ? SignalAccessIndexEvaluationResult<syrec::Number>::createFromSimplifiedNonConstantValue(bitRangeStartEvaluationStatus, false, copyUtils::createCopyOfNumber(accessedBitRange->first))
         : SignalAccessIndexEvaluationResult<syrec::Number>::createFromConstantValue(bitRangeStartEvaluationStatus, wasOriginalBitRangeStartSimplified , *bitRangeStartEvaluated);
 
     auto rangeEndEvaluationResult = bitRangeEndEvaluationStatus == IndexValidityStatus::Unknown
-        ? SignalAccessIndexEvaluationResult<syrec::Number>::createFromSimplifiedNonConstantValue(bitRangeEndEvaluationStatus, false, createCopyOfNumber(accessedBitRange->second))
+        ? SignalAccessIndexEvaluationResult<syrec::Number>::createFromSimplifiedNonConstantValue(bitRangeEndEvaluationStatus, false, copyUtils::createCopyOfNumber(accessedBitRange->second))
         : SignalAccessIndexEvaluationResult<syrec::Number>::createFromConstantValue(bitRangeEndEvaluationStatus, wasOriginalBitRangeEndSimplified, *bitRangeEndEvaluated);
 
     return std::make_optional(BitRangeEvaluationResult({.rangeStartEvaluationResult = std::move(rangeStartEvaluationResult), .rangeEndEvaluationResult = std::move(rangeEndEvaluationResult)}));
@@ -1519,7 +1423,7 @@ std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvalua
                     *didAllDefinedIndicesEvaluateToConstants = true;
                 }
             } else {
-                bitRangeStart = createCopyOfNumber(tryFetchNonOwningReferenceOfNonConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeStartEvaluationResult)->get());
+                bitRangeStart = copyUtils::createCopyOfNumber(tryFetchNonOwningReferenceOfNonConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeStartEvaluationResult)->get());
             }
 
             if (wasAnyDefinedIndexOutOfRange) {
@@ -1532,7 +1436,7 @@ std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvalua
                     *didAllDefinedIndicesEvaluateToConstants &= true;
                 }
             } else {
-                bitRangeEnd = createCopyOfNumber(tryFetchNonOwningReferenceOfNonConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeEndEvaluationResult)->get());
+                bitRangeEnd = copyUtils::createCopyOfNumber(tryFetchNonOwningReferenceOfNonConstantValueOfIndex(evaluatedSignalAccess.accessedBitRange->rangeEndEvaluationResult)->get());
             }
 
             if (wasAnyDefinedIndexOutOfRange) {
@@ -1550,7 +1454,7 @@ std::unique_ptr<syrec::VariableAccess> optimizations::Optimizer::transformEvalua
                     *didAllDefinedIndicesEvaluateToConstants &= true;
                 }
             } else {
-                auto copyOfEvaluatedValueOfDimension = createCopyOfExpression(tryFetchNonOwningReferenceOfNonConstantValueOfIndex(evaluatedValueOfDimension)->get());
+                auto copyOfEvaluatedValueOfDimension = copyUtils::createCopyOfExpression(tryFetchNonOwningReferenceOfNonConstantValueOfIndex(evaluatedValueOfDimension)->get());
                 definedDimensionAccess.emplace_back(std::move(copyOfEvaluatedValueOfDimension));
                 if (didAllDefinedIndicesEvaluateToConstants) {
                     *didAllDefinedIndicesEvaluateToConstants = false;
@@ -2352,12 +2256,12 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
              * should not be removed, since the given module is the assumed "main" module and thus required for a valid SyReC grammar.
              */
             if (!unusedModuleIndices.count(i)) {
-                remainingModulesContainer.emplace_back(createCopyOfModule(unoptimizedModules.at(i)));
+                remainingModulesContainer.emplace_back(copyUtils::createCopyOfModule(unoptimizedModules.at(i)));
             }
             else {
                 const auto& callSignatureContainerOfUnoptimizedModule = createCallSignaturesFrom({unoptimizedModules.at(i)});
                 if (doesModuleMatchMainModuleSignature(callSignatureContainerOfUnoptimizedModule.front(), expectedMainModuleSignature)) {
-                    remainingModulesContainer.emplace_back(createCopyOfModule(unoptimizedModules.at(i)));
+                    remainingModulesContainer.emplace_back(copyUtils::createCopyOfModule(unoptimizedModules.at(i)));
                 }
             }
         }

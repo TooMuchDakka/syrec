@@ -136,13 +136,6 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::expression>     handleVariableExpr(const syrec::VariableExpression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::expression>     handleNumericExpr(const syrec::NumericExpression& numericExpr) const;
 
-        [[nodiscard]] static std::vector<std::unique_ptr<syrec::Statement>> createCopyOfStatements(const syrec::Statement::vec& statements);
-        [[nodiscard]] static std::unique_ptr<syrec::Statement>  createCopyOfStmt(const syrec::Statement& stmt);
-        [[nodiscard]] static std::unique_ptr<syrec::expression> createCopyOfExpression(const syrec::expression& expr);
-        [[nodiscard]] static std::unique_ptr<syrec::Number>     createCopyOfNumber(const syrec::Number& number);
-        [[nodiscard]] static std::unique_ptr<syrec::Module>     createCopyOfModule(const syrec::Module& module);
-
-
         [[nodiscard]] static std::unique_ptr<syrec::expression>                                               trySimplifyExpr(const syrec::expression& expr, const parser::SymbolTable& symbolTable, bool simplifyExprByReassociation, bool performOperationStrengthReduction, std::vector<syrec::VariableAccess::ptr>* optimizedAwaySignalAccesses);
         [[nodiscard]] static std::unique_ptr<syrec::expression>                                               transformCompileTimeConstantExpressionToNumber(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr);
         [[nodiscard]] static std::optional<syrec_operation::operation>                                        tryMapCompileTimeConstantOperation(syrec::Number::CompileTimeConstantExpression::Operation compileTimeConstantExprOperation);
