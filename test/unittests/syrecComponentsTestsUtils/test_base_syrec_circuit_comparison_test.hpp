@@ -92,6 +92,15 @@ protected:
         }
     }
 
+    void checkThatExpectedCircuitsAreWellFormed(const std::vector<std::string>& expectedOptimizedCircuits) const {
+        for (const std::string& expectedOptimizedCircuit : expectedOptimizedCircuits) {
+            syrec::program internalParserInterface;
+            std::string errorsFromParsedCircuit;
+            ASSERT_NO_THROW(errorsFromParsedCircuit = internalParserInterface.readFromString(expectedOptimizedCircuit, config)) << "Unexpected crash during parsing of expected optimized circuit '" << expectedOptimizedCircuit << "'";
+            ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected optimized circuit '" << expectedOptimizedCircuit << "' to be represent a well formed SyReC program but the following errors where found: " << errorsFromParsedCircuit;
+        }
+    }
+
     void determineExpectedCircuitsFromJson(const nlohmann::json& testCaseJsonData, std::vector<std::string>& expectedOptimizedCircuits) {
         if (testCaseJsonData.contains(cJsonKeyExpectedCircuitOutput)) {
             ASSERT_TRUE(testCaseJsonData.at(cJsonKeyExpectedCircuitOutput).is_string()) << "Expected entry with key '" << cJsonKeyExpectedCircuitOutput << "' to by a string";
@@ -115,6 +124,8 @@ protected:
         } else {
             expectedOptimizedCircuits.emplace_back(circuitToOptimize);
         }
+        
+        checkThatExpectedCircuitsAreWellFormed(expectedOptimizedCircuits);
     }
 
      static void compareExpectedAndActualErrors(const std::vector<std::string>& expectedErrors, const std::vector<std::string>& actualErrorsInUnifiedFormat) {
@@ -310,7 +321,8 @@ protected:
         }
 
         if (wereLoopUnrollConfigOptionsDefined) {
-            generatedConfig.optionalLoopUnrollConfig.emplace(optimizations::LoopOptimizationConfig(maxUnrollCountPerLoop, maxAllowedNestingLevelOfInnerLoops, maxAllowedTotalLoopSize, allowRemainderLoop, forceUnrollAll));
+            generatedConfig.optionalLoopUnrollConfig.emplace(optimizations::LoopOptimizationConfig({maxUnrollCountPerLoop, maxAllowedNestingLevelOfInnerLoops, maxAllowedTotalLoopSize, allowRemainderLoop, forceUnrollAll, generatedConfig.deadCodeEliminationEnabled
+        }));
         }
         parsedProgramSettings.emplace(generatedConfig);
     }
@@ -333,12 +345,12 @@ protected:
         if (userDefinedOptimizations.optionalLoopUnrollConfig.has_value() && !defaultParserConfig.optionalLoopUnrollConfig.has_value()) {
             mergedOptions.optionalLoopUnrollConfig.emplace(*userDefinedOptimizations.optionalLoopUnrollConfig);
         } else if (userDefinedOptimizations.optionalLoopUnrollConfig.has_value() && defaultParserConfig.optionalLoopUnrollConfig.has_value()) {
-            const auto maxAllowedTotalLoopSize = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollMaxAllowedTotalSize, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->maxAllowedTotalLoopSize, userDefinedOptimizations.optionalLoopUnrollConfig->maxAllowedTotalLoopSize);
+            const auto maxAllowedTotalLoopSize    = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollMaxAllowedTotalSize, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->maxAllowedLoopSizeInNumberOfStatements, userDefinedOptimizations.optionalLoopUnrollConfig->maxAllowedLoopSizeInNumberOfStatements);
             const auto maxAllowedLoopNestingLevel = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollMaxNestingLevel, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->maxAllowedNestingLevelOfInnerLoops, userDefinedOptimizations.optionalLoopUnrollConfig->maxAllowedNestingLevelOfInnerLoops);
-            const auto maxUnrolledLoopIterations  = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollMaxUnrollCountPerLoop, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->maxUnrollCountPerLoop, userDefinedOptimizations.optionalLoopUnrollConfig->maxUnrollCountPerLoop);
-            const auto allowLoopRemainder         = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollAllowRemainderFlag, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->allowRemainderLoop, userDefinedOptimizations.optionalLoopUnrollConfig->allowRemainderLoop);
-            const auto forceUnrollLoops           = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopForceUnrollFlag, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->forceUnrollAll, userDefinedOptimizations.optionalLoopUnrollConfig->forceUnrollAll);
-            mergedOptions.optionalLoopUnrollConfig.emplace(optimizations::LoopOptimizationConfig(maxUnrolledLoopIterations, maxAllowedLoopNestingLevel, maxAllowedTotalLoopSize, allowLoopRemainder, forceUnrollLoops));
+            const auto maxUnrolledLoopIterations  = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollMaxUnrollCountPerLoop, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->maxNumberOfUnrolledIterationsPerLoop, userDefinedOptimizations.optionalLoopUnrollConfig->maxNumberOfUnrolledIterationsPerLoop);
+            const auto allowLoopRemainder         = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopUnrollAllowRemainderFlag, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->isRemainderLoopAllowed, userDefinedOptimizations.optionalLoopUnrollConfig->isRemainderLoopAllowed);
+            const auto forceUnrollLoops           = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::LoopForceUnrollFlag, loadedOptimizationOptions, defaultParserConfig.optionalLoopUnrollConfig->forceUnroll, userDefinedOptimizations.optionalLoopUnrollConfig->forceUnroll);
+            mergedOptions.optionalLoopUnrollConfig.emplace(optimizations::LoopOptimizationConfig({maxUnrolledLoopIterations, maxAllowedLoopNestingLevel, maxAllowedTotalLoopSize, allowLoopRemainder, forceUnrollLoops, mergedOptions.deadCodeEliminationEnabled}));
         } else if (!userDefinedOptimizations.optionalLoopUnrollConfig.has_value() && defaultParserConfig.optionalLoopUnrollConfig.has_value()) {
             mergedOptions.optionalLoopUnrollConfig.emplace(*defaultParserConfig.optionalLoopUnrollConfig);
         }
