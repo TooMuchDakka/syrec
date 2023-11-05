@@ -87,17 +87,11 @@ namespace parser {
          * \return A std::optional<T> object containing the casted return value of the production
          */
         template<typename T>
-        [[nodiscard]] std::optional<T> tryConvertProductionReturnValue(std::any productionReturnType) const {
-            if (!productionReturnType.has_value()) {
-                return std::nullopt;
+        [[nodiscard]] std::optional<T> tryConvertProductionReturnValue(std::any&& productionReturnType) const {
+            if (const std::optional<T>* castedReturnValue = std::any_cast<std::optional<T>>(&productionReturnType); castedReturnValue) {
+                return *castedReturnValue;
             }
-
-            try {
-                return std::any_cast<std::optional<T>>(productionReturnType);
-            } catch (std::bad_any_cast& ex) {
-                // TODO: Better error handling, i.e. logging or returning C-style error code to check whether cast or something else failed
-                return std::nullopt;
-            }
+            return std::nullopt;
         }
 
         /**

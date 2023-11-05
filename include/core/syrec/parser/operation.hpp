@@ -1,5 +1,7 @@
 #ifndef OPERATION_HPP
 #define OPERATION_HPP
+#include "core/syrec/number.hpp"
+
 #include <optional>
 
 namespace syrec_operation {
@@ -53,6 +55,7 @@ namespace syrec_operation {
     [[nodiscard]] std::optional<operation> tryMapShiftOperationFlagToEnum(unsigned int shiftOperation) noexcept;
     [[nodiscard]] std::optional<operation> tryMapAssignmentOperationFlagToEnum(unsigned int assignmentOperation) noexcept;
     [[nodiscard]] std::optional<operation> tryMapUnaryAssignmentOperationFlagToEnum(unsigned int unaryAssignmentOperation) noexcept;
+    [[nodiscard]] std::optional<operation> tryMapCompileTimeConstantExprOperationFlagToEnum(syrec::Number::CompileTimeConstantExpression::Operation compileTimeConstantExprOperation) noexcept;
     // TODO: Add mappings for unary expression if support for it is added within syrec
     //[[nodiscard]] std::optional<unsigned int> tryMapUnaryExpressionOperationEnumToFlag(operation unaryExpressionOperation) noexcept;
 
@@ -67,6 +70,8 @@ namespace syrec_operation {
     [[nodiscard]] bool isOperationUnaryAssignmentOperation(operation operationToCheck) noexcept;
     [[nodiscard]] bool isOperationRelationalOperation(operation operationToCheck) noexcept;
     [[nodiscard]] bool isOperationEquivalenceOperation(operation operationToCheck) noexcept;
+
+    [[nodiscard]] std::optional<bool> determineBooleanResultIfOperandsOfBinaryExprMatchForOperation(operation operationToCheck) noexcept;
 };
 
 #endif

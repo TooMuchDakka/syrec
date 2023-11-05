@@ -295,6 +295,12 @@ bool SymbolTable::changeStatementsOfModule(const ModuleIdentifier& moduleIdentif
     return false;
 }
 
+bool SymbolTable::isVariableUsedAnywhereBasedOnReferenceCount(const std::string_view& literalIdent) const {
+    if (const auto& matchingEntryForVariable = getEntryForVariable(literalIdent); matchingEntryForVariable) {
+        return matchingEntryForVariable->referenceCount;
+    }
+    return false;
+}
 
 void SymbolTable::openScope(SymbolTable::ptr& currentScope) {
     if (currentScope) {
@@ -336,7 +342,7 @@ std::optional<unsigned int> SymbolTable::tryFetchValueForLiteral(const syrec::Va
     }
     
     const auto  isAssignedToVariableLoopVariable = std::holds_alternative<syrec::Number::ptr>(symbolTableEntryForVariable->variableInformation);
-    const auto& transformedBitRange = tryTransformAccessedBitRange(assignedToSignalParts);
+    const auto& transformedBitRange = tryTransformAccessedBitRange(assignedToSignalParts, false);
     const auto& transformedDimensionAccess = tryTransformAccessedDimensions(assignedToSignalParts, isAssignedToVariableLoopVariable);
 
     const auto& signalValueLookup = *symbolTableEntryForVariable->optionalValueLookup;
@@ -355,7 +361,7 @@ std::optional<unsigned> SymbolTable::tryFetchValueOfLoopVariable(const std::stri
 
 void SymbolTable::invalidateStoredValuesFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const {
     const auto& symbolTableEntryForVariable = getEntryForVariable(assignedToSignalParts->var->name);
-    if (symbolTableEntryForVariable == nullptr || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {
+    if (!symbolTableEntryForVariable || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {
         return;
     }
 
@@ -382,7 +388,7 @@ void SymbolTable::invalidateStoredValuesFor(const syrec::VariableAccess::ptr& as
 
 void SymbolTable::invalidateStoredValueForLoopVariable(const std::string_view& loopVariableIdent) const {
     const auto& symbolTableEntryForVariable = getEntryForVariable(loopVariableIdent);
-    if (symbolTableEntryForVariable == nullptr || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {
+    if (!symbolTableEntryForVariable || !symbolTableEntryForVariable->optionalValueLookup.has_value()) {
         return;
     }
 
@@ -566,7 +572,7 @@ std::optional<SymbolTable::DeclaredModuleSignature> SymbolTable::tryGetOptimized
     return moduleMatchingNameAndInternalId == signaturesOfModulesMatchingName.cend() ? std::nullopt : std::make_optional(*moduleMatchingNameAndInternalId);
 }
 
-std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> SymbolTable::tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts) {
+std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> SymbolTable::tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts, bool considerUnknownBitRangeStartAndEndAsWholeSignalAccess) {
     const auto&                                                               accessedBitRange = accessedSignalParts->range;
     std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> transformedBitRangeAccess;
     if (accessedBitRange.has_value()) {
@@ -575,6 +581,8 @@ std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> Symbol
         if (accessedBitRange->first->isConstant() && accessedBitRange->second->isConstant()) {
             bitRangeStart = accessedBitRange->first->evaluate({});
             bitRangeEnd   = accessedBitRange->second->evaluate({});
+        } else if (!considerUnknownBitRangeStartAndEndAsWholeSignalAccess) {
+            return std::nullopt;
         }
         transformedBitRangeAccess.emplace(std::pair(bitRangeStart, bitRangeEnd));
     }
@@ -653,8 +661,8 @@ void SymbolTable::updateViaSignalAssignment(const syrec::VariableAccess::ptr& as
 
     // TODO: Are these checks necessary or can we require the caller to validate its arguments and throw an exception otherwise.
     // TODO: One could also invalidate the lhs if the rhs either has not value, is not an inout / out parameter or has not corresponding symbol table entry
-    if (symbolTableEntryForLhsVariable == nullptr || !symbolTableEntryForLhsVariable->optionalValueLookup.has_value() 
-        || symbolTableEntryForRhsVariable == nullptr || !symbolTableEntryForRhsVariable->optionalValueLookup.has_value()) {
+    if (!symbolTableEntryForLhsVariable || !symbolTableEntryForLhsVariable->optionalValueLookup.has_value() 
+        || !symbolTableEntryForRhsVariable || !symbolTableEntryForRhsVariable->optionalValueLookup.has_value()) {
         return;
     }
 

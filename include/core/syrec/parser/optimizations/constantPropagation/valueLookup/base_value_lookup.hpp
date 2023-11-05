@@ -26,6 +26,14 @@ namespace valueLookup {
 
         virtual ~BaseValueLookup() = 0;
 
+        /**
+         * \brief Check whether an existing restriction exists that blocks any value lookup
+         * \param accessedDimensions The accessed values per dimension, if none is provided for a dimension (std::nullopt), an access on all declared values of the dimension is assumed. It is assumed, that the user provided values per dimension are within range of the declared values per dimension of the accessed signal. For all not accessed dimension, an access on all values per dimension is assumed.
+         * \param bitRange The accessed bit range, if none is provided an access on the whole signal bit range is assumed. Furthermore, it is assumed that the user provided bit range is within range of the declared signal bit range.
+         * \return Whether an existing restriction for the accessed signal parts exists
+         */
+        [[nodiscard]] bool isValueLookupBlockedFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const;
+
         void invalidateStoredValueFor(const std::vector<std::optional<unsigned int>>& accessedDimensions) const;
         void invalidateStoredValueForBitrange(const std::vector<std::optional<unsigned int>>& accessedDimensions, const optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) const;
         void invalidateAllStoredValuesForSignal() const;
@@ -44,6 +52,8 @@ namespace valueLookup {
             const BaseValueLookup<Vt>&                                                     valueLookupOfRhsOperand
         );
 
+        // TODO: If a value of a dimension was invalidate once, the entry in the value lookup is removed and can only be restored/recreated by a swap with a known value.
+        // The latter is currently not done.
         void swapValuesAndRestrictionsBetween(
                 const std::vector<std::optional<unsigned int>>&                                accessedDimensionsOfLhsAssignmentOperand,
                 const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& optionallyAccessedBitRangeOfLhsAssignmentOperand,
@@ -67,7 +77,6 @@ namespace valueLookup {
         [[nodiscard]] std::optional<std::shared_ptr<LayerData<std::map<unsigned int, std::optional<Vt>>>>> initializeValueLookupLayer(const unsigned int dimension, const std::optional<Vt>& defaultValue);
 
         [[nodiscard]] std::optional<std::vector<unsigned int>> transformAccessOnDimensions(const std::vector<std::optional<unsigned int>>& accessedDimensions) const;
-        [[nodiscard]] bool                                     isValueLookupBlockedFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const;
         /*
          * To have both static and dynamic polymorphism we need to use type erase to keep the dynamic part here
          * https://www.artima.com/articles/on-the-tension-between-object-oriented-and-generic-programming-in-c

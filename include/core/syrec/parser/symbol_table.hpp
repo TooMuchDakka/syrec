@@ -64,6 +64,7 @@ namespace parser {
         void                  updateReferenceCountOfLiteral(const std::string_view& literalIdent, ReferenceCountUpdate typeOfUpdate) const;
         void                  updateReferenceCountOfModulesMatchingSignature(const std::vector<ModuleIdentifier>& moduleIdentifiers, ReferenceCountUpdate typeOfUpdate) const;
         [[maybe_unused]] bool changeStatementsOfModule(const ModuleIdentifier& moduleIdentifier, const syrec::Statement::vec& updatedModuleBodyStatements) const;
+        [[nodiscard]] bool    isVariableUsedAnywhereBasedOnReferenceCount(const std::string_view& literalIdent) const;
 
         // TODO: CONSTANT_PROPAGATION
         [[nodiscard]] std::optional<unsigned int> tryFetchValueForLiteral(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
@@ -150,7 +151,7 @@ namespace parser {
 
         [[nodiscard]] bool                                                               doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const;
         [[nodiscard]] std::optional<DeclaredModuleSignature>                             tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, std::size_t& internalModuleId) const;
-        static std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts);
+        static std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts, bool considerUnknownBitRangeStartAndEndAsWholeSignalAccess = true);
         static std::vector<std::optional<unsigned int>>                                  tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable);
         static void                                                                      performReferenceCountUpdate(std::size_t& currentReferenceCount, ReferenceCountUpdate typeOfUpdate);
         static void                                                                      addIndexOfDroppedParameterToOptimizedModule(ModuleSymbolTableEntry::InternalModuleHelperData& optimizedModuleData, std::size_t indexOfOptimizedAwayParameter);

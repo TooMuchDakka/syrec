@@ -42,6 +42,7 @@ namespace optimizations {
         }
         [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Statement>> transformCollectionOfSharedPointersToReferences(const syrec::Statement::vec& statements);
         [[nodiscard]] static std::optional<unsigned int>                                 tryEvaluateNumberToConstant(const syrec::Number& number);
+        [[nodiscard]] static std::optional<unsigned int>                                 tryEvaluateExpressionToConstant(const syrec::expression& expr);
         void                                                                             storeUniqueAssignmentForCurrentScope(const std::string& assignedToSignalIdent, const ScopeLocalAssignmentParts& uniqueAssignment);
         void                                                                             restrictAccessTo(const syrec::VariableAccess& assignedToSignalParts);
         void                                                                             restrictAccessTo(const syrec::Variable& assignedToSignal);

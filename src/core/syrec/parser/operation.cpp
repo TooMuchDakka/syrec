@@ -377,6 +377,21 @@ std::optional<operation> syrec_operation::tryMapUnaryAssignmentOperationFlagToEn
     }
 }
 
+std::optional<operation> syrec_operation::tryMapCompileTimeConstantExprOperationFlagToEnum(syrec::Number::CompileTimeConstantExpression::Operation compileTimeConstantExprOperation) noexcept {
+    switch (compileTimeConstantExprOperation) {
+        case syrec::Number::CompileTimeConstantExpression::Addition:
+            return syrec_operation::operation::Addition;
+        case syrec::Number::CompileTimeConstantExpression::Subtraction:
+            return syrec_operation::operation::Subtraction;
+        case syrec::Number::CompileTimeConstantExpression::Multiplication:
+            return syrec_operation::operation::Multiplication;
+        case syrec::Number::CompileTimeConstantExpression::Division:
+            return syrec_operation::operation::Division;
+        default:
+            return std::nullopt;
+    }
+}
+
 std::optional<unsigned> syrec_operation::tryMapBinaryOperationEnumToFlag(const operation binaryOperation) noexcept {
     switch (binaryOperation) {
         case operation::Addition:
@@ -499,4 +514,13 @@ bool syrec_operation::isOperationUnaryAssignmentOperation(operation operationToC
         default:
             return false;
     }
+}
+
+std::optional<bool> syrec_operation::determineBooleanResultIfOperandsOfBinaryExprMatchForOperation(operation operationToCheck) noexcept {
+    if (isOperationEquivalenceOperation(operationToCheck) || isOperationRelationalOperation(operationToCheck)) {
+        if (const auto& evaluationResult = apply(operationToCheck, 0, 0); evaluationResult.has_value()) {
+            return *evaluationResult != 0;
+        }   
+    }
+    return std::nullopt;
 }

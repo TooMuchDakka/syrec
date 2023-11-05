@@ -1,6 +1,10 @@
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
 
-#include "core/syrec/parser/utils/signal_access_utils.hpp"
+#include "core/syrec/parser/operation.hpp"
+#include "core/syrec/parser/optimizations/reassociate_expression.hpp"
+#include "core/syrec/parser/expression_comparer.hpp"
+#include "core/syrec/parser/utils/dangerous_component_check_utils.hpp"
+#include "core/syrec/parser/utils/loop_range_utils.hpp"
 
 void optimizations::LoopBodyValuePropagationBlocker::openNewScopeAndAppendDataDataFlowAnalysisResult(const std::vector<std::reference_wrapper<const syrec::Statement>>& stmtsToAnalyze, bool* wereAnyAssignmentsPerformedInCurrentScope) {
     if (stmtsToAnalyze.empty()) {
@@ -29,7 +33,7 @@ void optimizations::LoopBodyValuePropagationBlocker::closeScopeAndDiscardDataFlo
 
 bool optimizations::LoopBodyValuePropagationBlocker::isAccessBlockedFor(const syrec::VariableAccess& accessedPartsOfSignal) const {
     return restrictionStatusPerSignal.count(accessedPartsOfSignal.var->name)
-        && !restrictionStatusPerSignal.at(accessedPartsOfSignal.var->name)->tryFetchValueFor(transformUserDefinedDimensionAccess(accessedPartsOfSignal), transformUserDefinedBitRangeAccess(accessedPartsOfSignal)).has_value();
+        && restrictionStatusPerSignal.at(accessedPartsOfSignal.var->name)->isValueLookupBlockedFor(transformUserDefinedDimensionAccess(accessedPartsOfSignal), transformUserDefinedBitRangeAccess(accessedPartsOfSignal));
 }
 
 // TODO: Perform dead code elimination ?
@@ -39,15 +43,56 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatements(const std:
     }
 }
 
+/*
+ * TODO: Perform loop unroll and add constant propagation of loop variable if loop performs only one iteration (which would also mean to perform all other optimization like dead-code or constant propagation for all effected statements again)
+ * TODO: Perform simplification of expressions
+ * TODO: Perform constant propagation
+ */
 void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec::Statement& stmt, bool* wasUniqueAssignmentDefined) {
-    if (const auto& stmtAsLoopStmt = stmtCastedAs<syrec::ForStatement>(stmt); stmtAsLoopStmt != nullptr) {
+    // TODO: Perform loop unroll
+    if (const auto& stmtAsLoopStmt = stmtCastedAs<syrec::ForStatement>(stmt); stmtAsLoopStmt) {
+        const auto& iterationRangeStartEvaluated = tryEvaluateNumberToConstant(*stmtAsLoopStmt->range.first);
+        const auto& iterationRangeEndEvaluated   = tryEvaluateNumberToConstant(*stmtAsLoopStmt->range.second);
+
+        /*
+         * Ignore loops that do not perform any iterations
+         */
+        if (const auto&     iterationRangeStepSizeEvaluated = tryEvaluateNumberToConstant(*stmtAsLoopStmt->step); iterationRangeStartEvaluated.has_value() && iterationRangeEndEvaluated.has_value() && iterationRangeStepSizeEvaluated.has_value()) {
+            if (const auto& numberOfIterations              = utils::determineNumberOfLoopIterations(*iterationRangeStartEvaluated, *iterationRangeEndEvaluated, *iterationRangeStepSizeEvaluated); numberOfIterations.has_value() && *numberOfIterations < 1) {
+                return;
+            }
+        }
+
         handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsLoopStmt->statements), wasUniqueAssignmentDefined);
     }
-    else if (const auto& stmtAsIfStmt = stmtCastedAs<syrec::IfStatement>(stmt); stmtAsIfStmt != nullptr) {
-        handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->thenStatements), wasUniqueAssignmentDefined);
-        handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->elseStatements), wasUniqueAssignmentDefined && *wasUniqueAssignmentDefined ? nullptr : wasUniqueAssignmentDefined);
+    else if (const auto& stmtAsIfStmt = stmtCastedAs<syrec::IfStatement>(stmt); stmtAsIfStmt) {
+        std::optional<unsigned int> evaluatedValueOfGuardExpr = tryEvaluateExpressionToConstant(*stmtAsIfStmt->condition);
+
+        /*
+         * Try to simplify the user defined guard expression to determine whether a branch of the if statement can be skipped.
+         */
+        if (!evaluatedValueOfGuardExpr.has_value()) {
+            if (const auto& simplificationResultOfBinaryExpr = optimizations::simplifyBinaryExpression(stmtAsIfStmt->condition, true, std::nullopt, *symbolTableReference, nullptr); simplificationResultOfBinaryExpr) {
+                evaluatedValueOfGuardExpr = tryEvaluateExpressionToConstant(*simplificationResultOfBinaryExpr);
+            }
+        }
+        if (const auto& guardConditionAsBinaryExpr = std::dynamic_pointer_cast<const syrec::BinaryExpression>(stmtAsIfStmt->condition); guardConditionAsBinaryExpr && !evaluatedValueOfGuardExpr.has_value()) {
+            if (const auto& mappedToBinaryOperationFromFlag = syrec_operation::tryMapBinaryOperationFlagToEnum(guardConditionAsBinaryExpr->op); parser::areSyntacticallyEquivalent(guardConditionAsBinaryExpr->lhs, guardConditionAsBinaryExpr->rhs) && mappedToBinaryOperationFromFlag.has_value()) {
+                evaluatedValueOfGuardExpr = syrec_operation::determineBooleanResultIfOperandsOfBinaryExprMatchForOperation(*mappedToBinaryOperationFromFlag);
+            }
+        }
+
+        if (!evaluatedValueOfGuardExpr.has_value()) {
+            handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->thenStatements), wasUniqueAssignmentDefined);
+            handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->elseStatements), wasUniqueAssignmentDefined && *wasUniqueAssignmentDefined ? nullptr : wasUniqueAssignmentDefined);            
+        } else if (evaluatedValueOfGuardExpr.has_value() && *evaluatedValueOfGuardExpr) {
+            handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->thenStatements), wasUniqueAssignmentDefined);
+        } else {
+            handleStatements(transformCollectionOfSharedPointersToReferences(stmtAsIfStmt->elseStatements), wasUniqueAssignmentDefined);
+        }
+
     }
-    else if (const auto& stmtAsSwapStmt = stmtCastedAs<syrec::SwapStatement>(stmt); stmtAsSwapStmt != nullptr) {
+    else if (const auto& stmtAsSwapStmt = stmtCastedAs<syrec::SwapStatement>(stmt); stmtAsSwapStmt) {
         if (const auto& uniqueAssignmentResolverResultOfLhsOperand = handleAssignment(*stmtAsSwapStmt->lhs); uniqueAssignmentResolverResultOfLhsOperand) {
             if (wasUniqueAssignmentDefined && !*wasUniqueAssignmentDefined) {
                 *wasUniqueAssignmentDefined = true;
@@ -63,7 +108,18 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec
             restrictAccessTo(*stmtAsSwapStmt->rhs);
         }
     }
-    else if (const auto& stmtAsAssignmentStmt = stmtCastedAs<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
+    else if (const auto& stmtAsAssignmentStmt = stmtCastedAs<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt) {
+        /*
+         * Ignore assignments that are considered dead code (i.e. the value of the rhs expr is equal to the identity element of the defined assignment operand
+         */
+        if (const auto& rhsEvaluatedAsConstant = tryEvaluateExpressionToConstant(*stmtAsAssignmentStmt->rhs); rhsEvaluatedAsConstant.has_value()) {
+            if (const auto& mappedToOperationEnumValueForFlag = syrec_operation::tryMapAssignmentOperationFlagToEnum(stmtAsAssignmentStmt->op); mappedToOperationEnumValueForFlag.has_value()) {
+                if (syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToOperationEnumValueForFlag, *rhsEvaluatedAsConstant)) {
+                    return;
+                }            
+            }
+        }
+
         if (const auto& uniqueAssignmentResolverResultOfAssignedToSignal = handleAssignment(*stmtAsAssignmentStmt->lhs); uniqueAssignmentResolverResultOfAssignedToSignal) {
             if (wasUniqueAssignmentDefined && !*wasUniqueAssignmentDefined) {
                 *wasUniqueAssignmentDefined = true;
@@ -72,7 +128,7 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec
             restrictAccessTo(*stmtAsAssignmentStmt->lhs);
         }
     }
-    else if (const auto& stmtAsUnaryAssignmntStmt = stmtCastedAs<syrec::UnaryStatement>(stmt); stmtAsUnaryAssignmntStmt != nullptr) {
+    else if (const auto& stmtAsUnaryAssignmntStmt = stmtCastedAs<syrec::UnaryStatement>(stmt); stmtAsUnaryAssignmntStmt) {
         if (const auto& uniqueAssignmentResolverResultOfAssignedToSignal = handleAssignment(*stmtAsUnaryAssignmntStmt->var); uniqueAssignmentResolverResultOfAssignedToSignal) {
             if (wasUniqueAssignmentDefined && !*wasUniqueAssignmentDefined) {
                 *wasUniqueAssignmentDefined = true;
@@ -81,10 +137,35 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec
             restrictAccessTo(*stmtAsUnaryAssignmntStmt->var);
         }
     }
-    else if (const auto& stmtAsCallStmt = stmtCastedAs<syrec::CallStatement>(stmt); stmtAsCallStmt != nullptr) {
+    else if (const auto& stmtAsCallStmt = stmtCastedAs<syrec::CallStatement>(stmt); stmtAsCallStmt) {
         if (const auto& matchingModulesForGivenSignature = symbolTableReference->tryGetOptimizedSignatureForModuleCall(stmtAsCallStmt->target->name, stmtAsCallStmt->parameters, false); matchingModulesForGivenSignature.has_value()) {
             std::unordered_set<std::size_t> indicesOfRemainingCallerArguments;
             matchingModulesForGivenSignature->determineOptimizedCallSignature(&indicesOfRemainingCallerArguments);
+
+            /*
+             * Ignore modules (based on the optimized module version if it exists) that contain only read-only parameters or do not perform any assignments to modifiable parameters.
+             */
+            bool                 callerArgumentOk = true;
+            syrec::Variable::vec remainingCallerArguments;
+            remainingCallerArguments.reserve(indicesOfRemainingCallerArguments.size());
+            
+            for (const auto& indexOfRemainingCallerArgument : indicesOfRemainingCallerArguments) {
+                const auto& symbolTableEntryForCallerArgument = symbolTableReference->getVariable(stmtAsCallStmt->parameters.at(indexOfRemainingCallerArgument));
+                if (symbolTableEntryForCallerArgument.has_value() && std::holds_alternative<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument)) {
+                    remainingCallerArguments.emplace_back(std::get<syrec::Variable::ptr>(*symbolTableEntryForCallerArgument));
+                }
+                else {
+                    callerArgumentOk = false;
+                    break;
+                }
+            }
+
+            if (callerArgumentOk) {
+                const parser::SymbolTable::ModuleCallSignature moduleCallSignature({stmtAsCallStmt->target->name, remainingCallerArguments});
+                if (dangerousComponentCheckUtils::doesOptimizedModuleSignatureContainNoParametersOrOnlyReadonlyOnes(moduleCallSignature) || !dangerousComponentCheckUtils::doesOptimizedModuleBodyContainAssignmentToModifiableParameter(*stmtAsCallStmt->target, *symbolTableReference)) {
+                    return;
+                }
+            }
 
             for (const auto& i : indicesOfRemainingCallerArguments) {
                 if (const auto& callerParameter = matchingModulesForGivenSignature->declaredParameters.at(i); callerParameter->type == syrec::Variable::Types::Inout ||callerParameter->type == syrec::Variable::Types::Out) {
@@ -92,7 +173,7 @@ void optimizations::LoopBodyValuePropagationBlocker::handleStatement(const syrec
                         *wasUniqueAssignmentDefined = true;
                     }
                     storeUniqueAssignmentForCurrentScope(stmtAsCallStmt->parameters.at(i), ScopeLocalAssignmentParts({.dimensionAccess = {}, .bitRange = std::nullopt}));
-                    restrictAccessTo(*callerParameter);
+                    restrictAccessTo(*remainingCallerArguments.at(i));
                 }
             }
         }
@@ -122,7 +203,7 @@ std::optional<optimizations::LoopBodyValuePropagationBlocker::ScopeLocalAssignme
     assignedToSignal.indexes.cend(),
     std::back_inserter(transformedAccessedValuePerDimension),
     [](const syrec::expression::ptr& accessedValueOfDimension) -> std::optional<unsigned int> {
-        if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&*accessedValueOfDimension); exprAsNumericExpr != nullptr) {
+        if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&*accessedValueOfDimension); exprAsNumericExpr) {
             return tryEvaluateNumberToConstant(*exprAsNumericExpr->value);
         }
         return std::nullopt;
@@ -143,6 +224,13 @@ std::vector<std::reference_wrapper<const syrec::Statement>> optimizations::LoopB
 
 std::optional<unsigned> optimizations::LoopBodyValuePropagationBlocker::tryEvaluateNumberToConstant(const syrec::Number& number) {
     return number.isConstant() ? std::make_optional(number.evaluate({})) : std::nullopt;
+}
+
+std::optional<unsigned> optimizations::LoopBodyValuePropagationBlocker::tryEvaluateExpressionToConstant(const syrec::expression& expr) {
+    if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr) {
+        return tryEvaluateNumberToConstant(*exprAsNumericExpr->value);
+    }
+    return std::nullopt;
 }
 
 
@@ -178,11 +266,7 @@ std::vector<std::optional<unsigned>> optimizations::LoopBodyValuePropagationBloc
 }
 
 std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> optimizations::LoopBodyValuePropagationBlocker::transformUserDefinedBitRangeAccess(const syrec::VariableAccess& accessedPartsOfSignal) {
-    if (!accessedPartsOfSignal.range.has_value()) {
-        return std::nullopt;
-    }
-
-    if (!accessedPartsOfSignal.range->first->isConstant() || !accessedPartsOfSignal.range->second->isConstant()) {
+    if (!accessedPartsOfSignal.range.has_value() || !accessedPartsOfSignal.range->first->isConstant() || !accessedPartsOfSignal.range->second->isConstant()) {
         return std::nullopt;
     }
 
@@ -219,7 +303,7 @@ void optimizations::LoopBodyValuePropagationBlocker::restrictAccessTo(const syre
             assignedToSignalParts.indexes.cend(),
             std::back_inserter(transformedAccessedValuePerDimension),
             [](const syrec::expression::ptr& accessedValueOfDimension) -> std::optional<unsigned int> {
-                if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&*accessedValueOfDimension); exprAsNumericExpr != nullptr) {
+                if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&*accessedValueOfDimension); exprAsNumericExpr) {
                     return tryEvaluateNumberToConstant(*exprAsNumericExpr->value);
                 }
                 return std::nullopt;

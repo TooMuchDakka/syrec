@@ -208,7 +208,9 @@ void BaseValueLookup<Vt>::liftRestrictionsFromWholeSignal() const {
 
 template<typename Vt>
 std::optional<Vt> BaseValueLookup<Vt>::tryFetchValueFor(const std::vector<std::optional<unsigned int>>& accessedDimensions, const std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>& bitRange) const {
-    if (isValueLookupBlockedFor(accessedDimensions, bitRange)) {
+      const optimizations::BitRangeAccessRestriction::BitRangeAccess& transformedBitRangeAccess = bitRange.has_value() ? *bitRange : optimizations::BitRangeAccessRestriction::BitRangeAccess(0, signalInformation.bitWidth - 1);
+
+    if (isValueLookupBlockedFor(accessedDimensions, transformedBitRangeAccess)) {
         return std::nullopt;
     }
 
@@ -223,13 +225,13 @@ std::optional<Vt> BaseValueLookup<Vt>::tryFetchValueFor(const std::vector<std::o
 
     for (std::size_t dimension = 1; dimension < accessedDimensions.size() && canFetchValue; ++dimension) {
         const auto accessedValueOfDimension = (*transformedAccessedDimensions).at(dimension - 1);
-        canFetchValue                       = !lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), bitRange);
+        canFetchValue                       = !lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), transformedBitRangeAccess);
         lastAccessedDimensionData           = lastAccessedDimensionData->nextLayerLinks.at(accessedValueOfDimension);
         valueLookupLayer                    = valueLookupLayer->nextLayerLinks.at(accessedValueOfDimension);
     }
 
     const unsigned int accessedValueOfDimension = accessedDimensions.size() == 1 ? (*transformedAccessedDimensions).front() : (*transformedAccessedDimensions).at(accessedDimensions.size() - 1);
-    canFetchValue &= !lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), bitRange);
+    canFetchValue &= !lastAccessedDimensionData->layerData->isSubstitutionBlockedFor(std::make_optional(accessedValueOfDimension), transformedBitRangeAccess);
     if (!canFetchValue) {
         return std::nullopt;
     }

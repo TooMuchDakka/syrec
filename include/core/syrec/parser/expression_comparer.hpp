@@ -1,5 +1,6 @@
 #ifndef EXPRESSION_COMPARER_HPP
 #define EXPRESSION_COMPARER_HPP
+#pragma once
 
 #include "core/syrec/expression.hpp"
 
