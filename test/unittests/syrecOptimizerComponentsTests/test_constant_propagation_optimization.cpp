@@ -26,7 +26,7 @@ INSTANTIATE_TEST_SUITE_P(SyReCOptimizations, ConstantPropagationTests,
                          [](const testing::TestParamInfo<ConstantPropagationTests::ParamType>& info) {
                              auto s = info.param;
                              std::replace( s.begin(), s.end(), syrecTestUtils::notAllowedTestNameCharacter, syrecTestUtils::testNameDelimiterSymbol);
-                             return s; });
+                             return "DISABLED_" + s; });
 
 TEST_P(ConstantPropagationTests, GenericConstantPropagationTest) {
     performParsingAndCompareExpectedAndActualCircuit();

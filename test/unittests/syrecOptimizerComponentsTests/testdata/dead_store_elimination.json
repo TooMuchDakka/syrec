@@ -154,22 +154,22 @@
     "circuit": "module main(out a(4)) wire c(4) ++= c; for $i = 0 to 2 step 1 do a.0:$i += c.0:$i rof"
   },
   "deadStoreMadeLiveByAccessOnOverlappingValueOfDimension": {
-    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; a[0] += c[0]"
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0]; a[0] += c[0]"
   },
   "deadStoreMadeLiveByAccessOnOverlappingBitOfValueOfDimension": {
-    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; a[0].0 += c[0].0"
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0]; a[0].0 += c[0].0"
   },
   "deadStoreMadeLiveByAccessOnPotentiallyOverlappingUnknownBitOfValueOfDimension": {
-    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; for $i = 0 to 2 step 1 do a[0].$i += c[0].$i rof"
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0]; for $i = 0 to 2 step 1 do a[0].$i += c[0].$i rof"
   },
   "deadStoreMadeLiveByAccessOnOverlappingBitRangeOfValueOfDimension": {
-    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; a[0].0:2 += c[0].0:2"
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0]; a[0].0:2 += c[0].0:2"
   },
   "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownStartOfValueOfDimension": {
-    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; for $i = 0 to 2 step 1 do a[0].$i:2 += c[0].$i:2 rof"
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0]; for $i = 0 to 2 step 1 do a[0].$i:2 += c[0].$i:2 rof"
   },
   "deadStoreMadeLiveByAccessOnPotentiallyOverlappingBitRangeWithUnknownEndOfValueOfDimension": {
-    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c; for $i = 0 to 2 step 1 do a[0].0:$i += c[0].0:$i rof"
+    "circuit": "module main(out a[2](4)) wire c[2](4) ++= c[0]; for $i = 0 to 2 step 1 do a[0].0:$i += c[0].0:$i rof"
   },
 
   "deadStoreMadeLiveByAccessOnPotentiallyOverlappingUnknownValueOfDimension": {

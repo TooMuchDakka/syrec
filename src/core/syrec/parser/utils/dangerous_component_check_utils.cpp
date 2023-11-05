@@ -73,6 +73,9 @@ bool dangerousComponentCheckUtils::doesSignalAccessContainPotentiallyDangerousCo
         if (const auto& accessedValueOfDimension = tryEvaluateExpressionToConstant(*signalAccess.indexes.at(i), nullptr, false, evaluableLoopVariablesIfConstantPropagationIsDisabled, nullptr); accessedValueOfDimension.has_value()) {
             containsPotentiallyDangerousOperation |= !parser::isValidDimensionAccess(signalAccess.var, i, *accessedValueOfDimension, true);
         }
+        else {
+            containsPotentiallyDangerousOperation = true;
+        }
     }
     return containsPotentiallyDangerousOperation;
 }

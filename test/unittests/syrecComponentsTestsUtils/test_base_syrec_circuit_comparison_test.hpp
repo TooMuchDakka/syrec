@@ -124,7 +124,7 @@ protected:
         } else {
             expectedOptimizedCircuits.emplace_back(circuitToOptimize);
         }
-        
+
         checkThatExpectedCircuitsAreWellFormed(expectedOptimizedCircuits);
     }
 
@@ -160,8 +160,10 @@ protected:
         ASSERT_TRUE(testcaseJsonData.contains(cJsonKeyCircuit)) << "Required entry with key '" << cJsonKeyCircuit << "' was not found";
         ASSERT_TRUE(testcaseJsonData.at(cJsonKeyCircuit).is_string()) << "Expected entry with key '" << cJsonKeyCircuit << "' to by a string";
         circuitToOptimize = testcaseJsonData.at(cJsonKeyCircuit).get<std::string>();
-        ASSERT_NO_FATAL_FAILURE(determineExpectedCircuitsFromJson(testcaseJsonData, expectedOptimizedCircuits));
         ASSERT_NO_FATAL_FAILURE(determineExpectedErrorsFromJson(testcaseJsonData));
+        if (expectedErrors.empty()) {
+            ASSERT_NO_FATAL_FAILURE(determineExpectedCircuitsFromJson(testcaseJsonData, expectedOptimizedCircuits));   
+        }
 
         std::map<OptimizerOption, std::string> userDefinedOptions;
         if (testcaseJsonData.contains(cJsonKeyEnabledOptimizations)) {
@@ -421,7 +423,7 @@ protected:
     }
 
     [[nodiscard]] virtual std::string extractTestCaseNameFromParameter(const std::string& parameter) const {
-        return std::string(parameter);
+        return parameter;
     }
 
     template<typename T>
