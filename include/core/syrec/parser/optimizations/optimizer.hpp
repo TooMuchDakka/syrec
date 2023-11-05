@@ -17,9 +17,9 @@ namespace optimizations {
     class Optimizer {
     public:
         explicit Optimizer(const parser::ParserConfig& parserConfig, const parser::SymbolTable::ptr& sharedSymbolTableReference):
-            parserConfig(parserConfig), activeSymbolTableScope({!sharedSymbolTableReference ? std::make_shared<parser::SymbolTable>() : sharedSymbolTableReference}), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(activeSymbolTableScope)) {}
+            parserConfig(parserConfig), activeSymbolTableScope({!sharedSymbolTableReference ? std::make_shared<parser::SymbolTable>() : sharedSymbolTableReference}), loopUnrollerInstance(std::make_unique<optimizations::LoopUnroller>()), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(activeSymbolTableScope)) {}
 
-        
+        // TODO: Add new result flag FAILED?
         enum OptimizationResultFlag {
             WasOptimized,
             IsUnchanged,
@@ -95,15 +95,18 @@ namespace optimizations {
     protected:
         parser::ParserConfig                                          parserConfig;
         parser::SymbolTable::ptr                                      activeSymbolTableScope;
+        std::unique_ptr<LoopUnroller>                                 loopUnrollerInstance;
+        std::size_t                                                   internalIfStatementNestingLevel = 0;
+        std::size_t                                                   internalLoopNestingLevel        = 0;
+        std::optional<bool>                                           internalReferenceCountModificationEnabledFlag;
 
-        std::size_t internalIfStatementNestingLevel = 0;
         struct IfStatementBranchSymbolTableBackupScope {
             std::size_t ifStatementNestingLevel;
             std::shared_ptr<parser::SymbolTableBackupHelper> backupScope;
         };
         std::vector<IfStatementBranchSymbolTableBackupScope>          symbolTableBackupScopeContainers;
         std::unique_ptr<LoopBodyValuePropagationBlocker>              activeDataFlowValuePropagationRestrictions;
-        std::unordered_set<std::string>                               evaluableLoopVariableLookup;
+        syrec::Number::loop_variable_mapping                          evaluableLoopVariableLookup;
 
         void                                                                                       openNewIfStatementBranchSymbolTableBackupScope(std::size_t nestingLevel);
         void                                                                                       updateBackupOfValuesChangedInScopeAndOptionallyResetMadeChanges(bool resetLocalChanges) const;
@@ -142,7 +145,7 @@ namespace optimizations {
         [[nodiscard]] static std::optional<syrec::Number::CompileTimeConstantExpression::Operation>           tryMapOperationToCompileTimeConstantOperation(syrec_operation::operation operation);
         [[nodiscard]] static std::unique_ptr<syrec::expression>                                               tryMapCompileTimeConstantOperandToExpr(const syrec::Number& number);
         [[nodiscard]] static std::unique_ptr<syrec::Number>                                                   tryMapExprToCompileTimeConstantExpr(const syrec::expression& expr);
-        [[nodiscard]] static std::optional<std::variant<unsigned int, std::unique_ptr<syrec::Number>>>        trySimplifyNumber(const syrec::Number& number, const parser::SymbolTable& symbolTable, bool simplifyExprByReassociation, bool performOperationStrengthReduction, std::vector<syrec::VariableAccess::ptr>* optimizedAwaySignalAccesses);
+        [[nodiscard]] std::optional<std::variant<unsigned int, std::unique_ptr<syrec::Number>>>               trySimplifyNumber(const syrec::Number& number) const;
         
         
         void updateReferenceCountOf(const std::string_view& signalIdent, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
@@ -179,6 +182,10 @@ namespace optimizations {
 
             [[nodiscard]] static SignalAccessIndexEvaluationResult<T> createFromSimplifiedNonConstantValue(IndexValidityStatus validityStatus, bool wasToBeEvaluatedIndexSimplified, std::unique_ptr<T> nonConstantValue) {
                 return SignalAccessIndexEvaluationResult<T>({.validityStatus = validityStatus, .constantValue = std::nullopt, .simplifiedNonConstantValue = std::move(nonConstantValue), .originalValue = nullptr, .wasToBeEvaluatedIndexSimplified = wasToBeEvaluatedIndexSimplified });
+            }
+
+            [[nodiscard]] static SignalAccessIndexEvaluationResult<T> createAsUnchangedNonConstantValue(IndexValidityStatus validityStatus, std::unique_ptr<T> originalNonConstantValue) {
+                return SignalAccessIndexEvaluationResult<T>({.validityStatus = validityStatus, .constantValue = std::nullopt, simplifiedNonConstantValue = nullptr, .originalValue = std::move(originalNonConstantValue), .wasToBeEvaluatedIndexSimplified = false});
             }
         };
 
@@ -223,16 +230,16 @@ namespace optimizations {
             std::vector<SignalAccessIndexEvaluationResult<syrec::expression>> valuePerDimension;
             const bool                                                              wasAnyExprSimplified;
         };
-        [[nodiscard]] DimensionAccessEvaluationResult                      evaluateUserDefinedDimensionAccess(const std::string_view& accessedSignalIdent, const std::vector<std::reference_wrapper<const syrec::expression>>& accessedValuePerDimension) const;
-        [[nodiscard]] static std::optional<unsigned int>                   tryEvaluateNumberAsConstant(const syrec::Number& number, const parser::SymbolTable* symbolTableUsedForEvaluation, bool shouldPerformConstantPropagation, const std::unordered_set<std::string>& evaluableLoopVariablesIfConstantPropagationIsDisabled, bool *wasOriginalNumberSimplified);
-        [[nodiscard]] static std::optional<unsigned int>                   tryEvaluateExpressionToConstant(const syrec::expression& expr, const parser::SymbolTable* symbolTableUsedForEvaluation, bool shouldPerformConstantPropagation, const std::unordered_set<std::string>& evaluableLoopVariablesIfConstantPropagationIsDisabled, bool *wasOriginalExprSimplified);
+        [[nodiscard]] DimensionAccessEvaluationResult    evaluateUserDefinedDimensionAccess(const std::string_view& accessedSignalIdent, const std::vector<std::reference_wrapper<const syrec::expression>>& accessedValuePerDimension) const;
+        [[nodiscard]] static std::optional<unsigned int> tryEvaluateNumberAsConstant(const syrec::Number& number, const parser::SymbolTable* symbolTableUsedForEvaluation, bool shouldPerformConstantPropagation, const syrec::Number::loop_variable_mapping& evaluableLoopVariablesIfConstantPropagationIsDisabled,  bool* wasOriginalNumberSimplified);
+        [[nodiscard]] static std::optional<unsigned int> tryEvaluateExpressionToConstant(const syrec::expression& expr, const parser::SymbolTable* symbolTableUsedForEvaluation, bool shouldPerformConstantPropagation, const syrec::Number::loop_variable_mapping& evaluableLoopVariablesIfConstantPropagationIsDisabled, bool* wasOriginalExprSimplified);
 
         struct BitRangeEvaluationResult {
             SignalAccessIndexEvaluationResult<syrec::Number> rangeStartEvaluationResult;
             SignalAccessIndexEvaluationResult<syrec::Number> rangeEndEvaluationResult;
         };
-        [[nodiscard]] std::optional<BitRangeEvaluationResult>         evaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<std::reference_wrapper<const syrec::Number>, std::reference_wrapper<const syrec::Number>>>& accessedBitRange) const;
-        [[nodiscard]] static std::unique_ptr<syrec::BinaryExpression> createBinaryExprFromCompileTimeConstantExpr(const syrec::Number& number);
+        [[nodiscard]] std::optional<BitRangeEvaluationResult>         evaluateUserDefinedBitRangeAccess(const std::string_view& accessedSignalIdent, const std::optional<std::pair<const syrec::Number*, const syrec::Number*>>& accessedBitRange) const;
+        [[nodiscard]] static std::unique_ptr<syrec::BinaryExpression> createBinaryExprFromCompileTimeConstantExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression);
 
         struct EvaluatedSignalAccess {
             const std::string_view                        accessedSignalIdent;
@@ -270,8 +277,11 @@ namespace optimizations {
         [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Statement>> transformCollectionOfSharedPointersToReferences(const syrec::Statement::vec& statements);
         void                                                                             decrementReferenceCountsOfLoopHeaderComponents(const syrec::Number& iterationRangeStart, const std::optional<std::reference_wrapper<const syrec::Number>>& iterationRangeEnd, const syrec::Number& stepSize) const;
         [[nodiscard]] static syrec::Statement::vec                                       createStatementListFrom(const syrec::Statement::vec& originalStmtList, std::vector<std::unique_ptr<syrec::Statement>> simplifiedStmtList);
-        void                                                                             updateValueOfLoopVariable(const std::string_view& loopVariableIdent, std::optional<unsigned int> value) const;
-        void                                                                             removeLoopVariableFromSymbolTable(const std::string_view& loopVariableIdent) const;
+        void                                                                             updateValueOfLoopVariable(const std::string& loopVariableIdent, const std::optional<unsigned int>& value);
+        void                                                                             addSymbolTableEntryForLoopVariable(const std::string_view& loopVariableIdent, const std::optional<unsigned int>& expectedMaximumValue) const;
+        void                                                                             removeLoopVariableFromSymbolTable(const std::string& loopVariableIdent);
+        [[nodiscard]] std::optional<unsigned int>                                        tryDetermineMaximumValueOfLoopVariable(const std::string_view loopVariableIdent, const std::optional<unsigned int>& initialValueOfLoopVariable, const syrec::Number& maximumValueContainerToBeEvaluated);
+
         [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInModuleBody(const syrec::Module& module, bool areCallerArgumentsBasedOnOptimizedSignature) const;
         [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements, const std::unordered_set<std::string>& parameterAndLocalLookup, bool areCallerArgumentsBasedOnOptimizedSignature) const;
         [[nodiscard]] bool                                                               isAnyModifiableParameterOrLocalModifiedInStatement(const syrec::Statement& statement, const std::unordered_set<std::string>& parameterAndLocalLookup, bool areCallerArgumentsBasedOnOptimizedSignature) const;
@@ -281,27 +291,33 @@ namespace optimizations {
         void                                                                             emplaceSingleSkipStatementIfContainerIsEmpty(std::optional<std::vector<std::unique_ptr<syrec::Statement>>>& statementsContainer);
         [[nodiscard]] std::size_t                                                        incrementInternalIfStatementNestingLevelCounter();
         void                                                                             decrementInternalIfStatementNestingLevelCounter();
+        [[maybe_unused]] std::size_t                                                     incrementInternalLoopNestingLevel();
+        void                                                                             decrementInternalLoopNestingLevel();
+        void                                                                             resetInternalNestingLevelsForIfAndLoopStatements();
 
         [[nodiscard]] std::unordered_set<std::size_t>                              determineIndicesOfUnusedModules(const std::vector<parser::SymbolTable::ModuleCallSignature>& unoptimizedModuleCallSignatures) const;
         [[nodiscard]] OptimizationResult<syrec::Module>                            removeUnusedModulesFrom(const std::vector<std::reference_wrapper<const syrec::Module>>& unoptimizedModules, const ExpectedMainModuleCallSignature& expectedMainModuleSignature) const;
         [[nodiscard]] OptimizationResult<syrec::Module>                            removeUnusedModulesFrom(const std::vector<parser::SymbolTable::ModuleCallSignature>& unoptimizedModuleCallSignatures, std::vector<std::unique_ptr<syrec::Module>>& optimizedModules, const ExpectedMainModuleCallSignature& expectedMainModuleSignature) const;
         [[nodiscard]] bool                                                         canModuleCallBeRemovedWhenIgnoringReferenceCount(const parser::SymbolTable::ModuleIdentifier& moduleIdentifier, const parser::SymbolTable::ModuleCallSignature& userProvidedCallSignature) const;
-        void                                                                       markLoopVariableAsEvaluableIfConstantPropagationIsDisabled(const std::string& loopVariableIdent);
-        void                                                                       unmarkLoopVariableAsEvaluableIfConstantPropagationIsDisabled(const std::string& loopVariableIdent);
-        [[nodiscard]] static bool                                                  canLoopVariableBeEvaluated(const std::string& loopVariableIdent, bool isConstantPropagationEnabled, const std::unordered_set<std::string>& evaluableLoopVariablesIfConstantPropagationIsDisabled);
+        [[nodiscard]] static std::optional<unsigned int>                           tryFetchValueOfLoopVariable(const std::string& loopVariableIdent, const parser::SymbolTable& activeSymbolTableScope, bool isConstantPropagationEnabled, const syrec::Number::loop_variable_mapping& evaluableLoopVariablesIfConstantPropagationIsDisabled);
+        [[nodiscard]] static bool                                                  doesLoopBodyDefineAnyPotentiallyDangerousStmt(const syrec::Statement::vec& unoptimizedLoopBodyStmts, const std::optional<std::vector<std::unique_ptr<syrec::Statement>>>& optimizedLoopBodyStmts, const parser::SymbolTable& activeSymbolTableScope);
         [[nodiscard]] static bool                                                  doesModuleMatchMainModuleSignature(const parser::SymbolTable::ModuleCallSignature& moduleSignature, const ExpectedMainModuleCallSignature& expectedMainModuleSignature);
         [[nodiscard]] static std::optional<ExpectedMainModuleCallSignature>        determineActualMainModuleName(const std::vector<std::reference_wrapper<const syrec::Module>>& unoptimizedModules, const std::string_view& defaultMainModuleIdent);
         [[nodiscard]] static std::vector<parser::SymbolTable::ModuleCallSignature> createCallSignaturesFrom(const std::vector<std::reference_wrapper<const syrec::Module>>& modules);
+        static void                                                                insertStatementCopiesInto(syrec::Statement::vec& containerForCopies, std::vector<std::unique_ptr<syrec::Statement>> copiesOfStatements);
+        [[nodiscard]] bool                                                         optimizePeeledLoopBodyStatements(syrec::Statement::vec& containerForResult, const std::vector<std::unique_ptr<syrec::Statement>>& peeledLoopBodyStatements);
+        [[nodiscard]] bool                                                         optimizeUnrolledLoopBodyStatements(syrec::Statement::vec& containerForResult, std::size_t numUnrolledIterations, optimizations::LoopUnroller::UnrolledIterationInformation& unrolledLoopBodyStatementsInformation);
 
-        [[nodiscard]] static bool doesNumberContainPotentiallyDangerousComponent(const syrec::Number& number);
-        [[nodiscard]] static bool doesSignalAccessContainPotentiallyDangerousComponent(const syrec::VariableAccess& signalAccess);
-        [[nodiscard]] static bool doesExprContainPotentiallyDangerousComponent(const syrec::expression& expr);
-        [[nodiscard]] static bool doesStatementContainPotentiallyDangerousComponent(const syrec::Statement& statement, const parser::SymbolTable& symbolTable);
-        [[nodiscard]] static bool doesModuleContainPotentiallyDangerousComponent(const syrec::Module& module, const parser::SymbolTable& symbolTable);
-        [[nodiscard]] static bool doesOptimizedModuleSignatureContainNoParametersOrOnlyReadonlyOnes(const parser::SymbolTable::ModuleCallSignature& moduleCallSignature);
-        [[nodiscard]] static bool doesOptimizedModuleBodyContainAssignmentToModifiableParameter(const syrec::Module& module, const parser::SymbolTable& symbolTable);
-        [[nodiscard]] static bool doesStatementDefineAssignmentToModifiableParameter(const syrec::Statement& statement, const std::unordered_set<std::string>& identsOfModifiableParameters, const parser::SymbolTable& symbolTable);
-        [[nodiscard]] static bool isModifiableParameterAccessed(const syrec::VariableAccess& signalAccess, const std::unordered_set<std::string>& identsOfModifiableParameters);
+
+        //[[nodiscard]] static bool doesNumberContainPotentiallyDangerousComponent(const syrec::Number& number);
+        //[[nodiscard]] static bool doesSignalAccessContainPotentiallyDangerousComponent(const syrec::VariableAccess& signalAccess);
+        //[[nodiscard]] static bool doesExprContainPotentiallyDangerousComponent(const syrec::expression& expr);
+        //[[nodiscard]] static bool doesStatementContainPotentiallyDangerousComponent(const syrec::Statement& statement, const parser::SymbolTable& symbolTable);
+        //[[nodiscard]] static bool doesModuleContainPotentiallyDangerousComponent(const syrec::Module& module, const parser::SymbolTable& symbolTable);
+        //[[nodiscard]] static bool doesOptimizedModuleSignatureContainNoParametersOrOnlyReadonlyOnes(const parser::SymbolTable::ModuleCallSignature& moduleCallSignature);
+        //[[nodiscard]] static bool doesOptimizedModuleBodyContainAssignmentToModifiableParameter(const syrec::Module& module, const parser::SymbolTable& symbolTable);
+        //[[nodiscard]] static bool doesStatementDefineAssignmentToModifiableParameter(const syrec::Statement& statement, const std::unordered_set<std::string>& identsOfModifiableParameters, const parser::SymbolTable& symbolTable);
+        //[[nodiscard]] static bool isModifiableParameterAccessed(const syrec::VariableAccess& signalAccess, const std::unordered_set<std::string>& identsOfModifiableParameters);
 
         template<typename T>
         void removeElementsAtIndices(std::vector<T>& vectorToModify, const std::unordered_set<std::size_t>& indicesOfElementsToRemove) {

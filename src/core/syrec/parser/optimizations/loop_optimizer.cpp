@@ -1,185 +1,167 @@
 #include "core/syrec/parser/optimizations/loop_optimizer.hpp"
+
+#include "core/syrec/parser/operation.hpp"
+#include "core/syrec/parser/utils/copy_utils.hpp"
 #include "core/syrec/parser/utils/loop_range_utils.hpp"
 
-#include <algorithm>
-
-optimizations::LoopUnroller::UnrollInformation optimizations::LoopUnroller::tryUnrollLoop(const LoopOptimizationConfig& loopUnrollConfig, const std::shared_ptr<syrec::ForStatement>& loopStatement) {
-    return tryUnrollLoop(loopUnrollConfig, 0, loopStatement);
+// TODO: Returned loop header information should only contain simplified expression values if constant propagation is enabled ?
+void optimizations::LoopUnroller::resetInternals(const LoopOptimizationConfig& newUnrollConfig, const syrec::Number::loop_variable_mapping& newKnownLoopVariableValueMappings) {
+    knownLoopVariableValueMappings = newKnownLoopVariableValueMappings;
+    unrollConfig                   = newUnrollConfig;
 }
 
-optimizations::LoopUnroller::UnrollInformation optimizations::LoopUnroller::tryUnrollLoop(const LoopOptimizationConfig& loopUnrollConfig, const std::size_t loopNestingLevel, const std::shared_ptr<syrec::ForStatement>& loopStatement) {
-    
-    if (loopUnrollConfig.forceUnrollAll) {
-        if (const auto& fullyUnrolledLoopInformation = canLoopBeFullyUnrolled(loopUnrollConfig, loopNestingLevel, loopStatement); fullyUnrolledLoopInformation.has_value()) {
-            return UnrollInformation(*fullyUnrolledLoopInformation);   
-        }
-    } else if (const auto& fullyUnrolledLoopInformation = canLoopBeFullyUnrolled(loopUnrollConfig, loopNestingLevel, loopStatement); fullyUnrolledLoopInformation.has_value()) {
-        return UnrollInformation(*fullyUnrolledLoopInformation);
-    } else if (const auto& peeledLoopInformation = canLoopIterationsBePeeled(loopUnrollConfig, loopNestingLevel, loopStatement); peeledLoopInformation.has_value()) {
-        return UnrollInformation(*peeledLoopInformation);
-    } else if (const auto& partiallyUnrolledLoopInformation = canLoopBePartiallyUnrolled(loopUnrollConfig, loopNestingLevel, loopStatement); partiallyUnrolledLoopInformation.has_value()) {
-        return UnrollInformation(*partiallyUnrolledLoopInformation);
-    }
-    return UnrollInformation(NotModifiedLoopInformation({loopStatement}));
+bool optimizations::LoopUnroller::canLoopBeFullyUnrolled(const LoopHeaderInformation& loopHeaderInformation) const {
+    const auto& numberOfIterationsOfLoop = tryDetermineNumberOfLoopIterations(loopHeaderInformation);
+    return unrollConfig.forceUnroll || (numberOfIterationsOfLoop.has_value() && (*numberOfIterationsOfLoop <= unrollConfig.maxNumberOfUnrolledIterationsPerLoop || (*numberOfIterationsOfLoop == 1 && unrollConfig.autoUnrollLoopsWithOneIteration)));
 }
 
-std::optional<optimizations::LoopUnroller::FullyUnrolledLoopInformation> optimizations::LoopUnroller::canLoopBeFullyUnrolled(const LoopOptimizationConfig& loopUnrollConfig, std::size_t loopNestingLevel, const std::shared_ptr<syrec::ForStatement>& loopStatement) {
-    const auto& numberOfLoopIterations = determineNumberOfLoopIterations(loopStatement);
-    if (!numberOfLoopIterations.has_value()) {
+bool optimizations::LoopUnroller::doesCurrentLoopNestingLevelAllowUnroll(std::size_t currentLoopNestingLevel) const {
+    return currentLoopNestingLevel <= unrollConfig.maxAllowedNestingLevelOfInnerLoops;
+}
+
+std::optional<optimizations::LoopUnroller::FullyUnrolledLoopInformation> optimizations::LoopUnroller::tryPerformFullLoopUnroll(const LoopHeaderInformation& loopHeader, const syrec::Statement::vec& loopBodyStatements) {
+    const auto& numberOfIterations = tryDetermineNumberOfLoopIterations(loopHeader);
+    if (!numberOfIterations.has_value()) {
         return std::nullopt;
     }
 
-    if (!loopUnrollConfig.forceUnrollAll) {
-        if (*numberOfLoopIterations > loopUnrollConfig.maxUnrollCountPerLoop || loopNestingLevel > loopUnrollConfig.maxAllowedNestingLevelOfInnerLoops) {
-            return std::nullopt;
-        }   
-    }
-
-    const auto&                                         declaredLoopVariable             = tryGetLoopVariable(loopStatement);
-    const auto&                                         optionalLoopVariableValueLookup = declaredLoopVariable.has_value() ? std::make_optional(determineLoopIterationInfo(loopStatement)) : std::nullopt;
-    std::vector<std::vector<UnrollInformation>>         unrollInformationOfNestedLoopsPerIteration(*numberOfLoopIterations);
-    const auto&                                         nestedLoops = buildLoopStructure(loopStatement);
-
-    if (nestedLoops.nestedLoops.empty()) {
-        const auto unrollingInformation = FullyUnrolledLoopInformation(optionalLoopVariableValueLookup, unrollInformationOfNestedLoopsPerIteration, *numberOfLoopIterations);
-        return std::make_optional(unrollingInformation);
-    }
-
-    auto startValue = loopStatement->range.first->evaluate(loopVariableValueLookup);
-
-    for (std::size_t i = 0; i < *numberOfLoopIterations; ++i) {
-        if (declaredLoopVariable.has_value()) {
-            loopVariableValueLookup.insert_or_assign(*declaredLoopVariable, startValue++);
-        }
-
-        std::vector<UnrollInformation> unrolledNestedLoopForIteration;
-        for (const auto& nestedLoop: nestedLoops.nestedLoops) {
-            unrolledNestedLoopForIteration.emplace_back(tryUnrollLoop(loopUnrollConfig, loopNestingLevel + 1, nestedLoop.loopStmt));
-        }
-        unrollInformationOfNestedLoopsPerIteration[i] = unrolledNestedLoopForIteration;
-        //unrollInformationOfNestedLoopsPerIteration.at(i) = unrolledNestedLoopForIteration;
-    }
-
-    if (declaredLoopVariable.has_value()) {
-        loopVariableValueLookup.erase(*declaredLoopVariable);
-    }
-
-    const auto unrollingInformation = FullyUnrolledLoopInformation(optionalLoopVariableValueLookup, unrollInformationOfNestedLoopsPerIteration, *numberOfLoopIterations);
-    return std::make_optional(unrollingInformation);
-}
-
-std::optional<optimizations::LoopUnroller::PeeledIterationsOfLoopInformation> optimizations::LoopUnroller::canLoopIterationsBePeeled(const LoopOptimizationConfig& loopUnrollConfig, std::size_t loopNestingLevel, const std::shared_ptr<syrec::ForStatement>& loopStatement) {
-    if (loopUnrollConfig.forceUnrollAll) {
+    auto copiesOfLoopBodyStatements = *numberOfIterations ? copyUtils::createCopyOfStatements(loopBodyStatements) : std::vector<std::unique_ptr<syrec::Statement>>();
+    if (*numberOfIterations && copiesOfLoopBodyStatements.empty()) {
         return std::nullopt;
     }
 
-    const auto& numberOfLoopIterations = determineNumberOfLoopIterations(loopStatement);
-    if (!numberOfLoopIterations.has_value() || (loopUnrollConfig.maxUnrollCountPerLoop < numberOfLoopIterations && !loopUnrollConfig.allowRemainderLoop) || loopNestingLevel > loopUnrollConfig.maxAllowedNestingLevelOfInnerLoops) {
+    std::optional<LoopVariableValueInformation> loopVariableValueInformation;
+    FullyUnrolledLoopInformation fullyUnrolledLoopInformation;
+    fullyUnrolledLoopInformation.numUnrolledIterations = *numberOfIterations;
+
+    if (loopHeader.loopVariableIdent.has_value() && *numberOfIterations) {
+        std::vector<unsigned int> loopVariableValuePerIteration(*numberOfIterations, 0);
+        loopVariableValuePerIteration[0] = loopHeader.initialLoopVariableValue;
+
+        if (*numberOfIterations > 1) {
+            for (std::size_t i = 1; i < loopVariableValuePerIteration.size(); ++i) {
+                loopVariableValuePerIteration[i] = loopVariableValuePerIteration[i - 1] + loopHeader.stepSize;
+            }   
+        }
+        loopVariableValueInformation = LoopVariableValueInformation({*loopHeader.loopVariableIdent, loopVariableValuePerIteration});
+    }
+    fullyUnrolledLoopInformation.unrolledIterations = UnrolledIterationInformation({std::move(copiesOfLoopBodyStatements), loopVariableValueInformation});
+    return fullyUnrolledLoopInformation;
+}
+
+std::optional<optimizations::LoopUnroller::PartiallyUnrolledLoopInformation> optimizations::LoopUnroller::tryPerformPartialUnrollOfLoop(const std::size_t maxNumberOfUnrolledIterationsPerLoop, bool isLoopRemainderAllowed, const LoopHeaderInformation& loopHeader, const syrec::Statement::vec& loopBodyStatements) {
+    const auto& numberOfIterations = tryDetermineNumberOfLoopIterations(loopHeader);
+    if (!numberOfIterations.has_value() || !*numberOfIterations || *numberOfIterations <= maxNumberOfUnrolledIterationsPerLoop || (*numberOfIterations > maxNumberOfUnrolledIterationsPerLoop && !isLoopRemainderAllowed)) {
+        return std::nullopt;
+    }
+    
+    auto       copiesOfLoopBodyStatements      = *numberOfIterations ? copyUtils::createCopyOfStatements(loopBodyStatements) : std::vector<std::unique_ptr<syrec::Statement>>();
+    if (*numberOfIterations && copiesOfLoopBodyStatements.empty()) {
         return std::nullopt;
     }
 
-    const auto numPeeledIterations = std::min(loopUnrollConfig.maxUnrollCountPerLoop, *numberOfLoopIterations);
-    const auto numNotPeeledIterations = *numberOfLoopIterations - numPeeledIterations;
-
-    const auto&                                 nestedLoops          = buildLoopStructure(loopStatement);
-    const auto&                                 declaredLoopVariable = tryGetLoopVariable(loopStatement);
-    auto                                        peeledLoopVariableValueLookup = determineLoopIterationInfo(loopStatement);
-    std::vector<std::vector<UnrollInformation>> unrolledNestedLoopInformation(numPeeledIterations);
-    std::vector<UnrollInformation>              nestedLoopInformationOfNotPeeledIterations;
-
-    for (std::size_t peeledIterationIdx = 0; peeledIterationIdx < numPeeledIterations; ++peeledIterationIdx) {
-        if (declaredLoopVariable.has_value()) {
-            loopVariableValueLookup.insert_or_assign(*declaredLoopVariable, peeledLoopVariableValueLookup.initialLoopVariableValue + (peeledIterationIdx * peeledLoopVariableValueLookup.stepSize));
-        }
-
-        std::vector<UnrollInformation> unrolledNestedLoopForPeeledIteration;
-        for (const auto& nestedLoop: nestedLoops.nestedLoops) {
-            unrolledNestedLoopForPeeledIteration.emplace_back(tryUnrollLoop(loopUnrollConfig, loopNestingLevel + 1, nestedLoop.loopStmt));
-            loopNestingLevel--;
-        }
-        unrolledNestedLoopInformation.at(peeledIterationIdx) = unrolledNestedLoopForPeeledIteration;
+    auto copiesOfRemainingLoopBodyStatements = *numberOfIterations ? copyUtils::createCopyOfStatements(loopBodyStatements) : std::vector<std::unique_ptr<syrec::Statement>>();
+    if (*numberOfIterations && copiesOfRemainingLoopBodyStatements.empty()) {
+        return std::nullopt;
     }
 
-    if (numNotPeeledIterations > 0) {
-        /*if (declaredLoopVariable.has_value()) {
-            loopVariableValueLookup.insert_or_assign(*declaredLoopVariable, startValue++);
-        }*/
-        for (const auto& nestedLoop: nestedLoops.nestedLoops) {
-            nestedLoopInformationOfNotPeeledIterations.emplace_back(tryUnrollLoop(loopUnrollConfig, loopNestingLevel + 1, nestedLoop.loopStmt));
-            loopNestingLevel--;
+    const auto                                  numberOfRemainingLoopIterations = *numberOfIterations - maxNumberOfUnrolledIterationsPerLoop;
+    const auto                                  numberOfUnrolledLoopIterations  = *numberOfIterations - numberOfRemainingLoopIterations;
+    std::optional<LoopVariableValueInformation> loopVariableValueInformation;
+    if (loopHeader.loopVariableIdent.has_value() && numberOfUnrolledLoopIterations) {
+        std::vector<unsigned int> loopVariableValuePerIteration(numberOfUnrolledLoopIterations, 0);
+        loopVariableValuePerIteration[0] = loopHeader.initialLoopVariableValue;
+        for (std::size_t i = 1; i < loopVariableValuePerIteration.size(); ++i) {
+            loopVariableValuePerIteration[i] = loopVariableValuePerIteration[i - 1] + loopHeader.stepSize;
         }
+        loopVariableValueInformation = LoopVariableValueInformation({*loopHeader.loopVariableIdent, loopVariableValuePerIteration});
     }
 
-    /*for (std::size_t notPeeledIterationIdx = 0; notPeeledIterationIdx < numNotPeeledIterations; ++notPeeledIterationIdx) {
-        if (declaredLoopVariable.has_value()) {
-            loopVariableValueLookup.insert_or_assign(*declaredLoopVariable, startValue++);
-        }
-        std::vector<UnrollInformation> unrolledNestedLoopForNotPeeledIteration;
-        for (const auto& nestedLoop: nestedLoops.nestedLoops) {
-            unrolledNestedLoopForNotPeeledIteration.emplace_back(tryUnrollLoop(loopUnrollConfig, loopNestingLevel++, nestedLoop.loopStmt));
-            loopNestingLevel--;
-        }
-        nestedLoopInformationOfNotPeeledIterations.at(notPeeledIterationIdx) = unrolledNestedLoopForNotPeeledIteration;
-    }*/
+    const unsigned int loopRemainderIterationRangeStartValue = loopVariableValueInformation.has_value()
+        ? loopVariableValueInformation->valuePerIteration.back() + loopHeader.stepSize
+        : loopHeader.initialLoopVariableValue + (numberOfUnrolledLoopIterations * loopHeader.stepSize);
 
-    if (declaredLoopVariable.has_value()) {
-        loopVariableValueLookup.erase(*declaredLoopVariable);
-    }
-
-    if (numNotPeeledIterations == 0) {
-        return std::make_optional(PeeledIterationsOfLoopInformation({peeledLoopVariableValueLookup, unrolledNestedLoopInformation, std::nullopt}));
-    }
-    
-    return std::make_optional(PeeledIterationsOfLoopInformation(
-            {peeledLoopVariableValueLookup,
-             unrolledNestedLoopInformation,
-             std::make_optional(std::make_pair(determineLoopHeaderInformationForNotPeeledLoopRemainder(peeledLoopVariableValueLookup, numPeeledIterations), nestedLoopInformationOfNotPeeledIterations))}));
-    
+    PartiallyUnrolledLoopInformation partiallyUnrolledLoopInformation;
+    partiallyUnrolledLoopInformation.numUnrolledIterations = numberOfUnrolledLoopIterations;
+    partiallyUnrolledLoopInformation.unrolledIterations    = UnrolledIterationInformation({std::move(copiesOfLoopBodyStatements), loopVariableValueInformation});
+    partiallyUnrolledLoopInformation.remainderLoopHeaderInformation = LoopHeaderInformation({loopHeader.loopVariableIdent, loopRemainderIterationRangeStartValue, loopHeader.finalLoopVariableValue, loopHeader.stepSize});
+    partiallyUnrolledLoopInformation.remainderLoopBodyStatements    = std::move(copiesOfRemainingLoopBodyStatements);
+    return partiallyUnrolledLoopInformation;
 }
 
-std::optional<optimizations::LoopUnroller::PartiallyUnrolledLoopInformation> optimizations::LoopUnroller::canLoopBePartiallyUnrolled(const LoopOptimizationConfig& loopUnrollConfig, std::size_t loopNestingLevel, const std::shared_ptr<syrec::ForStatement>& loopStatement) {
+std::optional<unsigned> optimizations::LoopUnroller::tryEvaluateNumberToConstant(const syrec::Number& numberContainer, const syrec::Number::loop_variable_mapping& knownLoopVariableValueMappings) {
+    if (numberContainer.isConstant()) {
+        return numberContainer.evaluate(knownLoopVariableValueMappings);
+    }
+    if (numberContainer.isLoopVariable() && knownLoopVariableValueMappings.count(numberContainer.variableName())) {
+        return numberContainer.evaluate(knownLoopVariableValueMappings);
+    }
+    if (numberContainer.isCompileTimeConstantExpression()) {
+        return tryEvaluateCompileTimeConstantExpr(numberContainer.getExpression(), knownLoopVariableValueMappings);
+    }
     return std::nullopt;
 }
 
-std::optional<std::size_t> optimizations::LoopUnroller::estimateUnrolledLoopSize(const LoopOptimizationConfig& loopUnrollConfig, std::size_t loopNestingLevel, const std::shared_ptr<syrec::ForStatement>& loopStatement) {
-    return std::nullopt;
+std::optional<unsigned> optimizations::LoopUnroller::tryEvaluateCompileTimeConstantExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr, const syrec::Number::loop_variable_mapping& knownLoopVariableValueMappings) {
+    const auto& lhsOperandEvaluated = tryEvaluateNumberToConstant(*compileTimeConstantExpr.lhsOperand, knownLoopVariableValueMappings);
+    const auto& rhsOperandEvaluated = tryEvaluateNumberToConstant(*compileTimeConstantExpr.rhsOperand, knownLoopVariableValueMappings);
+    const auto& mappedToBinaryOperation = syrec_operation::tryMapCompileTimeConstantExprOperationFlagToEnum(compileTimeConstantExpr.operation);
+    if (!(lhsOperandEvaluated.has_value() && rhsOperandEvaluated.has_value() && mappedToBinaryOperation.has_value())) {
+        return std::nullopt;
+    }
+    return syrec_operation::apply(*mappedToBinaryOperation, lhsOperandEvaluated, rhsOperandEvaluated);
 }
 
-std::optional<std::size_t> optimizations::LoopUnroller::determineNumberOfLoopIterations(const std::shared_ptr<syrec::ForStatement>& loopStatement) const {
-    const auto& startValue             = loopStatement->range.first->evaluate(loopVariableValueLookup);
-    const auto& endValue   = loopStatement->range.second->evaluate(loopVariableValueLookup);
-    const auto& stepSize               = loopStatement->step->evaluate(loopVariableValueLookup);
-    return utils::determineNumberOfLoopIterations(startValue, endValue, stepSize);
-}
+std::optional<optimizations::LoopUnroller::LoopHeaderInformation> optimizations::LoopUnroller::tryDetermineIterationRangeForLoopHeader(const syrec::ForStatement& loopStatement, const syrec::Number::loop_variable_mapping& knownLoopVariableValueMappings) {
+    const auto& iterationRangeStartValueEvaluated = tryEvaluateNumberToConstant(*loopStatement.range.first, knownLoopVariableValueMappings);
+    const auto& iterationRangeEndValueEvaluated   = tryEvaluateNumberToConstant(*loopStatement.range.second, knownLoopVariableValueMappings);
+    const auto& iterationRangeStepSizeValueEvaluated = tryEvaluateNumberToConstant(*loopStatement.step, knownLoopVariableValueMappings);
 
-std::optional<std::string> optimizations::LoopUnroller::tryGetLoopVariable(const std::shared_ptr<syrec::ForStatement>& loopStatement) {
-    return loopStatement->loopVariable.empty() ? std::nullopt : std::make_optional(loopStatement->loopVariable);
-}
-
-optimizations::LoopUnroller::LoopIterationInfo optimizations::LoopUnroller::determineLoopIterationInfo(const std::shared_ptr<syrec::ForStatement>& loopStatement) const {
-    const auto& startValue = loopStatement->range.first->evaluate(loopVariableValueLookup);
-    const auto& endValue   = loopStatement->range.second->evaluate(loopVariableValueLookup);
-    const auto& stepSize   = loopStatement->step->evaluate(loopVariableValueLookup);
-    return LoopIterationInfo({tryGetLoopVariable(loopStatement), startValue, endValue, stepSize});
-}
-
-optimizations::LoopUnroller::LoopIterationInfo optimizations::LoopUnroller::determineLoopHeaderInformationForNotPeeledLoopRemainder(const LoopIterationInfo& initialLoopIterationInformation, std::size_t numPeeledIterations) {
-    if (numPeeledIterations == 0) {
-        return initialLoopIterationInformation;
+    if (!(iterationRangeStartValueEvaluated.has_value() && iterationRangeEndValueEvaluated.has_value() && iterationRangeStepSizeValueEvaluated.has_value())) {
+        return std::nullopt;
     }
 
-    const auto& modifiedStartValue = initialLoopIterationInformation.initialLoopVariableValue + (numPeeledIterations * initialLoopIterationInformation.stepSize);
-    return LoopIterationInfo({initialLoopIterationInformation.loopVariableIdent, modifiedStartValue, initialLoopIterationInformation.finalLoopVariableValue, initialLoopIterationInformation.stepSize});
+    return optimizations::LoopUnroller::LoopHeaderInformation({loopStatement.loopVariable.empty() ? std::nullopt : std::make_optional(loopStatement.loopVariable), *iterationRangeStartValueEvaluated, *iterationRangeEndValueEvaluated, *iterationRangeStepSizeValueEvaluated});
 }
 
+std::optional<unsigned> optimizations::LoopUnroller::tryDetermineNumberOfLoopIterations(const LoopHeaderInformation& loopHeader) {
+    return utils::determineNumberOfLoopIterations(loopHeader.initialLoopVariableValue, loopHeader.finalLoopVariableValue, loopHeader.stepSize);
+}
 
-optimizations::LoopUnroller::NestedLoopInformation optimizations::LoopUnroller::buildLoopStructure(const std::shared_ptr<syrec::ForStatement>& loopStatement) {
-    std::vector<NestedLoopInformation> nestedLoops;
+std::unique_ptr<syrec::ForStatement> optimizations::LoopUnroller::createLoopStatements(const LoopHeaderInformation& loopHeader, const std::vector<std::reference_wrapper<const syrec::Statement>>& loopBody) {
+    auto generatedLoopStatement = std::make_unique<syrec::ForStatement>();
+    generatedLoopStatement->loopVariable = loopHeader.loopVariableIdent.value_or("");
 
-    for (const auto& stmt : loopStatement->statements) {
-        if (const auto& stmtAsLoopStmt = std::dynamic_pointer_cast<syrec::ForStatement>(stmt); stmtAsLoopStmt != nullptr) {
-            nestedLoops.emplace_back(buildLoopStructure(stmtAsLoopStmt));
+    const auto& generatedContainerForStepSize = std::make_shared<syrec::Number>(loopHeader.stepSize);
+    const auto& generatedContainerForIterationRangeStart = std::make_shared<syrec::Number>(loopHeader.initialLoopVariableValue);
+    const auto& generatedContainerForIterationRangeEnd = std::make_shared<syrec::Number>(loopHeader.finalLoopVariableValue);
+
+    if (!generatedLoopStatement || !generatedContainerForStepSize || !generatedContainerForIterationRangeStart || !generatedContainerForIterationRangeEnd) {
+        return nullptr;
+    }
+
+    generatedLoopStatement->statements.reserve(loopBody.size());
+    for (std::size_t i = 0; i < loopBody.size(); ++i) {
+        if (syrec::Statement::ptr generatedCopyOfStatement = copyUtils::createCopyOfStmt(loopBody.at(i)); generatedCopyOfStatement) {
+            generatedLoopStatement->addStatement(generatedCopyOfStatement);
         }
     }
-    return {loopStatement, nestedLoops};
+    return generatedLoopStatement;
+}
+
+std::unique_ptr<optimizations::LoopUnroller::BaseUnrolledLoopInformation> optimizations::LoopUnroller::tryUnrollLoop(std::size_t currentLoopNestingLevel, const syrec::ForStatement& loopStatement, const syrec::Number::loop_variable_mapping& knownLoopVariableValueMappings, const LoopOptimizationConfig& unrollConfigToUse) {
+    resetInternals(unrollConfigToUse, knownLoopVariableValueMappings);
+    const auto& determinedLoopHeaderInformation = tryDetermineIterationRangeForLoopHeader(loopStatement, knownLoopVariableValueMappings);
+    if (!determinedLoopHeaderInformation.has_value() || !doesCurrentLoopNestingLevelAllowUnroll(currentLoopNestingLevel)) {
+        return std::make_unique<UnmodifiedLoopInformation>();
+    }
+
+    if (canLoopBeFullyUnrolled(*determinedLoopHeaderInformation)) {
+        if (auto fullLoopUnrollingResult = tryPerformFullLoopUnroll(*determinedLoopHeaderInformation, loopStatement.statements); fullLoopUnrollingResult.has_value()) {
+            return std::make_unique<FullyUnrolledLoopInformation>(std::move(*fullLoopUnrollingResult));
+        }
+    } else if (auto partialLoopUnrollingResult = tryPerformPartialUnrollOfLoop(unrollConfig.maxNumberOfUnrolledIterationsPerLoop, unrollConfig.isRemainderLoopAllowed, *determinedLoopHeaderInformation, loopStatement.statements); partialLoopUnrollingResult.has_value()) {
+        return std::make_unique<PartiallyUnrolledLoopInformation>(std::move(*partialLoopUnrollingResult));
+    }
+    return std::make_unique<UnmodifiedLoopInformation>();
 }
