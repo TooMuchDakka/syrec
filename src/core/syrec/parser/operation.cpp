@@ -200,6 +200,7 @@ std::optional<unsigned int> syrec_operation::apply(const operation operation, co
     return isValidUnaryOperation ? std::optional(result) : std::nullopt;
 }
 
+// This check only works for binary operations (and not assignment operations)
 bool syrec_operation::isCommutative(operation operation) noexcept {
     switch (operation) {
         case operation::Addition:
@@ -515,6 +516,11 @@ bool syrec_operation::isOperationUnaryAssignmentOperation(operation operationToC
             return false;
     }
 }
+
+bool syrec_operation::isOperationShiftOperation(operation operationToCheck) noexcept {
+    return operationToCheck == operation::ShiftLeft || operationToCheck == operation::ShiftRight;
+}
+
 
 std::optional<bool> syrec_operation::determineBooleanResultIfOperandsOfBinaryExprMatchForOperation(operation operationToCheck) noexcept {
     if (isOperationEquivalenceOperation(operationToCheck) || isOperationRelationalOperation(operationToCheck)) {

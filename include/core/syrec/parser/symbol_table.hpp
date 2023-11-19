@@ -81,6 +81,7 @@ namespace parser {
         [[nodiscard]] std::unordered_set<std::size_t>   updateOptimizedModuleSignatureByMarkingAndReturningIndicesOfUnusedParameters(const ModuleIdentifier& moduleIdentifier) const;
         [[nodiscard]] std::unordered_set<std::size_t>   fetchUnusedLocalModuleVariableIndicesAndRemoveFromSymbolTable(const ModuleIdentifier& moduleIdentifier) const;
 
+        [[nodiscard]] std::optional<bool>                                canSignalBeAssignedTo(const std::string_view& literalIdent) const;
         [[nodiscard]] std::optional<bool>                                determineIfModuleWasUnused(const ModuleCallSignature& moduleSignatureToCheck) const;
         [[nodiscard]] std::optional<valueLookup::SignalValueLookup::ptr> createBackupOfValueOfSignal(const std::string_view& literalIdent) const;
         void                                                             restoreValuesFromBackup(const std::string_view& literalIdent, const valueLookup::SignalValueLookup::ptr& newValues) const;
@@ -147,14 +148,16 @@ namespace parser {
         
         [[nodiscard]] ModuleSymbolTableEntry*   getEntryForModulesWithMatchingName(const std::string_view& moduleIdent) const;
         [[nodiscard]] VariableSymbolTableEntry* getEntryForVariable(const std::string_view& literalIdent) const;
-        static bool                             doModuleSignaturesMatch(const syrec::Module::ptr& module, const syrec::Module::ptr& otherModule);
+        [[nodiscard]] static bool               doModuleSignaturesMatch(const syrec::Module::ptr& module, const syrec::Module::ptr& otherModule);
 
-        [[nodiscard]] bool                                                               doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const;
-        [[nodiscard]] std::optional<DeclaredModuleSignature>                             tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, std::size_t& internalModuleId) const;
-        static std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts, bool considerUnknownBitRangeStartAndEndAsWholeSignalAccess = true);
-        static std::vector<std::optional<unsigned int>>                                  tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable);
-        static void                                                                      performReferenceCountUpdate(std::size_t& currentReferenceCount, ReferenceCountUpdate typeOfUpdate);
-        static void                                                                      addIndexOfDroppedParameterToOptimizedModule(ModuleSymbolTableEntry::InternalModuleHelperData& optimizedModuleData, std::size_t indexOfOptimizedAwayParameter);
+        [[nodiscard]] bool                                                                             doesVariableAccessAllowValueLookup(const VariableSymbolTableEntry* symbolTableEntryForVariable, const syrec::VariableAccess::ptr& variableAccess) const;
+        [[nodiscard]] std::optional<DeclaredModuleSignature>                                           tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, std::size_t& internalModuleId) const;
+        [[nodiscard]] static std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts, bool considerUnknownBitRangeStartAndEndAsWholeSignalAccess = true);
+        [[nodiscard]] static std::vector<std::optional<unsigned int>>                                  tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable);
+        static void                                                                                    performReferenceCountUpdate(std::size_t& currentReferenceCount, ReferenceCountUpdate typeOfUpdate);
+        static void                                                                                    addIndexOfDroppedParameterToOptimizedModule(ModuleSymbolTableEntry::InternalModuleHelperData& optimizedModuleData, std::size_t indexOfOptimizedAwayParameter);
+        [[nodiscard]] static bool                                                                      doesVariableTypeAllowAssignment(syrec::Variable::Types variableTypeFlag);
+        [[nodiscard]] static std::optional<syrec::Variable::Types>                                     convertVariableTypeFlagToEnum(unsigned int variableTypeFlag);
     };    
 }
 

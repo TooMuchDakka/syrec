@@ -453,6 +453,18 @@ std::unordered_set<std::size_t> SymbolTable::fetchUnusedLocalModuleVariableIndic
     return optimizedAwayLocalVariables;
 }
 
+std::optional<bool> SymbolTable::canSignalBeAssignedTo(const std::string_view& literalIdent) const {
+    if (const auto& matchingSymbolTableEntryForSignal = getEntryForVariable(literalIdent); matchingSymbolTableEntryForSignal) {
+        if (std::holds_alternative<syrec::Variable::ptr>(matchingSymbolTableEntryForSignal->variableInformation)) {
+            const auto& variableInformation = std::get<syrec::Variable::ptr>(matchingSymbolTableEntryForSignal->variableInformation);
+            const auto& mappedToVariableTypeEnumFromFlag = convertVariableTypeFlagToEnum(variableInformation->type);
+            return mappedToVariableTypeEnumFromFlag.has_value() && doesVariableTypeAllowAssignment(*mappedToVariableTypeEnumFromFlag);
+        }
+    }
+    return false;
+}
+
+
 // For correct overload resolution of the user supplied module, the unoptimized module call signature shall be provided as the calling argument to this function
 std::optional<bool> SymbolTable::determineIfModuleWasUnused(const ModuleCallSignature& moduleSignatureToCheck) const {
     // We should only use this function in the global symbol table scope
@@ -722,4 +734,36 @@ void SymbolTable::addIndexOfDroppedParameterToOptimizedModule(ModuleSymbolTableE
             }) == optimizedModuleData.indicesOfDroppedParametersInOptimizedVersion.cend()) {
         optimizedModuleData.indicesOfDroppedParametersInOptimizedVersion.emplace_back(indexOfOptimizedAwayParameter);
     }
+}
+
+// TODO: Handling of state flag
+bool SymbolTable::doesVariableTypeAllowAssignment(syrec::Variable::Types variableType) {
+    switch (variableType) {
+        case syrec::Variable::Inout:
+        case syrec::Variable::Out:
+        case syrec::Variable::Wire:
+        //case syrec::Variable::State:
+            return true;
+        default:
+            return false;
+    }
+}
+
+std::optional<syrec::Variable::Types> SymbolTable::convertVariableTypeFlagToEnum(unsigned variableTypeFlag) {
+    if (variableTypeFlag == syrec::Variable::Types::In) {
+        return syrec::Variable::Types::In;
+    }
+    if (variableTypeFlag == syrec::Variable::Types::Out) {
+        return syrec::Variable::Types::Out;
+    }
+    if (variableTypeFlag == syrec::Variable::Types::Inout) {
+        return syrec::Variable::Types::Inout;
+    }
+    if (variableTypeFlag == syrec::Variable::Types::Wire) {
+        return syrec::Variable::Types::Wire;
+    }
+    if (variableTypeFlag == syrec::Variable::Types::State) {
+        return syrec::Variable::Types::State;
+    }
+    return std::nullopt;
 }

@@ -70,6 +70,7 @@ namespace syrec_operation {
     [[nodiscard]] bool isOperationUnaryAssignmentOperation(operation operationToCheck) noexcept;
     [[nodiscard]] bool isOperationRelationalOperation(operation operationToCheck) noexcept;
     [[nodiscard]] bool isOperationEquivalenceOperation(operation operationToCheck) noexcept;
+    [[nodiscard]] bool isOperationShiftOperation(operation operationToCheck) noexcept;
 
     [[nodiscard]] std::optional<bool> determineBooleanResultIfOperandsOfBinaryExprMatchForOperation(operation operationToCheck) noexcept;
 };
