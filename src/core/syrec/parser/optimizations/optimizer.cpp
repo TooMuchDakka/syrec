@@ -7,6 +7,7 @@
 
 #include "core/syrec/parser/expression_comparer.hpp"
 #include "core/syrec/parser/range_check.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
 #include "core/syrec/parser/utils/binary_expression_simplifier.hpp"
 #include "core/syrec/parser/utils/bit_helpers.hpp"
 #include "core/syrec/parser/utils/copy_utils.hpp"
@@ -294,22 +295,26 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); !skipCheckForSplitOfAssignmentInSubAssignments && activeSymbolTableScope.has_value()) {
-        const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::MainAdditionalLineForAssignmentSimplifier>(*activeSymbolTableScope, nullptr, nullptr);
-        const auto assignmentStmtToSimplify = lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs
+        //const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::MainAdditionalLineForAssignmentSimplifier>(*activeSymbolTableScope, nullptr, nullptr);
+        const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier>(*activeSymbolTableScope);
+
+        const auto  assignmentStmtToSimplify             = lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs
             ? std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand)
             : std::make_shared<syrec::AssignStatement>(assignmentStmt);
-        
-        if (auto generatedSimplifierAssignments = noAdditionalLineAssignmentSimplifier->tryReduceRequiredAdditionalLinesFor(assignmentStmtToSimplify, isValueLookupBlockedByDataFlowAnalysisRestriction(*assignmentStmtToSimplify->lhs)); !generatedSimplifierAssignments.empty()) {
-            filterAssignmentsThatDoNotChangeAssignedToSignal(generatedSimplifierAssignments);
-            if (generatedSimplifierAssignments.empty()) {
+
+        //if (auto generatedSimplifierAssignments = noAdditionalLineAssignmentSimplifier->tryReduceRequiredAdditionalLinesFor(assignmentStmtToSimplify, isValueLookupBlockedByDataFlowAnalysisRestriction(*assignmentStmtToSimplify->lhs)); !generatedSimplifierAssignments.empty()) {
+        if (auto simplificationResult = noAdditionalLineAssignmentSimplifier->simplify(assignmentStmtToSimplify, {}); simplificationResult){
+            syrec::Statement::vec generatedSimplifiedAssignmentStatements = simplificationResult->generatedAssignments;
+            filterAssignmentsThatDoNotChangeAssignedToSignal(generatedSimplifiedAssignmentStatements);
+            if (generatedSimplifiedAssignmentStatements.empty()) {
                 updateReferenceCountOf(lhsOperand->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
                 updateReferenceCountsOfSignalIdentsUsedIn(*rhsOperand, parser::SymbolTable::ReferenceCountUpdate::Decrement);
                 return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();        
             }
 
             std::vector<std::unique_ptr<syrec::Statement>> remainingSimplifiedAssignments;
-            remainingSimplifiedAssignments.reserve(generatedSimplifierAssignments.size());
-            for (const auto& generatedSubAssignment : generatedSimplifierAssignments) {
+            remainingSimplifiedAssignments.reserve(generatedSimplifiedAssignmentStatements.size());
+            for (const auto& generatedSubAssignment: generatedSimplifiedAssignmentStatements) {
                 const auto subAssignmentCasted = std::static_pointer_cast<syrec::AssignStatement>(generatedSubAssignment);
                 remainingSimplifiedAssignments.emplace_back(std::make_unique<syrec::AssignStatement>(subAssignmentCasted->lhs, subAssignmentCasted->op, subAssignmentCasted->rhs));
             }
