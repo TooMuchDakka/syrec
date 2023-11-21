@@ -16,7 +16,7 @@ namespace noAdditionalLineSynthesis {
 
         void storeActiveAssignment(const syrec::AssignStatement::ptr& assignment);
         void markCutoffForInvertibleAssignments();
-        void invertAllAssignmentsUpToLastCutoff(bool excludeLastGeneratedAssignment);
+        void invertAllAssignmentsUpToLastCutoff(std::size_t numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne);
         void popLastCutoffForInvertibleAssignments();
         void rollbackLastXAssignments(std::size_t numberOfAssignmentsToRemove);
         void rollbackAssignmentsMadeSinceLastCutoffAndPopCutoff();

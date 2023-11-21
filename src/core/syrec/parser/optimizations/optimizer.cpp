@@ -303,7 +303,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
             : std::make_shared<syrec::AssignStatement>(assignmentStmt);
 
         //if (auto generatedSimplifierAssignments = noAdditionalLineAssignmentSimplifier->tryReduceRequiredAdditionalLinesFor(assignmentStmtToSimplify, isValueLookupBlockedByDataFlowAnalysisRestriction(*assignmentStmtToSimplify->lhs)); !generatedSimplifierAssignments.empty()) {
-        if (auto simplificationResult = noAdditionalLineAssignmentSimplifier->simplify(assignmentStmtToSimplify, {}); simplificationResult){
+        if (auto simplificationResult = noAdditionalLineAssignmentSimplifier->simplify(*assignmentStmtToSimplify, {}); simplificationResult){
             syrec::Statement::vec generatedSimplifiedAssignmentStatements = simplificationResult->generatedAssignments;
             filterAssignmentsThatDoNotChangeAssignedToSignal(generatedSimplifiedAssignmentStatements);
             if (generatedSimplifiedAssignmentStatements.empty()) {

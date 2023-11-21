@@ -11,8 +11,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-
-// TODO: Always prefer leaf nodes on the left-hand side of an expression
 namespace noAdditionalLineSynthesis {
     class ExpressionTraversalHelper {
     public:

@@ -235,7 +235,7 @@ ExpressionTraversalHelper::OperationNodeReference ExpressionTraversalHelper::cre
     const auto parentIdForNestedExpressions = std::make_optional(generatedIdForCurrentNode);
     if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr) {
         mappedToOperation = *syrec_operation::tryMapShiftOperationFlagToEnum(exprAsShiftExpr->op);
-        nodeForLhsOperand = createOperandNode(exprAsShiftExpr->lhs, parentOperationNodeId);
+        nodeForLhsOperand = createOperandNode(exprAsShiftExpr->lhs, parentIdForNestedExpressions);
         nodeForRhsOperand = createOperandNode(createExpressionForNumber(exprAsShiftExpr->rhs, exprAsShiftExpr->lhs->bitwidth()), parentIdForNestedExpressions);
     } else if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr) {
         mappedToOperation = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
@@ -243,7 +243,7 @@ ExpressionTraversalHelper::OperationNodeReference ExpressionTraversalHelper::cre
         nodeForRhsOperand = createOperandNode(exprAsBinaryExpr->rhs, parentIdForNestedExpressions);
     }
 
-    const auto  operationNode          = OperationNode({generatedIdForCurrentNode, parentIdForNestedExpressions, mappedToOperation, nodeForLhsOperand, nodeForRhsOperand});
+    const auto  operationNode          = OperationNode({generatedIdForCurrentNode, parentOperationNodeId, mappedToOperation, nodeForLhsOperand, nodeForRhsOperand});
     const auto& operationNodeReference = std::make_shared<OperationNode>(operationNode);
     return operationNodeReference;
 }

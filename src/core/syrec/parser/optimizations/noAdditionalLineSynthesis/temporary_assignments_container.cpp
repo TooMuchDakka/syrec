@@ -28,14 +28,14 @@ void TemporaryAssignmentsContainer::markCutoffForInvertibleAssignments() {
     cutOffIndicesForInvertibleAssignments.emplace_back(generatedAssignments.size());
 }
 
-void TemporaryAssignmentsContainer::invertAllAssignmentsUpToLastCutoff(bool excludeLastGeneratedAssignment) {
+void TemporaryAssignmentsContainer::invertAllAssignmentsUpToLastCutoff(std::size_t numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne) {
     std::vector<std::size_t> relevantIndicesOfActiveAssignments = cutOffIndicesForInvertibleAssignments.empty()
         ? indicesOfActiveAssignments
         : determineIndicesOfInvertibleAssignmentsStartingFrom(cutOffIndicesForInvertibleAssignments.back());
-
-    // Exclude the last active assignment from the assignments being inverted
-    if (excludeLastGeneratedAssignment && !relevantIndicesOfActiveAssignments.empty()) {
-        relevantIndicesOfActiveAssignments.pop_back();
+    
+    if (numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne && !relevantIndicesOfActiveAssignments.empty()) {
+        const std::size_t numEntriesToPop = std::min(numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne, relevantIndicesOfActiveAssignments.size());
+        relevantIndicesOfActiveAssignments.erase(std::next(relevantIndicesOfActiveAssignments.begin(), (relevantIndicesOfActiveAssignments.size() - numEntriesToPop) + 1), relevantIndicesOfActiveAssignments.end());
     }
 
     for (const auto& indexOfActiveAssignment: relevantIndicesOfActiveAssignments) {
