@@ -29,17 +29,15 @@ void TemporaryAssignmentsContainer::markCutoffForInvertibleAssignments() {
 }
 
 void TemporaryAssignmentsContainer::invertAllAssignmentsUpToLastCutoff(std::size_t numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne) {
-    std::vector<std::size_t> relevantIndicesOfActiveAssignments = cutOffIndicesForInvertibleAssignments.empty()
-        ? indicesOfActiveAssignments
-        : determineIndicesOfInvertibleAssignmentsStartingFrom(cutOffIndicesForInvertibleAssignments.back());
-    
+    std::vector<std::size_t> relevantIndicesOfActiveAssignments = cutOffIndicesForInvertibleAssignments.empty() ? indicesOfActiveAssignments : determineIndicesOfInvertibleAssignmentsStartingFrom(cutOffIndicesForInvertibleAssignments.back());
+
     if (numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne && !relevantIndicesOfActiveAssignments.empty()) {
         const std::size_t numEntriesToPop = std::min(numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne, relevantIndicesOfActiveAssignments.size());
-        relevantIndicesOfActiveAssignments.erase(std::next(relevantIndicesOfActiveAssignments.begin(), (relevantIndicesOfActiveAssignments.size() - numEntriesToPop) + 1), relevantIndicesOfActiveAssignments.end());
+        relevantIndicesOfActiveAssignments.erase(std::next(relevantIndicesOfActiveAssignments.begin(), relevantIndicesOfActiveAssignments.size() - numEntriesToPop), relevantIndicesOfActiveAssignments.end());
     }
 
-    for (const auto& indexOfActiveAssignment: relevantIndicesOfActiveAssignments) {
-        const auto& referenceActiveAssignment = generatedAssignments.at(indexOfActiveAssignment);
+    for (auto activeAssignmentIndicesIterator = relevantIndicesOfActiveAssignments.rbegin(); activeAssignmentIndicesIterator != relevantIndicesOfActiveAssignments.rend(); ++activeAssignmentIndicesIterator) {
+        const syrec::AssignStatement::ptr& referenceActiveAssignment = generatedAssignments.at(*activeAssignmentIndicesIterator);
         if (const auto& referenceAssignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(referenceActiveAssignment); referenceAssignmentCasted) {
             invertAssignmentAndStoreAndMarkOriginalAsInactive(*referenceAssignmentCasted);
         }
@@ -47,8 +45,8 @@ void TemporaryAssignmentsContainer::invertAllAssignmentsUpToLastCutoff(std::size
 }
 
 void TemporaryAssignmentsContainer::popLastCutoffForInvertibleAssignments() {
-    if (!indicesOfActiveAssignments.empty()) {
-        indicesOfActiveAssignments.pop_back();
+    if (!cutOffIndicesForInvertibleAssignments.empty()) {
+        cutOffIndicesForInvertibleAssignments.pop_back();
     }
 }
 
@@ -67,7 +65,7 @@ void TemporaryAssignmentsContainer::rollbackLastXAssignments(std::size_t numberO
                 return activeAssignmentIndex >= indexOfFirstRemovedAssignment;
     }), indicesOfActiveAssignments.end());
     
-    for (auto generatedAssignmentsToBeRemovedIterator = std::next(generatedAssignments.begin(), indexOfFirstRemovedAssignment + 1); generatedAssignmentsToBeRemovedIterator != generatedAssignments.end();) {
+    for (auto generatedAssignmentsToBeRemovedIterator = std::next(generatedAssignments.begin(), indexOfFirstRemovedAssignment); generatedAssignmentsToBeRemovedIterator != generatedAssignments.end();) {
         if (const auto& referencedAssignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(*generatedAssignmentsToBeRemovedIterator); referencedAssignmentCasted) {
             removeActiveAssignmentFromLookup(referencedAssignmentCasted->lhs);   
         }
@@ -75,11 +73,13 @@ void TemporaryAssignmentsContainer::rollbackLastXAssignments(std::size_t numberO
     }
 }
 
-void TemporaryAssignmentsContainer::rollbackAssignmentsMadeSinceLastCutoffAndPopCutoff() {
+void TemporaryAssignmentsContainer::rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(bool popCutOff) {
     std::size_t       indexOfFirstRemovedAssignment = 0;
     if (!cutOffIndicesForInvertibleAssignments.empty()) {
         indexOfFirstRemovedAssignment = cutOffIndicesForInvertibleAssignments.back();
-        cutOffIndicesForInvertibleAssignments.pop_back();
+        if (popCutOff) {
+            cutOffIndicesForInvertibleAssignments.pop_back();   
+        }
     }
     rollbackLastXAssignments(generatedAssignments.size() - indexOfFirstRemovedAssignment);
 }
@@ -102,7 +102,7 @@ bool TemporaryAssignmentsContainer::existsOverlappingAssignmentFor(const syrec::
     }
 
     const auto& matchingActiveAssignmentsForSignalIdent = activeAssignmentsLookup.at(assignedToSignal.var->name);
-    return !std::any_of(
+    return !std::all_of(
             matchingActiveAssignmentsForSignalIdent.cbegin(),
             matchingActiveAssignmentsForSignalIdent.cend(),
             [&assignedToSignal, symbolTable](const syrec::VariableAccess::ptr& activeAssignedToSignals) {
@@ -139,6 +139,8 @@ void TemporaryAssignmentsContainer::invertAssignmentAndStoreAndMarkOriginalAsIna
         ++activeAssignmentIndexIterator;
     }
     removeActiveAssignmentFromLookup(assignmentToInvert.lhs);
+    syrec::AssignStatement::ptr generatedInvertedAssignment = invertAssignment(assignmentToInvert);
+    generatedAssignments.emplace_back(generatedInvertedAssignment);
 }
 
 syrec::AssignStatement::ptr TemporaryAssignmentsContainer::invertAssignment(const syrec::AssignStatement& assignment) {
@@ -173,4 +175,7 @@ void TemporaryAssignmentsContainer::removeActiveAssignmentFromLookup(const syrec
 
     auto& activeAssignmentsForAssignedToSignalIdent = activeAssignmentsLookup.at(assignedToSignal->var->name);
     activeAssignmentsForAssignedToSignalIdent.erase(assignedToSignal);
+    if (activeAssignmentsForAssignedToSignalIdent.empty()) {
+        activeAssignmentsLookup.erase(assignedToSignal->var->name);
+    }
 }

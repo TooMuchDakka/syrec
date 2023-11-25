@@ -87,7 +87,7 @@ std::optional<std::size_t> ExpressionTraversalHelper::getOperandNodeIdOfNestedOp
 
 
 bool ExpressionTraversalHelper::canSignalBeUsedOnAssignmentLhs(const std::string& signalIdent) const {
-    return !identsOfAssignableSignals.count(signalIdent);
+    return identsOfAssignableSignals.count(signalIdent);
 }
 
 
@@ -97,6 +97,13 @@ void ExpressionTraversalHelper::markOperationNodeAsPotentialBacktrackOption(std:
             backtrackOperationNodeIds.emplace_back(operationNodeId);
         }
     }
+}
+
+std::optional<ExpressionTraversalHelper::OperationNodeReference> ExpressionTraversalHelper::getOperationNodeById(std::size_t operationNodeId) const {
+    if (!operationNodeDataLookup.count(operationNodeId)) {
+        return std::nullopt;
+    }
+    return operationNodeDataLookup.at(operationNodeId);
 }
 
 void ExpressionTraversalHelper::removeOperationNodeAsPotentialBacktrackOperation(std::size_t operationNodeId) {
@@ -135,6 +142,7 @@ void ExpressionTraversalHelper::backtrack() {
 
 void ExpressionTraversalHelper::buildTraversalQueue(const syrec::expression::ptr& expr, const parser::SymbolTable& symbolTableReference) {
     resetInternals();
+    operationNodeIdGenerator.generateNextId();
     const auto& generatedOperationNode = createOperationNode(expr, std::nullopt);
     operationNodeDataLookup.insert(std::make_pair(generatedOperationNode->id, generatedOperationNode));
     handleOperationNodeDuringTraversalQueueInit(generatedOperationNode);
@@ -199,13 +207,6 @@ std::optional<syrec::expression::ptr> ExpressionTraversalHelper::getDataOfOperan
         return std::nullopt;   
     }
     return operandNodeDataLookup.at(operandNodeId);
-}
-
-std::optional<ExpressionTraversalHelper::OperationNodeReference> ExpressionTraversalHelper::getOperationNodeById(std::size_t operationNodeId) const {
-    if (!operationNodeDataLookup.count(operationNodeId)) {
-        return std::nullopt;
-    }
-    return operationNodeDataLookup.at(operationNodeId);
 }
 
 ExpressionTraversalHelper::OperandNode ExpressionTraversalHelper::createOperandNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId) {

@@ -19,7 +19,7 @@ namespace noAdditionalLineSynthesis {
         void invertAllAssignmentsUpToLastCutoff(std::size_t numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne);
         void popLastCutoffForInvertibleAssignments();
         void rollbackLastXAssignments(std::size_t numberOfAssignmentsToRemove);
-        void rollbackAssignmentsMadeSinceLastCutoffAndPopCutoff();
+        void rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(bool popCutOff);
         void resetInternals();
 
         [[nodiscard]] syrec::AssignStatement::vec getAssignments() const;

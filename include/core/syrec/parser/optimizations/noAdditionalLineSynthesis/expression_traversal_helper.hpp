@@ -45,6 +45,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<syrec_operation::operation> getOperationOfOperationNode(std::size_t operationNodeId) const;
         [[nodiscard]] std::optional<std::size_t>                getOperandNodeIdOfNestedOperation(std::size_t parentOperationNodeId, std::size_t nestedOperationNodeId) const;
         [[nodiscard]] bool                                      canSignalBeUsedOnAssignmentLhs(const std::string& signalIdent) const;
+        [[nodiscard]] std::optional<OperationNodeReference>     getOperationNodeById(std::size_t operationNodeId) const;
         void                                                    markOperationNodeAsPotentialBacktrackOption(std::size_t operationNodeId);
         void                                                    removeOperationNodeAsPotentialBacktrackOperation(std::size_t operationNodeId);
         void                                                    backtrack();
@@ -59,7 +60,7 @@ namespace noAdditionalLineSynthesis {
         virtual ~ExpressionTraversalHelper() = default;
     protected:
         struct IdGenerator {
-            [[nodiscard]] std::size_t generateNextId();
+            [[maybe_unused]] std::size_t generateNextId();
             void                      reset();
         private:
             std::size_t lastGeneratedId = 0;
@@ -79,7 +80,6 @@ namespace noAdditionalLineSynthesis {
         void                                                addSignalIdentAsUsableInAssignmentLhsIfAssignable(const std::string& signalIdent, const parser::SymbolTable& symbolTableReference);
         void                                                determineIdentsOfSignalsUsableInAssignmentLhs(const parser::SymbolTable& symbolTableReference);
         [[nodiscard]] std::optional<syrec::expression::ptr> getDataOfOperand(std::size_t operandNodeId) const;
-        [[nodiscard]] std::optional<OperationNodeReference> getOperationNodeById(std::size_t operationNodeId) const;
         [[nodiscard]] OperandNode                           createOperandNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId);
         [[nodiscard]] OperationNodeReference                createOperationNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId);
         [[nodiscard]] static bool                           doesExpressionContainNestedExprAsOperand(const syrec::expression& expr);
