@@ -2,6 +2,7 @@
 #define ASSIGNMENT_WITHOUT_ADDITIONAL_LINES_SIMPLIFIER_HPP
 #pragma once
 
+#include "expression_to_subassignment_splitter.hpp"
 #include "core/syrec/statement.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_assignments_container.hpp"
@@ -19,11 +20,12 @@ namespace noAdditionalLineSynthesis {
 
          virtual ~AssignmentWithoutAdditionalLineSimplifier() = default;
         AssignmentWithoutAdditionalLineSimplifier(const parser::SymbolTable::ptr& symbolTableReference) {
-            generatedAssignmentsContainer          = std::make_shared<TemporaryAssignmentsContainer>();
-            expressionTraversalHelper              = std::make_shared<ExpressionTraversalHelper>();
-            this->symbolTableReference             = symbolTableReference;
-            signalPartsBlockedFromEvaluationLookup = std::make_unique<SignalPartsBlockedFromEvaluationLookup>();
-            learnedConflictsLookup                 = std::make_unique<LearnedConflictsLookup>();
+            generatedAssignmentsContainer              = std::make_shared<TemporaryAssignmentsContainer>();
+            expressionTraversalHelper                  = std::make_shared<ExpressionTraversalHelper>();
+            this->symbolTableReference                 = symbolTableReference;
+            expressionToSubAssignmentSplitterReference = std::make_unique<ExpressionToSubAssignmentSplitter>();
+            signalPartsBlockedFromEvaluationLookup     = std::make_unique<SignalPartsBlockedFromEvaluationLookup>();
+            learnedConflictsLookup                     = std::make_unique<LearnedConflictsLookup>();
         }
 
     protected:
@@ -40,16 +42,26 @@ namespace noAdditionalLineSynthesis {
             syrec::expression::ptr backupOfExpressionRequiringFixup;
         };
         using DecisionReference = std::shared_ptr<Decision>;
-        std::vector<DecisionReference>     pastDecisions;
-        TemporaryAssignmentsContainer::ptr generatedAssignmentsContainer;
-        ExpressionTraversalHelper::ptr     expressionTraversalHelper;
-        parser::SymbolTable::ptr           symbolTableReference;
+        std::vector<DecisionReference>         pastDecisions;
+        TemporaryAssignmentsContainer::ptr     generatedAssignmentsContainer;
+        ExpressionTraversalHelper::ptr         expressionTraversalHelper;
+        parser::SymbolTable::ptr               symbolTableReference;
+        ExpressionToSubAssignmentSplitter::ptr expressionToSubAssignmentSplitterReference;
 
         using SignalPartsBlockedFromEvaluationLookup = std::map<std::string, std::vector<syrec::VariableAccess::ptr>, std::less<>>;
         using SignalPartsBlockedFromEvaluationLookupReference = std::unique_ptr<SignalPartsBlockedFromEvaluationLookup>;
         SignalPartsBlockedFromEvaluationLookupReference signalPartsBlockedFromEvaluationLookup;
 
-        using LearnedConflictsLookup = std::map<std::string, std::unordered_set<syrec::VariableAccess::ptr>, std::less<>>;
+        // TODO: Refactor to be a map of operation node ids as well as choosen operand which could be a bit instead of an enum
+        using LearnedConflictsLookupKey = std::pair<std::size_t, Decision::ChoosenOperand>;
+        struct LearnedConflictsLookupKeyHasher {
+            std::size_t operator()(const LearnedConflictsLookupKey& key) const {
+                return std::hash<std::size_t>()(key.first) ^ std::hash<Decision::ChoosenOperand>()(key.second);
+            }
+        };
+
+        // Since the std::unordered_set does not work with std::pair out of the box, we need to provide a custom hasher function
+        using LearnedConflictsLookup = std::unordered_set<LearnedConflictsLookupKey, LearnedConflictsLookupKeyHasher>;
         using LearnedConflictsLookupReference = std::unique_ptr<LearnedConflictsLookup>;
         LearnedConflictsLookupReference learnedConflictsLookup;
 
@@ -99,15 +111,16 @@ namespace noAdditionalLineSynthesis {
         void                                           markOperationNodeAsSourceOfConflict(std::size_t operationNodeId);
         void                                           markSourceOfConflictReached();
         [[nodiscard]] bool                             shouldBacktrackDueToConflict() const;
+        [[nodiscard]] syrec::AssignStatement::vec      performSimplificationOfAssignmentRhs(const syrec::AssignStatement::ptr& assignment) const;
 
         // This call should be responsible to determine conflicts, during a decision their should not arise any conflicts
         // The check for a conflict should take place in the operations nodes with either one or two leaf nodes by using this call before making any decisions
         // If a conflict is detected, the first decision starting from the initial one shall be our backtrack destination and all overlapping assignments for the found first decision
         // shall be recorded as learned conflicts.
-        [[nodiscard]] bool                                    wereAccessedSignalPartsModifiedByActiveAssignment(const syrec::VariableAccess& accessedSignalParts) const;
-        [[nodiscard]] std::vector<syrec::VariableAccess::ptr> determineDecisionsOverlappingAccessedSignalPartsOmittingAlreadyRecordedOnes(const syrec::VariableAccess& accessedSignalParts) const;
-        void                                                  handleConflict(std::size_t associatedOperationNodeIdOfAccessedSignalPartsOperand, const syrec::VariableAccess& accessedSignalPartsUsedInCheckForConflict);
-        [[nodiscard]] std::size_t                             determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(std::size_t currentOperationNodeId, std::size_t conflictOperationNodeId) const;
+        [[nodiscard]] bool                                                                                                 wereAccessedSignalPartsModifiedByActiveAssignment(const syrec::VariableAccess& accessedSignalParts) const;
+        [[nodiscard]] std::vector<DecisionReference>                                                                       determineDecisionsOverlappingAccessedSignalPartsOmittingAlreadyRecordedOnes(const syrec::VariableAccess& accessedSignalParts) const;
+        void                                                                                                               handleConflict(std::size_t associatedOperationNodeIdOfAccessedSignalPartsOperand, const syrec::VariableAccess& accessedSignalPartsUsedInCheckForConflict);
+        [[nodiscard]] std::size_t                                                                                          determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(std::size_t currentOperationNodeId, std::size_t conflictOperationNodeId) const;
 
         /**
          * \brief Determine whether another choice for a previously made decision could be made. This calls excludes the last made decision under the assumption that this call is made after a conflict was derived at the current operation node
@@ -121,41 +134,17 @@ namespace noAdditionalLineSynthesis {
         virtual void                                                                                     resetInternals();
         [[nodiscard]] virtual std::unique_ptr<syrec::AssignStatement>                                    transformAssignmentPriorToSimplification(const syrec::AssignStatement& assignmentToSimplify) const;
         void                                                                                             transformExpressionPriorToSimplification(syrec::expression& expr) const;
-        void                                                                                             rememberConflict(const syrec::VariableAccess::ptr& assignmentCausingConflict) const;
-        [[nodiscard]] bool                                                                               didPreviousDecisionMatchingChoiceCauseConflict(const syrec::VariableAccess& madeChoice) const;
-        [[nodiscard]] std::optional<std::pair<syrec::AssignStatement::ptr, syrec::AssignStatement::ptr>> trySplitAssignmentRhs(const syrec::VariableAccess::ptr& assignedToSignal, syrec_operation::operation assignmentOperation, const syrec::expression::ptr& assignmentRhsExpr) const;
-
+        void                                                                                             rememberConflict(std::size_t operationNodeId, Decision::ChoosenOperand chosenOperandAtOperationNode) const;
+        [[nodiscard]] bool                                                                               didPreviousDecisionMatchingChoiceCauseConflict(const LearnedConflictsLookupKey& lookupKeyRepresentingSearchedForPreviousDecision) const;
+        
         [[nodiscard]] static syrec::expression::ptr                                                             fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>                                         tryCreateAssignmentForOperationNode(const syrec::VariableAccess::ptr& assignmentLhs, syrec_operation::operation op, const syrec::expression::ptr& assignmentRhs);
         [[nodiscard]] static syrec::expression::ptr                                                             createExpressionFrom(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
         [[nodiscard]] static syrec::expression::ptr                                                             createExpressionFromOperationNode(const ExpressionTraversalHelper::ptr& expressionTraversalHelper, const ExpressionTraversalHelper::OperationNodeReference& operationNode);
         [[nodiscard]] static syrec::expression::ptr                                                             createExpressionFromOperandSimplificationResult(const OperationOperandSimplificationResult& operandSimplificationResult);
         [[nodiscard]] static bool                                                                               doesExpressionDefineNestedSplitableExpr(const syrec::expression& expr);
-        [[nodiscard]] static constexpr unsigned int                                                             combineAssignmentAndBinaryOperation(syrec_operation::operation assignmentOperation, syrec_operation::operation binaryOperation) {
-            return mapRelevantOperationsToNumericValue(assignmentOperation) + mapRelevantOperationsToNumericValue(binaryOperation);
-        }
-        [[nodiscard]] static constexpr unsigned int                                                             mapRelevantOperationsToNumericValue(syrec_operation::operation operation) {
-            constexpr unsigned int baseValue = 1;
-            switch (operation) {
-                case syrec_operation::operation::AddAssign:
-                    return baseValue << 0;
-                case syrec_operation::operation::Addition:
-                    return baseValue << 1;
-                case syrec_operation::operation::MinusAssign:
-                    return baseValue << 2;
-                case syrec_operation::operation::Subtraction:
-                    return baseValue << 3;
-                case syrec_operation::operation::XorAssign:
-                    return baseValue << 4;
-                case syrec_operation::operation::BitwiseXor:
-                    return baseValue << 5;
-                default:
-                    return 0;
-            }
-        }
-
-        [[nodiscard]] static std::optional<syrec::AssignStatement::ptr> tryCreateAssignmentFromOperands(Decision::ChoosenOperand chosenOperandAsAssignedToSignal, const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
-        [[nodiscard]] static std::optional<syrec::expression::ptr>      tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
+        [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>                                         tryCreateAssignmentFromOperands(Decision::ChoosenOperand chosenOperandAsAssignedToSignal, const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
+        [[nodiscard]] static std::optional<syrec::expression::ptr>                                              tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
 
         /**
          * \brief Build the lookup defining which signal parts are blocked from value evaluation
