@@ -7,6 +7,8 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_assignments_container.hpp"
 
+#include <functional>
+
 // TODO: General overhaul of enums to scoped enums if possible (see https://en.cppreference.com/w/cpp/language/enum)
 
 namespace noAdditionalLineSynthesis {
@@ -15,17 +17,17 @@ namespace noAdditionalLineSynthesis {
         struct SimplificationResult {
             syrec::AssignStatement::vec generatedAssignments;
         };
+        using SignalValueLookupCallback = std::function<std::optional<unsigned int>(const syrec::VariableAccess&)>;
         using SimplificationResultReference = std::unique_ptr<SimplificationResult>;
-        [[nodiscard]] SimplificationResultReference simplify(const syrec::AssignStatement& assignmentStatement, const syrec::AssignStatement::vec& assignmentsDefiningSignalPartsBlockedFromEvaluation);
+        [[nodiscard]] SimplificationResultReference simplify(const syrec::AssignStatement& assignmentStatement, const SignalValueLookupCallback& signalValueLookupCallback);
 
          virtual ~AssignmentWithoutAdditionalLineSimplifier() = default;
         AssignmentWithoutAdditionalLineSimplifier(const parser::SymbolTable::ptr& symbolTableReference) {
-            generatedAssignmentsContainer              = std::make_shared<TemporaryAssignmentsContainer>();
-            expressionTraversalHelper                  = std::make_shared<ExpressionTraversalHelper>();
-            this->symbolTableReference                 = symbolTableReference;
-            expressionToSubAssignmentSplitterReference = std::make_unique<ExpressionToSubAssignmentSplitter>();
-            signalPartsBlockedFromEvaluationLookup     = std::make_unique<SignalPartsBlockedFromEvaluationLookup>();
-            learnedConflictsLookup                     = std::make_unique<LearnedConflictsLookup>();
+            generatedAssignmentsContainer                     = std::make_shared<TemporaryAssignmentsContainer>();
+            expressionTraversalHelper                         = std::make_shared<ExpressionTraversalHelper>();
+            this->symbolTableReference                        = symbolTableReference;
+            expressionToSubAssignmentSplitterReference        = std::make_unique<ExpressionToSubAssignmentSplitter>();
+            learnedConflictsLookup                            = std::make_unique<LearnedConflictsLookup>();
         }
 
     protected:
@@ -47,12 +49,7 @@ namespace noAdditionalLineSynthesis {
         ExpressionTraversalHelper::ptr         expressionTraversalHelper;
         parser::SymbolTable::ptr               symbolTableReference;
         ExpressionToSubAssignmentSplitter::ptr expressionToSubAssignmentSplitterReference;
-
-        using SignalPartsBlockedFromEvaluationLookup = std::map<std::string, std::vector<syrec::VariableAccess::ptr>, std::less<>>;
-        using SignalPartsBlockedFromEvaluationLookupReference = std::unique_ptr<SignalPartsBlockedFromEvaluationLookup>;
-        SignalPartsBlockedFromEvaluationLookupReference signalPartsBlockedFromEvaluationLookup;
-
-        // TODO: Refactor to be a map of operation node ids as well as choosen operand which could be a bit instead of an enum
+        
         using LearnedConflictsLookupKey = std::pair<std::size_t, Decision::ChoosenOperand>;
         struct LearnedConflictsLookupKeyHasher {
             std::size_t operator()(const LearnedConflictsLookupKey& key) const {
@@ -101,17 +98,37 @@ namespace noAdditionalLineSynthesis {
         // Backtrack to last overlapping decision, add additional field backtrackingToNode to determine whether a conflict or a backtrack is in progress when std::nullopt is returned during handling of operation node
         // Add lookup for learned "clauses" i.e. previous conflicts that can be erased during backtracking
         [[nodiscard]] bool                             doesAssignmentToSignalLeadToConflict(const syrec::VariableAccess& assignedToSignal) const;
-        [[nodiscard]] std::optional<unsigned int>      tryFetchValueOfSignal(const syrec::VariableAccess& assignedToSignal) const;
         [[nodiscard]] std::optional<DecisionReference> tryGetDecisionForOperationNode(const std::size_t& operationNodeId) const;
-        [[nodiscard]] bool                             isValueEvaluationOfAccessedSignalPartsBlocked(const syrec::VariableAccess& accessedSignalParts) const;
         
-        [[nodiscard]] DecisionReference                makeDecision(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const std::pair<std::reference_wrapper<const OperationOperandSimplificationResult>, std::reference_wrapper<const OperationOperandSimplificationResult>>& potentialChoices);
-        [[nodiscard]] std::optional<std::size_t>       determineOperationNodeIdCausingConflict(const syrec::VariableAccess& choiceOfAssignedToSignalTriggeringSearchForCauseOfConflict) const;
-        [[nodiscard]] bool                             isOperationNodeSourceOfConflict(std::size_t operationNodeId) const;
-        void                                           markOperationNodeAsSourceOfConflict(std::size_t operationNodeId);
-        void                                           markSourceOfConflictReached();
-        [[nodiscard]] bool                             shouldBacktrackDueToConflict() const;
-        [[nodiscard]] syrec::AssignStatement::vec      performSimplificationOfAssignmentRhs(const syrec::AssignStatement::ptr& assignment) const;
+        [[nodiscard]] DecisionReference           makeDecision(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const std::pair<std::reference_wrapper<const OperationOperandSimplificationResult>, std::reference_wrapper<const OperationOperandSimplificationResult>>& potentialChoices);
+        [[nodiscard]] std::optional<std::size_t>  determineOperationNodeIdCausingConflict(const syrec::VariableAccess& choiceOfAssignedToSignalTriggeringSearchForCauseOfConflict) const;
+        [[nodiscard]] bool                        isOperationNodeSourceOfConflict(std::size_t operationNodeId) const;
+        void                                      markOperationNodeAsSourceOfConflict(std::size_t operationNodeId);
+        void                                      markSourceOfConflictReached();
+        [[nodiscard]] bool                        shouldBacktrackDueToConflict() const;
+
+        /**
+         * \brief Try to replace assignments of the from  a += ... with a ^= ... if the value of the symbol table entry for 'a' had the value 0.
+         * \remark
+         * We are assuming that, constant propagation did already perform any substitutions of accessed signals on the rhs of every assignment thus the values of all remaining signal accesses
+         * on the rhs of any assignment are assumed to be unknown. Furthermore, for any signal access to be chosen as the assigned to signal in an assignment for any subexpression of the original assignment
+         * must have the signal type of either 'wire', 'out' or 'inout' and since constant propagation did not substitute the accessed signal parts implies that they must be not zero.
+         * \remark
+         * We are processing the given assignment front to back and are assuming that the ordering of the assignment inside of the vector is based on the "insertion" time thus assignments generated further down the expression
+         * tree are found at smaller indices in the vector. After an assignment of the form (referred to as assignment 1) a += ... was transformed to a ^= ..., the next application of the same transformation can only happen at the next assignment of the form a += ...
+         * if either the rhs of the assignment 1 was 0 or the matching inversion of assignment 1 took place.
+         *
+         * \param generatedAssignments The assignments to transform
+         * \param signalValueLookupCallback The callback used to determine the value of a given signal access
+         */
+        void               tryReplaceAddWithXorAsAssignmentOperationIfAssignedToSignalIsZero(const syrec::AssignStatement::vec& generatedAssignments, const SignalValueLookupCallback& signalValueLookupCallback) const;
+        
+        /**
+         * \brief Try to simplify the rhs of an assignment by splitting it into sub-assignments if possible. We are assuming that no signal accesses overlapping the lhs operand of the assignment is defined on the rhs.
+         * \param assignment The assignment which should be simplified.
+         * \return The generated sub-assignments or a vector containing the original assignment
+         */
+        [[nodiscard]] syrec::AssignStatement::vec performSimplificationOfAssignmentRhs(const syrec::AssignStatement::ptr& assignment) const;
 
         // This call should be responsible to determine conflicts, during a decision their should not arise any conflicts
         // The check for a conflict should take place in the operations nodes with either one or two leaf nodes by using this call before making any decisions
@@ -143,20 +160,11 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static syrec::expression::ptr                                                             createExpressionFromOperationNode(const ExpressionTraversalHelper::ptr& expressionTraversalHelper, const ExpressionTraversalHelper::OperationNodeReference& operationNode);
         [[nodiscard]] static syrec::expression::ptr                                                             createExpressionFromOperandSimplificationResult(const OperationOperandSimplificationResult& operandSimplificationResult);
         [[nodiscard]] static bool                                                                               doesExpressionDefineNestedSplitableExpr(const syrec::expression& expr);
+        [[nodiscard]] static bool                                                                               doesExpressionDefineNumber(const syrec::expression& expr);
+        [[nodiscard]] static bool                                                                               doesExprDefineSignalAccess(const syrec::expression& expr);
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>                                         tryCreateAssignmentFromOperands(Decision::ChoosenOperand chosenOperandAsAssignedToSignal, const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
         [[nodiscard]] static std::optional<syrec::expression::ptr>                                              tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
-
-        /**
-         * \brief Build the lookup defining which signal parts are blocked from value evaluation
-         *
-         * - Since heterogeneous lookup for containers was added in the C++ 2as working draft (https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0919r2.html) but C++ 17 is used in this project, we need to "fallback" to ordered
-         * containers that allow the usage of heterogeneous lookup that was added with C++ 14 (https://stackoverflow.com/a/35525806)
-         *
-         * \param assignmentsDefiningSignalPartsBlockedFromEvaluation The assignments defining the signal parts blocked from value evaluation (i.e. the assigned to signal on the left hand side of the assignment)
-         * \param symbolTableReference The symbol table usable to evaluate any non-constant expressions used to define the assigned to signal of an assignment statement
-         * \return A lookup container used to define the signal parts blocked from value lookup
-         */
-        [[nodiscard]] static SignalPartsBlockedFromEvaluationLookupReference buildLookupOfSignalsPartsBlockedFromEvaluation(const syrec::AssignStatement::vec& assignmentsDefiningSignalPartsBlockedFromEvaluation, const parser::SymbolTable& symbolTableReference);
+        [[nodiscard]] static bool                                                                               areAssignedToSignalPartsZero(const syrec::VariableAccess& accessedSignalParts, const SignalValueLookupCallback& signalValueLookupCallback);
     };
 }
 

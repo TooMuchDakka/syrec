@@ -279,49 +279,47 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         skipCheckForSplitOfAssignmentInSubAssignments |= !parserConfig.noAdditionalLineOptimizationEnabled || rhsOperandEvaluatedAsConstant.has_value();
     }
 
+    const std::optional<EvaluatedSignalAccess> evaluatedSignalAccessOfAssignedToSignal = !doesAssignmentNotModifyAssignedToSignalValue ? tryEvaluateDefinedSignalAccess(*lhsOperand) : std::nullopt;
     /*
      * If the value of the rhs expr does not modifiy the value of the assigned to signal but no dead code elimination is enabled, we can skip the application of the assignment
      */
     if (!doesAssignmentNotModifyAssignedToSignalValue) {
-        if (auto evaluatedAssignedToSignal = tryEvaluateDefinedSignalAccess(*lhsOperand); evaluatedAssignedToSignal.has_value()) {
-            /*
-         * TODO:
-         * When an assignment should be performed and only if we know that the size both operands after an dimension access is at most 1, we can use the perform assignment call
-         * Otherwise, we either need to perform a broadcast check (which should have been done in the parser already) which in case that no broadcasting is required still
-         * needs to handle assignments of N-d signals (for which we need to determine whether the synthesizer supports such statements).
-         */
-            performAssignment(*evaluatedAssignedToSignal, *mappedToAssignmentOperationFromFlag, rhsOperandEvaluatedAsConstant);
-        }   
-    }
+        if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); !skipCheckForSplitOfAssignmentInSubAssignments && activeSymbolTableScope.has_value()) {
+            const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier>(*activeSymbolTableScope);
 
-    if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); !skipCheckForSplitOfAssignmentInSubAssignments && activeSymbolTableScope.has_value()) {
-        //const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::MainAdditionalLineForAssignmentSimplifier>(*activeSymbolTableScope, nullptr, nullptr);
-        const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier>(*activeSymbolTableScope);
+            const auto assignmentStmtToSimplify = lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs ? std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand) : std::make_shared<syrec::AssignStatement>(assignmentStmt);
+            noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SignalValueLookupCallback signalValueLookupCallback = [this](const syrec::VariableAccess& accessedSignalParts) { return tryFetchValueForAccessedSignal(accessedSignalParts); };
+            if (auto simplificationResult = noAdditionalLineAssignmentSimplifier->simplify(*assignmentStmtToSimplify, signalValueLookupCallback); simplificationResult) {
+                syrec::Statement::vec generatedSimplifiedAssignmentStatements = simplificationResult->generatedAssignments;
+                filterAssignmentsThatDoNotChangeAssignedToSignal(generatedSimplifiedAssignmentStatements);
+                if (generatedSimplifiedAssignmentStatements.empty()) {
+                    updateReferenceCountOf(lhsOperand->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
+                    updateReferenceCountsOfSignalIdentsUsedIn(*rhsOperand, parser::SymbolTable::ReferenceCountUpdate::Decrement);
+                    return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
+                }
 
-        const auto  assignmentStmtToSimplify             = lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs
-            ? std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand)
-            : std::make_shared<syrec::AssignStatement>(assignmentStmt);
-
-        //if (auto generatedSimplifierAssignments = noAdditionalLineAssignmentSimplifier->tryReduceRequiredAdditionalLinesFor(assignmentStmtToSimplify, isValueLookupBlockedByDataFlowAnalysisRestriction(*assignmentStmtToSimplify->lhs)); !generatedSimplifierAssignments.empty()) {
-        if (auto simplificationResult = noAdditionalLineAssignmentSimplifier->simplify(*assignmentStmtToSimplify, {}); simplificationResult){
-            syrec::Statement::vec generatedSimplifiedAssignmentStatements = simplificationResult->generatedAssignments;
-            filterAssignmentsThatDoNotChangeAssignedToSignal(generatedSimplifiedAssignmentStatements);
-            if (generatedSimplifiedAssignmentStatements.empty()) {
-                updateReferenceCountOf(lhsOperand->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-                updateReferenceCountsOfSignalIdentsUsedIn(*rhsOperand, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-                return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();        
+                std::vector<std::unique_ptr<syrec::Statement>> remainingSimplifiedAssignments;
+                remainingSimplifiedAssignments.reserve(generatedSimplifiedAssignmentStatements.size());
+                for (const auto& generatedSubAssignment: generatedSimplifiedAssignmentStatements) {
+                    const auto subAssignmentCasted = std::static_pointer_cast<syrec::AssignStatement>(generatedSubAssignment);
+                    remainingSimplifiedAssignments.emplace_back(std::make_unique<syrec::AssignStatement>(subAssignmentCasted->lhs, subAssignmentCasted->op, subAssignmentCasted->rhs));
+                }
+                performAssignment(*evaluatedSignalAccessOfAssignedToSignal, *mappedToAssignmentOperationFromFlag, std::nullopt);
+                return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(remainingSimplifiedAssignments));
             }
-
-            std::vector<std::unique_ptr<syrec::Statement>> remainingSimplifiedAssignments;
-            remainingSimplifiedAssignments.reserve(generatedSimplifiedAssignmentStatements.size());
-            for (const auto& generatedSubAssignment: generatedSimplifiedAssignmentStatements) {
-                const auto subAssignmentCasted = std::static_pointer_cast<syrec::AssignStatement>(generatedSubAssignment);
-                remainingSimplifiedAssignments.emplace_back(std::make_unique<syrec::AssignStatement>(subAssignmentCasted->lhs, subAssignmentCasted->op, subAssignmentCasted->rhs));
+        // Try to replace an assignment of the form a += ... to a ^= ... of the symbol table entry for 'a' has the value 0.
+        } else if (evaluatedSignalAccessOfAssignedToSignal.has_value() && mappedToAssignmentOperationFromFlag.has_value() && *mappedToAssignmentOperationFromFlag == syrec_operation::operation::AddAssign) {
+            const std::optional<unsigned int> fetchedValueOfAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(*evaluatedSignalAccessOfAssignedToSignal);
+            performAssignment(*evaluatedSignalAccessOfAssignedToSignal, *mappedToAssignmentOperationFromFlag, fetchedValueOfAssignedToSignal);
+            if (fetchedValueOfAssignedToSignal.has_value() && !*fetchedValueOfAssignedToSignal) {
+                return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::AssignStatement>(
+                        lhsOperand,
+                        *syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign),
+                        rhsOperand));   
             }
-            return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(remainingSimplifiedAssignments));
         }
     }
-
+    
     if (lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs) {
         return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand));
     }
