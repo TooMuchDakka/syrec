@@ -13,6 +13,15 @@ namespace noAdditionalLineSynthesis {
         ExpressionToSubAssignmentSplitter():
             fixedSubAssignmentOperationsQueueIdx(0), operationInversionFlag(false) {}
 
+        /**
+         * \brief Try to simplify assignment by splitting the rhs operand of said statement into sub-assignments if possible.
+         *
+         * NOTE: It is the responsibility of the caller to guarantee that no signal accessed overlapping \p assignedToSignal are defined in \p expr.
+         * \param assignedToSignal The assigned to signal defining of the original assignment which servers as the default left hand side operand of any generated sub-assignment.
+         * \param initialAssignmentOperation The initial assignment operation.
+         * \param expr The expression which should be simplified by generating subexpressions if possible.
+         * \return A vector containing either the generated sub assignments or an assignment consisting of the user provided parameters of the form \p assignedToSignal \p initialAssignmentOperation \p expr.
+         */
         [[nodiscard]] syrec::AssignStatement::vec createSubAssignmentsBySplitOfExpr(const syrec::VariableAccess::ptr& assignedToSignal, syrec_operation::operation initialAssignmentOperation, const syrec::expression::ptr& expr);
     protected:
         syrec::AssignStatement::vec                      generatedAssignments;

@@ -31,14 +31,16 @@ void ExpressionToSubAssignmentSplitter::updateOperationInversionFlag(syrec_opera
 }
 
 bool ExpressionToSubAssignmentSplitter::handleExpr(const syrec::expression::ptr& expr) {
-    const std::optional<std::pair<bool, bool>> optionalLeafNodeStatusPerOperandOfExpr = determineLeafNodeStatusForOperandsOfExpr(*expr);
-    if (!optionalLeafNodeStatusPerOperandOfExpr.has_value()) {
+    if (const std::optional<std::pair<bool, bool>> optionalLeafNodeStatusPerOperandOfExpr = determineLeafNodeStatusForOperandsOfExpr(*expr); optionalLeafNodeStatusPerOperandOfExpr.has_value()) {
+        if (optionalLeafNodeStatusPerOperandOfExpr->first && optionalLeafNodeStatusPerOperandOfExpr->second) {
+            return handleExprWithTwoLeafNodes(expr);
+        }
+        if (optionalLeafNodeStatusPerOperandOfExpr->first || optionalLeafNodeStatusPerOperandOfExpr->second) {
+            return handleExprWithOneLeafNode(expr);            
+        }
         return handleExprWithNoLeafNodes(expr);
     }
-    if (optionalLeafNodeStatusPerOperandOfExpr->first && optionalLeafNodeStatusPerOperandOfExpr->second) {
-        return handleExprWithTwoLeafNodes(expr);
-    }
-    return handleExprWithOneLeafNode(expr);
+    return false;
 }
 
 bool ExpressionToSubAssignmentSplitter::handleExprWithNoLeafNodes(const syrec::expression::ptr& expr) {
@@ -110,12 +112,16 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithOneLeafNode(const syrec::e
             }
         }
     }
+    else {
+        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, expr));
+        return true;
+    }
     return false;
 }
 
 bool ExpressionToSubAssignmentSplitter::handleExprWithTwoLeafNodes(const syrec::expression::ptr& expr) {
-    const syrec_operation::operation assignmentOperationOfLhsExpr = getOperationOfNextSubAssignment().value();
-    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr) {
+    const std::optional<syrec_operation::operation> assignmentOperationOfLhsExpr = getOperationOfNextSubAssignment();
+    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr && assignmentOperationOfLhsExpr.has_value()) {
         const std::optional<syrec_operation::operation> definedBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
         const std::optional<syrec_operation::operation> matchingAssignmentOperationForBinaryOperation = definedBinaryOperation.has_value()
             ? syrec_operation::getMatchingAssignmentOperationForOperation(*definedBinaryOperation)
@@ -147,12 +153,13 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithTwoLeafNodes(const syrec::
                 }
 
                 if (!handlingOfOperandsOk) {
-                    storeAssignment(createAssignmentFrom(fixedAssignmentLhs, assignmentOperationOfLhsExpr, transformExprBeforeProcessing(exprAsBinaryExpr->rhs)));
+                    storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, transformExprBeforeProcessing(exprAsBinaryExpr->rhs)));
                     storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfRhsExpr, transformExprBeforeProcessing(exprAsBinaryExpr->rhs)));   
                 }
-                return true;   
             }
         }
+        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, expr));
+        return true;   
     }
     return false;
 }
@@ -216,10 +223,10 @@ std::optional<std::pair<bool, bool>> ExpressionToSubAssignmentSplitter::determin
     }
 
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr) {
-        return std::make_pair(doesExprDefineSubExpression(*exprAsBinaryExpr->lhs), doesExprDefineSubExpression(*exprAsBinaryExpr->rhs));
+        return std::make_pair(!doesExprDefineSubExpression(*exprAsBinaryExpr->lhs), !doesExprDefineSubExpression(*exprAsBinaryExpr->rhs));
     }
     if (const auto& exprAsShiftExpr = dynamic_cast<const syrec::ShiftExpression*>(&expr); exprAsShiftExpr) {
-        return std::make_pair(doesExprDefineSubExpression(*exprAsShiftExpr->lhs), false);
+        return std::make_pair(!doesExprDefineSubExpression(*exprAsShiftExpr->lhs), false);
     }
     return std::nullopt;
 }
