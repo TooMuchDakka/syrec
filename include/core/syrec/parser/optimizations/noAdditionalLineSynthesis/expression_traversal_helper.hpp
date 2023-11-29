@@ -17,8 +17,8 @@ namespace noAdditionalLineSynthesis {
         using ptr = std::shared_ptr<ExpressionTraversalHelper>;
 
         struct OperandNode {
-            std::size_t id;
-            std::optional<std::size_t> referencedOperationNodeId;
+            std::size_t                id;
+            std::optional<std::size_t> operationNodeId;
 
             [[nodiscard]] bool isLeafNode() const;
         };

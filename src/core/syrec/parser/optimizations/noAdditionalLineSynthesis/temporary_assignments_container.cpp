@@ -28,7 +28,7 @@ void TemporaryAssignmentsContainer::markCutoffForInvertibleAssignments() {
     cutOffIndicesForInvertibleAssignments.emplace_back(generatedAssignments.size());
 }
 
-void TemporaryAssignmentsContainer::invertAllAssignmentsUpToLastCutoff(std::size_t numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne) {
+void TemporaryAssignmentsContainer::invertAllAssignmentsUpToLastCutoff(std::size_t numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne, const syrec::VariableAccess::ptr* optionalExcludedFromInversionAssignmentsFilter) {
     std::vector<std::size_t> relevantIndicesOfActiveAssignments = cutOffIndicesForInvertibleAssignments.empty() ? indicesOfActiveAssignments : determineIndicesOfInvertibleAssignmentsStartingFrom(cutOffIndicesForInvertibleAssignments.back());
 
     if (numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne && !relevantIndicesOfActiveAssignments.empty()) {
@@ -39,7 +39,9 @@ void TemporaryAssignmentsContainer::invertAllAssignmentsUpToLastCutoff(std::size
     for (auto activeAssignmentIndicesIterator = relevantIndicesOfActiveAssignments.rbegin(); activeAssignmentIndicesIterator != relevantIndicesOfActiveAssignments.rend(); ++activeAssignmentIndicesIterator) {
         const syrec::AssignStatement::ptr& referenceActiveAssignment = generatedAssignments.at(*activeAssignmentIndicesIterator);
         if (const auto& referenceAssignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(referenceActiveAssignment); referenceAssignmentCasted) {
-            invertAssignmentAndStoreAndMarkOriginalAsInactive(*referenceAssignmentCasted);
+            if (!optionalExcludedFromInversionAssignmentsFilter || referenceAssignmentCasted->lhs != *optionalExcludedFromInversionAssignmentsFilter) {
+                invertAssignmentAndStoreAndMarkOriginalAsInactive(*activeAssignmentIndicesIterator);   
+            }
         }
     }
 }
@@ -119,28 +121,26 @@ std::size_t TemporaryAssignmentsContainer::getNumberOfAssignments() const {
 }
 
 // START OF NON-PUBLIC FUNCTIONS
-void TemporaryAssignmentsContainer::invertAssignmentAndStoreAndMarkOriginalAsInactive(const syrec::AssignStatement& assignmentToInvert) {
-    const std::vector<std::size_t> activeAssignmentsForCurrentCutoff = cutOffIndicesForInvertibleAssignments.empty()
-        ? indicesOfActiveAssignments
-        : determineIndicesOfInvertibleAssignmentsStartingFrom(cutOffIndicesForInvertibleAssignments.back());
-
+void TemporaryAssignmentsContainer::invertAssignmentAndStoreAndMarkOriginalAsInactive(std::size_t indexOfAssignmentToInvert) {
     /*
      * Perform a search for the index of the reference active assignment and mark it as inactive by removing said index from the indices of the active assignments
      */
-    for (auto activeAssignmentIndexIterator = activeAssignmentsForCurrentCutoff.rbegin(); activeAssignmentIndexIterator != activeAssignmentsForCurrentCutoff.rend();) {
-        const auto& referenceGeneratedAssignment = generatedAssignments.at(*activeAssignmentIndexIterator);
-        if (const auto& referenceAssignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(referenceGeneratedAssignment); referenceAssignmentCasted) {
-            if (referenceAssignmentCasted->lhs == assignmentToInvert.lhs) {
-                const auto& index = std::distance(activeAssignmentsForCurrentCutoff.rbegin(), activeAssignmentIndexIterator);
-                indicesOfActiveAssignments.erase(std::next(indicesOfActiveAssignments.begin(), index));
-                break;
-            }
+    const auto& referenceGeneratedAssignment = generatedAssignments.at(indexOfAssignmentToInvert);
+    if (const auto& referenceAssignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(referenceGeneratedAssignment); referenceAssignmentCasted) {
+        const auto& indexOfActiveAssignmentToRemove = std::find_if(
+                indicesOfActiveAssignments.cbegin(),
+                indicesOfActiveAssignments.cend(),
+                [&indexOfAssignmentToInvert](const std::size_t indexOfActiveAssignment) {
+                    return indexOfAssignmentToInvert == indexOfActiveAssignment;
+                });
+        if (indexOfActiveAssignmentToRemove != indicesOfActiveAssignments.cend()) {
+            indicesOfActiveAssignments.erase(indexOfActiveAssignmentToRemove);
         }
-        ++activeAssignmentIndexIterator;
+
+        removeActiveAssignmentFromLookup(referenceAssignmentCasted->lhs);
+        syrec::AssignStatement::ptr generatedInvertedAssignment = invertAssignment(*referenceAssignmentCasted);
+        generatedAssignments.emplace_back(generatedInvertedAssignment);
     }
-    removeActiveAssignmentFromLookup(assignmentToInvert.lhs);
-    syrec::AssignStatement::ptr generatedInvertedAssignment = invertAssignment(assignmentToInvert);
-    generatedAssignments.emplace_back(generatedInvertedAssignment);
 }
 
 syrec::AssignStatement::ptr TemporaryAssignmentsContainer::invertAssignment(const syrec::AssignStatement& assignment) {
@@ -157,7 +157,7 @@ std::vector<std::size_t> TemporaryAssignmentsContainer::determineIndicesOfInvert
             indicesOfActiveAssignments.cbegin(),
             indicesOfActiveAssignments.cend(),
             [&firstRelevantAssignmentIndex](const std::size_t activeAssignmentIndex) {
-                return activeAssignmentIndex > firstRelevantAssignmentIndex;
+                return activeAssignmentIndex >= firstRelevantAssignmentIndex;
             });
     if (indexOfFirstActiveAssignmentWithLargerIndex == indicesOfActiveAssignments.cend()) {
         return {};

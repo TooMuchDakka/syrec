@@ -16,7 +16,12 @@ namespace noAdditionalLineSynthesis {
 
         void storeActiveAssignment(const syrec::AssignStatement::ptr& assignment);
         void markCutoffForInvertibleAssignments();
-        void invertAllAssignmentsUpToLastCutoff(std::size_t numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne);
+        /**
+         * \brief Invert all assignments starting from the last generated one up to the last marked cutoff position and optionally exclude a fixed number of assignments or all matching a given active assignment
+         * \param numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne The number of assignment to not invert starting from the last active one
+         * \param optionalExcludedFromInversionAssignmentsFilter An optional filter defining an active assignment which with all of its sub-assignments should be kept active
+         */
+        void invertAllAssignmentsUpToLastCutoff(std::size_t numberOfAssignmentToExcludeFromInversionStartingFromLastGeneratedOne, const syrec::VariableAccess::ptr* optionalExcludedFromInversionAssignmentsFilter);
         void popLastCutoffForInvertibleAssignments();
         void rollbackLastXAssignments(std::size_t numberOfAssignmentsToRemove);
         void rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(bool popCutOff);
@@ -31,7 +36,7 @@ namespace noAdditionalLineSynthesis {
         std::vector<syrec::AssignStatement::ptr>                                        generatedAssignments;
         std::unordered_map<std::string, std::unordered_set<syrec::VariableAccess::ptr>> activeAssignmentsLookup;
 
-        void                                                             invertAssignmentAndStoreAndMarkOriginalAsInactive(const syrec::AssignStatement& assignmentToInvert);
+        void                                                             invertAssignmentAndStoreAndMarkOriginalAsInactive(std::size_t indexOfAssignmentToInvert);
         [[nodiscard]] static syrec::AssignStatement::ptr                 invertAssignment(const syrec::AssignStatement& assignment);
         [[nodiscard]] std::vector<std::size_t>                           determineIndicesOfInvertibleAssignmentsStartingFrom(std::size_t firstRelevantAssignmentIndex) const;
         void                                                             removeActiveAssignmentFromLookup(const syrec::VariableAccess::ptr& assignedToSignal);

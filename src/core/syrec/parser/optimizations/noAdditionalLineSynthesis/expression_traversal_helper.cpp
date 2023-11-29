@@ -5,7 +5,7 @@
 using namespace noAdditionalLineSynthesis;
 
 bool ExpressionTraversalHelper::OperandNode::isLeafNode() const {
-    return !referencedOperationNodeId.has_value();
+    return !operationNodeId.has_value();
 }
 
 
@@ -72,14 +72,15 @@ std::optional<syrec_operation::operation> ExpressionTraversalHelper::getOperatio
 }
 
 std::optional<std::size_t> ExpressionTraversalHelper::getOperandNodeIdOfNestedOperation(std::size_t parentOperationNodeId, std::size_t nestedOperationNodeId) const {
-    if (const auto& parentOperationNodeReference = getOperationNodeById(parentOperationNodeId); parentOperationNodeReference.has_value()) {
-        const auto& lhsOperand = parentOperationNodeReference->get()->lhsOperand;
-        if (lhsOperand.referencedOperationNodeId.has_value() && *lhsOperand.referencedOperationNodeId == nestedOperationNodeId) {
-            return lhsOperand.id;
+    if (const std::optional<OperationNodeReference> parentOperationNodeReference = getOperationNodeById(parentOperationNodeId); parentOperationNodeReference) {
+        const OperandNode& lhsOperand = parentOperationNodeReference->get()->lhsOperand;
+        if (lhsOperand.operationNodeId.has_value() && *lhsOperand.operationNodeId == nestedOperationNodeId) {
+            return *lhsOperand.operationNodeId;
         }
-        const auto& rhsOperand = parentOperationNodeReference->get()->rhsOperand;
-        if (rhsOperand.referencedOperationNodeId.has_value() && *rhsOperand.referencedOperationNodeId == nestedOperationNodeId) {
-            return rhsOperand.id;
+
+        const OperandNode& rhsOperand = parentOperationNodeReference->get()->rhsOperand;
+        if (rhsOperand.operationNodeId.has_value() && *rhsOperand.operationNodeId == nestedOperationNodeId) {
+            return *rhsOperand.operationNodeId;
         }
     }
     return std::nullopt;
@@ -181,10 +182,10 @@ void ExpressionTraversalHelper::handleOperationNodeDuringTraversalQueueInit(cons
     
     operationNodeTraversalQueue.emplace_back(operationNode->id);
     if (!operationNode->lhsOperand.isLeafNode()) {
-        handleOperationNodeDuringTraversalQueueInit(*getOperationNodeById(operationNode->lhsOperand.id));
+        handleOperationNodeDuringTraversalQueueInit(*getOperationNodeById(*operationNode->lhsOperand.operationNodeId));
     }
     if (!operationNode->rhsOperand.isLeafNode()) {
-        handleOperationNodeDuringTraversalQueueInit(*getOperationNodeById(operationNode->rhsOperand.id));
+        handleOperationNodeDuringTraversalQueueInit(*getOperationNodeById(*operationNode->rhsOperand.operationNodeId));
     }
 }
 
@@ -213,10 +214,11 @@ ExpressionTraversalHelper::OperandNode ExpressionTraversalHelper::createOperandN
     if (doesExpressionContainNestedExprAsOperand(*expr)) {
         const auto& generatedOperationNode = createOperationNode(expr, parentOperationNodeId);
         operationNodeDataLookup.insert(std::make_pair(generatedOperationNode->id, generatedOperationNode));
-        return OperandNode({generatedOperationNode->id, parentOperationNodeId});
+        const std::size_t generatedIdForOperationNodeAsOperand = operandNodeIdGenerator.generateNextId();
+        return OperandNode({generatedIdForOperationNodeAsOperand, generatedOperationNode->id});
     }
 
-    const auto& generatedIdForExprOperand = operandNodeIdGenerator.generateNextId();
+    const std::size_t generatedIdForExprOperand = operandNodeIdGenerator.generateNextId();
     operandNodeDataLookup.insert(std::make_pair(generatedIdForExprOperand, expr));
     return OperandNode({generatedIdForExprOperand, std::nullopt});
 }
