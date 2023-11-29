@@ -10,7 +10,7 @@
 #include <functional>
 
 // TODO: General overhaul of enums to scoped enums if possible (see https://en.cppreference.com/w/cpp/language/enum)
-
+// TODO: Support for unary expressions if SyReC IR support such expressions
 namespace noAdditionalLineSynthesis {
     class AssignmentWithoutAdditionalLineSimplifier {
     public:
@@ -85,10 +85,10 @@ namespace noAdditionalLineSynthesis {
         };
         using OwningOperationOperandSimplificationResultReference = std::unique_ptr<OperationOperandSimplificationResult>;
 
-        [[nodiscard]] std::optional<OwningOperationOperandSimplificationResultReference> handleOperationNode(const ExpressionTraversalHelper::OperationNodeReference& operationNode);
-        [[nodiscard]] std::optional<OwningOperationOperandSimplificationResultReference> handleOperationNodeWithNoLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode);
-        [[nodiscard]] std::optional<OwningOperationOperandSimplificationResultReference> handleOperationNodeWithOneLeafNode(const ExpressionTraversalHelper::OperationNodeReference& operationNode);
-        [[nodiscard]] std::optional<OwningOperationOperandSimplificationResultReference> handleOperationNodeWithOnlyLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode);
+        [[nodiscard]] std::optional<OwningOperationOperandSimplificationResultReference> handleOperationNode(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
+        [[nodiscard]] std::optional<OwningOperationOperandSimplificationResultReference> handleOperationNodeWithNoLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
+        [[nodiscard]] std::optional<OwningOperationOperandSimplificationResultReference> handleOperationNodeWithOneLeafNode(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
+        [[nodiscard]] std::optional<OwningOperationOperandSimplificationResultReference> handleOperationNodeWithOnlyLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
 
         // This function should probably be refactored since the usage of a signal access can only determine a conflict and not the choice when trying to create an assignments
         // Only active assignments contribute to the set of potential conflicts.
@@ -126,9 +126,10 @@ namespace noAdditionalLineSynthesis {
         /**
          * \brief Try to simplify the rhs of an assignment by splitting it into sub-assignments if possible. We are assuming that no signal accesses overlapping the lhs operand of the assignment is defined on the rhs.
          * \param assignment The assignment which should be simplified.
+         * \param signalValueLookupCallback The user-provided callback used to determine the value of any accessed signal parts
          * \return The generated sub-assignments or a vector containing the original assignment
          */
-        [[nodiscard]] syrec::AssignStatement::vec performSimplificationOfAssignmentRhs(const syrec::AssignStatement::ptr& assignment) const;
+        [[nodiscard]] syrec::AssignStatement::vec performSimplificationOfAssignmentRhs(const syrec::AssignStatement::ptr& assignment, const SignalValueLookupCallback& signalValueLookupCallback) const;
 
         // This call should be responsible to determine conflicts, during a decision their should not arise any conflicts
         // The check for a conflict should take place in the operations nodes with either one or two leaf nodes by using this call before making any decisions
@@ -154,17 +155,38 @@ namespace noAdditionalLineSynthesis {
         void                                                                                             rememberConflict(std::size_t operationNodeId, Decision::ChoosenOperand chosenOperandAtOperationNode) const;
         [[nodiscard]] bool                                                                               didPreviousDecisionMatchingChoiceCauseConflict(const LearnedConflictsLookupKey& lookupKeyRepresentingSearchedForPreviousDecision) const;
         
-        [[nodiscard]] static syrec::expression::ptr                                                             fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
-        [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>                                         tryCreateAssignmentForOperationNode(const syrec::VariableAccess::ptr& assignmentLhs, syrec_operation::operation op, const syrec::expression::ptr& assignmentRhs);
-        [[nodiscard]] static syrec::expression::ptr                                                             createExpressionFrom(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
-        [[nodiscard]] static syrec::expression::ptr                                                             createExpressionFromOperationNode(const ExpressionTraversalHelper::ptr& expressionTraversalHelper, const ExpressionTraversalHelper::OperationNodeReference& operationNode);
-        [[nodiscard]] static syrec::expression::ptr                                                             createExpressionFromOperandSimplificationResult(const OperationOperandSimplificationResult& operandSimplificationResult);
-        [[nodiscard]] static bool                                                                               doesExpressionDefineNestedSplitableExpr(const syrec::expression& expr);
-        [[nodiscard]] static bool                                                                               doesExpressionDefineNumber(const syrec::expression& expr);
-        [[nodiscard]] static bool                                                                               doesExprDefineSignalAccess(const syrec::expression& expr);
-        [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>                                         tryCreateAssignmentFromOperands(Decision::ChoosenOperand chosenOperandAsAssignedToSignal, const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
-        [[nodiscard]] static std::optional<syrec::expression::ptr>                                              tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
-        [[nodiscard]] static bool                                                                               areAssignedToSignalPartsZero(const syrec::VariableAccess& accessedSignalParts, const SignalValueLookupCallback& signalValueLookupCallback);
+        [[nodiscard]] static syrec::expression::ptr                      fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
+        [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentForOperationNode(const syrec::VariableAccess::ptr& assignmentLhs, syrec_operation::operation op, const syrec::expression::ptr& assignmentRhs);
+        [[nodiscard]] static syrec::expression::ptr                      createExpressionFrom(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
+        [[nodiscard]] static syrec::expression::ptr                      createExpressionFromOperationNode(const ExpressionTraversalHelper::ptr& expressionTraversalHelper, const ExpressionTraversalHelper::OperationNodeReference& operationNode);
+        [[nodiscard]] static syrec::expression::ptr                      createExpressionFromOperandSimplificationResult(const OperationOperandSimplificationResult& operandSimplificationResult);
+        [[nodiscard]] static bool                                        doesExpressionDefineNestedSplitableExpr(const syrec::expression& expr);
+        [[nodiscard]] static bool                                        doesExpressionDefineNumber(const syrec::expression& expr);
+        [[nodiscard]] static bool                                        doesExprDefineSignalAccess(const syrec::expression& expr);
+        [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentFromOperands(Decision::ChoosenOperand chosenOperandAsAssignedToSignal, const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
+        [[nodiscard]] static std::optional<syrec::expression::ptr>       tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
+        [[nodiscard]] static bool                                        areAssignedToSignalPartsZero(const syrec::VariableAccess& accessedSignalParts, const SignalValueLookupCallback& signalValueLookupCallback);
+        [[nodiscard]] static bool                                        doesExprOnlyDefineReversibleOperationAndXorOnlyInLeafNodes(const syrec::expression& expr);
+        static void                                                      tryConvertNumericToBinaryExpr(syrec::expression::ptr& expr);
+        [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr> convertNumericExprToBinary(const syrec::NumericExpression& numericExpr);
+        [[nodiscard]] static std::optional<syrec_operation::operation>   tryMapCompileTimeConstantExprOperationToBinaryOperation(syrec::Number::CompileTimeConstantExpression::Operation operation);
+        [[nodiscard]] static syrec::expression::ptr                      convertNumberToExpr(const syrec::Number::ptr& number, unsigned int expectedBitwidth);
+        [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr> convertCompileTimeConstantExprToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr, unsigned int expectedBitwidth);
+        [[nodiscard]] static syrec::expression::ptr                      transformExprBeforeProcessing(const syrec::expression::ptr& initialExpr);
+        /**
+         * \brief Check whether the simplified split of assignment right-hand side expression is allowed.
+         *
+         * \remarks This is allowed in the following cases: <br>
+         * I.   The assignment operation is not equal to '^=' and the topmost operation of the rhs is not equal to the bitwise xor operation <br>
+         * II.  The defined assignment operation is '^=' and the value of the assigned to signal parts is 0
+         * III. The topmost expression of the assignment right-hand side is not a shift expression
+         * \param assignedToSignalParts The assigned to signal parts by the assignment
+         * \param operation The defined assignment operation
+         * \param topmostAssignmentRhsExpr The right-hand side expression of the assignment
+         * \param signalValueLookupCallback The callback used to determine the value of the assigned to signal parts
+         * \return Whether the simplified split "algorithm" can be applied.
+         */
+        [[nodiscard]] static bool isSplitOfAssignmentRhsIntoSubexpressionsAllowed(const syrec::VariableAccess& assignedToSignalParts, syrec_operation::operation operation, const syrec::expression& topmostAssignmentRhsExpr, const SignalValueLookupCallback& signalValueLookupCallback);
     };
 }
 

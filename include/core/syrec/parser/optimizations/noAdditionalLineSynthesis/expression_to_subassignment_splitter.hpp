@@ -48,11 +48,6 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                                           doesExprDefineSubExpression(const syrec::expression& expr);
         [[nodiscard]] static bool                                           doesOperandDefineLeafNode(const syrec::expression& expr);
         [[nodiscard]] static std::optional<std::pair<bool, bool>>           determineLeafNodeStatusForOperandsOfExpr(const syrec::expression& expr);
-        [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr>    convertNumericExprToBinary(const syrec::NumericExpression& numericExpr);
-        [[nodiscard]] static std::optional<syrec_operation::operation>      tryMapCompileTimeConstantExprOperationToBinaryOperation(syrec::Number::CompileTimeConstantExpression::Operation operation);
-        [[nodiscard]] static syrec::expression::ptr                         convertNumberToExpr(const syrec::Number::ptr& number, unsigned int expectedBitwidth);
-        [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr>    convertCompileTimeConstantExprToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr, unsigned int expectedBitwidth);
-        [[nodiscard]] static syrec::expression::ptr                         transformExprBeforeProcessing(const syrec::expression::ptr& initialExpr);
     };
 }
 

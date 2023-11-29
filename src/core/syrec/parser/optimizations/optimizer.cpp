@@ -304,13 +304,13 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
                     const auto subAssignmentCasted = std::static_pointer_cast<syrec::AssignStatement>(generatedSubAssignment);
                     remainingSimplifiedAssignments.emplace_back(std::make_unique<syrec::AssignStatement>(subAssignmentCasted->lhs, subAssignmentCasted->op, subAssignmentCasted->rhs));
                 }
-                performAssignment(*evaluatedSignalAccessOfAssignedToSignal, *mappedToAssignmentOperationFromFlag, std::nullopt);
+                performAssignment(*evaluatedSignalAccessOfAssignedToSignal, *mappedToAssignmentOperationFromFlag, rhsOperandEvaluatedAsConstant);
                 return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(remainingSimplifiedAssignments));
             }
         // Try to replace an assignment of the form a += ... to a ^= ... of the symbol table entry for 'a' has the value 0.
         } else if (evaluatedSignalAccessOfAssignedToSignal.has_value() && mappedToAssignmentOperationFromFlag.has_value() && *mappedToAssignmentOperationFromFlag == syrec_operation::operation::AddAssign) {
             const std::optional<unsigned int> fetchedValueOfAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(*evaluatedSignalAccessOfAssignedToSignal);
-            performAssignment(*evaluatedSignalAccessOfAssignedToSignal, *mappedToAssignmentOperationFromFlag, fetchedValueOfAssignedToSignal);
+            performAssignment(*evaluatedSignalAccessOfAssignedToSignal, *mappedToAssignmentOperationFromFlag, rhsOperandEvaluatedAsConstant);
             if (fetchedValueOfAssignedToSignal.has_value() && !*fetchedValueOfAssignedToSignal) {
                 return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::AssignStatement>(
                         lhsOperand,
@@ -2496,7 +2496,6 @@ void optimizations::Optimizer::resetInternalNestingLevelsForIfAndLoopStatements(
     internalLoopNestingLevel = 0;
     internalIfStatementNestingLevel = 0;
 }
-
 
 std::unordered_set<std::size_t> optimizations::Optimizer::determineIndicesOfUnusedModules(const std::vector<parser::SymbolTable::ModuleCallSignature>& unoptimizedModuleCallSignatures) const {
     const auto& activeSymbolTableScope = getActiveSymbolTableScope();
