@@ -2,15 +2,55 @@
 
 using namespace noAdditionalLineSynthesis;
 
-syrec::AssignStatement::vec ExpressionToSubAssignmentSplitter::createSubAssignmentsBySplitOfExpr(const syrec::VariableAccess::ptr& assignedToSignal, syrec_operation::operation initialAssignmentOperation, const syrec::expression::ptr& expr) {
+// Handling or split of subexpressions should also work under for this example currently does not
+syrec::AssignStatement::vec ExpressionToSubAssignmentSplitter::createSubAssignmentsBySplitOfExpr(const syrec::AssignStatement::ptr& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
     resetInternals();
-    if (const bool isGivenOperationAssignmentOperation = syrec_operation::isOperationAssignmentOperation(initialAssignmentOperation); isGivenOperationAssignmentOperation) {
-        init(assignedToSignal, initialAssignmentOperation);
-        if (!handleExpr(expr)) {
-            storeAssignment(createAssignmentFrom(fixedAssignmentLhs, initialAssignmentOperation, expr));
+    const auto& assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment);
+    if (assignmentCasted) {
+        transformTwoSubsequentMinusOperations(*assignmentCasted);
+        // We have to perform this sort of revert of a previous optimization so that our split precondition holds (which would not be the case for an assignment of 
+        transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(*assignmentCasted, currentValueOfAssignedToSignal);
+        transformAddAssignOperationToXorAssignOperationIfTopmostOpOfRhsExprIsBitwiseXor(*assignmentCasted, currentValueOfAssignedToSignal);
+    }
+    const std::optional<syrec_operation::operation> mappedToAssignmentOperationFromFlag = assignmentCasted ? syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op) : std::nullopt;
+    if (mappedToAssignmentOperationFromFlag.has_value() && isPreconditionSatisfied(*mappedToAssignmentOperationFromFlag, *assignmentCasted->rhs, currentValueOfAssignedToSignal)) {
+        init(assignmentCasted->lhs, *mappedToAssignmentOperationFromFlag, currentValueOfAssignedToSignal);
+        if (!handleExpr(assignmentCasted->rhs)) {
+            storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *mappedToAssignmentOperationFromFlag, assignmentCasted->rhs));
         }
+    } else {
+        storeAssignment(assignment);
     }
     return generatedAssignments;
+}
+
+bool ExpressionToSubAssignmentSplitter::isPreconditionSatisfied(syrec_operation::operation operation, const syrec::expression& topmostAssignmentRhsExpr, const std::optional<unsigned int>& currentValueOfAssignedToSignal) const {
+    if (!syrec_operation::isOperationAssignmentOperation(operation)) {
+        return false;
+    }
+    const auto& topmostExprOfRhsAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&topmostAssignmentRhsExpr);
+    if (!topmostExprOfRhsAsBinaryExpr) {
+        return true;
+    }
+
+    syrec::expression::ptr                          expressionToCheck      = std::make_shared<syrec::BinaryExpression>(topmostExprOfRhsAsBinaryExpr->lhs, topmostExprOfRhsAsBinaryExpr->op, topmostExprOfRhsAsBinaryExpr->rhs);
+    const std::optional<syrec_operation::operation> operationOfTopmostExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(topmostExprOfRhsAsBinaryExpr->op);
+    if (!operationOfTopmostExpr.has_value()) {
+        return false;
+    }
+
+    /*
+     * We perform an internal transformation of the given assignment operation to satisfy the precondition in the following case:
+     * I. If the assignment operation '+=' is used while the rhs expr defines a binary expression with the '^' operation, will transform the former to '^=' if the assigned to signal value is 0.
+     * II. if the assignment operation '^=' is used while the rhs expr defines a binary expression with an operation not equal to '^=', will transform the former to '+=' if the assigned to signal value is 0.
+     */
+    if ((currentValueOfAssignedToSignal.has_value() && !*currentValueOfAssignedToSignal && operationOfTopmostExpr.has_value())
+        && ((operation == syrec_operation::operation::XorAssign && *operationOfTopmostExpr != syrec_operation::operation::BitwiseXor) 
+            || (operation == syrec_operation::operation::AddAssign && *operationOfTopmostExpr == syrec_operation::operation::BitwiseXor)
+            || (operation == syrec_operation::operation::XorAssign && *operationOfTopmostExpr == syrec_operation::operation::BitwiseXor))) {
+            return true;
+    }
+    return operation != syrec_operation::operation::XorAssign && *operationOfTopmostExpr != syrec_operation::operation::BitwiseXor;
 }
 
 void ExpressionToSubAssignmentSplitter::resetInternals() {
@@ -18,12 +58,16 @@ void ExpressionToSubAssignmentSplitter::resetInternals() {
     generatedAssignments.clear();
     fixedSubAssignmentOperationsQueue.clear();
     fixedAssignmentLhs = nullptr;
+    areSplitsOfXorOperationIntoSubAssignmentsAllowed = false;
 }
 
-void ExpressionToSubAssignmentSplitter::init(const syrec::VariableAccess::ptr& fixedAssignedToSignalParts, syrec_operation::operation initialAssignmentOperation) {
+void ExpressionToSubAssignmentSplitter::init(const syrec::VariableAccess::ptr& fixedAssignedToSignalParts, syrec_operation::operation initialAssignmentOperation, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
     fixedAssignmentLhs = fixedAssignedToSignalParts;
     operationInversionFlag = initialAssignmentOperation == syrec_operation::operation::MinusAssign;
+    fixedSubAssignmentOperationsQueue.clear();
+    fixedSubAssignmentOperationsQueueIdx = 0;
     fixedSubAssignmentOperationsQueue.emplace_back(initialAssignmentOperation);
+    areSplitsOfXorOperationIntoSubAssignmentsAllowed = currentValueOfAssignedToSignal.has_value() && !*currentValueOfAssignedToSignal;
 }
 
 void ExpressionToSubAssignmentSplitter::updateOperationInversionFlag(syrec_operation::operation operationDeterminingInversionFlag) {
@@ -51,7 +95,7 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithNoLeafNodes(const syrec::e
 
     const syrec_operation::operation definedBinaryOperation = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
     const std::optional<syrec_operation::operation> assignmentOperationOfRhsOperand = determineAssignmentOperationToUse(definedBinaryOperation);
-    if (!assignmentOperationOfRhsOperand.has_value() || *assignmentOperationOfRhsOperand == syrec_operation::operation::BitwiseXor) {
+    if (!assignmentOperationOfRhsOperand.has_value()) {
         return false;   
     }
 
@@ -60,6 +104,11 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithNoLeafNodes(const syrec::e
     restorePreviousInversionStatusFlag(currentInversionFlagStatus);
     if (!couldLhsOperandBeHandled) {
         return false;
+    }
+
+    if (*assignmentOperationOfRhsOperand == syrec_operation::operation::XorAssign && doesExprDefineSubExpression(*exprAsBinaryExpr->rhs)) {
+        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, syrec_operation::operation::XorAssign, exprAsBinaryExpr->rhs));
+        return true;
     }
 
     fixNextSubAssignmentOperation(*assignmentOperationOfRhsOperand);
@@ -74,101 +123,93 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithNoLeafNodes(const syrec::e
 }
 
 bool ExpressionToSubAssignmentSplitter::handleExprWithOneLeafNode(const syrec::expression::ptr& expr) {
-    const std::shared_ptr<syrec::BinaryExpression> exprAsBinaryExpr                       = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
+    const std::shared_ptr<syrec::BinaryExpression> exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     if (!exprAsBinaryExpr) {
         return false;
     }
+
     const std::optional<std::pair<bool, bool>>      optionalLeafNodeStatusPerOperandOfExpr = determineLeafNodeStatusForOperandsOfExpr(*expr);
-    const std::optional<syrec_operation::operation> assignmentOperationOfLhsExpr           = getOperationOfNextSubAssignment();
-    if (!assignmentOperationOfLhsExpr) {
+    const syrec_operation::operation                definedBinaryOperation                = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+
+    if (!optionalLeafNodeStatusPerOperandOfExpr.has_value()) {
         return false;
     }
 
-    const syrec_operation::operation                definedBinaryOperation                = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
-    const std::optional<syrec_operation::operation> assignmentOperationForBinaryOperation = syrec_operation::getMatchingAssignmentOperationForOperation(definedBinaryOperation);
-
-    if (assignmentOperationForBinaryOperation.has_value() && *assignmentOperationForBinaryOperation != syrec_operation::operation::BitwiseXor) {
-        if (optionalLeafNodeStatusPerOperandOfExpr.has_value() && optionalLeafNodeStatusPerOperandOfExpr->first) {
-            if (const std::optional<syrec_operation::operation> assignmentOperationOfRhsOperand = determineAssignmentOperationToUse(definedBinaryOperation); assignmentOperationOfRhsOperand.has_value()) {
-                storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, exprAsBinaryExpr->lhs));
-                fixNextSubAssignmentOperation(*assignmentOperationOfRhsOperand);
-                updateOperationInversionFlag(*assignmentOperationOfRhsOperand);
-                if (!handleExpr(exprAsBinaryExpr->rhs)) {
-                    storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfRhsOperand, exprAsBinaryExpr->rhs));
-                }
-                return true;
-            }
-        }
-        if (optionalLeafNodeStatusPerOperandOfExpr.has_value() && optionalLeafNodeStatusPerOperandOfExpr->second) {
-            if (const std::optional<syrec_operation::operation> assignmentOperationOfRhsOperand = determineAssignmentOperationToUse(definedBinaryOperation); assignmentOperationOfRhsOperand.has_value()) {
-                const bool currentInversionFlagStatus = createBackupOfInversionFlagStatus();
-                if (!handleExpr(exprAsBinaryExpr->lhs)) {
-                    storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, exprAsBinaryExpr->lhs));
-                }
-                restorePreviousInversionStatusFlag(currentInversionFlagStatus);
-
-                storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfRhsOperand, exprAsBinaryExpr->rhs));
-                return true;
-            }
-        }
+    const std::optional<syrec_operation::operation> predefinedAssignmentOperationOfSubAssignment = getOperationOfNextSubAssignment(false);
+    if (!predefinedAssignmentOperationOfSubAssignment.has_value()) {
+        return false;
     }
-    else {
-        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, expr));
+
+    const std::optional<syrec_operation::operation> assignmentOperationOfRhsOperand = determineAssignmentOperationToUse(definedBinaryOperation);
+    if (!assignmentOperationOfRhsOperand.has_value() || (*assignmentOperationOfRhsOperand == syrec_operation::operation::XorAssign && !areSplitsOfXorOperationIntoSubAssignmentsAllowed)) {
+        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *predefinedAssignmentOperationOfSubAssignment, expr));
         return true;
+    }
+
+    if (optionalLeafNodeStatusPerOperandOfExpr->first) {
+        if (const std::optional<syrec_operation::operation> assignmentOperationForSubAssignment = getOperationOfNextSubAssignment(); assignmentOperationForSubAssignment.has_value()) {
+            storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationForSubAssignment,exprAsBinaryExpr->lhs));
+            if (*assignmentOperationOfRhsOperand == syrec_operation::operation::XorAssign && doesExprDefineSubExpression(*exprAsBinaryExpr->rhs)) {
+                storeAssignment(createAssignmentFrom(fixedAssignmentLhs, syrec_operation::operation::XorAssign, exprAsBinaryExpr->rhs));
+                return true;
+            }
+
+            fixNextSubAssignmentOperation(*assignmentOperationOfRhsOperand);
+            updateOperationInversionFlag(*assignmentOperationOfRhsOperand);
+            if (!handleExpr(exprAsBinaryExpr->rhs)) {
+                storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfRhsOperand, exprAsBinaryExpr->rhs));
+            }
+            return true;
+        }
+    } else {
+        const bool currentInversionFlagStatus = createBackupOfInversionFlagStatus();
+        if (!handleExpr(exprAsBinaryExpr->lhs)) {
+            storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *predefinedAssignmentOperationOfSubAssignment, exprAsBinaryExpr->lhs));
+        }
+        restorePreviousInversionStatusFlag(currentInversionFlagStatus);
+        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfRhsOperand, exprAsBinaryExpr->rhs));
+        return true;    
     }
     return false;
 }
 
 bool ExpressionToSubAssignmentSplitter::handleExprWithTwoLeafNodes(const syrec::expression::ptr& expr) {
     const std::optional<syrec_operation::operation> assignmentOperationOfLhsExpr = getOperationOfNextSubAssignment();
-    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr && assignmentOperationOfLhsExpr.has_value()) {
-        const std::optional<syrec_operation::operation> definedBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
-        const std::optional<syrec_operation::operation> matchingAssignmentOperationForBinaryOperation = definedBinaryOperation.has_value()
-            ? syrec_operation::getMatchingAssignmentOperationForOperation(*definedBinaryOperation)
-            : std::nullopt;
+    const auto&                                     exprAsBinaryExpr             = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
 
-        if (matchingAssignmentOperationForBinaryOperation.has_value()) {
-            if (const std::optional<syrec_operation::operation> assignmentOperationOfRhsExpr = determineAssignmentOperationToUse(*definedBinaryOperation); assignmentOperationOfRhsExpr.has_value()) {
-                bool                   handlingOfOperandsOk = true;
-                const bool currentInversionFlagStatus = createBackupOfInversionFlagStatus();
-                updateOperationInversionFlag(*definedBinaryOperation);
-                if (!handleExpr(exprAsBinaryExpr->lhs)) {
-                    handlingOfOperandsOk = false;
-                }
-                restorePreviousInversionStatusFlag(currentInversionFlagStatus);
-                
-                if (handlingOfOperandsOk) {
-                    const bool currentInversionFlagStatus = createBackupOfInversionFlagStatus();
-                    updateOperationInversionFlag(*definedBinaryOperation);
-                    if (!handleExpr(exprAsBinaryExpr->rhs)) {
-                        handlingOfOperandsOk = false;
-                    }
-                    restorePreviousInversionStatusFlag(currentInversionFlagStatus);
-                }
-
-                if (!handlingOfOperandsOk) {
-                    storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, exprAsBinaryExpr->lhs));
-                    storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfRhsExpr, exprAsBinaryExpr->rhs));
-                }
-                return true;
-            }
-        }
-        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, expr));
-        return true;   
+    if (!assignmentOperationOfLhsExpr.has_value() || !exprAsBinaryExpr) {
+        return false;
     }
-    return false;
+
+    const std::optional<syrec_operation::operation> definedBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+    const std::optional<syrec_operation::operation> subAssignmentOperationForRhs = definedBinaryOperation.has_value() ? determineAssignmentOperationToUse(*definedBinaryOperation) : std::nullopt;
+
+    if (!subAssignmentOperationForRhs.has_value() || (definedBinaryOperation.has_value() && *definedBinaryOperation == syrec_operation::operation::BitwiseXor && !areSplitsOfXorOperationIntoSubAssignmentsAllowed)) {
+        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, expr));
+    } else {
+        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, exprAsBinaryExpr->lhs));
+        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *subAssignmentOperationForRhs, exprAsBinaryExpr->rhs));        
+    }
+    return true;
 }
 
 void ExpressionToSubAssignmentSplitter::storeAssignment(const syrec::AssignStatement::ptr& assignment) {
+    if (const auto& assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment); assignmentCasted) {
+        transformTwoSubsequentMinusOperations(*assignmentCasted);
+    }   
     generatedAssignments.emplace_back(assignment);
 }
 
-std::optional<syrec_operation::operation> ExpressionToSubAssignmentSplitter::getOperationOfNextSubAssignment() {
+std::optional<syrec_operation::operation> ExpressionToSubAssignmentSplitter::getOperationOfNextSubAssignment(bool markAsConsumed) {
     if (fixedSubAssignmentOperationsQueueIdx >= fixedSubAssignmentOperationsQueue.size()) {
         return std::nullopt;
     }
 
-    const syrec_operation::operation operationInQueue = fixedSubAssignmentOperationsQueue.at(fixedSubAssignmentOperationsQueueIdx++);
+    const syrec_operation::operation operationInQueue = fixedSubAssignmentOperationsQueue.at(fixedSubAssignmentOperationsQueueIdx);
+    if (markAsConsumed) {
+        ++fixedSubAssignmentOperationsQueueIdx;
+    }
+
     if (syrec_operation::isOperationAssignmentOperation(operationInQueue)) {
         return operationInQueue;
     }
@@ -224,4 +265,76 @@ std::optional<std::pair<bool, bool>> ExpressionToSubAssignmentSplitter::determin
         return std::make_pair(!doesExprDefineSubExpression(*exprAsShiftExpr->lhs), false);
     }
     return std::nullopt;
+}
+
+void ExpressionToSubAssignmentSplitter::transformTwoSubsequentMinusOperations(syrec::AssignStatement& assignment) {
+    /*
+     * Try perform transformation of expression <assignedToSignal> -= (<subExpr_1> - <subExpr_2>) to <assignedToSignal += (<subExpr_2> - <subExpr_1>) to enable the optimization of replacing
+     * an += operation with a ^= operation if the symbol table entry for the assigned to signal value is zero. The latter will not be checked here and only the assignment will be transformed.
+     */
+    const std::optional<syrec_operation::operation>               usedAssignmentOperation       = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
+    const std::optional<std::shared_ptr<syrec::BinaryExpression>> assignmentRhsExprAsBinaryExpr = usedAssignmentOperation.has_value() ? std::make_optional(std::dynamic_pointer_cast<syrec::BinaryExpression>(assignment.rhs)) : std::nullopt;
+
+    if (usedAssignmentOperation.has_value() && *usedAssignmentOperation == syrec_operation::operation::MinusAssign && assignmentRhsExprAsBinaryExpr.has_value() && *assignmentRhsExprAsBinaryExpr) {
+        if (const std::optional<syrec_operation::operation> binaryOperationOfRhsExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(assignmentRhsExprAsBinaryExpr->get()->op); binaryOperationOfRhsExpr.has_value() && *binaryOperationOfRhsExpr == syrec_operation::operation::Subtraction) {
+            if (const std::optional<unsigned int> mappedToOperationFlagFromEnum = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::AddAssign); mappedToOperationFlagFromEnum.has_value()) {
+                const syrec::expression::ptr backupOfAssignmentRhsExprLhsOperand = assignmentRhsExprAsBinaryExpr->get()->lhs;
+                assignmentRhsExprAsBinaryExpr->get()->lhs                        = assignmentRhsExprAsBinaryExpr->get()->rhs;
+                assignmentRhsExprAsBinaryExpr->get()->rhs                        = backupOfAssignmentRhsExprLhsOperand;
+                assignment.op                                                    = *mappedToOperationFlagFromEnum;
+            }
+        }
+    }
+}
+
+void ExpressionToSubAssignmentSplitter::transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
+    if (!currentValueOfAssignedToSignal.has_value() || *currentValueOfAssignedToSignal) {
+        return;
+    }
+    const std::optional<syrec_operation::operation>               usedAssignmentOperation       = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
+    const std::optional<std::shared_ptr<syrec::BinaryExpression>> assignmentRhsExprAsBinaryExpr = usedAssignmentOperation.has_value() ? std::make_optional(std::dynamic_pointer_cast<syrec::BinaryExpression>(assignment.rhs)) : std::nullopt;
+    const std::optional<syrec_operation::operation>               usedBinaryOperation           = assignmentRhsExprAsBinaryExpr.has_value() && *assignmentRhsExprAsBinaryExpr ? syrec_operation::tryMapBinaryOperationFlagToEnum(assignmentRhsExprAsBinaryExpr->get()->op) : std::nullopt;
+
+    if (usedBinaryOperation.has_value() && *usedBinaryOperation != syrec_operation::operation::BitwiseXor && *usedAssignmentOperation == syrec_operation::operation::XorAssign) {
+        if (const std::optional<unsigned int> flagForAddAssignOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::AddAssign); flagForAddAssignOperation.has_value()) {
+            assignment.op = *flagForAddAssignOperation;    
+        }
+    }
+}
+
+void ExpressionToSubAssignmentSplitter::transformAddAssignOperationToXorAssignOperationIfTopmostOpOfRhsExprIsBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned>& currentValueOfAssignedToSignal) {
+    if (!currentValueOfAssignedToSignal.has_value() || *currentValueOfAssignedToSignal) {
+        return;
+    }
+    const std::optional<syrec_operation::operation>               usedAssignmentOperation       = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
+    const std::optional<std::shared_ptr<syrec::BinaryExpression>> assignmentRhsExprAsBinaryExpr = usedAssignmentOperation.has_value() ? std::make_optional(std::dynamic_pointer_cast<syrec::BinaryExpression>(assignment.rhs)) : std::nullopt;
+    const std::optional<syrec_operation::operation>               usedBinaryOperation           = assignmentRhsExprAsBinaryExpr.has_value() && *assignmentRhsExprAsBinaryExpr ? syrec_operation::tryMapBinaryOperationFlagToEnum(assignmentRhsExprAsBinaryExpr->get()->op) : std::nullopt;
+
+    if (usedBinaryOperation.has_value() && *usedBinaryOperation != syrec_operation::operation::BitwiseXor && *usedAssignmentOperation == syrec_operation::operation::AddAssign) {
+        if (const std::optional<unsigned int> flagForAddAssignOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign); flagForAddAssignOperation.has_value()) {
+            assignment.op = *flagForAddAssignOperation;
+        }
+    }
+}
+
+
+bool ExpressionToSubAssignmentSplitter::doesExprNotContainAnyOperationWithoutAssignmentCounterpartWhenBothOperandsAreNestedExpr(const syrec::expression& expr) {
+    if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr) {
+        const std::optional<syrec_operation::operation> mappedToBinaryOperationEnumValueFromFlag = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+        if (!mappedToBinaryOperationEnumValueFromFlag.has_value()) {
+            return false;
+        }
+
+        if (syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToBinaryOperationEnumValueFromFlag).has_value()) {
+            return doesExprNotContainAnyOperationWithoutAssignmentCounterpartWhenBothOperandsAreNestedExpr(*exprAsBinaryExpr->lhs) && doesExprNotContainAnyOperationWithoutAssignmentCounterpartWhenBothOperandsAreNestedExpr(*exprAsBinaryExpr->rhs);
+        }
+        return !doesExprDefineSubExpression(*exprAsBinaryExpr->lhs) && !doesExprDefineSubExpression(*exprAsBinaryExpr->rhs);
+    }
+    if (const auto& exprAsSignalAccessExpr = dynamic_cast<const syrec::VariableExpression*>(&expr); exprAsSignalAccessExpr) {
+        return true;
+    }
+    if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr) {
+        return true;
+    }
+    return false;
 }

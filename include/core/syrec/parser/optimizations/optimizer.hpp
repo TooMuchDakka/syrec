@@ -307,18 +307,7 @@ namespace optimizations {
         static void                                                                insertStatementCopiesInto(syrec::Statement::vec& containerForCopies, std::vector<std::unique_ptr<syrec::Statement>> copiesOfStatements);
         [[nodiscard]] bool                                                         optimizePeeledLoopBodyStatements(syrec::Statement::vec& containerForResult, const std::vector<std::unique_ptr<syrec::Statement>>& peeledLoopBodyStatements);
         [[nodiscard]] bool                                                         optimizeUnrolledLoopBodyStatements(syrec::Statement::vec& containerForResult, std::size_t numUnrolledIterations, optimizations::LoopUnroller::UnrolledIterationInformation& unrolledLoopBodyStatementsInformation);
-
-
-        //[[nodiscard]] static bool doesNumberContainPotentiallyDangerousComponent(const syrec::Number& number);
-        //[[nodiscard]] static bool doesSignalAccessContainPotentiallyDangerousComponent(const syrec::VariableAccess& signalAccess);
-        //[[nodiscard]] static bool doesExprContainPotentiallyDangerousComponent(const syrec::expression& expr);
-        //[[nodiscard]] static bool doesStatementContainPotentiallyDangerousComponent(const syrec::Statement& statement, const parser::SymbolTable& symbolTable);
-        //[[nodiscard]] static bool doesModuleContainPotentiallyDangerousComponent(const syrec::Module& module, const parser::SymbolTable& symbolTable);
-        //[[nodiscard]] static bool doesOptimizedModuleSignatureContainNoParametersOrOnlyReadonlyOnes(const parser::SymbolTable::ModuleCallSignature& moduleCallSignature);
-        //[[nodiscard]] static bool doesOptimizedModuleBodyContainAssignmentToModifiableParameter(const syrec::Module& module, const parser::SymbolTable& symbolTable);
-        //[[nodiscard]] static bool doesStatementDefineAssignmentToModifiableParameter(const syrec::Statement& statement, const std::unordered_set<std::string>& identsOfModifiableParameters, const parser::SymbolTable& symbolTable);
-        //[[nodiscard]] static bool isModifiableParameterAccessed(const syrec::VariableAccess& signalAccess, const std::unordered_set<std::string>& identsOfModifiableParameters);
-
+        
         template<typename T>
         void removeElementsAtIndices(std::vector<T>& vectorToModify, const std::unordered_set<std::size_t>& indicesOfElementsToRemove) {
             if (indicesOfElementsToRemove.empty() || vectorToModify.empty()) {

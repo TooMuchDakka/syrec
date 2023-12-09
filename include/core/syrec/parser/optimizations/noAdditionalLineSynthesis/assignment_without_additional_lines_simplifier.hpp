@@ -2,6 +2,7 @@
 #define ASSIGNMENT_WITHOUT_ADDITIONAL_LINES_SIMPLIFIER_HPP
 #pragma once
 
+#include "assignment_transformer.hpp"
 #include "expression_to_subassignment_splitter.hpp"
 #include "core/syrec/statement.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp"
@@ -28,6 +29,8 @@ namespace noAdditionalLineSynthesis {
             this->symbolTableReference                        = symbolTableReference;
             expressionToSubAssignmentSplitterReference        = std::make_unique<ExpressionToSubAssignmentSplitter>();
             learnedConflictsLookup                            = std::make_unique<LearnedConflictsLookup>();
+            disabledValueLookupToggle                         = false;
+            assignmentTransformer                             = std::make_unique<AssignmentTransformer>();
         }
 
     protected:
@@ -49,6 +52,8 @@ namespace noAdditionalLineSynthesis {
         ExpressionTraversalHelper::ptr         expressionTraversalHelper;
         parser::SymbolTable::ptr               symbolTableReference;
         ExpressionToSubAssignmentSplitter::ptr expressionToSubAssignmentSplitterReference;
+        bool                                   disabledValueLookupToggle;
+        AssignmentTransformer::ptr             assignmentTransformer;
         
         using LearnedConflictsLookupKey = std::pair<std::size_t, Decision::ChoosenOperand>;
         struct LearnedConflictsLookupKeyHasher {
@@ -107,30 +112,6 @@ namespace noAdditionalLineSynthesis {
         void                                      markSourceOfConflictReached();
         [[nodiscard]] bool                        shouldBacktrackDueToConflict() const;
 
-        /**
-         * \brief Try to replace assignments of the from  a += ... with a ^= ... if the value of the symbol table entry for 'a' had the value 0.
-         * \remark
-         * We are assuming that, constant propagation did already perform any substitutions of accessed signals on the rhs of every assignment thus the values of all remaining signal accesses
-         * on the rhs of any assignment are assumed to be unknown. Furthermore, for any signal access to be chosen as the assigned to signal in an assignment for any subexpression of the original assignment
-         * must have the signal type of either 'wire', 'out' or 'inout' and since constant propagation did not substitute the accessed signal parts implies that they must be not zero.
-         * \remark
-         * We are processing the given assignment front to back and are assuming that the ordering of the assignment inside of the vector is based on the "insertion" time thus assignments generated further down the expression
-         * tree are found at smaller indices in the vector. After an assignment of the form (referred to as assignment 1) a += ... was transformed to a ^= ..., the next application of the same transformation can only happen at the next assignment of the form a += ...
-         * if either the rhs of the assignment 1 was 0 or the matching inversion of assignment 1 took place.
-         *
-         * \param generatedAssignments The assignments to transform
-         * \param signalValueLookupCallback The callback used to determine the value of a given signal access
-         */
-        void               tryReplaceAddWithXorAsAssignmentOperationIfAssignedToSignalIsZero(const syrec::AssignStatement::vec& generatedAssignments, const SignalValueLookupCallback& signalValueLookupCallback) const;
-        
-        /**
-         * \brief Try to simplify the rhs of an assignment by splitting it into sub-assignments if possible. We are assuming that no signal accesses overlapping the lhs operand of the assignment is defined on the rhs.
-         * \param assignment The assignment which should be simplified.
-         * \param signalValueLookupCallback The user-provided callback used to determine the value of any accessed signal parts
-         * \return The generated sub-assignments or a vector containing the original assignment
-         */
-        [[nodiscard]] syrec::AssignStatement::vec performSimplificationOfAssignmentRhs(const syrec::AssignStatement::ptr& assignment, const SignalValueLookupCallback& signalValueLookupCallback) const;
-
         // This call should be responsible to determine conflicts, during a decision their should not arise any conflicts
         // The check for a conflict should take place in the operations nodes with either one or two leaf nodes by using this call before making any decisions
         // If a conflict is detected, the first decision starting from the initial one shall be our backtrack destination and all overlapping assignments for the found first decision
@@ -154,7 +135,9 @@ namespace noAdditionalLineSynthesis {
         void                                                                                             transformExpressionPriorToSimplification(syrec::expression& expr) const;
         void                                                                                             rememberConflict(std::size_t operationNodeId, Decision::ChoosenOperand chosenOperandAtOperationNode) const;
         [[nodiscard]] bool                                                                               didPreviousDecisionMatchingChoiceCauseConflict(const LearnedConflictsLookupKey& lookupKeyRepresentingSearchedForPreviousDecision) const;
-        
+        void                                                                                             disableValueLookup();
+        void                                                                                             enabledValueLookup();
+
         [[nodiscard]] static syrec::expression::ptr                      fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentForOperationNode(const syrec::VariableAccess::ptr& assignmentLhs, syrec_operation::operation op, const syrec::expression::ptr& assignmentRhs);
         [[nodiscard]] static syrec::expression::ptr                      createExpressionFrom(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
@@ -173,20 +156,32 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static syrec::expression::ptr                      convertNumberToExpr(const syrec::Number::ptr& number, unsigned int expectedBitwidth);
         [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr> convertCompileTimeConstantExprToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr, unsigned int expectedBitwidth);
         [[nodiscard]] static syrec::expression::ptr                      transformExprBeforeProcessing(const syrec::expression::ptr& initialExpr);
-        /**
-         * \brief Check whether the simplified split of assignment right-hand side expression is allowed.
-         *
-         * \remarks This is allowed in the following cases: <br>
-         * I.   The assignment operation is not equal to '^=' and the topmost operation of the rhs is not equal to the bitwise xor operation <br>
-         * II.  The defined assignment operation is '^=' and the value of the assigned to signal parts is 0
-         * III. The topmost expression of the assignment right-hand side is not a shift expression
-         * \param assignedToSignalParts The assigned to signal parts by the assignment
-         * \param operation The defined assignment operation
-         * \param topmostAssignmentRhsExpr The right-hand side expression of the assignment
-         * \param signalValueLookupCallback The callback used to determine the value of the assigned to signal parts
-         * \return Whether the simplified split "algorithm" can be applied.
-         */
-        [[nodiscard]] static bool isSplitOfAssignmentRhsIntoSubexpressionsAllowed(const syrec::VariableAccess& assignedToSignalParts, syrec_operation::operation operation, const syrec::expression& topmostAssignmentRhsExpr, const SignalValueLookupCallback& signalValueLookupCallback);
+        ///**
+        // * \brief Check whether the simplified split of assignment right-hand side expression is allowed.
+        // *
+        // * \remarks This is allowed when the following conditions hold (when applicable): <br>
+        // * I.    The assignment operation is NOT equal to '^=' and the rhs expr does not contain any non-reversible operations or bitwise xor operation. <br>
+        // * II.   The assignment operation is equal to '^=' while the value of the assigned to signal is equal to zero and the following holds for the rhs expr: <br>
+        // * II.I. The rhs expr does not contain any non-reversible operations <br>
+        // * II.I. Starting from the first operation node of the expression tree when traversing the rhs expr in post-order traversal only the first operation node can define the bitwise
+        // *       xor operation on an operation node with two leaf nodes, all other operation nodes defining the bitwise xor operation and reachable by the first operation can only contain
+        // *       a leaf node as the "second" operand of the operation node while the "first" operand must be the expr reachable from the first operation node (when traversing the expression tree
+        // *       bottom-up) <br>
+        // * \param assignedToSignalParts The assigned to signal parts by the assignment
+        // * \param operation The defined assignment operation
+        // * \param topmostAssignmentRhsExpr The right-hand side expression of the assignment
+        // * \param signalValueLookupCallback The callback used to determine the value of the assigned to signal parts
+        // * \return Whether the simplified split "algorithm" can be applied.
+        // */
+        //[[nodiscard]] static bool isSplitOfAssignmentRhsIntoSubexpressionsAllowed(const syrec::VariableAccess& assignedToSignalParts, syrec_operation::operation operation, const syrec::expression& topmostAssignmentRhsExpr, const SignalValueLookupCallback& signalValueLookupCallback);
+
+        ///**
+        // * \brief Check whether the given \p expr does not defined any operations without a matching assignment operation counterpart. <br>
+        // * \remarks This function assumes that numeric expressions that defined compile time constant expression where already converted to binary expressions
+        // * \param expr The expression to check
+        // * \return Whether all defined operations of the expression had a matching assignment operation counterpart defined
+        // */
+        //[[nodiscard]] static bool doesExprNotContainAnyOperationWithoutAssignmentCounterpart(const syrec::expression& expr);
     };
 }
 

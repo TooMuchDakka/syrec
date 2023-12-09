@@ -16,11 +16,6 @@
  */
 noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResultReference noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::simplify(const syrec::AssignStatement& assignmentStatement, const SignalValueLookupCallback& signalValueLookupCallback) {
     resetInternals();
-    if (!doesExpressionDefineNestedSplitableExpr(*assignmentStatement.rhs)) {
-        SimplificationResultReference simplificationResult = std::make_unique<SimplificationResult>(SimplificationResult{generatedAssignmentsContainer->getAssignments()});
-        return simplificationResult;
-    }
-
     // TODO: For a binary expression with no nested expressions as operands, should we prefer that a signal access is always the lhs operand 
     const std::shared_ptr<syrec::AssignStatement> transformedAssignmentStmt = transformAssignmentPriorToSimplification(assignmentStatement);
     if (!transformedAssignmentStmt) {
@@ -28,76 +23,60 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::Simplifica
         return simplificationResult;
     }
 
-    // TODO: Should be perform this "simple" algorithm every time the precondition holds, or should the "advanced" algorithm be chosen instead
-    /*
-     * TODO: this currently does not work correctly (see test simplificationWithNoneReversibleOperationWithSubAssignOperationAndTopmostOperationOfRhsBeingXorOperationWithLhsGeneratingExprAndRhsGeneratingExprLeavesAssignmentUnoptimized)
-     * TODO: We can also split an assignment of the form a ^= (<subExpr_1> ^ <subExpr_2>) to a ^= <subExpr_1>; a ^= <subExpr_2> if a is 0
-     * If the assignment statement rhs expr only consists of expressions using operation which have a matching assignment operation (i.e. '+', '-' or '^' with both operands being leaf nodes [i.e. signal access or number]).
-     * This assumes that compile time constant expression are already converted to binary expressions.
-     */
-    if (doesExprOnlyDefineReversibleOperationAndXorOnlyInLeafNodes(*transformedAssignmentStmt->rhs)) {
-        const syrec::AssignStatement::vec generatedSubAssignmentsFromOriginalAssignment = performSimplificationOfAssignmentRhs(transformedAssignmentStmt, signalValueLookupCallback);
-        tryReplaceAddWithXorAsAssignmentOperationIfAssignedToSignalIsZero(generatedSubAssignmentsFromOriginalAssignment, signalValueLookupCallback);
-        return std::make_unique<SimplificationResult>(SimplificationResult{generatedSubAssignmentsFromOriginalAssignment});
-    }
-    
-    expressionTraversalHelper->buildTraversalQueue(transformedAssignmentStmt->rhs, *symbolTableReference);
+    if (!doesExprOnlyDefineReversibleOperationAndXorOnlyInLeafNodes(*transformedAssignmentStmt->rhs)) {
+        expressionTraversalHelper->buildTraversalQueue(transformedAssignmentStmt->rhs, *symbolTableReference);
+        disableValueLookup();
 
-    std::optional<ExpressionTraversalHelper::OperationNodeReference> topMostOperationNode = expressionTraversalHelper->getNextOperationNode();
-    if (topMostOperationNode.has_value()) {
-        bool continueProcessingOperationNode = true;
-        std::optional<OwningOperationOperandSimplificationResultReference> simplificationResultOfTopmostOperationNode;
-        while (continueProcessingOperationNode) {
-            // TODO: If an expression is created for the rhs we can still try to split it if a binary operation with an assignment counterpart exists
-            simplificationResultOfTopmostOperationNode = handleOperationNode(*topMostOperationNode, signalValueLookupCallback);
-            if (shouldBacktrackDueToConflict()) {
-                markSourceOfConflictReached();
-                topMostOperationNode = expressionTraversalHelper->getNextOperationNode();
+        std::optional<ExpressionTraversalHelper::OperationNodeReference> topMostOperationNode = expressionTraversalHelper->getNextOperationNode();
+        if (topMostOperationNode.has_value()) {
+            bool                                                               continueProcessingOperationNode = true;
+            std::optional<OwningOperationOperandSimplificationResultReference> simplificationResultOfTopmostOperationNode;
+            while (continueProcessingOperationNode) {
+                // TODO: If an expression is created for the rhs we can still try to split it if a binary operation with an assignment counterpart exists
+                simplificationResultOfTopmostOperationNode = handleOperationNode(*topMostOperationNode, signalValueLookupCallback);
+                if (shouldBacktrackDueToConflict()) {
+                    markSourceOfConflictReached();
+                    topMostOperationNode = expressionTraversalHelper->getNextOperationNode();
+                } else {
+                    continueProcessingOperationNode = !simplificationResultOfTopmostOperationNode.has_value();
+                }
             }
-            else {
-                continueProcessingOperationNode = !simplificationResultOfTopmostOperationNode.has_value();
+
+            if (simplificationResultOfTopmostOperationNode.has_value()) {
+                const auto& generatedExprForTopmostOperationRhsExpr = simplificationResultOfTopmostOperationNode->get()->getGeneratedExpr();
+                const auto& generatedLastAssignedToSignalOfRhsExpr  = simplificationResultOfTopmostOperationNode->get()->getAssignedToSignalOfAssignment();
+
+                syrec::VariableAccess::ptr generatedAssignmentAssignedToSignal = transformedAssignmentStmt->lhs;
+                syrec::expression::ptr     generatedAssignmentRhsExpr;
+                if (generatedLastAssignedToSignalOfRhsExpr.has_value()) {
+                    generatedAssignmentRhsExpr = std::make_shared<syrec::VariableExpression>(*generatedLastAssignedToSignalOfRhsExpr);
+                } else {
+                    generatedAssignmentRhsExpr = *generatedExprForTopmostOperationRhsExpr;
+                }
+
+                const syrec::AssignStatement::ptr generatedAssignment = std::make_shared<syrec::AssignStatement>(
+                        generatedAssignmentAssignedToSignal,
+                        transformedAssignmentStmt->op,
+                        generatedAssignmentRhsExpr);
+                const std::size_t currentNumberOfExistingAssignments = generatedAssignmentsContainer->getNumberOfAssignments();
+                generatedAssignmentsContainer->storeActiveAssignment(generatedAssignment);
+                const std::size_t numberOfAssignmentsToNotInvertStartingFromLastCreatedOne = generatedAssignmentsContainer->getNumberOfAssignments() - currentNumberOfExistingAssignments;
+                generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(numberOfAssignmentsToNotInvertStartingFromLastCreatedOne, nullptr);
             }
+            topMostOperationNode = expressionTraversalHelper->getNextOperationNode();
         }
-
-        if (simplificationResultOfTopmostOperationNode.has_value()) {
-            const auto& generatedExprForTopmostOperationRhsExpr = simplificationResultOfTopmostOperationNode->get()->getGeneratedExpr();
-            const auto& generatedLastAssignedToSignalOfRhsExpr  = simplificationResultOfTopmostOperationNode->get()->getAssignedToSignalOfAssignment();
-
-            syrec::VariableAccess::ptr generatedAssignmentAssignedToSignal = transformedAssignmentStmt->lhs;
-            syrec::expression::ptr generatedAssignmentRhsExpr;
-            if (generatedLastAssignedToSignalOfRhsExpr.has_value()) {
-                generatedAssignmentRhsExpr = std::make_shared<syrec::VariableExpression>(*generatedLastAssignedToSignalOfRhsExpr);
-            }
-            else {
-                generatedAssignmentRhsExpr = *generatedExprForTopmostOperationRhsExpr;
-            }
-
-            const syrec::AssignStatement::ptr generatedAssignment = std::make_shared<syrec::AssignStatement>(
-                    generatedAssignmentAssignedToSignal,
-                    transformedAssignmentStmt->op,
-                    generatedAssignmentRhsExpr);
-            const std::size_t                 currentNumberOfExistingAssignments            = generatedAssignmentsContainer->getNumberOfAssignments();
-            const syrec::AssignStatement::vec generatedSubAssignmentsFromOriginalAssignment = performSimplificationOfAssignmentRhs(generatedAssignment, signalValueLookupCallback);
-
-            for (const syrec::AssignStatement::ptr& subAssignment : generatedSubAssignmentsFromOriginalAssignment) {
-                generatedAssignmentsContainer->storeActiveAssignment(subAssignment);
-            }
-            const std::size_t numberOfAssignmentsToNotInvertStartingFromLastCreatedOne = generatedAssignmentsContainer->getNumberOfAssignments() - currentNumberOfExistingAssignments;
-            generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(numberOfAssignmentsToNotInvertStartingFromLastCreatedOne, nullptr);
-        }
-        topMostOperationNode = expressionTraversalHelper->getNextOperationNode();
     }
 
     syrec::AssignStatement::vec generatedAssignments;
     if (!generatedAssignmentsContainer->getNumberOfAssignments()) {
-        if (const std::shared_ptr<syrec::AssignStatement> topMostAssignmentStmtIfNoOptimizationTookPlace = !transformedAssignmentStmt ? transformedAssignmentStmt : std::make_shared<syrec::AssignStatement>(assignmentStatement); topMostAssignmentStmtIfNoOptimizationTookPlace) {
+        if (const std::shared_ptr<syrec::AssignStatement> topMostAssignmentStmtIfNoOptimizationTookPlace = transformedAssignmentStmt ? transformedAssignmentStmt : std::make_shared<syrec::AssignStatement>(assignmentStatement); topMostAssignmentStmtIfNoOptimizationTookPlace) {
             generatedAssignments.emplace_back(topMostAssignmentStmtIfNoOptimizationTookPlace);
         }
     } else {
         generatedAssignments = generatedAssignmentsContainer->getAssignments();
     }
 
-    tryReplaceAddWithXorAsAssignmentOperationIfAssignedToSignalIsZero(generatedAssignments, signalValueLookupCallback);
+    generatedAssignments = assignmentTransformer->simplify(generatedAssignments, signalValueLookupCallback);
     return std::make_unique<SimplificationResult>(SimplificationResult{generatedAssignments});
 }
 
@@ -192,11 +171,7 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
          * At this point no overlapping signal accesses can be contained in the rhs of the generated assignment since this would have already triggered a conflict.
          */
         const std::size_t                 currentNumberOfExistingAssignments            = generatedAssignmentsContainer->getNumberOfAssignments();
-        const syrec::AssignStatement::vec generatedSubAssignmentsFromOriginalAssignment = performSimplificationOfAssignmentRhs(*generatedAssignment, signalValueLookupCallback);
-
-        for (const syrec::AssignStatement::ptr& assignment: generatedSubAssignmentsFromOriginalAssignment) {
-            generatedAssignmentsContainer->storeActiveAssignment(assignment);
-        }
+        generatedAssignmentsContainer->storeActiveAssignment(*generatedAssignment);
         const std::size_t numberOfAssignmentsToNotInvertStartingFromLastCreatedOne = generatedAssignmentsContainer->getNumberOfAssignments() - currentNumberOfExistingAssignments;
         const auto&       assignedToSignalOfGeneratedAssignment                    = std::dynamic_pointer_cast<const syrec::AssignStatement>(*generatedAssignment)->lhs;
         generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(numberOfAssignmentsToNotInvertStartingFromLastCreatedOne, &assignedToSignalOfGeneratedAssignment);
@@ -290,11 +265,7 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
          * At this point no overlapping signal accesses can be contained in the rhs of the generated assignment since this would have already triggered a conflict.
          */
         const std::size_t currentNumberOfExistingAssignments = generatedAssignmentsContainer->getNumberOfAssignments();
-        const syrec::AssignStatement::vec generatedSubAssignmentsFromOriginalAssignment = performSimplificationOfAssignmentRhs(*generatedAssignment, signalValueLookupCallback);
-
-        for (const syrec::AssignStatement::ptr& assignment : generatedSubAssignmentsFromOriginalAssignment) {
-            generatedAssignmentsContainer->storeActiveAssignment(assignment);   
-        }
+        generatedAssignmentsContainer->storeActiveAssignment(*generatedAssignment);   
         const std::size_t numberOfAssignmentsToNotInvertStartingFromLastCreatedOne = generatedAssignmentsContainer->getNumberOfAssignments() - currentNumberOfExistingAssignments;
         const auto&       assignedToSignalOfGeneratedAssignment                    = std::dynamic_pointer_cast<const syrec::AssignStatement>(*generatedAssignment)->lhs;
         generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(numberOfAssignmentsToNotInvertStartingFromLastCreatedOne, &assignedToSignalOfGeneratedAssignment);
@@ -574,20 +545,6 @@ bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::shoul
     return operationNodeCausingConflictAndBacktrack.has_value();
 }
 
-syrec::AssignStatement::vec noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::performSimplificationOfAssignmentRhs(const syrec::AssignStatement::ptr& assignment, const SignalValueLookupCallback& signalValueLookupCallback) const {
-    const std::shared_ptr<syrec::AssignStatement> assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment);
-    const std::optional<syrec_operation::operation> definedAssignmentOperationEnumValue = assignmentCasted ? syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op) : std::nullopt;
-    if (definedAssignmentOperationEnumValue.has_value()) {
-        if (isSplitOfAssignmentRhsIntoSubexpressionsAllowed(*assignmentCasted->lhs, *definedAssignmentOperationEnumValue, *assignmentCasted->rhs, signalValueLookupCallback)) {
-            const syrec::AssignStatement::vec generatedSubAssignments = expressionToSubAssignmentSplitterReference->createSubAssignmentsBySplitOfExpr(assignmentCasted->lhs, *definedAssignmentOperationEnumValue, assignmentCasted->rhs);
-            if (!generatedSubAssignments.empty()) {
-                return generatedSubAssignments;
-            }    
-        }
-    }
-    return {assignment};
-}
-
 // TODO: can probably be removed
 bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::couldAnotherChoiceBeMadeAtPreviousDecision(const std::optional<std::size_t>& pastDecisionForOperationNodeWithIdToExclude) const {
     if (pastDecisions.empty()) {
@@ -645,12 +602,18 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::reset
     pastDecisions.clear();
     generatedAssignmentsContainer->resetInternals();
     expressionTraversalHelper->resetInternals();
+    enabledValueLookup();
 }
 
 std::unique_ptr<syrec::AssignStatement> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::transformAssignmentPriorToSimplification(const syrec::AssignStatement& assignmentToSimplify) const {
     if (std::unique_ptr<syrec::AssignStatement> owningCopyOfAssignmentStmt = std::make_unique<syrec::AssignStatement>(assignmentToSimplify); owningCopyOfAssignmentStmt) {
+        tryConvertNumericToBinaryExpr(owningCopyOfAssignmentStmt->rhs);
+        if (!doesExpressionDefineNestedSplitableExpr(*owningCopyOfAssignmentStmt->rhs)) {
+            return nullptr;
+        }
+
         /*
-         * Try to convert an assignment of the form a -= (<lhsExpr> - <rhsExpr>) to a += (<rhsExpr> - <lhsExpr>) to enable the optimization of converting an assignment of the form:
+         * Try to convert an assignment of the form a -= (<lhsExpr> - <rhsExpr>) to a += (<rhsExpr> - <lhsExpr>) if the <lhsExpr> is a nested expression, to enable the optimization of converting an assignment of the form:
          * a += ... to a ^= 0 if the symbol table entry for the assigned to signal has the value 0
          */
         if (const auto& assignmentRhsExprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(owningCopyOfAssignmentStmt->rhs); assignmentRhsExprAsBinaryExpr) {
@@ -658,10 +621,12 @@ std::unique_ptr<syrec::AssignStatement> noAdditionalLineSynthesis::AssignmentWit
             const std::optional<syrec_operation::operation> mappedToBinaryOperationEnumFromFlag     = syrec_operation::tryMapBinaryOperationFlagToEnum(assignmentRhsExprAsBinaryExpr->op);
             if (mappedToAssignmentOperationEnumFromFlag.has_value() && *mappedToAssignmentOperationEnumFromFlag == syrec_operation::operation::MinusAssign
                 && mappedToBinaryOperationEnumFromFlag.has_value() && *mappedToBinaryOperationEnumFromFlag == syrec_operation::operation::Subtraction) {
-                owningCopyOfAssignmentStmt->op = *syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::AddAssign);
-                const syrec::expression::ptr copyOfBinaryExprLhs = assignmentRhsExprAsBinaryExpr->lhs;
-                assignmentRhsExprAsBinaryExpr->lhs               = assignmentRhsExprAsBinaryExpr->rhs;
-                assignmentRhsExprAsBinaryExpr->rhs               = copyOfBinaryExprLhs;
+                if (!doesExprDefineSignalAccess(*assignmentRhsExprAsBinaryExpr->lhs)) {
+                    owningCopyOfAssignmentStmt->op                   = *syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::AddAssign);
+                    const syrec::expression::ptr copyOfBinaryExprLhs = assignmentRhsExprAsBinaryExpr->lhs;
+                    assignmentRhsExprAsBinaryExpr->lhs               = assignmentRhsExprAsBinaryExpr->rhs;
+                    assignmentRhsExprAsBinaryExpr->rhs               = copyOfBinaryExprLhs;   
+                }
             }
         }
         transformExpressionPriorToSimplification(*owningCopyOfAssignmentStmt->rhs);
@@ -679,6 +644,19 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::trans
         const bool doesLhsOperandDefineNestedEpxr = doesExpressionDefineNestedSplitableExpr(*exprAsBinaryExpr->lhs);
         const bool doesRhsOperandDefineNestedExpr  = doesExpressionDefineNestedSplitableExpr(*exprAsBinaryExpr->rhs);
         const std::optional<syrec_operation::operation> mappedToOperationOfParentExpr  = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
+
+        /*
+         * Try to transform a binary expression of the form (<number> op <signalAccess>) to (<signalAccess> op <number>) if is op is commutative and a matching assignment operation for op exists.
+         */
+        if (mappedToOperationOfParentExpr.has_value() && syrec_operation::isCommutative(*mappedToOperationOfParentExpr) && syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationOfParentExpr).has_value()
+            //&& ((doesExpressionDefineNumber(*exprAsBinaryExpr->lhs) && doesExprDefineSignalAccess(*exprAsBinaryExpr->rhs)) || (doesLhsOperandDefineNestedEpxr && !doesRhsOperandDefineNestedExpr && doesExprDefineSignalAccess(exprAsBinaryExpr->rhs))) {
+            && (doesExpressionDefineNumber(*exprAsBinaryExpr->lhs) || doesLhsOperandDefineNestedEpxr) && doesExprDefineSignalAccess(*exprAsBinaryExpr->rhs)) {
+            const auto backupOfBinaryExprLhsOperand = exprAsBinaryExpr->rhs;
+            exprAsBinaryExpr->rhs                   = exprAsBinaryExpr->lhs;
+            exprAsBinaryExpr->lhs                   = backupOfBinaryExprLhsOperand;
+        }
+
+
         if (const std::shared_ptr<syrec::BinaryExpression> rhsExprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprAsBinaryExpr->rhs); rhsExprAsBinaryExpr) {
             const std::optional<syrec_operation::operation> mappedToOperationOfRhsExpr    = syrec_operation::tryMapBinaryOperationFlagToEnum(rhsExprAsBinaryExpr->op);
 
@@ -686,25 +664,19 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::trans
              * Try to transform an expression of the form (a - (b - c)) to (a + (c - b)) only if b is not a signal access. The latter condition is heuristic as the transformation could prevent the creation of an assignment
              * of the form b -= c.
              */
-            if (!doesLhsOperandDefineNestedEpxr || doesRhsOperandDefineNestedExpr) {
-                if (mappedToOperationOfParentExpr.has_value() && mappedToOperationOfRhsExpr.has_value() && *mappedToOperationOfRhsExpr == syrec_operation::operation::Subtraction && *mappedToOperationOfParentExpr == syrec_operation::operation::Subtraction) {
-                    /*
-                     * We do not want to prevent any future generation of sub - assignments, thus expressions of the form(<subExpr_1> - (<signalAccess> - <number>)) wont be simplified by our transformation
-                     * as this would prevent the creation of the assignment <signalAccess> -= <number>
-                     */
-                    if (!(doesExprDefineSignalAccess(*rhsExprAsBinaryExpr->lhs) && doesExpressionDefineNumber(*rhsExprAsBinaryExpr->rhs))) {
-                        exprAsBinaryExpr->op                    = *syrec_operation::tryMapBinaryOperationEnumToFlag(syrec_operation::operation::Addition);
-                        const auto backupOfNestedExprLhsOperand = rhsExprAsBinaryExpr->lhs;
-                        rhsExprAsBinaryExpr->lhs                = rhsExprAsBinaryExpr->rhs;
-                        rhsExprAsBinaryExpr->rhs                = backupOfNestedExprLhsOperand;   
-                    }
-                }   
-            }
-        }
-        else if (doesRhsOperandDefineNestedExpr && !doesLhsOperandDefineNestedEpxr && mappedToOperationOfParentExpr.has_value() && syrec_operation::isCommutative(*mappedToOperationOfParentExpr)) {
-            const auto backupOfBinaryExprLhsOperand = exprAsBinaryExpr->lhs;
-            exprAsBinaryExpr->rhs                    = exprAsBinaryExpr->lhs;
-            exprAsBinaryExpr->lhs                    = backupOfBinaryExprLhsOperand;
+            if (mappedToOperationOfParentExpr.has_value() && mappedToOperationOfRhsExpr.has_value() && *mappedToOperationOfRhsExpr == syrec_operation::operation::Subtraction && *mappedToOperationOfParentExpr == syrec_operation::operation::Subtraction) {
+                /*
+                 * Try to convert an expression of the form (<subExpr_1> - (<subExpr_2> - <subExpr_3>)) to (<subExpr_1> + (<subExpr_3> - <subExpr_2)).
+                 * We do not apply this transformation if <subExpr_2> defines a signal access while <subExpr_3> defines a nested expressions as this could prevent the generation of the assignment <subExpr_2> -= <subExpr_3>.
+                 * NOTE: We try to not prevent any future assignments by this transformation, but could implicitly block some by our transformation due to a conflict later during preprocessing.
+                 */
+                if (!doesExprDefineSignalAccess(*rhsExprAsBinaryExpr->lhs) || doesExprDefineSignalAccess(*rhsExprAsBinaryExpr->rhs)) {
+                    exprAsBinaryExpr->op                    = *syrec_operation::tryMapBinaryOperationEnumToFlag(syrec_operation::operation::Addition);
+                    const auto backupOfNestedExprLhsOperand = rhsExprAsBinaryExpr->lhs;
+                    rhsExprAsBinaryExpr->lhs                = rhsExprAsBinaryExpr->rhs;
+                    rhsExprAsBinaryExpr->rhs                = backupOfNestedExprLhsOperand;
+                }
+            }  
         }
         transformExpressionPriorToSimplification(*exprAsBinaryExpr->rhs);
     } else if (const auto& exprAsShiftExpr = dynamic_cast<const syrec::ShiftExpression*>(&expr); exprAsShiftExpr) {
@@ -723,56 +695,12 @@ bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::didPr
     return learnedConflictsLookup->count(lookupKeyRepresentingSearchedForPreviousDecision);
 }
 
-void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::tryReplaceAddWithXorAsAssignmentOperationIfAssignedToSignalIsZero(const syrec::AssignStatement::vec& assignments, const SignalValueLookupCallback& signalValueLookupCallback) const {
-    std::unordered_map<syrec::VariableAccess::ptr, std::shared_ptr<std::unordered_map<syrec::expression::ptr, syrec_operation::operation>>> awaitedAssignmentInversions;
-    for (const syrec::AssignStatement::ptr& assignment: assignments) {
-        const std::shared_ptr<syrec::AssignStatement> assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment);
-        if (!assignmentCasted) {
-            continue;
-        }
+void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::disableValueLookup() {
+    disabledValueLookupToggle = true;
+}
 
-        const std::optional<syrec_operation::operation> matchingAssignmentOperationEnumValueForFlag = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op);
-        if (!matchingAssignmentOperationEnumValueForFlag.has_value()) {
-            awaitedAssignmentInversions.erase(assignmentCasted->lhs);
-            continue;
-        }
-
-        // Are inversions for given assignment required
-        if (awaitedAssignmentInversions.count(assignmentCasted->lhs)) {
-            std::shared_ptr<std::unordered_map<syrec::expression::ptr, syrec_operation::operation>>& awaitedAssignmentInversionsForSignalAccess = awaitedAssignmentInversions.at(assignmentCasted->lhs);
-            if (!awaitedAssignmentInversionsForSignalAccess) {
-                continue;
-            }
-
-            // Matching inversion was found
-            if (awaitedAssignmentInversionsForSignalAccess->count(assignmentCasted->rhs) && *matchingAssignmentOperationEnumValueForFlag == awaitedAssignmentInversionsForSignalAccess->at(assignmentCasted->rhs)) {
-                awaitedAssignmentInversionsForSignalAccess->erase(assignmentCasted->rhs);
-            } else {
-                // Add assignment requiring inversion
-                const std::optional<syrec_operation::operation> expectedInversionForAssignment = syrec_operation::invert(*matchingAssignmentOperationEnumValueForFlag);
-                if (expectedInversionForAssignment.has_value()) {
-                    awaitedAssignmentInversionsForSignalAccess->emplace(std::make_pair(assignmentCasted->rhs, *expectedInversionForAssignment));
-                } else {
-                    awaitedAssignmentInversionsForSignalAccess = nullptr;
-                }
-            }
-        } else {
-            const std::optional<syrec_operation::operation> expectedInversionForAssignment = syrec_operation::invert(*matchingAssignmentOperationEnumValueForFlag);
-            // Add new assignment requiring inversion
-            if (expectedInversionForAssignment.has_value()) {
-                std::shared_ptr requiredAssignmentInversionsForSignalAccess = std::make_shared<std::unordered_map<syrec::expression::ptr, syrec_operation::operation>>();
-                if (!requiredAssignmentInversionsForSignalAccess) {
-                    requiredAssignmentInversionsForSignalAccess->emplace(std::make_pair(assignmentCasted->rhs, *expectedInversionForAssignment));
-                }
-                awaitedAssignmentInversions.emplace(std::make_pair(assignmentCasted->lhs, requiredAssignmentInversionsForSignalAccess));   
-            }
-
-            // Perform the actual "optimization"
-            if (*matchingAssignmentOperationEnumValueForFlag == syrec_operation::operation::AddAssign && areAssignedToSignalPartsZero(*assignmentCasted->lhs, signalValueLookupCallback)) {
-                assignmentCasted->op = *syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign);
-            }
-        }
-    }
+void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::enabledValueLookup() {
+    disabledValueLookupToggle = false;
 }
 
 syrec::expression::ptr noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand) {
@@ -829,7 +757,7 @@ bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::doesE
 }
 
 bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::doesExpressionDefineNumber(const syrec::expression& expr) {
-    return dynamic_cast<const syrec::NumericExpression*>(&expr);
+    return dynamic_cast<const syrec::NumericExpression*>(&expr) != nullptr;
 }
 
 bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::doesExprDefineSignalAccess(const syrec::expression& expr) {
@@ -947,6 +875,9 @@ std::optional<syrec_operation::operation> noAdditionalLineSynthesis::AssignmentW
 
 syrec::expression::ptr noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::convertNumberToExpr(const syrec::Number::ptr& number, unsigned int expectedBitwidth) {
     if (number->isCompileTimeConstantExpression()) {
+        if (const std::optional<syrec::BinaryExpression::ptr> mappedToBinaryExpr = convertCompileTimeConstantExprToBinaryExpr(number->getExpression(), expectedBitwidth); mappedToBinaryExpr.has_value()) {
+            return *mappedToBinaryExpr;
+        }
         return nullptr;
     }
 
@@ -977,22 +908,4 @@ syrec::expression::ptr noAdditionalLineSynthesis::AssignmentWithoutAdditionalLin
         }
     }
     return initialExpr;
-}
-
-bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::isSplitOfAssignmentRhsIntoSubexpressionsAllowed(const syrec::VariableAccess& assignedToSignalParts, syrec_operation::operation operation, const syrec::expression& topmostAssignmentRhsExpr, const SignalValueLookupCallback& signalValueLookupCallback) {
-    if (operation == syrec_operation::operation::XorAssign) {
-        const std::optional<unsigned int> fetchedValueOfAssignedToSignalParts = signalValueLookupCallback(assignedToSignalParts);
-        return fetchedValueOfAssignedToSignalParts.has_value() && !*fetchedValueOfAssignedToSignalParts;
-    }
-
-    if (const auto& topMostExprOfRhsAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&topmostAssignmentRhsExpr); topMostExprOfRhsAsBinaryExpr) {
-        const std::optional<unsigned int>               fetchedValueOfAssignedToSignalParts = signalValueLookupCallback(assignedToSignalParts);
-        const std::optional<syrec_operation::operation> definedTopMostBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(topMostExprOfRhsAsBinaryExpr->op);
-        if (definedTopMostBinaryOperation.has_value() && *definedTopMostBinaryOperation == syrec_operation::operation::BitwiseXor) {
-            return fetchedValueOfAssignedToSignalParts.has_value() && !*fetchedValueOfAssignedToSignalParts && (operation == syrec_operation::operation::AddAssign || operation == syrec_operation::operation::XorAssign);
-        }
-    }
-
-    const auto& topMostExprAsShiftExpr = dynamic_cast<const syrec::ShiftExpression*>(&topmostAssignmentRhsExpr);
-    return !topMostExprAsShiftExpr;
 }
