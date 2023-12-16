@@ -123,6 +123,8 @@ void ExpressionTraversalHelper::removeOperationNodeAsPotentialBacktrackOperation
 
 void ExpressionTraversalHelper::backtrack() {
     if (backtrackOperationNodeIds.empty()) {
+        // If we do not reset the traversal index here after all backtracking checkpoints were removed, we would never reach the start of the traversal queue again through backtracking
+        operationNodeTraversalQueueIdx = 0;
         return;
     }
 
@@ -190,7 +192,7 @@ void ExpressionTraversalHelper::handleOperationNodeDuringTraversalQueueInit(cons
 }
 
 void ExpressionTraversalHelper::addSignalIdentAsUsableInAssignmentLhsIfAssignable(const std::string& signalIdent, const parser::SymbolTable& symbolTableReference) {
-    if (!identsOfAssignableSignals.count(signalIdent) && symbolTableReference.canSignalBeAssignedTo(signalIdent)) {
+    if (!identsOfAssignableSignals.count(signalIdent) && symbolTableReference.canSignalBeAssignedTo(signalIdent).value_or(false)) {
         identsOfAssignableSignals.emplace(signalIdent);
     }
 }
@@ -211,16 +213,20 @@ std::optional<syrec::expression::ptr> ExpressionTraversalHelper::getDataOfOperan
 }
 
 ExpressionTraversalHelper::OperandNode ExpressionTraversalHelper::createOperandNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId) {
+    std::size_t generatedOperandNodeId;
+    std::optional<std::size_t> referencedOperationNodeId;
+
     if (doesExpressionContainNestedExprAsOperand(*expr)) {
         const auto& generatedOperationNode = createOperationNode(expr, parentOperationNodeId);
         operationNodeDataLookup.insert(std::make_pair(generatedOperationNode->id, generatedOperationNode));
-        const std::size_t generatedIdForOperationNodeAsOperand = operandNodeIdGenerator.generateNextId();
-        return OperandNode({generatedIdForOperationNodeAsOperand, generatedOperationNode->id});
+        generatedOperandNodeId    = operandNodeIdGenerator.generateNextId();
+        referencedOperationNodeId = generatedOperationNode->id;
     }
-
-    const std::size_t generatedIdForExprOperand = operandNodeIdGenerator.generateNextId();
-    operandNodeDataLookup.insert(std::make_pair(generatedIdForExprOperand, expr));
-    return OperandNode({generatedIdForExprOperand, std::nullopt});
+    else {
+        generatedOperandNodeId = operandNodeIdGenerator.generateNextId();
+    }
+    operandNodeDataLookup.insert(std::make_pair(generatedOperandNodeId, expr));
+    return OperandNode({generatedOperandNodeId, referencedOperationNodeId});
 }
 
 ExpressionTraversalHelper::OperationNodeReference ExpressionTraversalHelper::createOperationNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId) {
@@ -260,169 +266,3 @@ inline syrec::expression::ptr ExpressionTraversalHelper::createExpressionForNumb
     const auto& exprForNumber = std::make_shared<syrec::NumericExpression>(number, expectedBitwidth);
     return exprForNumber;
 }
-
-
-
-//#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp"
-//
-//#include <algorithm>
-//
-//using namespace noAdditionalLineSynthesis;
-//
-//void ExpressionTraversalHelper::switchOperandsOfOperation(std::size_t operationNodeId) const {
-//    if (const auto& operationNode = getOperationNodeById(operationNodeId); operationNode.has_value()) {
-//        const auto copyOfLhsNode = operationNode->get()->lhs;
-//        operationNode->get()->lhs = operationNode->get()->rhs;
-//        operationNode->get()->rhs = copyOfLhsNode;
-//    }
-//}
-//
-//std::optional<ExpressionTraversalHelper::OperationNodeReference> ExpressionTraversalHelper::tryGetNextOperationNode() {
-//    if (operationNodeTraversalQueueIndex >= operationNodeTraversalQueue.size()) {
-//        return std::nullopt;
-//    }
-//
-//    const auto idOfNextOperationNodeInQueue = operationNodeTraversalQueue.at(operationNodeTraversalQueueIndex++);
-//    return getOperationNodeById(idOfNextOperationNodeInQueue);
-//}
-//
-//std::optional<ExpressionTraversalHelper::OperationNodeReference> ExpressionTraversalHelper::peekNextOperationNode() const {
-//    if (operationNodeTraversalQueueIndex >= operationNodeTraversalQueue.size()) {
-//        return std::nullopt;
-//    }
-//    const auto idOfNextOperationNodeInQueue = operationNodeTraversalQueue.at(operationNodeTraversalQueueIndex);
-//    return getOperationNodeById(idOfNextOperationNodeInQueue);
-//}
-//
-//std::optional<std::pair<ExpressionTraversalHelper::OperandNode, ExpressionTraversalHelper::OperandNode>> ExpressionTraversalHelper::tryGetNonNestedOperationOperands(std::size_t operationNodeId) const {
-//    if (const auto& operationNodeForId = getOperationNodeById(operationNodeId); operationNodeForId.has_value() && !operationNodeForId->get()->lhs.isLeafNode() && !operationNodeForId->get()->rhs.isLeafNode()) {
-//        return std::make_pair(operationNodeForId->get()->lhs, operationNodeForId->get()->rhs);
-//    }
-//    return std::nullopt;
-//}
-//
-//std::optional<ExpressionTraversalHelper::OperandNode> ExpressionTraversalHelper::tryGetNonNestedOperationOperand(std::size_t operationNodeId) const {
-//    if (const auto& operationNodeForId = getOperationNodeById(operationNodeId); operationNodeForId.has_value()) {
-//        if (operationNodeForId->get()->lhs.isLeafNode()) {
-//            return operationNodeForId->get()->lhs;
-//        }
-//        if (operationNodeForId->get()->rhs.isLeafNode()) {
-//            return operationNodeForId->get()->rhs;
-//        }
-//    }
-//    return std::nullopt;
-//}
-//
-//std::optional<syrec::expression::ptr> ExpressionTraversalHelper::getDataOfOperandNode(std::size_t operandNodeId) const {
-//    if (operandNodeDataLookup.count(operandNodeId)) {
-//        return operandNodeDataLookup.at(operandNodeId);
-//    }
-//    return std::nullopt;
-//}
-//
-//bool ExpressionTraversalHelper::createCheckPointAtOperationNode(std::size_t operationNodeId) {
-//    if (const auto& fetchedOperationNodeForId = getOperationNodeById(operationNodeId); fetchedOperationNodeForId.has_value()) {
-//        if (!std::any_of(checkpoints.cbegin(), checkpoints.cend(), [&operationNodeId](const std::size_t existingCheckpointOperationNodeId) { return existingCheckpointOperationNodeId == operationNodeId; })) {
-//            checkpoints.emplace_back(operationNodeId);
-//            return true;
-//        }
-//    }
-//    return false;
-//}
-//
-//bool ExpressionTraversalHelper::tryBacktrackToLastCheckpoint() {
-//    if (checkpoints.empty()) {
-//        return true;
-//    }
-//
-//    const auto& checkpointOperationNodeId = checkpoints.back();
-//    checkpoints.pop_back();
-//
-//    std::size_t index = operationNodeTraversalQueue.size() - 1;
-//    bool        foundMatch = false;
-//    for (auto traversalQueueIterator = operationNodeTraversalQueue.rbegin(); traversalQueueIterator != operationNodeTraversalQueue.rend() && !foundMatch; ++traversalQueueIterator) {
-//        foundMatch = *traversalQueueIterator == checkpointOperationNodeId;
-//        if (foundMatch) {
-//            operationNodeTraversalQueueIndex = index;
-//        } else {
-//            --index;
-//        }
-//    }
-//    return foundMatch;
-//}
-//
-//// START OF IMPLEMENTATION OF PRIVATE FUNCTIONS
-//std::size_t ExpressionTraversalHelper::IdGenerator::generateNextId() {
-//    return lastGeneratedId++;
-//}
-//
-//void ExpressionTraversalHelper::IdGenerator::reset() {
-//    lastGeneratedId = 0;
-//}
-//
-//void ExpressionTraversalHelper::resetInternals() {
-//    operandNodeDataLookup.clear();
-//    operationNodeDataLookup.clear();
-//    operationNodeTraversalQueue.clear();
-//    checkpoints.clear();
-//    operationNodeTraversalQueueIndex = 0;
-//    operationNodeIdGenerator.reset();
-//    operandNodeIdGenerator.reset();
-//}
-//
-//ExpressionTraversalHelper::OperandNode ExpressionTraversalHelper::createNodeFor(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId) {
-//    if (doesExpressionDefineExprOperand(*expr)) {
-//        const auto& generatedOperationNode = createOperationNodeFor(expr, parentOperationNodeId);
-//        operationNodeDataLookup.insert(std::make_pair(generatedOperationNode->id, generatedOperationNode));
-//        return OperandNode({generatedOperationNode->id, false});
-//    }
-//
-//    const auto& generatedIdForExprOperand = operandNodeIdGenerator.generateNextId();
-//    operandNodeDataLookup.insert(std::make_pair(generatedIdForExprOperand, expr));
-//    return OperandNode({generatedIdForExprOperand, true});
-//}
-//
-//ExpressionTraversalHelper::OperationNodeReference ExpressionTraversalHelper::createOperationNodeFor(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId) {
-//    /*
-//     * We are assuming that this function is only called when trying to create an operation node for either a binary or shift expression, which we can guarantee
-//     * to a high degree of confidence by making this function only available to this class as well as for derived classes and placing the responsibility for a
-//     * correct call on the caller. The initialization of the mappedToOperation is needed to prevent a compiler warning due to the variable not being initialized
-//     * if none of the conditions of the if statement below hold.
-//     */ 
-//    syrec_operation::operation mappedToOperation = syrec_operation::operation::Addition;
-//    const auto                 generatedIdForCurrentNode = operationNodeIdGenerator.generateNextId();
-//    OperandNode                nodeForLhsOperand;
-//    OperandNode                nodeForRhsOperand;
-//
-//    const auto parentIdForNestedExpressions = std::make_optional(generatedIdForCurrentNode);
-//    if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr) {
-//        mappedToOperation = *syrec_operation::tryMapShiftOperationFlagToEnum(exprAsShiftExpr->op);
-//        nodeForLhsOperand = createNodeFor(exprAsShiftExpr->lhs, parentOperationNodeId);
-//        nodeForRhsOperand = createNodeFor(createExprForNumberOperand(exprAsShiftExpr->rhs, exprAsShiftExpr->lhs->bitwidth()), parentIdForNestedExpressions);
-//    } else if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr) {
-//        mappedToOperation = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
-//        nodeForLhsOperand = createNodeFor(exprAsShiftExpr->lhs, parentIdForNestedExpressions);
-//        nodeForRhsOperand = createNodeFor(createExprForNumberOperand(exprAsShiftExpr->rhs, exprAsShiftExpr->lhs->bitwidth()), parentIdForNestedExpressions);
-//    }
-//
-//    const auto  operationNode          = OperationNode({generatedIdForCurrentNode, parentIdForNestedExpressions, mappedToOperation, nodeForLhsOperand, nodeForRhsOperand});
-//    const auto& operationNodeReference = std::make_shared<OperationNode>(operationNode);
-//    return operationNodeReference;
-//}
-//
-//std::optional<ExpressionTraversalHelper::OperationNodeReference> ExpressionTraversalHelper::getOperationNodeById(std::size_t operationNodeId) const {
-//    if (operationNodeDataLookup.count(operationNodeId)) {
-//        return operationNodeDataLookup.at(operationNodeId);
-//    }
-//    return std::nullopt;
-//}
-//
-//bool ExpressionTraversalHelper::doesExpressionDefineExprOperand(const syrec::expression& expr) {
-//    // We are assuming here that compile time constant expressions were already converted to binary expressions
-//    return dynamic_cast<const syrec::NumericExpression*>(&expr) != nullptr || dynamic_cast<const syrec::VariableExpression*>(&expr) != nullptr;
-//}
-//
-//syrec::expression::ptr ExpressionTraversalHelper::createExprForNumberOperand(const syrec::Number::ptr& number, unsigned expectedBitwidth) {
-//    const auto& exprForNumber = std::make_shared<syrec::NumericExpression>(number, expectedBitwidth);
-//    return exprForNumber;
-//}

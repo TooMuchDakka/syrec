@@ -137,6 +137,8 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] bool                                                                               didPreviousDecisionMatchingChoiceCauseConflict(const LearnedConflictsLookupKey& lookupKeyRepresentingSearchedForPreviousDecision) const;
         void                                                                                             disableValueLookup();
         void                                                                                             enabledValueLookup();
+        [[nodiscard]] bool                                                                               canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::expression& alternativeToCheckAsExpr, const parser::SymbolTable& symbolTable) const;
+        [[nodiscard]] bool                                                                               canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::VariableAccess& alternativeToCheckAsSignalAccess, const parser::SymbolTable& symbolTable) const;
 
         [[nodiscard]] static syrec::expression::ptr                      fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentForOperationNode(const syrec::VariableAccess::ptr& assignmentLhs, syrec_operation::operation op, const syrec::expression::ptr& assignmentRhs);
@@ -156,6 +158,11 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static syrec::expression::ptr                      convertNumberToExpr(const syrec::Number::ptr& number, unsigned int expectedBitwidth);
         [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr> convertCompileTimeConstantExprToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr, unsigned int expectedBitwidth);
         [[nodiscard]] static syrec::expression::ptr                      transformExprBeforeProcessing(const syrec::expression::ptr& initialExpr);
+        
+        [[nodiscard]] static bool                                        doesExprContainOverlappingAccessOnGivenSignalAccess(const syrec::expression& expr, const syrec::VariableAccess& signalAccess, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static bool                                        doesNumberContainOverlappingAccessOnGivenSignalAccess(const syrec::Number& number, const syrec::VariableAccess& signalAccess, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static bool                                        doSignalAccessesOverlap(const syrec::VariableAccess& firstSignalAccess, const syrec::VariableAccess& otherSignalAccess, const parser::SymbolTable& symbolTable);
+
         ///**
         // * \brief Check whether the simplified split of assignment right-hand side expression is allowed.
         // *
