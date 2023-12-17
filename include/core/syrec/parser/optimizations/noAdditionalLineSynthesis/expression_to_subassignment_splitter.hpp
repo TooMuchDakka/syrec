@@ -30,10 +30,10 @@ namespace noAdditionalLineSynthesis {
         std::vector<syrec_operation::operation>          fixedSubAssignmentOperationsQueue;
         std::size_t                                      fixedSubAssignmentOperationsQueueIdx;
         bool                                             operationInversionFlag;
-        bool                                             areSplitsOfXorOperationIntoSubAssignmentsAllowed;
-
+        std::optional<unsigned int>                      currentAssignedToSignalValue;
+        
         virtual void resetInternals();
-        virtual void init(const syrec::VariableAccess::ptr& fixedAssignedToSignalParts, syrec_operation::operation initialAssignmentOperation, const std::optional<unsigned int>& currentValueOfAssignedToSignal);
+        virtual void init(const syrec::VariableAccess::ptr& fixedAssignedToSignalParts, syrec_operation::operation initialAssignmentOperation, const std::optional<unsigned int>& initialValueOfAssignedToSignalOfOriginalAssignment);
 
         
         /**
@@ -67,6 +67,17 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] bool                                             createBackupOfInversionFlagStatus() const;
         void                                                           restorePreviousInversionStatusFlag(bool previousInversionStatus);
         void                                                           fixNextSubAssignmentOperation(syrec_operation::operation operation);
+        void                                                           updateValueOfAssignedToSignalViaAssignment(const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::expression* assignmentRhsExpr);
+        
+        /**
+         * \brief Determine whether a given expression can be further split into sub-assignments assuming that the expression is the operand of an operation node defining a bitwise xor operation
+         * \remarks A split is possible if:
+         *  I. If \p expr defines a signal access or a non-nested numeric expression (i.e. the expression is a leaf node of the operation node for which the check if performed)
+         *  II. The current value of the assigned to signal is zero while the given expression does not match condition I.
+         * \param expr The expression which shall be checked whether it can be further split
+         * \return Whether a split can take place
+         */
+        [[nodiscard]] bool                                             isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(const syrec::expression& expr) const;
 
         [[nodiscard]] std::optional<syrec_operation::operation>             determineAssignmentOperationToUse(syrec_operation::operation operation) const;
         [[nodiscard]] static syrec::AssignStatement::ptr                    createAssignmentFrom(const syrec::VariableAccess::ptr& assignedToSignalParts, syrec_operation::operation operation, const syrec::expression::ptr& assignmentRhsExpr);

@@ -118,14 +118,13 @@ void AssignmentTransformer::updateEntryInValueLookupCacheByPerformingAssignment(
         valueOfExpr = exprAsNumericExpr->value->evaluate({});
     }
 
-    SignalValueLookupCacheEntryReference signalValueCacheEntry;
     if (!getSignalValueCacheEntryFor(assignedToSignalParts)) {
         return;
     }
 
-    signalValueCacheEntry = getSignalValueCacheEntryFor(assignedToSignalParts);
-    const std::optional<unsigned int> currentValueOfAssignedToSignalParts = signalValueCacheEntry->getValue();
-    const std::optional<unsigned int> newValueAfterApplicationOfAssignment = assignmentOperation.has_value() ? syrec_operation::apply(*assignmentOperation, currentValueOfAssignedToSignalParts, valueOfExpr) : std::nullopt;
+    const SignalValueLookupCacheEntryReference signalValueCacheEntry                = getSignalValueCacheEntryFor(assignedToSignalParts);
+    const std::optional<unsigned int>          currentValueOfAssignedToSignalParts  = signalValueCacheEntry->getValue();
+    const std::optional<unsigned int>          newValueAfterApplicationOfAssignment = assignmentOperation.has_value() ? syrec_operation::apply(*assignmentOperation, currentValueOfAssignedToSignalParts, valueOfExpr) : std::nullopt;
     signalValueCacheEntry->updateValueTo(newValueAfterApplicationOfAssignment);
 }
 

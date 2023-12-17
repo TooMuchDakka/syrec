@@ -151,7 +151,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentFromOperands(Decision::ChoosenOperand chosenOperandAsAssignedToSignal, const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
         [[nodiscard]] static std::optional<syrec::expression::ptr>       tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
         [[nodiscard]] static bool                                        areAssignedToSignalPartsZero(const syrec::VariableAccess& accessedSignalParts, const SignalValueLookupCallback& signalValueLookupCallback);
-        [[nodiscard]] static bool                                        doesExprOnlyDefineReversibleOperationAndXorOnlyInLeafNodes(const syrec::expression& expr);
+        [[nodiscard]] static bool                                        doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperation(const syrec::expression& expr);
         static void                                                      tryConvertNumericToBinaryExpr(syrec::expression::ptr& expr);
         [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr> convertNumericExprToBinary(const syrec::NumericExpression& numericExpr);
         [[nodiscard]] static std::optional<syrec_operation::operation>   tryMapCompileTimeConstantExprOperationToBinaryOperation(syrec::Number::CompileTimeConstantExpression::Operation operation);
@@ -162,33 +162,6 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                                        doesExprContainOverlappingAccessOnGivenSignalAccess(const syrec::expression& expr, const syrec::VariableAccess& signalAccess, const parser::SymbolTable& symbolTable);
         [[nodiscard]] static bool                                        doesNumberContainOverlappingAccessOnGivenSignalAccess(const syrec::Number& number, const syrec::VariableAccess& signalAccess, const parser::SymbolTable& symbolTable);
         [[nodiscard]] static bool                                        doSignalAccessesOverlap(const syrec::VariableAccess& firstSignalAccess, const syrec::VariableAccess& otherSignalAccess, const parser::SymbolTable& symbolTable);
-
-        ///**
-        // * \brief Check whether the simplified split of assignment right-hand side expression is allowed.
-        // *
-        // * \remarks This is allowed when the following conditions hold (when applicable): <br>
-        // * I.    The assignment operation is NOT equal to '^=' and the rhs expr does not contain any non-reversible operations or bitwise xor operation. <br>
-        // * II.   The assignment operation is equal to '^=' while the value of the assigned to signal is equal to zero and the following holds for the rhs expr: <br>
-        // * II.I. The rhs expr does not contain any non-reversible operations <br>
-        // * II.I. Starting from the first operation node of the expression tree when traversing the rhs expr in post-order traversal only the first operation node can define the bitwise
-        // *       xor operation on an operation node with two leaf nodes, all other operation nodes defining the bitwise xor operation and reachable by the first operation can only contain
-        // *       a leaf node as the "second" operand of the operation node while the "first" operand must be the expr reachable from the first operation node (when traversing the expression tree
-        // *       bottom-up) <br>
-        // * \param assignedToSignalParts The assigned to signal parts by the assignment
-        // * \param operation The defined assignment operation
-        // * \param topmostAssignmentRhsExpr The right-hand side expression of the assignment
-        // * \param signalValueLookupCallback The callback used to determine the value of the assigned to signal parts
-        // * \return Whether the simplified split "algorithm" can be applied.
-        // */
-        //[[nodiscard]] static bool isSplitOfAssignmentRhsIntoSubexpressionsAllowed(const syrec::VariableAccess& assignedToSignalParts, syrec_operation::operation operation, const syrec::expression& topmostAssignmentRhsExpr, const SignalValueLookupCallback& signalValueLookupCallback);
-
-        ///**
-        // * \brief Check whether the given \p expr does not defined any operations without a matching assignment operation counterpart. <br>
-        // * \remarks This function assumes that numeric expressions that defined compile time constant expression where already converted to binary expressions
-        // * \param expr The expression to check
-        // * \return Whether all defined operations of the expression had a matching assignment operation counterpart defined
-        // */
-        //[[nodiscard]] static bool doesExprNotContainAnyOperationWithoutAssignmentCounterpart(const syrec::expression& expr);
     };
 }
 

@@ -16,6 +16,8 @@
  *
  * TODO: When we are trying to create an assignment in an operation node with either only one leaf node or no leaf nodes (we need to check for the choosen assigned to signal whether the rhs expression does not contain said signal [same semantic check is perform for assignments that are passed into this function])
  *
+ * TODO: Currently we have a problem to fine a correct metric to decide whether we should perform our "simple" or "complex" simplification algorithm if the assignment only contains reversible operations (its a problem since the "complex" algorithm leads to a larger code size due to a larger number of assignments being created)
+ *
  */
 noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResultReference noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::simplify(const syrec::AssignStatement& assignmentStatement, const SignalValueLookupCallback& signalValueLookupCallback) {
     resetInternals();
@@ -26,7 +28,7 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::Simplifica
         return simplificationResult;
     }
 
-    if (!doesExprOnlyDefineReversibleOperationAndXorOnlyInLeafNodes(*transformedAssignmentStmt->rhs)) {
+    if (!doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperation(*transformedAssignmentStmt->rhs)) {
         expressionTraversalHelper->buildTraversalQueue(transformedAssignmentStmt->rhs, *symbolTableReference);
         disableValueLookup();
 
@@ -669,7 +671,6 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::trans
         transformExpressionPriorToSimplification(*exprAsBinaryExpr->lhs);
 
         const bool doesLhsOperandDefineNestedEpxr = doesExpressionDefineNestedSplitableExpr(*exprAsBinaryExpr->lhs);
-        const bool doesRhsOperandDefineNestedExpr  = doesExpressionDefineNestedSplitableExpr(*exprAsBinaryExpr->rhs);
         const std::optional<syrec_operation::operation> mappedToOperationOfParentExpr  = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
 
         /*
@@ -859,7 +860,7 @@ bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::areAs
 }
 
 // TODO: One could extend this condition to also include that non-reversible operations are only defined at operations nodes with only leaf nodes
-bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::doesExprOnlyDefineReversibleOperationAndXorOnlyInLeafNodes(const syrec::expression& expr) {
+bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperation(const syrec::expression& expr) {
     if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr) {
         return !exprAsNumericExpr->value->isCompileTimeConstantExpression();
     }
@@ -870,9 +871,9 @@ bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::doesE
         const std::optional<syrec_operation::operation> mappedToBinaryOperationEnumValue = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
         if (mappedToBinaryOperationEnumValue.has_value() && syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToBinaryOperationEnumValue).has_value()) {
             if (*mappedToBinaryOperationEnumValue == syrec_operation::operation::BitwiseXor) {
-                return !doesExpressionDefineNestedSplitableExpr(*exprAsBinaryExpr->lhs) && !doesExpressionDefineNestedSplitableExpr(*exprAsBinaryExpr->rhs);
+                return false;
             }
-            return doesExprOnlyDefineReversibleOperationAndXorOnlyInLeafNodes(*exprAsBinaryExpr->lhs) && doesExprOnlyDefineReversibleOperationAndXorOnlyInLeafNodes(*exprAsBinaryExpr->rhs);
+            return doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperation(*exprAsBinaryExpr->lhs) && doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperation(*exprAsBinaryExpr->rhs);
         }
     }
     return false;

@@ -2,6 +2,8 @@
 
 using namespace noAdditionalLineSynthesis;
 
+// TODO: Tests for split of subassignments when topmost one is subtraction (i.e. if nested expression contains operations without assignment equivalent)
+
 // Handling or split of subexpressions should also work under for this example currently does not
 syrec::AssignStatement::vec ExpressionToSubAssignmentSplitter::createSubAssignmentsBySplitOfExpr(const syrec::AssignStatement::ptr& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
     resetInternals();
@@ -58,16 +60,16 @@ void ExpressionToSubAssignmentSplitter::resetInternals() {
     generatedAssignments.clear();
     fixedSubAssignmentOperationsQueue.clear();
     fixedAssignmentLhs = nullptr;
-    areSplitsOfXorOperationIntoSubAssignmentsAllowed = false;
+    currentAssignedToSignalValue.reset();
 }
 
-void ExpressionToSubAssignmentSplitter::init(const syrec::VariableAccess::ptr& fixedAssignedToSignalParts, syrec_operation::operation initialAssignmentOperation, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
+void ExpressionToSubAssignmentSplitter::init(const syrec::VariableAccess::ptr& fixedAssignedToSignalParts, syrec_operation::operation initialAssignmentOperation, const std::optional<unsigned int>& initialValueOfAssignedToSignalOfOriginalAssignment) {
     fixedAssignmentLhs = fixedAssignedToSignalParts;
     operationInversionFlag = initialAssignmentOperation == syrec_operation::operation::MinusAssign;
     fixedSubAssignmentOperationsQueue.clear();
     fixedSubAssignmentOperationsQueueIdx = 0;
     fixedSubAssignmentOperationsQueue.emplace_back(initialAssignmentOperation);
-    areSplitsOfXorOperationIntoSubAssignmentsAllowed = currentValueOfAssignedToSignal.has_value() && !*currentValueOfAssignedToSignal;
+    currentAssignedToSignalValue               = initialAssignmentOperation != syrec_operation::operation::MinusAssign ? initialValueOfAssignedToSignalOfOriginalAssignment : std::nullopt;
 }
 
 void ExpressionToSubAssignmentSplitter::updateOperationInversionFlag(syrec_operation::operation operationDeterminingInversionFlag) {
@@ -95,7 +97,7 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithNoLeafNodes(const syrec::e
 
     const syrec_operation::operation definedBinaryOperation = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
     const std::optional<syrec_operation::operation> assignmentOperationOfRhsOperand = determineAssignmentOperationToUse(definedBinaryOperation);
-    if (!assignmentOperationOfRhsOperand.has_value()) {
+    if (!assignmentOperationOfRhsOperand.has_value() || (*assignmentOperationOfRhsOperand == syrec_operation::operation::XorAssign && !isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(*expr))) {
         return false;   
     }
 
@@ -106,8 +108,10 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithNoLeafNodes(const syrec::e
         return false;
     }
 
-    if (*assignmentOperationOfRhsOperand == syrec_operation::operation::XorAssign && doesExprDefineSubExpression(*exprAsBinaryExpr->rhs)) {
-        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, syrec_operation::operation::XorAssign, exprAsBinaryExpr->rhs));
+    // If we skip this check an operation node with two leaf nodes will still be split even if precondition for such a split is not satisfied after the handling of the lhs expr
+    // because the split precondition check is not performed when handling an operation node with two leaf nodes
+    if (*assignmentOperationOfRhsOperand == syrec_operation::operation::XorAssign && !isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(*exprAsBinaryExpr->rhs)) {
+        storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfRhsOperand, exprAsBinaryExpr->rhs));
         return true;
     }
 
@@ -141,7 +145,7 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithOneLeafNode(const syrec::e
     }
 
     const std::optional<syrec_operation::operation> assignmentOperationOfRhsOperand = determineAssignmentOperationToUse(definedBinaryOperation);
-    if (!assignmentOperationOfRhsOperand.has_value() || (*assignmentOperationOfRhsOperand == syrec_operation::operation::XorAssign && !areSplitsOfXorOperationIntoSubAssignmentsAllowed)) {
+    if (!assignmentOperationOfRhsOperand.has_value()) {
         storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *predefinedAssignmentOperationOfSubAssignment, expr));
         return true;
     }
@@ -149,7 +153,7 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithOneLeafNode(const syrec::e
     if (optionalLeafNodeStatusPerOperandOfExpr->first) {
         if (const std::optional<syrec_operation::operation> assignmentOperationForSubAssignment = getOperationOfNextSubAssignment(); assignmentOperationForSubAssignment.has_value()) {
             storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationForSubAssignment,exprAsBinaryExpr->lhs));
-            if (*assignmentOperationOfRhsOperand == syrec_operation::operation::XorAssign && doesExprDefineSubExpression(*exprAsBinaryExpr->rhs)) {
+            if (*assignmentOperationOfRhsOperand == syrec_operation::operation::XorAssign && !isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(*exprAsBinaryExpr->rhs)) {
                 storeAssignment(createAssignmentFrom(fixedAssignmentLhs, syrec_operation::operation::XorAssign, exprAsBinaryExpr->rhs));
                 return true;
             }
@@ -183,8 +187,8 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithTwoLeafNodes(const syrec::
 
     const std::optional<syrec_operation::operation> definedBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
     const std::optional<syrec_operation::operation> subAssignmentOperationForRhs = definedBinaryOperation.has_value() ? determineAssignmentOperationToUse(*definedBinaryOperation) : std::nullopt;
-
-    if (!subAssignmentOperationForRhs.has_value() || (definedBinaryOperation.has_value() && *definedBinaryOperation == syrec_operation::operation::BitwiseXor && !areSplitsOfXorOperationIntoSubAssignmentsAllowed)) {
+    
+    if (!subAssignmentOperationForRhs.has_value() || (definedBinaryOperation.has_value() && *definedBinaryOperation == syrec_operation::operation::BitwiseXor && !isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(*expr))) {
         storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, expr));
     } else {
         storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, exprAsBinaryExpr->lhs));
@@ -196,7 +200,11 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithTwoLeafNodes(const syrec::
 void ExpressionToSubAssignmentSplitter::storeAssignment(const syrec::AssignStatement::ptr& assignment) {
     if (const auto& assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment); assignmentCasted) {
         transformTwoSubsequentMinusOperations(*assignmentCasted);
-    }   
+        updateValueOfAssignedToSignalViaAssignment(syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op), assignmentCasted->rhs.get());
+    } else {
+        updateValueOfAssignedToSignalViaAssignment(std::nullopt, nullptr);
+    }
+
     generatedAssignments.emplace_back(assignment);
 }
 
@@ -227,6 +235,30 @@ void ExpressionToSubAssignmentSplitter::restorePreviousInversionStatusFlag(bool 
 
 void ExpressionToSubAssignmentSplitter::fixNextSubAssignmentOperation(syrec_operation::operation operation) {
     fixedSubAssignmentOperationsQueue.emplace_back(operation);
+}
+
+void ExpressionToSubAssignmentSplitter::updateValueOfAssignedToSignalViaAssignment(const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::expression* assignmentRhsExpr) {
+    if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(assignmentRhsExpr); exprAsNumericExpr) {
+        if (exprAsNumericExpr->value->isConstant()) {
+            currentAssignedToSignalValue = assignmentOperation.has_value()
+                ? syrec_operation::apply(*assignmentOperation, currentAssignedToSignalValue, exprAsNumericExpr->value->evaluate({}))
+                : std::nullopt;
+        }
+    }
+    else {
+        currentAssignedToSignalValue.reset();
+    }
+}
+
+bool ExpressionToSubAssignmentSplitter::isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(const syrec::expression& expr) const {
+    if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr) {
+        if (!exprAsNumericExpr->value->isCompileTimeConstantExpression()) {
+            return true;
+        }
+    } else if (const auto& exprAsVariableExpr = dynamic_cast<const syrec::VariableExpression*>(&expr); exprAsVariableExpr) {
+        return true;
+    }
+    return currentAssignedToSignalValue.has_value() && !currentAssignedToSignalValue.value();
 }
 
 syrec::AssignStatement::ptr ExpressionToSubAssignmentSplitter::createAssignmentFrom(const syrec::VariableAccess::ptr& assignedToSignalParts, syrec_operation::operation operation, const syrec::expression::ptr& assignmentRhsExpr) {
@@ -310,7 +342,7 @@ void ExpressionToSubAssignmentSplitter::transformAddAssignOperationToXorAssignOp
     const std::optional<std::shared_ptr<syrec::BinaryExpression>> assignmentRhsExprAsBinaryExpr = usedAssignmentOperation.has_value() ? std::make_optional(std::dynamic_pointer_cast<syrec::BinaryExpression>(assignment.rhs)) : std::nullopt;
     const std::optional<syrec_operation::operation>               usedBinaryOperation           = assignmentRhsExprAsBinaryExpr.has_value() && *assignmentRhsExprAsBinaryExpr ? syrec_operation::tryMapBinaryOperationFlagToEnum(assignmentRhsExprAsBinaryExpr->get()->op) : std::nullopt;
 
-    if (usedBinaryOperation.has_value() && *usedBinaryOperation != syrec_operation::operation::BitwiseXor && *usedAssignmentOperation == syrec_operation::operation::AddAssign) {
+    if (usedBinaryOperation.has_value() && *usedBinaryOperation == syrec_operation::operation::BitwiseXor && *usedAssignmentOperation == syrec_operation::operation::AddAssign) {
         if (const std::optional<unsigned int> flagForAddAssignOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign); flagForAddAssignOperation.has_value()) {
             assignment.op = *flagForAddAssignOperation;
         }
