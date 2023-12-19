@@ -82,11 +82,20 @@ namespace noAdditionalLineSynthesis {
                 return numGeneratedAssignments;
             }
 
-            explicit OperationOperandSimplificationResult(std::size_t numGeneratedAssignments, std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> data)
-                : numGeneratedAssignments(numGeneratedAssignments), data(std::move(data)) {}
+            [[nodiscard]] bool wasResultManuallyCreated() const {
+                return wasManuallyCreated;
+            }
+
+            [[nodiscard]] static OperationOperandSimplificationResult createManuallyFrom(const std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr>& data) {
+                return OperationOperandSimplificationResult(0, data, true);
+            }
+
+            explicit OperationOperandSimplificationResult(std::size_t numGeneratedAssignments, std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> data, bool wasManuallyCreated = false)
+                : numGeneratedAssignments(numGeneratedAssignments), data(std::move(data)), wasManuallyCreated(wasManuallyCreated) {}
         private:
             std::size_t                                                      numGeneratedAssignments;
             std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> data;
+            bool                                                             wasManuallyCreated;
         };
         using OwningOperationOperandSimplificationResultReference = std::unique_ptr<OperationOperandSimplificationResult>;
 

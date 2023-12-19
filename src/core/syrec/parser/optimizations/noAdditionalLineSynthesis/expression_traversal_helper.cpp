@@ -122,7 +122,7 @@ void ExpressionTraversalHelper::removeOperationNodeAsPotentialBacktrackOperation
 }
 
 void ExpressionTraversalHelper::backtrack() {
-    if (backtrackOperationNodeIds.empty()) {
+    if (backtrackOperationNodeIds.empty() || !operationNodeTraversalQueueIdx) {
         // If we do not reset the traversal index here after all backtracking checkpoints were removed, we would never reach the start of the traversal queue again through backtracking
         operationNodeTraversalQueueIdx = 0;
         return;
@@ -131,15 +131,11 @@ void ExpressionTraversalHelper::backtrack() {
     const auto& checkpointOperationNodeId = backtrackOperationNodeIds.back();
     backtrackOperationNodeIds.pop_back();
 
-    std::size_t index      = operationNodeTraversalQueue.size() - 1;
-    bool        foundMatch = false;
-    for (auto traversalQueueIterator = operationNodeTraversalQueue.rbegin(); traversalQueueIterator != operationNodeTraversalQueue.rend() && !foundMatch; ++traversalQueueIterator) {
+    bool foundMatch = false;
+    // Since the operation node traversal queue index is always advanced when fetching the next operation node, we take the current value of the latter -1 as the index for the current operation node
+    for (auto traversalQueueIterator = std::next(operationNodeTraversalQueue.cbegin(), operationNodeTraversalQueueIdx - 1); traversalQueueIterator != operationNodeTraversalQueue.cbegin() && !foundMatch; --traversalQueueIterator) {
         foundMatch = *traversalQueueIterator == checkpointOperationNodeId;
-        if (foundMatch) {
-            operationNodeTraversalQueueIdx = index;
-        } else {
-            --index;
-        }
+        operationNodeTraversalQueueIdx -= !foundMatch;
     }
 }
 
