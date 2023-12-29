@@ -3,6 +3,7 @@
 using namespace noAdditionalLineSynthesis;
 
 syrec::AssignStatement::vec AssignmentTransformer::simplify(const syrec::AssignStatement::vec& assignmentsToSimplify, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback) {
+    resetInternals();
     syrec::AssignStatement::vec generatedAssignments;
 
     for (const syrec::AssignStatement::ptr& assignment: assignmentsToSimplify) {

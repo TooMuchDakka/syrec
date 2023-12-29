@@ -10,5 +10,8 @@ namespace copyUtils {
     [[nodiscard]] std::unique_ptr<syrec::Statement>              createCopyOfStmt(const syrec::Statement& stmt);
     [[nodiscard]] std::unique_ptr<syrec::expression>             createCopyOfExpression(const syrec::expression& expr);
     [[nodiscard]] std::unique_ptr<syrec::Number>                 createCopyOfNumber(const syrec::Number& number);
+
+    [[nodiscard]] std::unique_ptr<syrec::AssignStatement> createDeepCopyOfAssignmentStmt(const syrec::AssignStatement& stmt);
+    [[nodiscard]] std::unique_ptr<syrec::expression>      createDeepCopyOfExpression(const syrec::expression& expr);
 };
 #endif

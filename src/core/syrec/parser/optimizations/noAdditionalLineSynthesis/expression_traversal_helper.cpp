@@ -128,14 +128,24 @@ void ExpressionTraversalHelper::backtrack() {
         return;
     }
 
-    const auto& checkpointOperationNodeId = backtrackOperationNodeIds.back();
     backtrackOperationNodeIds.pop_back();
+    if (backtrackOperationNodeIds.empty() == 1) {
+        operationNodeTraversalQueueIdx = 0;
+        return;
+    }
+    const auto& checkpointOperationNodeId = backtrackOperationNodeIds.back();
+
+    // Since the operation node traversal queue index is always advanced when fetching the next operation node, we take the current value of the latter -1 as the index for the current operation node
+    const std::size_t maxNumElementsToCheck  = operationNodeTraversalQueueIdx - 1;
+    auto              traversalQueueIterator = std::next(operationNodeTraversalQueue.cbegin(), maxNumElementsToCheck);
 
     bool foundMatch = false;
-    // Since the operation node traversal queue index is always advanced when fetching the next operation node, we take the current value of the latter -1 as the index for the current operation node
-    for (auto traversalQueueIterator = std::next(operationNodeTraversalQueue.cbegin(), operationNodeTraversalQueueIdx - 1); traversalQueueIterator != operationNodeTraversalQueue.cbegin() && !foundMatch; --traversalQueueIterator) {
+    for (std::size_t i = 0; i <= maxNumElementsToCheck && !foundMatch; ++i) {
         foundMatch = *traversalQueueIterator == checkpointOperationNodeId;
-        operationNodeTraversalQueueIdx -= !foundMatch;
+        if (!foundMatch) {
+            --operationNodeTraversalQueueIdx;
+            --traversalQueueIterator;
+        }
     }
 }
 

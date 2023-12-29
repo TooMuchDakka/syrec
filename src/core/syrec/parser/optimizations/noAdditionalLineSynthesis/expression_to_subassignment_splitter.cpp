@@ -3,6 +3,8 @@
 using namespace noAdditionalLineSynthesis;
 
 // TODO: Tests for split of subassignments when topmost one is subtraction (i.e. if nested expression contains operations without assignment equivalent)
+// TODO: Implementation of splits for XOR operations does not work correctly [see simplificationWithOnlyReversibleOpsAndUniqueSignalAccessHandlesCreatesAssignmentForOperationNodeWithLhsOperandBeingSignalAccessAndNonLeafCreatingAssignment]
+//  should we again perform a swap of the operands for an expression of the form (a ^ <subExpr>) to (<subExpr> ^ a)
 
 // Handling or split of subexpressions should also work under for this example currently does not
 syrec::AssignStatement::vec ExpressionToSubAssignmentSplitter::createSubAssignmentsBySplitOfExpr(const syrec::AssignStatement::ptr& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
@@ -187,8 +189,8 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithTwoLeafNodes(const syrec::
 
     const std::optional<syrec_operation::operation> definedBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
     const std::optional<syrec_operation::operation> subAssignmentOperationForRhs = definedBinaryOperation.has_value() ? determineAssignmentOperationToUse(*definedBinaryOperation) : std::nullopt;
-    
-    if (!subAssignmentOperationForRhs.has_value() || (definedBinaryOperation.has_value() && *definedBinaryOperation == syrec_operation::operation::BitwiseXor && !isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(*expr))) {
+
+    if (!subAssignmentOperationForRhs.has_value() || !definedBinaryOperation.has_value()) {
         storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, expr));
     } else {
         storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *assignmentOperationOfLhsExpr, exprAsBinaryExpr->lhs));
