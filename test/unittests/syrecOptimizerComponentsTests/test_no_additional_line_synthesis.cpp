@@ -17,7 +17,8 @@ protected:
     }
 
     syrec::ReadProgramSettings getDefaultParserConfig() const override {
-        return syrec::ReadProgramSettings(defaultSignalBitwidth, false, false, true, true);
+        const std::optional<parser::NoAdditionalLineSynthesisConfig> noAdditionalLineSynthesisConfig = std::make_optional<parser::NoAdditionalLineSynthesisConfig>({.useGeneratedAssignmentsByDecisionAsTieBreaker = true, .preferAssignmentsGeneratedByChoiceRegardlessOfCost = true});
+        return syrec::ReadProgramSettings(defaultSignalBitwidth, false, false, true, true, false, false, optimizations::MultiplicationSimplificationMethod::None, std::nullopt, noAdditionalLineSynthesisConfig);
     }
 };
 

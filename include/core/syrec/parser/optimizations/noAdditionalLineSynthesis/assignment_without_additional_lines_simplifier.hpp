@@ -5,6 +5,7 @@
 #include "assignment_transformer.hpp"
 #include "expression_to_subassignment_splitter.hpp"
 #include "core/syrec/statement.hpp"
+#include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_assignments_container.hpp"
 
@@ -23,7 +24,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] SimplificationResultReference simplify(const syrec::AssignStatement& assignmentStatement, const SignalValueLookupCallback& signalValueLookupCallback);
 
          virtual ~AssignmentWithoutAdditionalLineSimplifier() = default;
-        AssignmentWithoutAdditionalLineSimplifier(const parser::SymbolTable::ptr& symbolTableReference) {
+        AssignmentWithoutAdditionalLineSimplifier(const parser::SymbolTable::ptr& symbolTableReference, const std::optional<parser::NoAdditionalLineSynthesisConfig>& config) {
             generatedAssignmentsContainer                     = std::make_shared<TemporaryAssignmentsContainer>();
             expressionTraversalHelper                         = std::make_shared<ExpressionTraversalHelper>();
             this->symbolTableReference                        = symbolTableReference;
@@ -31,8 +32,9 @@ namespace noAdditionalLineSynthesis {
             learnedConflictsLookup                            = std::make_unique<LearnedConflictsLookup>();
             disabledValueLookupToggle                         = false;
             assignmentTransformer                             = std::make_unique<AssignmentTransformer>();
-            expressionNestingPenalty                          = 75;
-            expressionNestingPenaltyScalingPerNestingLevel    = 3.5;
+            if (config.has_value()) {
+                internalConfig = *config;
+            }
         }
 
     protected:
@@ -56,12 +58,7 @@ namespace noAdditionalLineSynthesis {
         ExpressionToSubAssignmentSplitter::ptr expressionToSubAssignmentSplitterReference;
         bool                                   disabledValueLookupToggle;
         AssignmentTransformer::ptr             assignmentTransformer;
-
-        /**
-         * \brief This additional factor for the cost of an expression can be used to achieve a balance between code-size and the number of additional signals required for the synthesis of an assignment
-         */
-        double expressionNestingPenalty;
-        double expressionNestingPenaltyScalingPerNestingLevel;
+        parser::NoAdditionalLineSynthesisConfig internalConfig;
         
         using LearnedConflictsLookupKey = std::pair<std::size_t, Decision::ChoosenOperand>;
         struct LearnedConflictsLookupKeyHasher {
@@ -157,6 +154,7 @@ namespace noAdditionalLineSynthesis {
         void                                                                                             backtrack(std::size_t operationNodeIdAtOriginOfBacktrack) const;
         [[nodiscard]] bool                                                                               canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::expression& alternativeToCheckAsExpr, const parser::SymbolTable& symbolTable) const;
         [[nodiscard]] bool                                                                               canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::VariableAccess& alternativeToCheckAsSignalAccess, const parser::SymbolTable& symbolTable) const;
+        [[nodiscard]] bool                                                                               isAccessedSignalAssignable(const std::string_view& accessedSignalIdent) const;
         [[nodiscard]] std::optional<double>                                                              determineCostOfExpr(const syrec::expression& expr, std::size_t currentNestingLevel) const;
         [[nodiscard]] std::optional<double>                                                              determineCostOfAssignment(const syrec::AssignStatement& assignment) const;
         [[nodiscard]] std::optional<double>                                                              determineCostOfNumber(const syrec::Number& number, std::size_t currentNestingLevel) const;

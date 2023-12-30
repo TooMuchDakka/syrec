@@ -276,7 +276,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     if (!skipCheckForSplitOfAssignmentInSubAssignments) {
-        skipCheckForSplitOfAssignmentInSubAssignments |= !parserConfig.noAdditionalLineOptimizationEnabled || rhsOperandEvaluatedAsConstant.has_value();
+        skipCheckForSplitOfAssignmentInSubAssignments |= !parserConfig.noAdditionalLineOptimizationConfig.has_value() || rhsOperandEvaluatedAsConstant.has_value();
     }
 
     const std::optional<EvaluatedSignalAccess> evaluatedSignalAccessOfAssignedToSignal = !doesAssignmentNotModifyAssignedToSignalValue ? tryEvaluateDefinedSignalAccess(*lhsOperand) : std::nullopt;
@@ -285,7 +285,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
      */
     if (!doesAssignmentNotModifyAssignedToSignalValue) {
         if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); !skipCheckForSplitOfAssignmentInSubAssignments && activeSymbolTableScope.has_value()) {
-            const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier>(*activeSymbolTableScope);
+            const auto& noAdditionalLineAssignmentSimplifier = std::make_unique<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier>(*activeSymbolTableScope, parserConfig.noAdditionalLineOptimizationConfig);
 
             const auto assignmentStmtToSimplify = lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs ? std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand) : std::make_shared<syrec::AssignStatement>(assignmentStmt);
             noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SignalValueLookupCallback signalValueLookupCallback = [this](const syrec::VariableAccess& accessedSignalParts) { return tryFetchValueForAccessedSignal(accessedSignalParts); };

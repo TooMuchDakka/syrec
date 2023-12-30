@@ -1,11 +1,11 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
-
 #include "core/syrec/parser/utils/copy_utils.hpp"
 #include "core/syrec/parser/utils/signal_access_utils.hpp"
 
 #ifndef NDEBUG
 #include "fmt/format.h"
 #endif
+
 
 /*
  * TODO: IMPORTANT (testcase simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingXorCorrectlyHandlesMixedOperationsInRhsExpr) is missing required inversion of assignments
@@ -29,6 +29,8 @@
  * TODO: Could the simplification (a - (b + c)) = (a - (c - b)) lead to further optimizations?
  *
  * TODO: Some cases could offer new optimizations: module main(out a(16), inout b(16), in c(16), in d(16)) a += (((b - c) + b) * d) [see simplification of previous point])
+ *
+ * TODO: IMPORTANT - When processing a rhs of an expression we cannot use any operand use in the lhs expr (how can we do this efficiently, does this check need to be done everytime)
  */
 
 // TODO: CHECK TEST simplificationWithNoneReversibleOperationWithXorAssignOperationAndTopmostOperationOfRhsBeingAdditionOperationWithLhsGeneratingAssignmentAndRhsGeneratingAssignmentCreatesCorrectAssignment FOR FAILED ROLLBACK
@@ -701,12 +703,10 @@ std::unique_ptr<syrec::AssignStatement> noAdditionalLineSynthesis::AssignmentWit
             const std::optional<syrec_operation::operation> mappedToBinaryOperationEnumFromFlag     = syrec_operation::tryMapBinaryOperationFlagToEnum(assignmentRhsExprAsBinaryExpr->op);
             if (mappedToAssignmentOperationEnumFromFlag.has_value() && *mappedToAssignmentOperationEnumFromFlag == syrec_operation::operation::MinusAssign
                 && mappedToBinaryOperationEnumFromFlag.has_value() && *mappedToBinaryOperationEnumFromFlag == syrec_operation::operation::Subtraction) {
-                if (!doesExprDefineSignalAccess(*assignmentRhsExprAsBinaryExpr->lhs)) {
-                    owningCopyOfAssignmentStmt->op                   = *syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::AddAssign);
-                    const syrec::expression::ptr copyOfBinaryExprLhs = assignmentRhsExprAsBinaryExpr->lhs;
-                    assignmentRhsExprAsBinaryExpr->lhs               = assignmentRhsExprAsBinaryExpr->rhs;
-                    assignmentRhsExprAsBinaryExpr->rhs               = copyOfBinaryExprLhs;   
-                }
+                owningCopyOfAssignmentStmt->op                   = *syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::AddAssign);
+                const syrec::expression::ptr copyOfBinaryExprLhs = assignmentRhsExprAsBinaryExpr->lhs;
+                assignmentRhsExprAsBinaryExpr->lhs               = assignmentRhsExprAsBinaryExpr->rhs;
+                assignmentRhsExprAsBinaryExpr->rhs               = copyOfBinaryExprLhs;   
             }
         }
         transformExpressionPriorToSimplification(*owningCopyOfAssignmentStmt->rhs, applyHeuristicsForSubassignmentGeneration);
@@ -725,14 +725,16 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::trans
         const std::optional<syrec_operation::operation> mappedToOperationOfParentExpr  = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
 
         /*
-         * Try to transform a binary expression of the form (<number> op <signalAccess>) to (<signalAccess> op <number>) if is op is commutative and a matching assignment operation for op exists.
+         * Try to transform a binary expression of the form (<number> op <signalAccess>) to (<signalAccess> op <number>) if the defined operation is commutative, has a matching assignment operation and the defined signal access accesses a modifiable signal.
          */
         if (applyHeuristicsForSubassignmentGeneration && mappedToOperationOfParentExpr.has_value() && syrec_operation::isCommutative(*mappedToOperationOfParentExpr) && syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationOfParentExpr).has_value()
-            //&& ((doesExpressionDefineNumber(*exprAsBinaryExpr->lhs) && doesExprDefineSignalAccess(*exprAsBinaryExpr->rhs)) || (doesLhsOperandDefineNestedEpxr && !doesRhsOperandDefineNestedExpr && doesExprDefineSignalAccess(exprAsBinaryExpr->rhs))) {
             && (doesExpressionDefineNumber(*exprAsBinaryExpr->lhs) || doesLhsOperandDefineNestedEpxr) && doesExprDefineSignalAccess(*exprAsBinaryExpr->rhs)) {
-            const auto backupOfBinaryExprLhsOperand = exprAsBinaryExpr->rhs;
-            exprAsBinaryExpr->rhs                   = exprAsBinaryExpr->lhs;
-            exprAsBinaryExpr->lhs                   = backupOfBinaryExprLhsOperand;
+            const auto& rhsOperandAsSignalAccess = std::dynamic_pointer_cast<const syrec::VariableExpression>(exprAsBinaryExpr->rhs);
+            if (rhsOperandAsSignalAccess && isAccessedSignalAssignable(rhsOperandAsSignalAccess->var->var->name)) {
+                const auto backupOfBinaryExprLhsOperand = exprAsBinaryExpr->rhs;
+                exprAsBinaryExpr->rhs                   = exprAsBinaryExpr->lhs;
+                exprAsBinaryExpr->lhs                   = backupOfBinaryExprLhsOperand;   
+            }
         }
 
 
@@ -798,6 +800,10 @@ bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::canAl
     return expressionTraversalHelper->canSignalBeUsedOnAssignmentLhs(signalAccess.var->name) && !didPreviousDecisionMatchingChoiceCauseConflict(LearnedConflictsLookupKey(operationNodeId, toBeChosenAlternative)) && !doesExprContainOverlappingAccessOnGivenSignalAccess(alternativeToCheckAsExpr, signalAccess, symbolTable);
 }
 
+bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::isAccessedSignalAssignable(const std::string_view& accessedSignalIdent) const {
+    return symbolTableReference && symbolTableReference->canSignalBeAssignedTo(accessedSignalIdent).value_or(false);
+}
+
 
 std::optional<double> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineCostOfExpr(const syrec::expression& expr, std::size_t currentNestingLevel) const {
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr) {
@@ -806,7 +812,7 @@ std::optional<double> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLine
         const std::optional<double> costOfRhsExpr = costOfLhsExpr.has_value() ? determineCostOfExpr(*exprAsBinaryExpr->rhs, currentNestingLevel) : std::nullopt;
 
         if (costOfRhsExpr.has_value()) {
-            return (expressionNestingPenaltyScalingPerNestingLevel * currentNestingLevel * expressionNestingPenalty) + *costOfLhsExpr + *costOfRhsExpr;
+            return (internalConfig.expressionNestingPenaltyScalingPerNestingLevel * currentNestingLevel * internalConfig.expressionNestingPenalty) + *costOfLhsExpr + *costOfRhsExpr;
         }
         return std::nullopt;
     }
@@ -816,7 +822,7 @@ std::optional<double> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLine
         const std::optional<double> costOfShiftAmount     = costOfToBeShiftedExpr.has_value() ? determineCostOfNumber(*exprAsShiftExpr->rhs, currentNestingLevel) : std::nullopt;
 
         if (costOfShiftAmount.has_value()) {
-            return (expressionNestingPenaltyScalingPerNestingLevel * currentNestingLevel * expressionNestingPenalty) + *costOfToBeShiftedExpr + *costOfShiftAmount;
+            return (internalConfig.expressionNestingPenaltyScalingPerNestingLevel * currentNestingLevel * internalConfig.expressionNestingPenalty) + *costOfToBeShiftedExpr + *costOfShiftAmount;
         }
         return std::nullopt;
     }
@@ -857,12 +863,16 @@ std::optional<double> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLine
 
 
 syrec::AssignStatement::vec noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineMostViableAlternativeBasedOnCost(const syrec::AssignStatement::vec& generatedSimplifiedAssignments, const std::shared_ptr<syrec::AssignStatement>& originalAssignmentUnoptimized, const SignalValueLookupCallback& signalValueCallback) const {
-    if (!doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperationWithNoLeafNodes(*originalAssignmentUnoptimized->rhs)) {
+    if (!generatedSimplifiedAssignments.empty() && (!doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperationWithNoLeafNodes(*originalAssignmentUnoptimized->rhs) || internalConfig.preferAssignmentsGeneratedByChoiceRegardlessOfCost)) {
         return generatedSimplifiedAssignments;
     }
     
     syrec::AssignStatement::vec containerForUnoptimizedTopmostAssignment = std::vector<syrec::AssignStatement::ptr>(1, originalAssignmentUnoptimized);
     containerForUnoptimizedTopmostAssignment                             = assignmentTransformer->simplify(containerForUnoptimizedTopmostAssignment, signalValueCallback);
+
+    if (generatedSimplifiedAssignments.empty()) {
+        return containerForUnoptimizedTopmostAssignment;
+    }
 
     const std::optional<std::size_t> costOfSimplifiedAssignments = determineCostOfAssignments(generatedSimplifiedAssignments);
     const std::optional<std::size_t> costOfSimplifiedAssignmentsOfTopmostAssignment = determineCostOfAssignments(containerForUnoptimizedTopmostAssignment);
@@ -871,7 +881,7 @@ syrec::AssignStatement::vec noAdditionalLineSynthesis::AssignmentWithoutAddition
         return generatedSimplifiedAssignments;
     }
 
-    if (*costOfSimplifiedAssignments <= *costOfSimplifiedAssignmentsOfTopmostAssignment) {
+    if (*costOfSimplifiedAssignments < *costOfSimplifiedAssignmentsOfTopmostAssignment || (*costOfSimplifiedAssignments == *costOfSimplifiedAssignmentsOfTopmostAssignment && internalConfig.useGeneratedAssignmentsByDecisionAsTieBreaker)) {
         return generatedSimplifiedAssignments;
     }
     return containerForUnoptimizedTopmostAssignment;

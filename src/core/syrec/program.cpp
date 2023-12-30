@@ -53,12 +53,12 @@ bool program::parseFileContent(std::string_view programToBeParsed, const ReadPro
                                                            config.reassociateExpressionEnabled,
                                                            config.deadCodeEliminationEnabled,
                                                            config.performConstantPropagation,
-                                                           config.noAdditionalLineOptimizationEnabled,
                                                            config.operationStrengthReductionEnabled,
                                                            config.deadStoreEliminationEnabled,
                                                            config.combineRedundantInstructions,
                                                            config.multiplicationSimplificationMethod,
                                                            config.optionalLoopUnrollConfig,
+                                                           config.optionalNoAdditionalLineSynthesisConfig,
                                                            config.expectedMainModuleName);
     const auto  parsingResult     = ::parser::SyrecParserInterface::parseProgram(programToBeParsed, parserConfigToUse);
     if (parsingResult.wasParsingSuccessful) {

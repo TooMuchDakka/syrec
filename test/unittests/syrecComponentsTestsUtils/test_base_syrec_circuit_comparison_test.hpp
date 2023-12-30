@@ -44,6 +44,8 @@ protected:
     static constexpr auto cJsonKeyLoopUnrollMaxAllowedTotalSize            = "loopUnrollMaxTotalSize";
     static constexpr auto cJsonKeyLoopUnrollForceUnrollFlag                = "loopUnrollForceUnrollON";
     static constexpr auto cJsonKeyLoopUnrollAllowRemainderFlag             = "loopUnrollAllowRemainderON";
+    static constexpr auto cJsonKeyNoAdditionalLineSynthesisGeneratedAssignmentsByDecisionTiebreakerFlag = "noAddLineSynGenByChoiceTiebreakerON";
+    static constexpr auto cJsonKeyNoAdditionalLineSynthesisPreferGeneratedAssignmentsByChoiceRegardlessOfChoiceFlag = "noAddLineSynAlwaysUseGenByChoiceAssignmentsON";
 
     static constexpr auto cJsonKeyMultiplicationSimplificationViaBinaryMethod = "binaryMethod";
     static constexpr auto cJsonKeyMultiplicationSimplificationViaBinaryFactoringMethod = "binaryFactoringMethod";
@@ -194,7 +196,6 @@ protected:
         SupportingBroadCastingAssignmentOperands,
         DeadCodeEliminationFlag,
         PerformConstantPropagationFlag,
-        NoAdditionalLineSynthesisFlag,
         OperationStrengthReductionEnabled,
         DeadStoreEliminationEnabled,
         CombineRedundantInstructionsEnabled,
@@ -204,7 +205,9 @@ protected:
         LoopUnrollMaxUnrollCountPerLoop,
         LoopUnrollMaxAllowedTotalSize,
         LoopForceUnrollFlag,
-        LoopUnrollAllowRemainderFlag
+        LoopUnrollAllowRemainderFlag,
+        NoAdditionalLineSynthesisTieBreakerByAssignmentsOfChoice,
+        NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts,
     };
     [[nodiscard]] std::map<OptimizerOption, std::string> loadDefinedOptimizationOptions(const nlohmann::json& testCaseDataJsonObject) const {
         std::map<OptimizerOption, std::string> userDefinedOptions;
@@ -231,6 +234,10 @@ protected:
         bool                            forceUnrollAll = false;
         bool                            wereLoopUnrollConfigOptionsDefined = false;
 
+        bool wereNoAdditionalLineSynthesisConfigOperationsDefined = false;
+        bool shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker = false;
+        bool preferAssignmentGeneratedByChoiceRegardlessOfCosts   = false;
+
         for (const auto& [key, value] : loadedOptimizationOptions) {
             switch (key) {
                 case SupportingBroadCastingExpressionOperandsFlag:
@@ -252,12 +259,6 @@ protected:
                     const auto parsedConstantPropagationFlagValue = tryParseStringToNumber(value);
                     ASSERT_TRUE(parsedConstantPropagationFlagValue.has_value()) << "Failed to map " << value << " to a valid constant propagation value";
                     generatedConfig.performConstantPropagation = *parsedConstantPropagationFlagValue > 0;
-                    break;
-                }
-                case NoAdditionalLineSynthesisFlag: {
-                    const auto parsedNoAdditionalLineSynthesisFlagValue = tryParseStringToNumber(value);
-                    ASSERT_TRUE(parsedNoAdditionalLineSynthesisFlagValue.has_value()) << "Failed to map " << value << " to a valid no additional line synthesis value";
-                    generatedConfig.noAdditionalLineOptimizationEnabled = *parsedNoAdditionalLineSynthesisFlagValue > 0;
                     break;
                 }
                 case OperationStrengthReductionEnabled: {
@@ -319,6 +320,19 @@ protected:
                     allowRemainderLoop = *parsedAllowLoopRemainderFlag > 0;
                     break;
                 }
+                case NoAdditionalLineSynthesisTieBreakerByAssignmentsOfChoice: {
+                    wereNoAdditionalLineSynthesisConfigOperationsDefined = true;
+                    const auto parsedTiebreakerOptionalFlag              = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedTiebreakerOptionalFlag.has_value()) << "Failed to map given tie breaker optional value for no additional line synthesis to a number: " << value;
+                    shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker = *parsedTiebreakerOptionalFlag != 0;
+                    break;
+                }
+                case NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts: {
+                    wereNoAdditionalLineSynthesisConfigOperationsDefined = true;
+                    const auto parsedPreferenceForGeneratedAssignmentsByChoiceFlag = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedPreferenceForGeneratedAssignmentsByChoiceFlag.has_value()) << "Failed to map given value for preference for generated assignments by choice for no additional line synthesis of assignments: " << value;
+                    preferAssignmentGeneratedByChoiceRegardlessOfCosts = *parsedPreferenceForGeneratedAssignmentsByChoiceFlag != 0;
+                }
             }
         }
 
@@ -326,6 +340,10 @@ protected:
             generatedConfig.optionalLoopUnrollConfig.emplace(optimizations::LoopOptimizationConfig({maxUnrollCountPerLoop, maxAllowedNestingLevelOfInnerLoops, maxAllowedTotalLoopSize, allowRemainderLoop, forceUnrollAll, generatedConfig.deadCodeEliminationEnabled
         }));
         }
+        if (wereNoAdditionalLineSynthesisConfigOperationsDefined) {
+            generatedConfig.optionalNoAdditionalLineSynthesisConfig.emplace(parser::NoAdditionalLineSynthesisConfig({.useGeneratedAssignmentsByDecisionAsTieBreaker = shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker, .preferAssignmentsGeneratedByChoiceRegardlessOfCost = preferAssignmentGeneratedByChoiceRegardlessOfCosts}));
+        }
+
         parsedProgramSettings.emplace(generatedConfig);
     }
 
@@ -337,7 +355,6 @@ protected:
         syrec::ReadProgramSettings mergedOptions;
         mergedOptions.deadCodeEliminationEnabled = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::DeadCodeEliminationFlag, loadedOptimizationOptions, defaultParserConfig.deadCodeEliminationEnabled, userDefinedOptimizations.deadCodeEliminationEnabled);
         mergedOptions.performConstantPropagation = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::PerformConstantPropagationFlag, loadedOptimizationOptions, defaultParserConfig.performConstantPropagation, userDefinedOptimizations.performConstantPropagation);
-        mergedOptions.noAdditionalLineOptimizationEnabled = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisFlag, loadedOptimizationOptions, defaultParserConfig.noAdditionalLineOptimizationEnabled, userDefinedOptimizations.noAdditionalLineOptimizationEnabled);
         mergedOptions.operationStrengthReductionEnabled   = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::OperationStrengthReductionEnabled, loadedOptimizationOptions, defaultParserConfig.operationStrengthReductionEnabled, userDefinedOptimizations.operationStrengthReductionEnabled);
         mergedOptions.deadStoreEliminationEnabled         = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::DeadStoreEliminationEnabled, loadedOptimizationOptions, defaultParserConfig.deadStoreEliminationEnabled, userDefinedOptimizations.deadStoreEliminationEnabled);
         mergedOptions.combineRedundantInstructions        = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::CombineRedundantInstructionsEnabled, loadedOptimizationOptions, defaultParserConfig.combineRedundantInstructions, userDefinedOptimizations.combineRedundantInstructions);
@@ -356,6 +373,19 @@ protected:
         } else if (!userDefinedOptimizations.optionalLoopUnrollConfig.has_value() && defaultParserConfig.optionalLoopUnrollConfig.has_value()) {
             mergedOptions.optionalLoopUnrollConfig.emplace(*defaultParserConfig.optionalLoopUnrollConfig);
         }
+
+        if (userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig.has_value() && !defaultParserConfig.optionalNoAdditionalLineSynthesisConfig.has_value()) {
+            mergedOptions.optionalNoAdditionalLineSynthesisConfig.emplace(*userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig);
+        } else if (userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig.has_value() && defaultParserConfig.optionalNoAdditionalLineSynthesisConfig.has_value()) {
+            mergedOptions.optionalNoAdditionalLineSynthesisConfig.emplace(parser::NoAdditionalLineSynthesisConfig({
+                .useGeneratedAssignmentsByDecisionAsTieBreaker      = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisTieBreakerByAssignmentsOfChoice, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->useGeneratedAssignmentsByDecisionAsTieBreaker, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->useGeneratedAssignmentsByDecisionAsTieBreaker),
+                .preferAssignmentsGeneratedByChoiceRegardlessOfCost = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost)
+            }));
+        }
+        else {
+            mergedOptions.optionalNoAdditionalLineSynthesisConfig.emplace(*defaultParserConfig.optionalNoAdditionalLineSynthesisConfig);
+        }
+
         return mergedOptions;
     }
 
@@ -380,7 +410,6 @@ protected:
         if (jsonKeyOfOptimizationOption == cJsonKeySupportingBroadCastingAssignmentOperands) return std::make_optional(OptimizerOption::SupportingBroadCastingAssignmentOperands);
         if (jsonKeyOfOptimizationOption == cJsonKeyDeadCodeEliminationFlag) return std::make_optional(OptimizerOption::DeadCodeEliminationFlag);
         if (jsonKeyOfOptimizationOption == cJsonKeyPerformConstantPropagationFlag) return std::make_optional(OptimizerOption::PerformConstantPropagationFlag);
-        if (jsonKeyOfOptimizationOption == cJsonKeyNoAdditionalLineSynthesisFlag) return std::make_optional(OptimizerOption::NoAdditionalLineSynthesisFlag);
         if (jsonKeyOfOptimizationOption == cJsonKeyOperationStrengthReductionEnabled) return std::make_optional(OptimizerOption::OperationStrengthReductionEnabled);
         if (jsonKeyOfOptimizationOption == cJsonKeyDeadStoreEliminationEnabled) return std::make_optional(OptimizerOption::DeadStoreEliminationEnabled);
         if (jsonKeyOfOptimizationOption == cJsonKeyCombineRedundantInstructionsEnabled) return std::make_optional(OptimizerOption::CombineRedundantInstructionsEnabled);
@@ -391,6 +420,8 @@ protected:
         if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollMaxAllowedTotalSize) return std::make_optional(OptimizerOption::LoopUnrollMaxAllowedTotalSize);
         if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollForceUnrollFlag) return std::make_optional(OptimizerOption::LoopForceUnrollFlag);
         if (jsonKeyOfOptimizationOption == cJsonKeyLoopUnrollAllowRemainderFlag) return std::make_optional(OptimizerOption::LoopUnrollAllowRemainderFlag);
+        if (jsonKeyOfOptimizationOption == cJsonKeyNoAdditionalLineSynthesisGeneratedAssignmentsByDecisionTiebreakerFlag) return std::make_optional(OptimizerOption::NoAdditionalLineSynthesisTieBreakerByAssignmentsOfChoice);
+        if (jsonKeyOfOptimizationOption == cJsonKeyNoAdditionalLineSynthesisPreferGeneratedAssignmentsByChoiceRegardlessOfChoiceFlag) return std::make_optional(OptimizerOption::NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts);
         return std::nullopt;
     }
 
