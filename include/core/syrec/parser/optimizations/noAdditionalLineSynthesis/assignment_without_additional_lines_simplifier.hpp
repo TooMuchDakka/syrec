@@ -4,6 +4,7 @@
 
 #include "assignment_transformer.hpp"
 #include "expression_to_subassignment_splitter.hpp"
+#include "temporary_expressions_container.hpp"
 #include "core/syrec/statement.hpp"
 #include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp"
@@ -26,6 +27,7 @@ namespace noAdditionalLineSynthesis {
          virtual ~AssignmentWithoutAdditionalLineSimplifier() = default;
         AssignmentWithoutAdditionalLineSimplifier(const parser::SymbolTable::ptr& symbolTableReference, const std::optional<parser::NoAdditionalLineSynthesisConfig>& config) {
             generatedAssignmentsContainer                     = std::make_shared<TemporaryAssignmentsContainer>();
+            temporaryExpressionsContainer                     = std::make_unique<TemporaryExpressionsContainer>(symbolTableReference);
             expressionTraversalHelper                         = std::make_shared<ExpressionTraversalHelper>();
             this->symbolTableReference                        = symbolTableReference;
             expressionToSubAssignmentSplitterReference        = std::make_unique<ExpressionToSubAssignmentSplitter>();
@@ -53,6 +55,7 @@ namespace noAdditionalLineSynthesis {
         using DecisionReference = std::shared_ptr<Decision>;
         std::vector<DecisionReference>         pastDecisions;
         TemporaryAssignmentsContainer::ptr     generatedAssignmentsContainer;
+        TemporaryExpressionsContainer::ptr     temporaryExpressionsContainer;
         ExpressionTraversalHelper::ptr         expressionTraversalHelper;
         parser::SymbolTable::ptr               symbolTableReference;
         ExpressionToSubAssignmentSplitter::ptr expressionToSubAssignmentSplitterReference;
@@ -126,6 +129,10 @@ namespace noAdditionalLineSynthesis {
         void                                      markSourceOfConflictReached();
         [[nodiscard]] bool                        shouldBacktrackDueToConflict() const;
 
+        void                                      considerExpressionInFutureDecisions(const syrec::expression::ptr& expr) const;
+        void                                      revokeConsiderationOfExpressionForFutureDecisions(const syrec::expression::ptr& expr) const;
+        [[nodiscard]] bool                        isChoiceOfSignalAccessBlockedByAnyActiveExpression(const syrec::VariableAccess& chosenOperand) const;
+
         // This call should be responsible to determine conflicts, during a decision their should not arise any conflicts
         // The check for a conflict should take place in the operations nodes with either one or two leaf nodes by using this call before making any decisions
         // If a conflict is detected, the first decision starting from the initial one shall be our backtrack destination and all overlapping assignments for the found first decision
@@ -133,7 +140,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] bool                                                                                                 wereAccessedSignalPartsModifiedByActiveAssignment(const syrec::VariableAccess& accessedSignalParts) const;
         [[nodiscard]] std::vector<DecisionReference>                                                                       determineDecisionsOverlappingAccessedSignalPartsOmittingAlreadyRecordedOnes(const syrec::VariableAccess& accessedSignalParts) const;
         void                                                                                                               handleConflict(std::size_t associatedOperationNodeIdOfAccessedSignalPartsOperand, const syrec::VariableAccess& accessedSignalPartsUsedInCheckForConflict);
-        [[nodiscard]] std::size_t                                                                                          determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(std::size_t currentOperationNodeId, std::size_t conflictOperationNodeId) const;
+        [[nodiscard]] std::size_t                                                                                          determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(std::size_t operationNodeIdOfEarliestSourceOfConflict, std::size_t operationNodeIdWhereConflictWasDetected) const;
 
         /**
          * \brief Determine whether another choice for a previously made decision could be made. This calls excludes the last made decision under the assumption that this call is made after a conflict was derived at the current operation node

@@ -84,6 +84,7 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/noAdditionalLineSynthesis/main_additional_line_for_assignment_simplifier.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/noAdditionalLineSynthesis/post_order_expr_traversal_helper.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_assignments_container.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_expressions_container.cpp
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/optimizations/operationSimplification/binary_factoring_multiplication_simplifier.cpp
@@ -153,6 +154,7 @@ add_library(
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/post_order_expr_traversal_helper.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_assignments_container.hpp
+      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_expressions_container.hpp
 
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp
       ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/binary_factoring_multiplication_simplifier.hpp
