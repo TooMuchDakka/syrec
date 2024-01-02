@@ -48,7 +48,10 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<OperationNodeReference>     getOperationNodeById(std::size_t operationNodeId) const;
         void                                                    markOperationNodeAsPotentialBacktrackOption(std::size_t operationNodeId);
         void                                                    removeOperationNodeAsPotentialBacktrackOperation(std::size_t operationNodeId);
-        void                                                    backtrack();
+        //void                                                    backtrack();
+        void                                                    backtrackToNode(std::size_t operationNodeId);
+        void                                                    backtrackOnePastNode(std::size_t operationNodeId);
+
         /**
          * \brief Build the traversal queue from the given expression. By default a pre-order traversal will be performed.
          * \param expr The expression from which the traversal queue shall be built.
@@ -79,6 +82,7 @@ namespace noAdditionalLineSynthesis {
         virtual void                                        handleOperationNodeDuringTraversalQueueInit(const OperationNodeReference& operationNode);
         void                                                addSignalIdentAsUsableInAssignmentLhsIfAssignable(const std::string& signalIdent, const parser::SymbolTable& symbolTableReference);
         void                                                determineIdentsOfSignalsUsableInAssignmentLhs(const parser::SymbolTable& symbolTableReference);
+        void                                                backtrackToNode(std::size_t operationNodeId, bool removeBacktrackEntryForNode);
         [[nodiscard]] std::optional<syrec::expression::ptr> getDataOfOperand(std::size_t operandNodeId) const;
         [[nodiscard]] OperandNode                           createOperandNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId);
         [[nodiscard]] OperationNodeReference                createOperationNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId);

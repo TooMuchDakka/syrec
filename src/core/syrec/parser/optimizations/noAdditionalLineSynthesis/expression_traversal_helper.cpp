@@ -121,32 +121,40 @@ void ExpressionTraversalHelper::removeOperationNodeAsPotentialBacktrackOperation
     }
 }
 
-void ExpressionTraversalHelper::backtrack() {
-    if (backtrackOperationNodeIds.empty() || !operationNodeTraversalQueueIdx) {
-        // If we do not reset the traversal index here after all backtracking checkpoints were removed, we would never reach the start of the traversal queue again through backtracking
-        operationNodeTraversalQueueIdx = 0;
-        return;
-    }
+//void ExpressionTraversalHelper::backtrack() {
+//    if (backtrackOperationNodeIds.empty() || !operationNodeTraversalQueueIdx) {
+//        // If we do not reset the traversal index here after all backtracking checkpoints were removed, we would never reach the start of the traversal queue again through backtracking
+//        operationNodeTraversalQueueIdx = 0;
+//        return;
+//    }
+//
+//    backtrackOperationNodeIds.pop_back();
+//    if (backtrackOperationNodeIds.empty() == 1) {
+//        operationNodeTraversalQueueIdx = 0;
+//        return;
+//    }
+//    const auto& checkpointOperationNodeId = backtrackOperationNodeIds.back();
+//
+//    // Since the operation node traversal queue index is always advanced when fetching the next operation node, we take the current value of the latter -1 as the index for the current operation node
+//    const std::size_t maxNumElementsToCheck  = operationNodeTraversalQueueIdx - 1;
+//    auto              traversalQueueIterator = std::next(operationNodeTraversalQueue.cbegin(), maxNumElementsToCheck);
+//
+//    bool foundMatch = false;
+//    for (std::size_t i = 0; i <= maxNumElementsToCheck && !foundMatch; ++i) {
+//        foundMatch = *traversalQueueIterator == checkpointOperationNodeId;
+//        if (!foundMatch) {
+//            --operationNodeTraversalQueueIdx;
+//            --traversalQueueIterator;
+//        }
+//    }
+//}
 
-    backtrackOperationNodeIds.pop_back();
-    if (backtrackOperationNodeIds.empty() == 1) {
-        operationNodeTraversalQueueIdx = 0;
-        return;
-    }
-    const auto& checkpointOperationNodeId = backtrackOperationNodeIds.back();
+void ExpressionTraversalHelper::backtrackToNode(std::size_t operationNodeId) {
+    backtrackToNode(operationNodeId, false);
+}
 
-    // Since the operation node traversal queue index is always advanced when fetching the next operation node, we take the current value of the latter -1 as the index for the current operation node
-    const std::size_t maxNumElementsToCheck  = operationNodeTraversalQueueIdx - 1;
-    auto              traversalQueueIterator = std::next(operationNodeTraversalQueue.cbegin(), maxNumElementsToCheck);
-
-    bool foundMatch = false;
-    for (std::size_t i = 0; i <= maxNumElementsToCheck && !foundMatch; ++i) {
-        foundMatch = *traversalQueueIterator == checkpointOperationNodeId;
-        if (!foundMatch) {
-            --operationNodeTraversalQueueIdx;
-            --traversalQueueIterator;
-        }
-    }
+void ExpressionTraversalHelper::backtrackOnePastNode(std::size_t operationNodeId) {
+    backtrackToNode(operationNodeId, true);
 }
 
 void ExpressionTraversalHelper::buildTraversalQueue(const syrec::expression::ptr& expr, const parser::SymbolTable& symbolTableReference) {
@@ -210,6 +218,36 @@ void ExpressionTraversalHelper::determineIdentsOfSignalsUsableInAssignmentLhs(co
         }
     }
 }
+
+void ExpressionTraversalHelper::backtrackToNode(std::size_t operationNodeId, bool removeEntryForOperationNodeId) {
+    if (!operationNodeTraversalQueueIdx) {
+        return;
+    }
+
+    const auto& indexOfOperationNodeInQueue = std::find_if(operationNodeTraversalQueue.cbegin(), operationNodeTraversalQueue.cend(), [&operationNodeId](const std::size_t operationQueueEntryId) { return operationQueueEntryId == operationNodeId; });
+    if (indexOfOperationNodeInQueue == operationNodeTraversalQueue.cend()) {
+        return;
+    }
+
+    operationNodeTraversalQueueIdx = std::distance(operationNodeTraversalQueue.cbegin(), indexOfOperationNodeInQueue);
+    if (removeEntryForOperationNodeId) {
+        backtrackOperationNodeIds.erase(
+                std::remove_if(
+                        backtrackOperationNodeIds.begin(),
+                        backtrackOperationNodeIds.end(),
+                        [&operationNodeId](const std::size_t backtrackOperationNodeId) { return backtrackOperationNodeId >= operationNodeId; }),
+                backtrackOperationNodeIds.end());
+    } else {
+        ++operationNodeTraversalQueueIdx;
+        backtrackOperationNodeIds.erase(
+                std::remove_if(
+                        backtrackOperationNodeIds.begin(),
+                        backtrackOperationNodeIds.end(),
+                        [&operationNodeId](const std::size_t backtrackOperationNodeId) { return backtrackOperationNodeId > operationNodeId; }),
+                backtrackOperationNodeIds.end());
+    }
+}
+
 
 std::optional<syrec::expression::ptr> ExpressionTraversalHelper::getDataOfOperand(std::size_t operandNodeId) const {
     if (!operandNodeDataLookup.count(operandNodeId)) {
