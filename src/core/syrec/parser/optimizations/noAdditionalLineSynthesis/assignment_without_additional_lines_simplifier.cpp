@@ -38,6 +38,10 @@
  *  if the split would take place immediately after the creation of the assignment would lead to the sequence a += b; a += 2 ... a -= b; a -= 2
  *
  * TODO: Testcase 'simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingAdditionWithDegeneratedLhsSubASTOfLhsOfAssignmentExpr' is an example where the heuristic optimization of - (<subExpr_1> - <subExpr_2>) leads to a worse result
+ *
+ *
+ * TODO: IMPORTANT: Rework of conflict handling that conflicting decision could be remade when reset in by a parent decision (check detection of hot path, found earliest conflict node, etc.)
+ * TODO: IMPORTANT: Tests that decision are remade not on hot path
  */
 
 // TODO: CHECK TEST simplificationWithNoneReversibleOperationWithXorAssignOperationAndTopmostOperationOfRhsBeingAdditionOperationWithLhsGeneratingAssignmentAndRhsGeneratingAssignmentCreatesCorrectAssignment FOR FAILED ROLLBACK
@@ -132,124 +136,6 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
 
 // TODO: If the simplification of any non-leaf node did result in a conflict check whether another decision at a previous position is possible, see other functions handling operation node with one leaf node
 std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::OwningOperationOperandSimplificationResultReference> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::handleOperationNodeWithNoLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback) {
-    //const std::size_t numExistingAssignmentsPriorToAnyOperandHandled = generatedAssignmentsContainer->getNumberOfAssignments();
-    //generatedAssignmentsContainer->markCutoffForInvertibleAssignments();
-    //expressionTraversalHelper->markOperationNodeAsPotentialBacktrackOption(operationNode->id);
-
-    //std::optional<ExpressionTraversalHelper::OperationNodeReference>   firstOperandOperationNode;
-    //std::optional<OwningOperationOperandSimplificationResultReference> firstOperandSimplificationResult;
-    //bool                                                               continueProcessingOfNonLeafNode = true;
-    //while (continueProcessingOfNonLeafNode) {
-    //    firstOperandOperationNode        = expressionTraversalHelper->getNextOperationNode();
-    //    firstOperandSimplificationResult = handleOperationNode(*firstOperandOperationNode, signalValueLookupCallback);
-    //    if (shouldBacktrackDueToConflict()) {
-    //        if (!isOperationNodeSourceOfConflict(operationNode->id)) {
-    //            generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
-    //            backtrack(operationNode->id, false);
-    //            return std::nullopt;
-    //        }
-    //        markSourceOfConflictReached();
-    //        generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(false);
-    //        backtrack(operationNode->id, true);
-    //        /*expressionTraversalHelper->markOperationNodeAsPotentialBacktrackOption(operationNode->id);
-    //        generatedAssignmentsContainer->markCutoffForInvertibleAssignments();*/
-    //    } else {
-    //        continueProcessingOfNonLeafNode = false;
-    //    }
-    //}
-
-    //// TODO: Check me if implemented correctly
-    //if (!firstOperandSimplificationResult.has_value()) {
-    //    if (couldAnotherChoiceBeMadeAtPreviousDecision(operationNode->id)) {
-    //        generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
-    //        backtrack(operationNode->id, false);
-    //        return std::nullopt;   
-    //    }
-    //    const std::size_t            operationNodeIdOfFirstOperand = *expressionTraversalHelper->getOperandNodeIdOfNestedOperation(*firstOperandOperationNode->get()->parentNodeId, firstOperandOperationNode->get()->id);
-    //    const syrec::expression::ptr firstOperandDataAsExpr        = *expressionTraversalHelper->getOperandAsExpr(operationNodeIdOfFirstOperand);
-    //    firstOperandSimplificationResult                           = std::make_unique<OperationOperandSimplificationResult>(OperationOperandSimplificationResult::createManuallyFrom(firstOperandDataAsExpr));
-    //}
-
-    ///*
-    // * If the first non-leaf node created an expression instead of an assignment, we need also need to take this generated expression as well as all active assignments into consideration
-    // * when processing the second non-leaf-node
-    // */
-    //const syrec::expression::ptr& expressionToConsiderForDecisionInSecondNode = firstOperandSimplificationResult.has_value()
-    //    ? firstOperandSimplificationResult->get()->getGeneratedExpr().value_or(nullptr)
-    //    : nullptr;
-    //considerExpressionInFutureDecisions(expressionToConsiderForDecisionInSecondNode);
-
-    //std::optional<ExpressionTraversalHelper::OperationNodeReference>   secondOperandOperationNode;
-    //std::optional<OwningOperationOperandSimplificationResultReference> secondOperandSimplificationResult;
-    //continueProcessingOfNonLeafNode = true;
-
-    //while (continueProcessingOfNonLeafNode) {
-    //    secondOperandOperationNode        = expressionTraversalHelper->getNextOperationNode();
-    //    secondOperandSimplificationResult = handleOperationNode(*secondOperandOperationNode, signalValueLookupCallback);
-    //    if (shouldBacktrackDueToConflict()) {
-    //        if (!isOperationNodeSourceOfConflict(operationNode->id)) {
-    //            generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
-    //            backtrack(operationNode->id, false);
-    //            revokeConsiderationOfExpressionForFutureDecisions(expressionToConsiderForDecisionInSecondNode);
-    //            return std::nullopt;
-    //        }
-    //        markSourceOfConflictReached();
-    //        generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(false);
-    //        backtrack(operationNode->id, true);
-    //        /*expressionTraversalHelper->markOperationNodeAsPotentialBacktrackOption(operationNode->id);
-    //        generatedAssignmentsContainer->markCutoffForInvertibleAssignments();*/
-    //    } else {
-    //        continueProcessingOfNonLeafNode = false;
-    //    }
-    //}
-    //
-    //// TODO: Check me if implemented correctly
-    //if (!secondOperandSimplificationResult.has_value()) {
-    //    if (couldAnotherChoiceBeMadeAtPreviousDecision(operationNode->id)) {
-    //        generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
-    //        backtrack(operationNode->id, false);
-    //        revokeConsiderationOfExpressionForFutureDecisions(expressionToConsiderForDecisionInSecondNode);
-    //        return std::nullopt;   
-    //    }
-    //    const std::size_t            operationNodeIdOfSecondOperand = *expressionTraversalHelper->getOperandNodeIdOfNestedOperation(*secondOperandOperationNode->get()->parentNodeId, secondOperandOperationNode->get()->id);
-    //    const syrec::expression::ptr secondOperandDataAsExpr        = *expressionTraversalHelper->getOperandAsExpr(operationNodeIdOfSecondOperand);
-    //    secondOperandSimplificationResult                           = std::make_unique<OperationOperandSimplificationResult>(OperationOperandSimplificationResult::createManuallyFrom(secondOperandDataAsExpr));
-    //}
-
-    //const DecisionReference madeDecision = makeDecision(operationNode, std::make_pair(**firstOperandSimplificationResult, **secondOperandSimplificationResult));
-    ///*
-    // * We need to revoke our consideration of the generated expression from the first non-leaf node of this operation node for any further decisions
-    // */
-    //revokeConsiderationOfExpressionForFutureDecisions(expressionToConsiderForDecisionInSecondNode);
-
-    //std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> simplificationResultData;
-    //if (madeDecision->choosenOperand != Decision::ChoosenOperand::None) {
-    //    const std::optional<syrec::AssignStatement::ptr> generatedAssignment = tryCreateAssignmentFromOperands(madeDecision->choosenOperand, **firstOperandSimplificationResult, operationNode->operation, **secondOperandSimplificationResult);
-    //    /*
-    //     * At this point no overlapping signal accesses can be contained in the rhs of the generated assignment since this would have already triggered a conflict.
-    //     */
-    //    const std::size_t                 currentNumberOfExistingAssignments            = generatedAssignmentsContainer->getNumberOfAssignments();
-    //    generatedAssignmentsContainer->storeActiveAssignment(*generatedAssignment);
-    //    const std::size_t numberOfAssignmentsToNotInvertStartingFromLastCreatedOne = generatedAssignmentsContainer->getNumberOfAssignments() - currentNumberOfExistingAssignments;
-    //    const auto&       assignedToSignalOfGeneratedAssignment                    = std::dynamic_pointer_cast<const syrec::AssignStatement>(*generatedAssignment)->lhs;
-    //    generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(numberOfAssignmentsToNotInvertStartingFromLastCreatedOne, &assignedToSignalOfGeneratedAssignment);
-    //    simplificationResultData = std::dynamic_pointer_cast<syrec::AssignStatement>(*generatedAssignment)->lhs;
-    //}
-    //else {
-    //    const std::optional<syrec::expression::ptr> generatedExpr = tryCreateExpressionFromOperationNodeOperandSimplifications(**firstOperandSimplificationResult, operationNode->operation, **secondOperandSimplificationResult);
-    //    simplificationResultData                                  = *generatedExpr;
-    //}
-
-    //// We should probably not remove any past decisions since this would clash with the check whether a different choice could be made at a previous decision
-    ////removeDecisionFor(operationNode->id);
-
-    //expressionTraversalHelper->removeOperationNodeAsPotentialBacktrackOperation(operationNode->id);
-    //generatedAssignmentsContainer->popLastCutoffForInvertibleAssignments();
-
-    //const std::size_t numExistingAssignmentsAfterOperationNodeWasHandled = generatedAssignmentsContainer->getNumberOfAssignments();
-    //const std::size_t numGeneratedAssignmentsByHandlingOfOperationNode                     = numExistingAssignmentsAfterOperationNodeWasHandled - numExistingAssignmentsPriorToAnyOperandHandled;
-    //return std::make_unique<OperationOperandSimplificationResult>(numGeneratedAssignmentsByHandlingOfOperationNode, simplificationResultData);
-
     const std::size_t numExistingAssignmentsPriorToAnyOperandHandled = generatedAssignmentsContainer->getNumberOfAssignments();
     generatedAssignmentsContainer->markCutoffForInvertibleAssignments();
     expressionTraversalHelper->markOperationNodeAsPotentialBacktrackOption(operationNode->id);
@@ -289,23 +175,7 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
      */
     revokeConsiderationOfExpressionForFutureDecisions(expressionToConsiderForDecisionInSecondNode);
 
-    std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> simplificationResultData;
-    if (madeDecision->choosenOperand != Decision::ChoosenOperand::None) {
-        const std::optional<syrec::AssignStatement::ptr> generatedAssignment = tryCreateAssignmentFromOperands(madeDecision->choosenOperand, **firstOperandSimplificationResult, operationNode->operation, **secondOperandSimplificationResult);
-        /*
-         * At this point no overlapping signal accesses can be contained in the rhs of the generated assignment since this would have already triggered a conflict.
-         */
-        const std::size_t currentNumberOfExistingAssignments = generatedAssignmentsContainer->getNumberOfAssignments();
-        generatedAssignmentsContainer->storeActiveAssignment(*generatedAssignment);
-        const std::size_t numberOfAssignmentsToNotInvertStartingFromLastCreatedOne = generatedAssignmentsContainer->getNumberOfAssignments() - currentNumberOfExistingAssignments;
-        const auto&       assignedToSignalOfGeneratedAssignment                    = std::dynamic_pointer_cast<const syrec::AssignStatement>(*generatedAssignment)->lhs;
-        generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(numberOfAssignmentsToNotInvertStartingFromLastCreatedOne, &assignedToSignalOfGeneratedAssignment);
-        simplificationResultData = std::dynamic_pointer_cast<syrec::AssignStatement>(*generatedAssignment)->lhs;
-    } else {
-        const std::optional<syrec::expression::ptr> generatedExpr = tryCreateExpressionFromOperationNodeOperandSimplifications(**firstOperandSimplificationResult, operationNode->operation, **secondOperandSimplificationResult);
-        simplificationResultData                                  = *generatedExpr;
-    }
-
+    const std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> simplificationResultData = createFinalSimplificationResultAfterDecisionWasMade(madeDecision, **firstOperandSimplificationResult, operationNode->operation, **secondOperandSimplificationResult);
     // We should probably not remove any past decisions since this would clash with the check whether a different choice could be made at a previous decision
     //removeDecisionFor(operationNode->id);
 
@@ -329,7 +199,7 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
         const auto& accessedSignalPartsOfLeafNode = std::dynamic_pointer_cast<syrec::VariableExpression>(*dataOfLeafNodeAsVariableExpr);
         if (wereAccessedSignalPartsModifiedByActiveAssignment(*accessedSignalPartsOfLeafNode->var)) {
             handleConflict(operationNode->id, *accessedSignalPartsOfLeafNode->var);
-            generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
+            generatedAssignmentsContainer->popLastCutoffForInvertibleAssignments();
             backtrack(operationNode->id, false);
             return std::nullopt;
         }
@@ -338,48 +208,36 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
     std::optional<OwningOperationOperandSimplificationResultReference> simplificationResultOfOperationNodeOperand;
     bool continueProcessingOfNonLeafNode = true;
     while (continueProcessingOfNonLeafNode) {
-        const ExpressionTraversalHelper::OperationNodeReference dataOfOperationNodeOperand = *expressionTraversalHelper->getNextOperationNode();
-        simplificationResultOfOperationNodeOperand                                         = handleOperationNode(dataOfOperationNodeOperand, signalValueLookupCallback);
-        if (shouldBacktrackDueToConflict()) {
-            if (!isOperationNodeSourceOfConflict(operationNode->id)) {
-                generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
-                backtrack(operationNode->id, false);
-                return std::nullopt;
-            }
-            markSourceOfConflictReached();
-            generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(false);
-            backtrack(operationNode->id, true);
+       OperationNodeProcessingResult resultOfNonLeafNode = processNextOperationNode(signalValueLookupCallback, false);
+        if (resultOfNonLeafNode.derivedConflictInOtherNode) {
+           return std::nullopt;
         }
-        else {
-            /*
-            * We need to perform our conflict check twice, once prior to the processing of the subexpression define in one of the operands of this operation and also
-            * after we have processed said subexpression, to determine whether the value of the leaf node was not changed in any of the sub-assignments generated during the processing
-            * of said subexpression
-            */
-            if (dataOfLeafNodeAsVariableExpr.has_value()) {
-                const auto& accessedSignalPartsOfLeafNode = std::dynamic_pointer_cast<syrec::VariableExpression>(*dataOfLeafNodeAsVariableExpr);
-                if (wereAccessedSignalPartsModifiedByActiveAssignment(*accessedSignalPartsOfLeafNode->var)) {
-                    handleConflict(operationNode->id, *accessedSignalPartsOfLeafNode->var);
-                    if (!isOperationNodeSourceOfConflict(operationNode->id)) {
-                        generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
-                        backtrack(operationNode->id, false);
-                        return std::nullopt;
-                    }
+        simplificationResultOfOperationNodeOperand = std::move(resultOfNonLeafNode.simplificationResult);
+        /*
+        * We need to perform our conflict check twice, once prior to the processing of the subexpression define in one of the operands of this operation and also
+        * after we have processed said subexpression, to determine whether the value of the leaf node was not changed in any of the sub-assignments generated during the processing
+        * of said subexpression
+        */
+        if (dataOfLeafNodeAsVariableExpr.has_value()) {
+            const auto& accessedSignalPartsOfLeafNode = std::dynamic_pointer_cast<syrec::VariableExpression>(*dataOfLeafNodeAsVariableExpr);
+            if (wereAccessedSignalPartsModifiedByActiveAssignment(*accessedSignalPartsOfLeafNode->var)) {
+                handleConflict(operationNode->id, *accessedSignalPartsOfLeafNode->var);
+                const bool isCurrentOperationNodeSourceOfConflict = isOperationNodeSourceOfConflict(operationNode->id);
+                
+                generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(!isCurrentOperationNodeSourceOfConflict);
+                backtrack(operationNode->id, isCurrentOperationNodeSourceOfConflict);
+                if (isCurrentOperationNodeSourceOfConflict) {
                     markSourceOfConflictReached();
-                    generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(false);
-                    continueProcessingOfNonLeafNode = true;
-                    backtrack(operationNode->id, true);
-                    continue;
+                    simplificationResultOfOperationNodeOperand.reset();
+                } else {
+                    return std::nullopt;
                 }
             }
-            continueProcessingOfNonLeafNode = false;
         }
+        continueProcessingOfNonLeafNode = !simplificationResultOfOperationNodeOperand.has_value();
     }
-
     
-    std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> simplificationResultData;
-    DecisionReference                                                madeDecision             = nullptr;
-
+    DecisionReference                                                madeDecision = nullptr;
     std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> simplificationResultDataOfLeafNode;
     if (dataOfLeafNodeAsVariableExpr.has_value()) {
         simplificationResultDataOfLeafNode = std::dynamic_pointer_cast<syrec::VariableExpression>(*dataOfLeafNodeAsVariableExpr)->var;
@@ -402,30 +260,14 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
         const std::size_t operandIdOfNonLeafNode   = wasLhsOperandLeafNode ? operationNode->rhsOperand.id : operationNode->lhsOperand.id;
         simplificationResultOfOperationNodeOperand = std::make_unique<OperationOperandSimplificationResult>(OperationOperandSimplificationResult::createManuallyFrom(*expressionTraversalHelper->getOperandAsExpr(operandIdOfNonLeafNode)));   
     }
-    
     expressionTraversalHelper->removeOperationNodeAsPotentialBacktrackOperation(operationNode->id);
-    if (madeDecision && madeDecision->choosenOperand != Decision::ChoosenOperand::None) {
-        const std::optional<syrec::AssignStatement::ptr> generatedAssignment = wasLhsOperandLeafNode
-            ? tryCreateAssignmentFromOperands(madeDecision->choosenOperand, simplificationResultOfLeafNode, operationNode->operation, **simplificationResultOfOperationNodeOperand)
-            : tryCreateAssignmentFromOperands(madeDecision->choosenOperand, **simplificationResultOfOperationNodeOperand, operationNode->operation, simplificationResultOfLeafNode);
 
-        /*
-         * At this point no overlapping signal accesses can be contained in the rhs of the generated assignment since this would have already triggered a conflict.
-         */
-        const std::size_t currentNumberOfExistingAssignments = generatedAssignmentsContainer->getNumberOfAssignments();
-        generatedAssignmentsContainer->storeActiveAssignment(*generatedAssignment);   
-        const std::size_t numberOfAssignmentsToNotInvertStartingFromLastCreatedOne = generatedAssignmentsContainer->getNumberOfAssignments() - currentNumberOfExistingAssignments;
-        const auto&       assignedToSignalOfGeneratedAssignment                    = std::dynamic_pointer_cast<const syrec::AssignStatement>(*generatedAssignment)->lhs;
-        generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(numberOfAssignmentsToNotInvertStartingFromLastCreatedOne, &assignedToSignalOfGeneratedAssignment);
-        simplificationResultData = std::dynamic_pointer_cast<syrec::AssignStatement>(*generatedAssignment)->lhs;
-    } else {
-        const std::optional<syrec::expression::ptr> generatedExpr = wasLhsOperandLeafNode
-            ? tryCreateExpressionFromOperationNodeOperandSimplifications(simplificationResultOfLeafNode, operationNode->operation, **simplificationResultOfOperationNodeOperand)
-            : tryCreateExpressionFromOperationNodeOperandSimplifications(**simplificationResultOfOperationNodeOperand, operationNode->operation, simplificationResultOfLeafNode);
-
-        simplificationResultData = *generatedExpr;
-        // Since we are not generating any assignments, we can also not invert any active ones as this would invalidate our propagated expression to the parent operation node
-        //generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(0);   
+    std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> simplificationResultData;
+    if (wasLhsOperandLeafNode) {
+        simplificationResultData = createFinalSimplificationResultAfterDecisionWasMade(madeDecision, simplificationResultOfLeafNode, operationNode->operation, **simplificationResultOfOperationNodeOperand);
+    }
+    else {
+        simplificationResultData = createFinalSimplificationResultAfterDecisionWasMade(madeDecision, **simplificationResultOfOperationNodeOperand, operationNode->operation, simplificationResultOfLeafNode);
     }
     generatedAssignmentsContainer->popLastCutoffForInvertibleAssignments();
 
@@ -436,6 +278,8 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
 }
 
 std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::OwningOperationOperandSimplificationResultReference> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::handleOperationNodeWithOnlyLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode) {
+    generatedAssignmentsContainer->markCutoffForInvertibleAssignments();
+
     std::optional<std::shared_ptr<syrec::VariableAccess>> accessedSignalPartsOfFirstOperand;
     if (const auto& accessedSignalPartsExprOfFirstOperand = expressionTraversalHelper->getOperandAsVariableExpr(operationNode->lhsOperand.id); accessedSignalPartsExprOfFirstOperand.has_value()) {
         const auto accessedSignalPartsOfFirstOperandCasted = std::dynamic_pointer_cast<syrec::VariableExpression>(*accessedSignalPartsExprOfFirstOperand);
@@ -443,6 +287,7 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
 
         if (wereAccessedSignalPartsModifiedByActiveAssignment(**accessedSignalPartsOfFirstOperand)) {
             handleConflict(operationNode->id, **accessedSignalPartsOfFirstOperand);
+            generatedAssignmentsContainer->popLastCutoffForInvertibleAssignments();
             return std::nullopt;
         }
     }
@@ -454,6 +299,7 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
         
         if (wereAccessedSignalPartsModifiedByActiveAssignment(**accessedSignalPartsOfSecondOperand)) {
             handleConflict(operationNode->id, **accessedSignalPartsOfSecondOperand);
+            generatedAssignmentsContainer->popLastCutoffForInvertibleAssignments();
             return std::nullopt;
         }
     }
@@ -474,23 +320,12 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
     }
     const auto&             simplificationResultOfSecondOperand = OperationOperandSimplificationResult::createManuallyFrom(simplificationResultDataOfSecondOperand);
     const DecisionReference madeDecision                        = makeDecision(operationNode, std::make_pair(simplificationResultOfFirstOperand, simplificationResultOfSecondOperand));
+    const std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> simplificationResultData                         = createFinalSimplificationResultAfterDecisionWasMade(madeDecision, simplificationResultOfFirstOperand, operationNode->operation, simplificationResultOfSecondOperand);
 
-    std::size_t                                                      numGeneratedAssignmentsByHandlingOfOperationNode = 0;
-    std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> simplificationResultData;
-
-    if (madeDecision->choosenOperand != Decision::ChoosenOperand::None) {
-        const std::optional<syrec::AssignStatement::ptr> generatedAssignment = tryCreateAssignmentFromOperands(madeDecision->choosenOperand, simplificationResultOfFirstOperand, operationNode->operation, simplificationResultOfSecondOperand);
-        generatedAssignmentsContainer->storeActiveAssignment(*generatedAssignment);
-        simplificationResultData = std::dynamic_pointer_cast<syrec::AssignStatement>(*generatedAssignment)->lhs;
-        ++numGeneratedAssignmentsByHandlingOfOperationNode;
-        
-    } else {
-        const std::optional<syrec::expression::ptr> generatedExpr = tryCreateExpressionFromOperationNodeOperandSimplifications(simplificationResultOfFirstOperand, operationNode->operation, simplificationResultOfSecondOperand);
-        simplificationResultData                                  = *generatedExpr;
-    }
+    generatedAssignmentsContainer->popLastCutoffForInvertibleAssignments();
     // We should probably not remove any past decisions since this would clash with the check whether a different choice could be made at a previous decision
     //removeDecisionFor(operationNode->id);
-    return std::make_unique<OperationOperandSimplificationResult>(numGeneratedAssignmentsByHandlingOfOperationNode, simplificationResultData);
+    return std::make_unique<OperationOperandSimplificationResult>(std::holds_alternative<syrec::VariableAccess::ptr>(simplificationResultData), simplificationResultData);
 }
 
 inline bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::doesAssignmentToSignalLeadToConflict(const syrec::VariableAccess& assignedToSignal) const {
@@ -713,10 +548,6 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
  * TODO: Review search for earliest operation node involved in conflict (line 712) with test 'simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingAdditionWithDegeneratedLhsSubASTOfLhsOfAssignmentExpr'
  */
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::handleConflict(std::size_t associatedOperationNodeIdOfAccessedSignalPartsOperand, const syrec::VariableAccess& accessedSignalPartsUsedInCheckForConflict) {
-    if (associatedOperationNodeIdOfAccessedSignalPartsOperand == 1) {
-        int x = 0;
-    }
-
     constexpr std::size_t                  earliestPossibleOperationNodeId               = 0;
     const std::size_t                      idOfEarliestOperationNodeIdInvolvedInConflict = determineOperationNodeIdCausingConflict(accessedSignalPartsUsedInCheckForConflict).value_or(earliestPossibleOperationNodeId);
     const std::optional<DecisionReference> earliestDecisionInvolvedInConflict            = determineEarliestDecisionsOverlappingAccessedSignalPartsOmittingAlreadyRecordedOnes(accessedSignalPartsUsedInCheckForConflict);
@@ -1127,6 +958,25 @@ syrec::AssignStatement::vec noAdditionalLineSynthesis::AssignmentWithoutAddition
     }
     return containerForUnoptimizedTopmostAssignment;
 }
+
+std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::createFinalSimplificationResultAfterDecisionWasMade(const DecisionReference& madeDecision, const OperationOperandSimplificationResult& lhsOperandOfOperationNode, syrec_operation::operation definedOperationAtOperationNode, const OperationOperandSimplificationResult& rhsOperandOfOperationNode) const {
+    if (madeDecision->choosenOperand != Decision::ChoosenOperand::None) {
+        /*
+         * At this point no overlapping signal accesses can be contained in the rhs of the generated assignment since this would have already triggered a conflict.
+         */
+        if (const std::optional<syrec::AssignStatement::ptr> generatedAssignment = tryCreateAssignmentFromOperands(madeDecision->choosenOperand, lhsOperandOfOperationNode, definedOperationAtOperationNode, rhsOperandOfOperationNode); generatedAssignment.has_value()) {
+            const std::size_t currentNumberOfExistingAssignments = generatedAssignmentsContainer->getNumberOfAssignments();
+            generatedAssignmentsContainer->storeActiveAssignment(*generatedAssignment);
+            const std::size_t numberOfAssignmentsToNotInvertStartingFromLastCreatedOne = generatedAssignmentsContainer->getNumberOfAssignments() - currentNumberOfExistingAssignments;
+            const auto&       assignedToSignalOfGeneratedAssignment                    = std::dynamic_pointer_cast<const syrec::AssignStatement>(*generatedAssignment)->lhs;
+            generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(numberOfAssignmentsToNotInvertStartingFromLastCreatedOne, &assignedToSignalOfGeneratedAssignment);
+            return std::dynamic_pointer_cast<syrec::AssignStatement>(*generatedAssignment)->lhs;
+        }
+    }
+    const std::optional<syrec::expression::ptr> generatedExpr = tryCreateExpressionFromOperationNodeOperandSimplifications(lhsOperandOfOperationNode, definedOperationAtOperationNode, rhsOperandOfOperationNode);
+    return *generatedExpr;
+}
+
 
 syrec::expression::ptr noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand) {
     if (syrec_operation::isOperationShiftOperation(op)) {

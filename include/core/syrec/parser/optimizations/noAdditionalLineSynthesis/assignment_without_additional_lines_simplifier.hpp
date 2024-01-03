@@ -189,15 +189,16 @@ namespace noAdditionalLineSynthesis {
                 return OperationNodeProcessingResult({.simplificationResult = std::nullopt, .derivedConflictInOtherNode = false, .derivedConflictInThisNode = true});
             }
         };
-        [[nodiscard]] OperationNodeProcessingResult                   processNextOperationNode(const SignalValueLookupCallback& signalValueLookupCallback, bool quitProcessingOnConflictInSameNode);
-        [[nodiscard]] bool                                            canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::expression& alternativeToCheckAsExpr, const parser::SymbolTable& symbolTable) const;
-        [[nodiscard]] bool                                            canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::VariableAccess& alternativeToCheckAsSignalAccess, const parser::SymbolTable& symbolTable) const;
-        [[nodiscard]] bool                                            isAccessedSignalAssignable(const std::string_view& accessedSignalIdent) const;
-        [[nodiscard]] std::optional<double>                           determineCostOfExpr(const syrec::expression& expr, std::size_t currentNestingLevel) const;
-        [[nodiscard]] std::optional<double>                           determineCostOfAssignment(const syrec::AssignStatement& assignment) const;
-        [[nodiscard]] std::optional<double>                           determineCostOfNumber(const syrec::Number& number, std::size_t currentNestingLevel) const;
-        [[nodiscard]] std::optional<double>                           determineCostOfAssignments(const syrec::AssignStatement::vec& assignments) const;
-        [[nodiscard]] syrec::AssignStatement::vec                     determineMostViableAlternativeBasedOnCost(const syrec::AssignStatement::vec& generatedSimplifiedAssignments, const std::shared_ptr<syrec::AssignStatement>& originalAssignmentUnoptimized, const SignalValueLookupCallback& signalValueCallback) const;
+        [[nodiscard]] OperationNodeProcessingResult                                    processNextOperationNode(const SignalValueLookupCallback& signalValueLookupCallback, bool quitProcessingOnConflictInSameNode);
+        [[nodiscard]] bool                                                             canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::expression& alternativeToCheckAsExpr, const parser::SymbolTable& symbolTable) const;
+        [[nodiscard]] bool                                                             canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::VariableAccess& alternativeToCheckAsSignalAccess, const parser::SymbolTable& symbolTable) const;
+        [[nodiscard]] bool                                                             isAccessedSignalAssignable(const std::string_view& accessedSignalIdent) const;
+        [[nodiscard]] std::optional<double>                                            determineCostOfExpr(const syrec::expression& expr, std::size_t currentNestingLevel) const;
+        [[nodiscard]] std::optional<double>                                            determineCostOfAssignment(const syrec::AssignStatement& assignment) const;
+        [[nodiscard]] std::optional<double>                                            determineCostOfNumber(const syrec::Number& number, std::size_t currentNestingLevel) const;
+        [[nodiscard]] std::optional<double>                                            determineCostOfAssignments(const syrec::AssignStatement::vec& assignments) const;
+        [[nodiscard]] syrec::AssignStatement::vec                                      determineMostViableAlternativeBasedOnCost(const syrec::AssignStatement::vec& generatedSimplifiedAssignments, const std::shared_ptr<syrec::AssignStatement>& originalAssignmentUnoptimized, const SignalValueLookupCallback& signalValueCallback) const;
+        [[nodiscard]] std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> createFinalSimplificationResultAfterDecisionWasMade(const DecisionReference& madeDecision, const OperationOperandSimplificationResult& lhsOperandOfOperationNode, syrec_operation::operation definedOperationAtOperationNode, const OperationOperandSimplificationResult& rhsOperandOfOperationNode) const;
 
         [[nodiscard]] static syrec::expression::ptr                      fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentForOperationNode(const syrec::VariableAccess::ptr& assignmentLhs, syrec_operation::operation op, const syrec::expression::ptr& assignmentRhs);
