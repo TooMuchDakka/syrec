@@ -1,5 +1,6 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_assignments_container.hpp"
 #include "core/syrec/parser/operation.hpp"
+#include "core/syrec/parser/utils/copy_utils.hpp"
 #include "core/syrec/parser/utils/signal_access_utils.hpp"
 
 #include <algorithm>
@@ -121,6 +122,22 @@ std::size_t TemporaryAssignmentsContainer::getNumberOfAssignments() const {
 }
 
 // START OF NON-PUBLIC FUNCTIONS
+std::vector<std::size_t> TemporaryAssignmentsContainer::determineIndicesOfInvertibleAssignmentsStartingFrom(std::size_t firstRelevantAssignmentIndex) const {
+    const auto& indexOfFirstActiveAssignmentWithLargerIndex = std::find_if(
+            indicesOfActiveAssignments.cbegin(),
+            indicesOfActiveAssignments.cend(),
+            [&firstRelevantAssignmentIndex](const std::size_t activeAssignmentIndex) {
+                return activeAssignmentIndex >= firstRelevantAssignmentIndex;
+            });
+    if (indexOfFirstActiveAssignmentWithLargerIndex == indicesOfActiveAssignments.cend()) {
+        return {};
+    }
+
+    std::vector<std::size_t> containerForIndicesOfActiveAssignments;
+    containerForIndicesOfActiveAssignments.assign(indexOfFirstActiveAssignmentWithLargerIndex, indicesOfActiveAssignments.cend());
+    return containerForIndicesOfActiveAssignments;
+}
+
 void TemporaryAssignmentsContainer::invertAssignmentAndStoreAndMarkOriginalAsInactive(std::size_t indexOfAssignmentToInvert) {
     /*
      * Perform a search for the index of the reference active assignment and mark it as inactive by removing said index from the indices of the active assignments
@@ -138,34 +155,11 @@ void TemporaryAssignmentsContainer::invertAssignmentAndStoreAndMarkOriginalAsIna
         }
 
         removeActiveAssignmentFromLookup(referenceAssignmentCasted->lhs);
-        syrec::AssignStatement::ptr generatedInvertedAssignment = invertAssignment(*referenceAssignmentCasted);
+
+        std::shared_ptr<syrec::AssignStatement> generatedInvertedAssignment = copyUtils::createDeepCopyOfAssignmentStmt(*referenceAssignmentCasted);
+        invertAssignment(*generatedInvertedAssignment);
         generatedAssignments.emplace_back(generatedInvertedAssignment);
     }
-}
-
-syrec::AssignStatement::ptr TemporaryAssignmentsContainer::invertAssignment(const syrec::AssignStatement& assignment) {
-    const auto& matchingAssignmentOperationEnumForFlag = *syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
-    const auto& invertedAssignmentOperation            = *syrec_operation::invert(matchingAssignmentOperationEnumForFlag);
-    const auto& mappedToAssignmentOperationFlagForInvertedOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(invertedAssignmentOperation);
-    syrec::AssignStatement::ptr invertedAssignment                                  = std::make_shared<syrec::AssignStatement>(
-        assignment.lhs, *mappedToAssignmentOperationFlagForInvertedOperation, assignment.rhs);
-    return invertedAssignment;
-}
-
-std::vector<std::size_t> TemporaryAssignmentsContainer::determineIndicesOfInvertibleAssignmentsStartingFrom(std::size_t firstRelevantAssignmentIndex) const {
-    const auto& indexOfFirstActiveAssignmentWithLargerIndex = std::find_if(
-            indicesOfActiveAssignments.cbegin(),
-            indicesOfActiveAssignments.cend(),
-            [&firstRelevantAssignmentIndex](const std::size_t activeAssignmentIndex) {
-                return activeAssignmentIndex >= firstRelevantAssignmentIndex;
-            });
-    if (indexOfFirstActiveAssignmentWithLargerIndex == indicesOfActiveAssignments.cend()) {
-        return {};
-    }
-
-    std::vector<std::size_t> containerForIndicesOfActiveAssignments;
-    containerForIndicesOfActiveAssignments.assign(indexOfFirstActiveAssignmentWithLargerIndex, indicesOfActiveAssignments.cend());
-    return containerForIndicesOfActiveAssignments;
 }
 
 void TemporaryAssignmentsContainer::removeActiveAssignmentFromLookup(const syrec::VariableAccess::ptr& assignedToSignal) {
@@ -178,4 +172,11 @@ void TemporaryAssignmentsContainer::removeActiveAssignmentFromLookup(const syrec
     if (activeAssignmentsForAssignedToSignalIdent.empty()) {
         activeAssignmentsLookup.erase(assignedToSignal->var->name);
     }
+}
+
+void TemporaryAssignmentsContainer::invertAssignment(syrec::AssignStatement& assignment) {
+    const auto& matchingAssignmentOperationEnumForFlag              = *syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
+    const auto& invertedAssignmentOperation                         = *syrec_operation::invert(matchingAssignmentOperationEnumForFlag);
+    const auto& mappedToAssignmentOperationFlagForInvertedOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(invertedAssignmentOperation);
+    assignment.op                                                   = *mappedToAssignmentOperationFlagForInvertedOperation;
 }

@@ -289,8 +289,12 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
             const auto assignmentStmtToSimplify = lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs ? std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand) : std::make_shared<syrec::AssignStatement>(assignmentStmt);
             noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SignalValueLookupCallback signalValueLookupCallback = [this](const syrec::VariableAccess& accessedSignalParts) { return tryFetchValueForAccessedSignal(accessedSignalParts); };
-            if (auto simplificationResult = noAdditionalLineAssignmentSimplifier->simplify(*assignmentStmtToSimplify, signalValueLookupCallback); simplificationResult) {
+            if (noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResultReference simplificationResult = noAdditionalLineAssignmentSimplifier->simplify(*assignmentStmtToSimplify, signalValueLookupCallback); simplificationResult) {
                 syrec::Statement::vec generatedSimplifiedAssignmentStatements = simplificationResult->generatedAssignments;
+                if (generatedSimplifiedAssignmentStatements.empty()) {
+                    generatedSimplifiedAssignmentStatements.emplace_back(assignmentStmtToSimplify);
+                }
+
                 filterAssignmentsThatDoNotChangeAssignedToSignal(generatedSimplifiedAssignmentStatements);
                 if (generatedSimplifiedAssignmentStatements.empty()) {
                     updateReferenceCountOf(lhsOperand->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);

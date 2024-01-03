@@ -36,10 +36,10 @@ namespace noAdditionalLineSynthesis {
         std::vector<syrec::AssignStatement::ptr>                                        generatedAssignments;
         std::unordered_map<std::string, std::unordered_set<syrec::VariableAccess::ptr>> activeAssignmentsLookup;
 
-        void                                                             invertAssignmentAndStoreAndMarkOriginalAsInactive(std::size_t indexOfAssignmentToInvert);
-        [[nodiscard]] static syrec::AssignStatement::ptr                 invertAssignment(const syrec::AssignStatement& assignment);
-        [[nodiscard]] std::vector<std::size_t>                           determineIndicesOfInvertibleAssignmentsStartingFrom(std::size_t firstRelevantAssignmentIndex) const;
-        void                                                             removeActiveAssignmentFromLookup(const syrec::VariableAccess::ptr& assignedToSignal);
+        [[nodiscard]] std::vector<std::size_t>                                          determineIndicesOfInvertibleAssignmentsStartingFrom(std::size_t firstRelevantAssignmentIndex) const;
+        void                                                                            invertAssignmentAndStoreAndMarkOriginalAsInactive(std::size_t indexOfAssignmentToInvert);
+        void                                                                            removeActiveAssignmentFromLookup(const syrec::VariableAccess::ptr& assignedToSignal);
+        static void                                                                     invertAssignment(syrec::AssignStatement& assignment);
     };
 }
 

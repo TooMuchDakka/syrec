@@ -6,7 +6,6 @@
 #include "fmt/format.h"
 #endif
 
-
 /*
  * TODO: IMPORTANT (testcase simplificationWithOnlyReversibleOpsAndUniqueSignalAccessesWithTopmostAssignmentBeingXorCorrectlyHandlesMixedOperationsInRhsExpr) is missing required inversion of assignments
  *
@@ -39,10 +38,16 @@
  *
  * TODO: Testcase 'simplifyWithOnlyReversibleOpsButNonUniqueSignalAccessWithAssignOperationBeingAdditionWithDegeneratedLhsSubASTOfLhsOfAssignmentExpr' is an example where the heuristic optimization of - (<subExpr_1> - <subExpr_2>) leads to a worse result
  *
+ * TODO: Should the decisions for intermediate operation nodes (i.e. with non-leaf nodes be extendened from the simple left, right distinction to a lookup) ?
  *
  * TODO: IMPORTANT: Rework of conflict handling that conflicting decision could be remade when reset in by a parent decision (check detection of hot path, found earliest conflict node, etc.)
  * TODO: IMPORTANT: Tests that decision are remade not on hot path
+ * TODO: IMPORTANT: Assignments using boxing (i.e. operand has bitwidth 5 instead of 4) should not be able to be processed
+ * TODO: IMPORTANT: Assignment where the bitwidth is unknown will not use replacements
  */
+
+
+
 
 // TODO: CHECK TEST simplificationWithNoneReversibleOperationWithXorAssignOperationAndTopmostOperationOfRhsBeingAdditionOperationWithLhsGeneratingAssignmentAndRhsGeneratingAssignmentCreatesCorrectAssignment FOR FAILED ROLLBACK
 noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResultReference noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::simplify(const syrec::AssignStatement& assignmentStatement, const SignalValueLookupCallback& signalValueLookupCallback) {
