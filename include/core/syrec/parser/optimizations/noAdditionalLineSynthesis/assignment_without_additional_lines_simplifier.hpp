@@ -3,6 +3,7 @@
 #pragma once
 
 #include "assignment_transformer.hpp"
+#include "expression_substitution_generator.hpp"
 #include "expression_to_subassignment_splitter.hpp"
 #include "temporary_expressions_container.hpp"
 #include "core/syrec/statement.hpp"
@@ -31,6 +32,10 @@ namespace noAdditionalLineSynthesis {
             expressionTraversalHelper                         = std::make_shared<ExpressionTraversalHelper>();
             this->symbolTableReference                        = symbolTableReference;
             expressionToSubAssignmentSplitterReference        = std::make_unique<ExpressionToSubAssignmentSplitter>();
+            substitutionGenerator                             = config.has_value() && config.value().optionalNewReplacementSignalIdentsPrefix.has_value()
+                ? std::make_unique<ExpressionSubstitutionGenerator>(symbolTableReference, *config.value().optionalNewReplacementSignalIdentsPrefix)
+                : nullptr;
+
             learnedConflictsLookup                            = std::make_unique<LearnedConflictsLookup>();
             disabledValueLookupToggle                         = false;
             assignmentTransformer                             = std::make_unique<AssignmentTransformer>();
@@ -47,23 +52,32 @@ namespace noAdditionalLineSynthesis {
                 None = 0x3
             };
 
+            enum ChoiceRepetition {
+                None,
+                UntilReset,
+                Always
+            };
+
             std::size_t                operationNodeId;
             ChoosenOperand             choosenOperand;
             std::size_t                numExistingAssignmentsPriorToDecision;
             syrec::expression::ptr     backupOfExpressionRequiringFixup;
             syrec::VariableAccess::ptr inheritedOperandDataForChoice;
-            bool                       shouldChoiceBeRepeatedFlag;
+            ChoiceRepetition           shouldChoiceBeRepeated;
+            
         };
         using DecisionReference = std::shared_ptr<Decision>;
-        std::vector<DecisionReference>         pastDecisions;
-        TemporaryAssignmentsContainer::ptr     generatedAssignmentsContainer;
-        TemporaryExpressionsContainer::ptr     temporaryExpressionsContainer;
-        ExpressionTraversalHelper::ptr         expressionTraversalHelper;
-        parser::SymbolTable::ptr               symbolTableReference;
-        ExpressionToSubAssignmentSplitter::ptr expressionToSubAssignmentSplitterReference;
-        bool                                   disabledValueLookupToggle;
-        AssignmentTransformer::ptr             assignmentTransformer;
+        std::vector<DecisionReference>          pastDecisions;
+        TemporaryAssignmentsContainer::ptr      generatedAssignmentsContainer;
+        TemporaryExpressionsContainer::ptr      temporaryExpressionsContainer;
+        ExpressionTraversalHelper::ptr          expressionTraversalHelper;
+        parser::SymbolTable::ptr                symbolTableReference;
+        ExpressionToSubAssignmentSplitter::ptr  expressionToSubAssignmentSplitterReference;
+        ExpressionSubstitutionGenerator::ptr    substitutionGenerator;
+        bool                                    disabledValueLookupToggle;
+        AssignmentTransformer::ptr              assignmentTransformer;
         parser::NoAdditionalLineSynthesisConfig internalConfig;
+        std::optional<unsigned int>             determinedBitWidthOfAssignmentToSimplify;
         
         using LearnedConflictsLookupKey = std::pair<std::size_t, Decision::ChoosenOperand>;
         struct LearnedConflictsLookupKeyHasher {
@@ -131,9 +145,12 @@ namespace noAdditionalLineSynthesis {
         void                                      markSourceOfConflictReached();
         [[nodiscard]] bool                        shouldBacktrackDueToConflict() const;
 
-        void                                      considerExpressionInFutureDecisions(const syrec::expression::ptr& expr) const;
-        void                                      revokeConsiderationOfExpressionForFutureDecisions(const syrec::expression::ptr& expr) const;
-        [[nodiscard]] bool                        isChoiceOfSignalAccessBlockedByAnyActiveExpression(const syrec::VariableAccess& chosenOperand) const;
+        void                                                                            considerExpressionInFutureDecisions(const syrec::expression::ptr& expr) const;
+        void                                                                            revokeConsiderationOfExpressionForFutureDecisions(const syrec::expression::ptr& expr) const;
+        void                                                                            defineNotUsableReplacementCandidatesFromAssignmentForGenerator(const syrec::AssignStatement& assignment) const;
+        [[nodiscard]] bool                                                              isChoiceOfSignalAccessBlockedByAnyActiveExpression(const syrec::VariableAccess& chosenOperand) const;
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>                         createReplacementForChosenOperand(const DecisionReference& decisionToReplace) const;
+
 
         // This call should be responsible to determine conflicts, during a decision their should not arise any conflicts
         // The check for a conflict should take place in the operations nodes with either one or two leaf nodes by using this call before making any decisions
@@ -219,13 +236,26 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr> convertCompileTimeConstantExprToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr, unsigned int expectedBitwidth);
         [[nodiscard]] static syrec::expression::ptr                      transformExprBeforeProcessing(const syrec::expression::ptr& initialExpr);
         
-        [[nodiscard]] static bool                                        doesExprContainOverlappingAccessOnGivenSignalAccess(const syrec::expression& expr, const syrec::VariableAccess& signalAccess, const parser::SymbolTable& symbolTable);
-        [[nodiscard]] static bool                                        doesNumberContainOverlappingAccessOnGivenSignalAccess(const syrec::Number& number, const syrec::VariableAccess& signalAccess, const parser::SymbolTable& symbolTable);
-        [[nodiscard]] static bool                                        doSignalAccessesOverlap(const syrec::VariableAccess& firstSignalAccess, const syrec::VariableAccess& otherSignalAccess, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static bool                                    doesExprContainOverlappingAccessOnGivenSignalAccess(const syrec::expression& expr, const syrec::VariableAccess& signalAccess, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static bool                                    doesNumberContainOverlappingAccessOnGivenSignalAccess(const syrec::Number& number, const syrec::VariableAccess& signalAccess, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static bool                                    doSignalAccessesOverlap(const syrec::VariableAccess& firstSignalAccess, const syrec::VariableAccess& otherSignalAccess, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static bool                                    areSignalAccessesSyntacticallyEquivalent(const syrec::VariableAccess& firstSignalAccess, const syrec::VariableAccess& otherSignalAccess, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static std::optional<unsigned int>             determineBitwidthOfSignalAccess(const syrec::VariableAccess& signalAccess);
+        [[nodiscard]] static std::optional<unsigned int>             evaluateNumber(const syrec::Number& numberToEvaluate);
 
+        /**
+         * \brief Determines the signal parts defined in the given expression which cannot be used as potential replacement candidates
+         * \param expr The expression which shall be checked
+         * \param symbolTable The symbol table used to lookup values during the comparision of signal accesses
+         * \remarks Only assignable signals are considered as potential replacement candidates. We are also assuming that numeric expression were converted to their binary expression counterpart.
+         * Unary expressions are currently not supported since SyReC does not provide a fitting container for them.
+         * \return The found exclusion vector containing all non-usable replacement candidate parts
+         */
+        [[nodiscard]] static std::vector<syrec::VariableAccess::ptr> determineSignalPartsNotUsableAsPotentialReplacementCandidates(const syrec::expression& expr, const parser::SymbolTable& symbolTable);
         
         [[nodiscard]] static constexpr bool shouldLogMessageBePrinted();
         [[nodiscard]] static std::string    stringifyChosenOperandForLogMessage(Decision::ChoosenOperand chosenOperand);
+        [[nodiscard]] static std::string    stringifyRepetitionOfChoice(Decision::ChoiceRepetition setRepetitionOfChoice);
         static void                         logDecision(const DecisionReference& madeDecision);
         static void                         logConflict(std::size_t operationNodeId, Decision::ChoosenOperand operandCausingConflict, const syrec::VariableAccess& signalAccessCausingConflict, const std::optional<std::size_t>& idOfEarliestDecisionInvolvedInConflict);
         static void                         logStartOfProcessingOfOperationNode(std::size_t operationNodeId);
@@ -233,6 +263,7 @@ namespace noAdditionalLineSynthesis {
         static void                         logBacktrackingResult(std::size_t operationNodeIdAtStartOfBacktracking, std::size_t nextOperationNodeAfterBacktrackingFinished);
         static void                         logMarkingOfOperationNodeAsSourceOfConflict(std::size_t operationNodeId);
         static void                         logMessage(const std::string& msg);
+        static void                         logCreationOfSubstitution(std::size_t operationNodeId, Decision::ChoosenOperand substitutedOperand, const syrec::VariableAccess& generatedSubstitution);
     };
 }
 

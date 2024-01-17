@@ -26,6 +26,14 @@ namespace parser {
         [[nodiscard]] bool                                                                  contains(const syrec::Module::ptr& module) const;
         [[nodiscard]] std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> getVariable(const std::string_view& literalIdent) const;
 
+        struct SharedBitwidthSignalGroup {
+            unsigned int bitwidth;
+            std::vector<syrec::Variable::vec> signalIdents;
+        };
+        [[nodiscard]] std::vector<unsigned int> fetchBitwidthsPerSharedBitwidthSignalGroupsWithAssignableSignals(unsigned int requiredMinimumBitwidth) const;
+        [[nodiscard]] syrec::Variable::vec      fetchedDeclaredAssignableSignalsHavingMatchingBitwidth(unsigned int requiredBitwidth) const;
+        [[nodiscard]] std::vector<std::string>  fetchIdentsOfSignalsStartingWith(const std::string_view& signalIdentPrefixRequiredForMatch) const;
+
         struct ModuleCallSignature {
             std::string moduleIdent;
             syrec::Variable::vec parameters;

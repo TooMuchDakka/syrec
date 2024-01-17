@@ -15,6 +15,7 @@ namespace noAdditionalLineSynthesis {
         using ptr = std::shared_ptr<TemporaryAssignmentsContainer>;
 
         void storeActiveAssignment(const syrec::AssignStatement::ptr& assignment);
+        void storeInitializationForSubstitution(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand);
         void markCutoffForInvertibleAssignments();
         /**
          * \brief Invert all assignments starting from the last generated one up to the last marked cutoff position and optionally exclude a fixed number of assignments or all matching a given active assignment
@@ -34,6 +35,7 @@ namespace noAdditionalLineSynthesis {
         std::vector<std::size_t>                                                        cutOffIndicesForInvertibleAssignments;
         std::vector<std::size_t>                                                        indicesOfActiveAssignments;
         std::vector<syrec::AssignStatement::ptr>                                        generatedAssignments;
+        std::vector<syrec::AssignStatement::ptr>                                        initializationAssignmentsForGeneratedSubstitutions;
         std::unordered_map<std::string, std::unordered_set<syrec::VariableAccess::ptr>> activeAssignmentsLookup;
 
         [[nodiscard]] std::vector<std::size_t>                                          determineIndicesOfInvertibleAssignmentsStartingFrom(std::size_t firstRelevantAssignmentIndex) const;

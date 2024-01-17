@@ -46,9 +46,16 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<std::size_t>                getOperandNodeIdOfNestedOperation(std::size_t parentOperationNodeId, std::size_t nestedOperationNodeId) const;
         [[nodiscard]] bool                                      canSignalBeUsedOnAssignmentLhs(const std::string& signalIdent) const;
         [[nodiscard]] std::optional<OperationNodeReference>     getOperationNodeById(std::size_t operationNodeId) const;
+        /**
+         * \brief Update the operand data of a given operation node
+         * \param operationNodeId The operation node containing the operand to be updated
+         * \param updateLhsOperandData A flag indicating whether the lhs operand shall be updated
+         * \param newOperandData The new data of the operand, which must be a syrec::VariableExpression
+         * \return Whether the update was successful
+         */
+        [[nodiscard]] bool                                      updateOperandData(std::size_t operationNodeId, bool updateLhsOperandData, const syrec::expression::ptr& newOperandData);
         void                                                    markOperationNodeAsPotentialBacktrackOption(std::size_t operationNodeId);
         void                                                    removeOperationNodeAsPotentialBacktrackOperation(std::size_t operationNodeId);
-        //void                                                    backtrack();
         void                                                    backtrackToNode(std::size_t operationNodeId);
         void                                                    backtrackOnePastNode(std::size_t operationNodeId);
 

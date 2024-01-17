@@ -59,6 +59,53 @@ std::optional<std::variant<syrec::Variable::ptr, syrec::Number::ptr>> SymbolTabl
     return found_entry;
 }
 
+std::vector<unsigned> SymbolTable::fetchBitwidthsPerSharedBitwidthSignalGroupsWithAssignableSignals(unsigned requiredMinimumBitwidth) const {
+    std::unordered_set<unsigned int> bitwidthGroups;
+    for (const auto& localsKvPair: locals) {
+        const std::shared_ptr<VariableSymbolTableEntry>& signalInformation = localsKvPair.second;
+        if (std::holds_alternative<syrec::Variable::ptr>(signalInformation->variableInformation) && canSignalBeAssignedTo(localsKvPair.first)) {
+            if (const syrec::Variable::ptr rawSignalInformation = std::get<syrec::Variable::ptr>(signalInformation->variableInformation); rawSignalInformation->bitwidth >= requiredMinimumBitwidth && !bitwidthGroups.count(rawSignalInformation->bitwidth)) {
+                bitwidthGroups.emplace(rawSignalInformation->bitwidth);
+            }
+        }
+    }
+
+    if (bitwidthGroups.empty()) {
+        return {};
+    }
+
+    std::vector<unsigned int> sortedBitwidthGroups;
+    sortedBitwidthGroups.reserve(bitwidthGroups.size());
+    for (const unsigned int bitwidth : bitwidthGroups) {
+        sortedBitwidthGroups.emplace_back(bitwidth);
+    }
+    std::sort(sortedBitwidthGroups.begin(), sortedBitwidthGroups.end());
+    return sortedBitwidthGroups;
+}
+
+syrec::Variable::vec SymbolTable::fetchedDeclaredAssignableSignalsHavingMatchingBitwidth(unsigned requiredBitwidth) const {
+    syrec::Variable::vec matchingSignalsForBitwidth;
+    for (const auto& localsKvPair : locals) {
+        const std::shared_ptr<VariableSymbolTableEntry>& signalInformation = localsKvPair.second;
+        if (std::holds_alternative<syrec::Variable::ptr>(signalInformation->variableInformation) && canSignalBeAssignedTo(localsKvPair.first)) {
+            if (const syrec::Variable::ptr rawSignalInformation = std::get<syrec::Variable::ptr>(signalInformation->variableInformation); rawSignalInformation->bitwidth == requiredBitwidth) {
+                matchingSignalsForBitwidth.emplace_back(rawSignalInformation);    
+            }
+        }
+    }
+    return matchingSignalsForBitwidth;
+}
+
+std::vector<std::string> SymbolTable::fetchIdentsOfSignalsStartingWith(const std::string_view& signalIdentPrefixRequiredForMatch) const {
+    std::vector<std::string> matchingSignalIdents;
+    for (const auto& localsKvPair : locals) {
+        if (!localsKvPair.first.rfind(signalIdentPrefixRequiredForMatch)) {
+            matchingSignalIdents.emplace_back(localsKvPair.first);
+        }
+    }
+    return matchingSignalIdents;
+}
+
 std::optional<SymbolTable::DeclaredModuleSignature> SymbolTable::getMatchingModuleForIdentifier(const ModuleIdentifier& moduleIdentifier) const {
     if (const auto& matchingModules = getEntryForModulesWithMatchingName(moduleIdentifier.moduleIdent); matchingModules && !matchingModules->internalDataLookup.empty() && matchingModules->internalDataLookup.count(moduleIdentifier.internalModuleId)) {
         const auto& internalDataLookupEntry = matchingModules->internalDataLookup.at(moduleIdentifier.internalModuleId);

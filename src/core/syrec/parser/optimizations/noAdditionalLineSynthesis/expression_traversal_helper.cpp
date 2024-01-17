@@ -107,6 +107,22 @@ std::optional<ExpressionTraversalHelper::OperationNodeReference> ExpressionTrave
     return operationNodeDataLookup.at(operationNodeId);
 }
 
+bool ExpressionTraversalHelper::updateOperandData(std::size_t operationNodeId, bool updateLhsOperandData, const syrec::expression::ptr& newOperandData) {
+    const std::optional<OperationNodeReference> referencedOperationNode = getOperationNodeById(operationNodeId);
+    if (newOperandData || !std::dynamic_pointer_cast<const syrec::VariableExpression>(newOperandData) || !referencedOperationNode.has_value() 
+        || (updateLhsOperandData && !referencedOperationNode->get()->lhsOperand.isLeafNode()) || (!updateLhsOperandData && !referencedOperationNode->get()->rhsOperand.isLeafNode())) {
+        return false;
+    }
+
+    const std::size_t idOfOperandToUpdate = updateLhsOperandData ? referencedOperationNode->get()->lhsOperand.id : referencedOperationNode->get()->rhsOperand.id;
+    if (!operandNodeDataLookup.count(idOfOperandToUpdate)) {
+        return false;
+    }
+    operandNodeDataLookup.at(idOfOperandToUpdate) = newOperandData;
+    return true;
+}
+
+
 void ExpressionTraversalHelper::removeOperationNodeAsPotentialBacktrackOperation(std::size_t operationNodeId) {
     if (const auto& fetchedOperationNodeForId = getOperationNodeById(operationNodeId); fetchedOperationNodeForId.has_value()) {
         const auto& foundMatchForOperationNode = std::find_if(
@@ -219,7 +235,7 @@ void ExpressionTraversalHelper::determineIdentsOfSignalsUsableInAssignmentLhs(co
     }
 }
 
-void ExpressionTraversalHelper::backtrackToNode(std::size_t operationNodeId, bool removeEntryForOperationNodeId) {
+void ExpressionTraversalHelper::backtrackToNode(std::size_t operationNodeId, bool removeBacktrackEntryForNode) {
     if (!operationNodeTraversalQueueIdx) {
         return;
     }
@@ -230,7 +246,7 @@ void ExpressionTraversalHelper::backtrackToNode(std::size_t operationNodeId, boo
     }
 
     operationNodeTraversalQueueIdx = std::distance(operationNodeTraversalQueue.cbegin(), indexOfOperationNodeInQueue);
-    if (removeEntryForOperationNodeId) {
+    if (removeBacktrackEntryForNode) {
         backtrackOperationNodeIds.erase(
                 std::remove_if(
                         backtrackOperationNodeIds.begin(),

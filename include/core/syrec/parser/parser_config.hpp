@@ -16,9 +16,9 @@ namespace parser {
         /**
          * \brief This additional factor for the cost of an expression can be used to achieve a balance between code-size and the number of additional signals required for the synthesis of an assignment
          */
-        double      expressionNestingPenalty                       = 75;
-        double      expressionNestingPenaltyScalingPerNestingLevel = 3.5;
-        std::string optionalNewReplacementSignalIdentsPrefix       = "";
+        double                     expressionNestingPenalty                       = 75;
+        double                     expressionNestingPenaltyScalingPerNestingLevel = 3.5;
+        std::optional<std::string> optionalNewReplacementSignalIdentsPrefix;
     };
 
     struct ParserConfig {

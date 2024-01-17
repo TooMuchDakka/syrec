@@ -25,6 +25,18 @@ void TemporaryAssignmentsContainer::storeActiveAssignment(const syrec::AssignSta
     }
 }
 
+void TemporaryAssignmentsContainer::storeInitializationForSubstitution(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand) {
+    const std::shared_ptr<syrec::AssignStatement> castedAssignmentDefiningSubstitution = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentDefiningSubstitution);
+    const std::shared_ptr<syrec::AssignStatement> castedRequiredResetAssignment        = optionalRequiredResetOfSubstitutionLhsOperand.has_value() ? std::dynamic_pointer_cast<syrec::AssignStatement>(*optionalRequiredResetOfSubstitutionLhsOperand) : nullptr;
+
+    if (!castedAssignmentDefiningSubstitution || (optionalRequiredResetOfSubstitutionLhsOperand.has_value() && !castedRequiredResetAssignment)) {
+        return;
+    }
+    initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedRequiredResetAssignment);
+    initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedAssignmentDefiningSubstitution);
+}
+
+
 void TemporaryAssignmentsContainer::markCutoffForInvertibleAssignments() {
     cutOffIndicesForInvertibleAssignments.emplace_back(generatedAssignments.size());
 }
@@ -93,10 +105,16 @@ void TemporaryAssignmentsContainer::resetInternals() {
     indicesOfActiveAssignments.clear();
     activeAssignmentsLookup.clear();
     cutOffIndicesForInvertibleAssignments.clear();
+    initializationAssignmentsForGeneratedSubstitutions.clear();
 }
 
 syrec::AssignStatement::vec TemporaryAssignmentsContainer::getAssignments() const {
-    return generatedAssignments;
+    std::vector<syrec::AssignStatement::ptr> containerForAllGeneratedAssignmentsAndSubstitutions;
+    containerForAllGeneratedAssignmentsAndSubstitutions.reserve(initializationAssignmentsForGeneratedSubstitutions.size() + generatedAssignments.size());
+
+    containerForAllGeneratedAssignmentsAndSubstitutions.insert(containerForAllGeneratedAssignmentsAndSubstitutions.cend(), initializationAssignmentsForGeneratedSubstitutions.begin(), initializationAssignmentsForGeneratedSubstitutions.end());
+    containerForAllGeneratedAssignmentsAndSubstitutions.insert(containerForAllGeneratedAssignmentsAndSubstitutions.cend(), generatedAssignments.begin(), generatedAssignments.end());
+    return containerForAllGeneratedAssignmentsAndSubstitutions;
 }
 
 bool TemporaryAssignmentsContainer::existsOverlappingAssignmentFor(const syrec::VariableAccess& assignedToSignal, const parser::SymbolTable& symbolTable) const {
