@@ -24,11 +24,12 @@ namespace optimizations {
         void liftAllRestrictions();
         void restrictAccessTo(const BitRangeAccess& specificBitRange);
 
-        explicit BitRangeAccessRestriction(const unsigned int validBitRange) :
-         BitRangeAccessRestriction(validBitRange, BitRangeAccess(0, validBitRange == 0 ? 0 : validBitRange - 1)) {}
+        explicit BitRangeAccessRestriction(const unsigned int validBitRange)
+            : validBitRange(validBitRange), restrictionRegions({}) {}
+         
 
         explicit BitRangeAccessRestriction(const unsigned int validBitRange, const BitRangeAccess& initialBitRangeRestriction)
-            : validBitRange(validBitRange), restrictionRegions({})
+            : BitRangeAccessRestriction(validBitRange)
         {
             restrictAccessTo(initialBitRangeRestriction);
         }
