@@ -31,7 +31,7 @@ namespace parser {
             std::vector<syrec::Variable::vec> signalIdents;
         };
         [[nodiscard]] std::vector<unsigned int> fetchBitwidthsPerSharedBitwidthSignalGroupsWithAssignableSignals(unsigned int requiredMinimumBitwidth) const;
-        [[nodiscard]] syrec::Variable::vec      fetchedDeclaredAssignableSignalsHavingMatchingBitwidth(unsigned int requiredBitwidth) const;
+        [[nodiscard]] syrec::Variable::vec      fetchedDeclaredAssignableSignalsHavingMatchingBitwidth(unsigned int requiredBitwidth, const std::optional<std::unordered_set<std::string>>& identsOfSignalsToExclude) const;
         [[nodiscard]] std::vector<std::string>  fetchIdentsOfSignalsStartingWith(const std::string_view& signalIdentPrefixRequiredForMatch) const;
 
         struct ModuleCallSignature {

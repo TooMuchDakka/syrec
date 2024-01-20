@@ -17,6 +17,11 @@ void noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::activateTempora
     }
 }
 
+void noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::loadLastNewlyGeneratedReplacementSignalInformation() {
+    const std::optional<std::size_t> lastGeneratedTemporarySignalName = loadLastGeneratedTemporarySignalNameFromSymbolTable();
+    lastGeneratedReplacementCandidateCounter                          = determineNextTemporarySignalPostfix(lastGeneratedTemporarySignalName);
+}
+
 void noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::clearAllRestrictions() const {
     dimensionReplacementStatusLookup->clear();
 }
@@ -73,7 +78,7 @@ void noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::DimensionReplac
 }
 
 bool noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::DimensionReplacementStatus::LeafLayerData::isAccessRestrictedToBitrange(const optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) const {
-    return temporaryRestrictions->isAccessRestrictedTo(bitRange);
+    return permanentRestrictions->isAccessRestrictedTo(bitRange) || temporaryRestrictions->isAccessRestrictedTo(bitRange);
 }
 
 
@@ -122,7 +127,19 @@ void noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::DimensionReplac
     if (std::optional<LayerDataEntry::ptr> dataForValueOfDimension = getDataOfValueOfDimension(valueOfDimensionData->referencedValueOfDimension); dataForValueOfDimension.has_value()) {
         *dataForValueOfDimension = valueOfDimensionData;
     } else {
-        dataPerValueOfDimension.emplace_back(valueOfDimensionData);
+        const std::size_t referencedValueOfDimensionForNewData          = valueOfDimensionData->referencedValueOfDimension;
+        const auto&       insertPositionForContainerForValueOfDimension = std::find_if(
+                      dataPerValueOfDimension.cbegin(),
+                      dataPerValueOfDimension.cend(),
+                      [referencedValueOfDimensionForNewData](const DimensionReplacementStatus::LayerDataEntry::ptr& containerForAlreadyLoadedValueOfDimension) {
+                    return containerForAlreadyLoadedValueOfDimension->referencedValueOfDimension > referencedValueOfDimensionForNewData;
+                });
+
+        if (insertPositionForContainerForValueOfDimension == dataPerValueOfDimension.cend()) {
+            dataPerValueOfDimension.emplace_back(valueOfDimensionData);
+        } else {
+            dataPerValueOfDimension.insert(insertPositionForContainerForValueOfDimension, valueOfDimensionData);
+        }
     }
 
     if (!wasValueOfDimensionAlreadyLoaded(valueOfDimensionData->referencedValueOfDimension)) {
@@ -172,6 +189,19 @@ void noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::cacheSignalBitw
     }
 }
 
+void noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::incrementLastNewlyGeneratedSignalCounter() {
+    if (!lastGeneratedReplacementCandidateCounter.has_value()) {
+        return;
+    }
+
+    if (*lastGeneratedReplacementCandidateCounter == UINT_MAX) {
+        lastGeneratedReplacementCandidateCounter.reset();
+        return;
+    }
+    lastGeneratedReplacementCandidateCounter = *lastGeneratedReplacementCandidateCounter + 1;
+}
+
+
 std::optional<std::reference_wrapper<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::SignalBitwidthGroup>> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::getOrCreateCacheEntryForSignalBitwdith(unsigned int bitwidth) {
     if (!bitwidth) {
         return std::nullopt;
@@ -191,6 +221,24 @@ std::optional<std::reference_wrapper<noAdditionalLineSynthesis::ExpressionSubsti
     }
     return *matchingGroupForSignalBitwidth;
 }
+
+std::unordered_set<std::string> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::determineCachedSignalIdentsHavingGivenBitwidth(unsigned bitwidth) const {
+    if (!bitwidth) {
+        return {};
+    }
+    
+    const auto& matchingGroupForSignalBitwidth = std::find_if(
+    orderedReplacementCandidatesBitwidthCache.cbegin(),
+    orderedReplacementCandidatesBitwidthCache.cend(),
+    [bitwidth](const SignalBitwidthGroup& signalBitwidthGroup) {
+        return signalBitwidthGroup.bitwidth == bitwidth;
+    });
+    if (matchingGroupForSignalBitwidth == orderedReplacementCandidatesBitwidthCache.cend()) {
+        return {};
+    }
+    return {matchingGroupForSignalBitwidth->signalIdents.cbegin(), matchingGroupForSignalBitwidth->signalIdents.cend()};
+}
+
 
 std::optional<unsigned> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::getSignalBitwidth(const std::string& signalIdent) const {
     if (const std::optional<syrec::Variable::ptr> symbolTableInformationOfReferencedSignal = getSignalInformationFromSymbolTable(signalIdent); symbolTableInformationOfReferencedSignal.has_value()) {
@@ -232,8 +280,8 @@ std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::Transf
 }
 
 std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::DimensionReplacementStatus::ptr> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::getOrCreateEntryForRestriction(const syrec::Variable& symbolTableEntryForReferencedSignal) {
-    if (const DimensionReplacementStatus::ptr existingEntryMatchingSignalIdent = dimensionReplacementStatusLookup->at(symbolTableEntryForReferencedSignal.name)) {
-        return existingEntryMatchingSignalIdent;
+    if (dimensionReplacementStatusLookup->count(symbolTableEntryForReferencedSignal.name)) {
+        return dimensionReplacementStatusLookup->at(symbolTableEntryForReferencedSignal.name);
     }
 
     const auto defaultAccessedValuePerDimension = std::vector(symbolTableEntryForReferencedSignal.dimensions.size(), 0u);
@@ -285,12 +333,12 @@ std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::Dimens
 }
 
 std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::DimensionReplacementStatus::LeafLayerData::ptr> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::generateDefaultDimensionReplacementStatusForValueOfDimensionInLeafLayer(unsigned bitwidthOfAccessedSignal) {
-    const optimizations::BitRangeAccessRestriction::ptr permanentPotentialReplacementStatus            = nullptr;
+    const optimizations::BitRangeAccessRestriction::ptr permanentPotentialReplacementRestrictionStatus = std::make_shared<optimizations::BitRangeAccessRestriction>(bitwidthOfAccessedSignal);
     const optimizations::BitRangeAccessRestriction::ptr temporaryPotentialReplacementRestrictionStatus = std::make_shared<optimizations::BitRangeAccessRestriction>(bitwidthOfAccessedSignal);
     if (!temporaryPotentialReplacementRestrictionStatus) {
         return std::nullopt;
     }
-    if (const auto& generatedLeafDataForValueOfDimension = std::make_shared<DimensionReplacementStatus::LeafLayerData>(DimensionReplacementStatus::LeafLayerData({permanentPotentialReplacementStatus, temporaryPotentialReplacementRestrictionStatus})); generatedLeafDataForValueOfDimension) {
+    if (const auto& generatedLeafDataForValueOfDimension = std::make_shared<DimensionReplacementStatus::LeafLayerData>(DimensionReplacementStatus::LeafLayerData({permanentPotentialReplacementRestrictionStatus, temporaryPotentialReplacementRestrictionStatus})); generatedLeafDataForValueOfDimension) {
         return generatedLeafDataForValueOfDimension;
     }
     return std::nullopt;
@@ -301,7 +349,7 @@ std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::Dimens
     for (std::size_t i = 0; i < dimensionAccessDefiningPathToLeafLayer.size(); ++i) {
         const std::size_t accessedValueOfDimension = dimensionAccessDefiningPathToLeafLayer.at(i);
         const bool        isIntermediateDimension  = i < (dimensionAccessDefiningPathToLeafLayer.size() - 1);
-        if (!currentDimensionReplacementStatus->dataPerValueOfDimension.at(accessedValueOfDimension)) {
+        if (!currentDimensionReplacementStatus->getDataOfValueOfDimension(accessedValueOfDimension).has_value()) {
             DimensionReplacementStatus::LayerDataEntry::ptr containerForLoadedValueOfDimension;
             if (isIntermediateDimension) {
                 std::vector<unsigned int> accessedValuePerDimensionOfRemainingDimensionAccess = std::vector(std::next(dimensionAccessDefiningPathToLeafLayer.cbegin(), i + 1), dimensionAccessDefiningPathToLeafLayer.cend());
@@ -317,8 +365,9 @@ std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::Dimens
             if (!containerForLoadedValueOfDimension) {
                 break;
             }
-            currentDimensionReplacementStatus->dataPerValueOfDimension.at(accessedValueOfDimension) = containerForLoadedValueOfDimension;
-        } else if (!isIntermediateDimension) {
+            currentDimensionReplacementStatus->makeValueOfDimensionAvailable(containerForLoadedValueOfDimension);
+        }
+        if (!isIntermediateDimension) {
             return currentDimensionReplacementStatus;
         }
 
@@ -400,11 +449,11 @@ std::optional<syrec::VariableAccess> noAdditionalLineSynthesis::ExpressionSubsti
 
 
 std::optional<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::searchForReplacementInPotentialReplacementCandidatesFromSymbolTableWithMatchingBitwidth(unsigned bitwidth) {
-    for (const syrec::Variable::ptr& potentialFutureReplacementCandidateFromSymbolTable: symbolTable->fetchedDeclaredAssignableSignalsHavingMatchingBitwidth(bitwidth)) {
+    const std::optional<std::unordered_set<std::string>> existingSignalsSharingSameBitwidth = std::make_optional(determineCachedSignalIdentsHavingGivenBitwidth(bitwidth));
+    for (const syrec::Variable::ptr& potentialFutureReplacementCandidateFromSymbolTable: symbolTable->fetchedDeclaredAssignableSignalsHavingMatchingBitwidth(bitwidth, existingSignalsSharingSameBitwidth)) {
         const std::optional<syrec::VariableAccess>   accessOnFutureReplacementCandidate                  = generateSignalAccessForNotLoadedEntryFromSymbolTableForGivenBitwidth(potentialFutureReplacementCandidateFromSymbolTable, bitwidth);
         const std::optional<TransformedSignalAccess> transformedSignalAccessOnFutureReplacementCandidate = accessOnFutureReplacementCandidate.has_value() ? transformSignalAccess(*accessOnFutureReplacementCandidate, *potentialFutureReplacementCandidateFromSymbolTable) : std::nullopt;
 
-        //currentGroupOfSignalsMatchingBitwidth->signalIdents.emplace_back(potentialFutureReplacementCandidateFromSymbolTable->name);
         if (transformedSignalAccessOnFutureReplacementCandidate.has_value()) {
             getOrCreateEntryForRestriction(*potentialFutureReplacementCandidateFromSymbolTable);
             if (const std::optional<syrec::VariableAccess::ptr> createdReplacement = createReplacementFromCandidate(potentialFutureReplacementCandidateFromSymbolTable, bitwidth); createdReplacement.has_value()) {
@@ -427,39 +476,55 @@ std::optional<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::ExpressionS
     }
 
     std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> foundUsableBitrangeAsReplacement;
+    bool                                                                    morePotentialCandidatesAvailableInCurrentSignal;
+    syrec::VariableAccess::ptr                                              generatedReplacementCandidate;
+
     do {
-        advanceRestrictionLookupToLeafLayer(*topMostRestrictionLayer, signalReplacementSearchData->currentValuePerAccessedDimension, symbolTableEntryForReplacementCandidate->bitwidth);
-        foundUsableBitrangeAsReplacement = signalReplacementSearchData->determineBitrangeUsableForReplacement(*topMostRestrictionLayer);
-    } while (!foundUsableBitrangeAsReplacement.has_value() && signalReplacementSearchData->advanceToNextProcessableValueOfDimension());
+        foundUsableBitrangeAsReplacement                = signalReplacementSearchData->determineBitrangeUsableForReplacement(*topMostRestrictionLayer);
+        morePotentialCandidatesAvailableInCurrentSignal = signalReplacementSearchData->advanceToNextProcessableValueOfDimension();
+        if (!foundUsableBitrangeAsReplacement.has_value()) {
+            continue;
+        }
 
-    if (!foundUsableBitrangeAsReplacement.has_value()) {
-        return std::nullopt;
-    }
+        if (!generatedReplacementCandidate) {
+            generatedReplacementCandidate = std::make_shared<syrec::VariableAccess>();
+            if (!generatedReplacementCandidate) {
+                return std::nullopt;
+            }
+            generatedReplacementCandidate->var     = symbolTableEntryForReplacementCandidate;
+            generatedReplacementCandidate->indexes = std::vector<syrec::expression::ptr>(symbolTableEntryForReplacementCandidate->dimensions.size(), nullptr);
+        }
 
-    const syrec::VariableAccess::ptr generatedReplacementCandidate = std::make_shared<syrec::VariableAccess>();
-    generatedReplacementCandidate->var                       = symbolTableEntryForReplacementCandidate;
-    generatedReplacementCandidate->indexes                         = std::vector<syrec::expression::ptr>(symbolTableEntryForReplacementCandidate->dimensions.size(), nullptr);
-    for (std::size_t i = 0; i < symbolTableEntryForReplacementCandidate->dimensions.size(); ++i) {
-        const unsigned int                  accessedValueOfDimension                   = signalReplacementSearchData->currentValuePerAccessedDimension.at(i);
-        const syrec::Number::ptr            containerForAccessedValueOfDimension       = std::make_shared<syrec::Number>(accessedValueOfDimension);
-        const syrec::NumericExpression::ptr containerForExprOfAccessedValueOfDimension = accessedValueOfDimension ? std::make_shared<syrec::NumericExpression>(containerForAccessedValueOfDimension, BitHelpers::getRequiredBitsToStoreValue(accessedValueOfDimension)) : nullptr;
-        if (!containerForExprOfAccessedValueOfDimension) {
+        for (std::size_t i = 0; i < symbolTableEntryForReplacementCandidate->dimensions.size(); ++i) {
+            const unsigned int                  accessedValueOfDimension                   = signalReplacementSearchData->currentValuePerAccessedDimension.at(i);
+            const syrec::Number::ptr            containerForAccessedValueOfDimension       = std::make_shared<syrec::Number>(accessedValueOfDimension);
+            const syrec::NumericExpression::ptr containerForExprOfAccessedValueOfDimension = accessedValueOfDimension ? std::make_shared<syrec::NumericExpression>(containerForAccessedValueOfDimension, BitHelpers::getRequiredBitsToStoreValue(accessedValueOfDimension)) : nullptr;
+            if (!containerForExprOfAccessedValueOfDimension) {
+                return std::nullopt;
+            }
+            generatedReplacementCandidate->indexes.at(i) = containerForExprOfAccessedValueOfDimension;
+        }
+
+        const syrec::Number::ptr containerForReplacementBitrangeStart = std::make_shared<syrec::Number>(foundUsableBitrangeAsReplacement->first);
+        const syrec::Number::ptr containerForReplacementBitrangeEnd   = std::make_shared<syrec::Number>(foundUsableBitrangeAsReplacement->second);
+        if (!containerForReplacementBitrangeStart || !containerForReplacementBitrangeEnd) {
             return std::nullopt;
         }
-        generatedReplacementCandidate->indexes.at(i) = containerForExprOfAccessedValueOfDimension;
-    }
+        generatedReplacementCandidate->range = std::make_pair(containerForReplacementBitrangeStart, containerForReplacementBitrangeEnd);
 
-    const syrec::Number::ptr containerForReplacementBitrangeStart = std::make_shared<syrec::Number>(foundUsableBitrangeAsReplacement->first);
-    const syrec::Number::ptr containerForReplacementBitrangeEnd = std::make_shared<syrec::Number>(foundUsableBitrangeAsReplacement->second);
-    if (!containerForReplacementBitrangeStart || !containerForReplacementBitrangeEnd) {
-        return std::nullopt;
-    }
-    generatedReplacementCandidate->range = std::make_pair(containerForReplacementBitrangeStart, containerForReplacementBitrangeEnd);
-    return generatedReplacementCandidate;
+        // Only if the current value of the generated signal access that shall be used as a replacement can be determined, can we use said replacement candidate since the prior value
+        // of the replacement candidate must be 0 for the substitution assignment to be created.
+        if (symbolTable->tryFetchValueForLiteral(generatedReplacementCandidate).has_value()) {
+            // Only here can we also increment out internal counter that is used to determine the ident of a newly generated replacement candidate that is not created from an existing signal
+            incrementLastNewlyGeneratedSignalCounter();
+            return generatedReplacementCandidate;
+        }
+    } while (morePotentialCandidatesAvailableInCurrentSignal);
+    return std::nullopt;
 }
 
 bool noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::SignalAccessReplacementSearchData::incrementProcessedValueOfDimensionAndCheckForOverflow() {
-    const std::size_t maxAllowedValue = std::min(UINT_MAX, symbolTableInformationOfReplacementCandidate->bitwidth);
+    const std::size_t maxAllowedValue = std::min(UINT_MAX, symbolTableInformationOfReplacementCandidate->dimensions.at(currentlyProcessedDimension));
     if (currentValuePerAccessedDimension.at(currentlyProcessedDimension) + 1 >= maxAllowedValue) {
         currentlyProcessedDimension = currentlyProcessedDimension ? --currentlyProcessedDimension : 0;
         for (std::size_t i = currentlyProcessedDimension; i < currentValuePerAccessedDimension.size(); ++i) {
@@ -476,9 +541,9 @@ bool noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::SignalAccessRep
         return true;
     }
 
-    const std::size_t remainingDimensionsToCheck = currentlyProcessedDimension + 1;
+    const std::size_t remainingDimensionsToCheck = currentlyProcessedDimension;
     bool              couldAdvanceToNextValueOfDimension = false;
-    for (std::size_t i = 0; i <= remainingDimensionsToCheck && !couldAdvanceToNextValueOfDimension; ++i) {
+    for (std::size_t i = 0; i < remainingDimensionsToCheck && !couldAdvanceToNextValueOfDimension; ++i) {
         couldAdvanceToNextValueOfDimension = !incrementProcessedValueOfDimensionAndCheckForOverflow();
     }
     return couldAdvanceToNextValueOfDimension;
@@ -492,7 +557,7 @@ std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> noAdditi
     }
 
     optimizations::BitRangeAccessRestriction::BitRangeAccess copyOfActiveBitrange = activeBitRangeAccess;
-    for (std::size_t i = 0; i < numPossibleBitRangeWindowAdvances; ++i) {
+    for (std::size_t i = 0; i <= numPossibleBitRangeWindowAdvances; ++i) {
         if (restrictionsStatusForCurrentDimensionAccess->get()->isAccessRestrictedToBitrange(copyOfActiveBitrange)) {
             copyOfActiveBitrange.first++;
             copyOfActiveBitrange.second++;
@@ -505,26 +570,37 @@ std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> noAdditi
 }
 
 std::optional<std::size_t> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::loadLastGeneratedTemporarySignalNameFromSymbolTable() const {
-    const std::vector<std::string> symbolTableEntriesMatchingPrefix = symbolTable->fetchIdentsOfSignalsStartingWith(DEFAULT_GENERATED_REPLACEMENT_CANDIDATE_PREFIX);
+    if (!generatedReplacementCandidatePrefix.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::vector<std::string> symbolTableEntriesMatchingPrefix = symbolTable->fetchIdentsOfSignalsStartingWith(*generatedReplacementCandidatePrefix);
     std::vector<std::size_t>       extractedPostfixesOfSymbolTableEntries;
     for (const std::string& symbolTableEntryIdent : symbolTableEntriesMatchingPrefix) {
         if (const std::optional<std::size_t> splitOfPostfixFromSignalIdent = determinePostfixOfNewlyGeneratedReplacementSignalIdent(symbolTableEntryIdent); splitOfPostfixFromSignalIdent.has_value()) {
             extractedPostfixesOfSymbolTableEntries.emplace_back(*splitOfPostfixFromSignalIdent);
+        }
+        else {
+            return std::nullopt;
         }
     }
 
     // Sorts the container in ascending order
     std::sort(extractedPostfixesOfSymbolTableEntries.begin(), extractedPostfixesOfSymbolTableEntries.end());
     if (extractedPostfixesOfSymbolTableEntries.empty()) {
-        return std::nullopt;
+        return 0;
     }
     return extractedPostfixesOfSymbolTableEntries.back();
 }
 
-std::optional<std::string> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::generateNextTemporarySignalName() {
-    lastGeneratedReplacementCandidateCounter = determineNextTemporarySignalPostfix(lastGeneratedReplacementCandidateCounter);
-    if (lastGeneratedReplacementCandidateCounter.has_value()) {
-        return std::string(DEFAULT_GENERATED_REPLACEMENT_CANDIDATE_PREFIX) + std::to_string(*lastGeneratedReplacementCandidateCounter);
+std::optional<std::string> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::generateNextTemporarySignalName() const {
+    if (!generatedReplacementCandidatePrefix.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::optional<std::size_t> generatedSignalPostfix = determineNextTemporarySignalPostfix(lastGeneratedReplacementCandidateCounter);
+    if (generatedSignalPostfix.has_value()) {
+        return std::string(*generatedReplacementCandidatePrefix) + std::to_string(*generatedSignalPostfix);
     }
     return std::nullopt;
 }
@@ -560,9 +636,9 @@ std::optional<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::ExpressionS
     return generatedSignalAccessOnReplacement;
 }
 
-std::optional<std::size_t> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::determinePostfixOfNewlyGeneratedReplacementSignalIdent(const std::string_view& signalIdent) const {
-    if (!signalIdent.rfind(DEFAULT_GENERATED_REPLACEMENT_CANDIDATE_PREFIX, 0)) {
-        
+std::optional<std::size_t> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::determinePostfixOfNewlyGeneratedReplacementSignalIdent(const std::string& signalIdent) const {
+    if (generatedReplacementCandidatePrefix.has_value() && !signalIdent.rfind(*generatedReplacementCandidatePrefix, 0)) {
+        return convertStringToNumericValue(signalIdent.substr(generatedReplacementCandidatePrefix->size()));    
     }
     return std::nullopt;
 }
@@ -572,4 +648,16 @@ std::optional<std::size_t> noAdditionalLineSynthesis::ExpressionSubstitutionGene
         return std::nullopt;
     }
     return *lastGeneratedTemporarySignalPostfix + 1;
+}
+
+std::optional<std::size_t> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::convertStringToNumericValue(const std::string& stringToConvert) {
+    if (stringToConvert == "0") {
+        return 0;
+    }
+
+    const auto determinedNumericValue = strtoul(stringToConvert.c_str(), nullptr, 10);
+    if (errno == ERANGE || !determinedNumericValue || determinedNumericValue > UINT_MAX) {
+        return std::nullopt;
+    }
+    return static_cast<std::size_t>(determinedNumericValue);
 }

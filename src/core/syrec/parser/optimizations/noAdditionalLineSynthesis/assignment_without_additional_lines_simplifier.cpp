@@ -45,6 +45,10 @@
  */
 
 
+
+
+
+
 /*
  * Ideas for the introduction of replacements:
  * - Replace signal accesses at operation nodes which are the cause of the conflict with a replacement
@@ -378,7 +382,7 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
         madeDecision->inheritedOperandDataForChoice = nullptr;
     }
     else {
-        madeDecision = std::make_shared<Decision>(Decision{operationNode->id, Decision::ChoosenOperand::None, generatedAssignmentsContainer->getNumberOfAssignments(), nullptr, nullptr, Decision::ChoiceRepetition::None});
+        madeDecision = std::make_shared<Decision>(Decision{operationNode->id, generatedAssignmentsContainer->getNumberOfAssignments(), Decision::ChoosenOperand::None, Decision::ChoiceRepetition::None, nullptr});
         recordDecision(madeDecision);
     }
 
@@ -450,6 +454,9 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
      *
      * TODO: Reference count updates ?
      * TODO: How are generated replacements made available to the caller?
+     *
+     * When we encounter a decision node defining an operation without assignment counterpart we should only generate the substitution and store it in a lookup but generate the required assignment
+     * every time anew (since the operand data could change due to backtracking, etc.).
      */
     else if (firstOperandAsVariableAccess.has_value()) {
         madeDecision->choosenOperand = shouldOperandsBeSwappedDueToPreferenceForReuseOfExistingAssignmentOfRhs ? Decision::ChoosenOperand::Right: Decision::ChoosenOperand::Left;
@@ -664,6 +671,7 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::defin
     if (substitutionGenerator) {
         std::vector<syrec::VariableAccess::ptr> notUsableReplacementCandidatesForSubstitutionGenerator = determineSignalPartsNotUsableAsPotentialReplacementCandidates(*assignment.rhs, *symbolTableReference);
         notUsableReplacementCandidatesForSubstitutionGenerator.emplace_back(assignment.lhs);
+        substitutionGenerator->loadLastNewlyGeneratedReplacementSignalInformation();
         substitutionGenerator->redefineNotUsableReplacementCandidates(notUsableReplacementCandidatesForSubstitutionGenerator);
     }
 }
@@ -696,9 +704,62 @@ std::optional<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::AssignmentW
     if (!generatedSubstitutionAssignment || !expressionTraversalHelper->updateOperandData(referencedOperationNode->get()->id, decisionToReplace->choosenOperand == Decision::ChoosenOperand::Left, generatedContainerForReplacementExpr)) {
         return std::nullopt;
     }
-    generatedAssignmentsContainer->storeInitializationForSubstitution(generatedSubstitutionAssignment, generatedReplacement->requiredResetOfReplacement);
+    generatedAssignmentsContainer->storeInitializationForReplacementOfLeafNode(generatedSubstitutionAssignment, generatedReplacement->requiredResetOfReplacement);
     return generatedReplacement->foundReplacement;
 }
+
+std::optional<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::getAndActiveReplacementForOperationNode(std::size_t referencedOperationNodeId, syrec_operation::operation definedOperationInOperationNode, const OperationOperandSimplificationResult& lhsOperandDataChoicesAfterSimplification, const OperationOperandSimplificationResult& rhsOperandDataChoicesAfterSimplification) {
+    // Currently we do not support shift expressions here
+    if (!determinedBitWidthOfAssignmentToSimplify.has_value() || !substitutionGenerator || !expressionTraversalHelper->getOperationNodeById(referencedOperationNodeId).has_value() || syrec_operation::isOperationShiftOperation(definedOperationInOperationNode)) {
+        return std::nullopt;
+    }
+    
+    const std::optional<syrec::expression::ptr> fusedExpressionFromOperands = tryCreateExpressionFromOperationNodeOperandSimplifications(lhsOperandDataChoicesAfterSimplification, definedOperationInOperationNode, rhsOperandDataChoicesAfterSimplification);
+    if (!fusedExpressionFromOperands.has_value()) {
+        return std::nullopt;
+    }
+
+    if (wholeExpressionOfOperationNodeReplacementLookup.count(referencedOperationNodeId)) {
+        /*
+         * If the operands of the already existing assignment did not change, simply reuse said assignment again. Otherwise, update the operands. The operation of the rhs expression of the assignments should not change thus the type of the expression should also not change.
+         */
+        const std::shared_ptr<syrec::AssignStatement> existingReplacementForOperationNode = std::dynamic_pointer_cast<syrec::AssignStatement>(wholeExpressionOfOperationNodeReplacementLookup.at(referencedOperationNodeId));
+        const std::shared_ptr<syrec::BinaryExpression> existingAssignmentRhsExprAsBinaryExpr = existingReplacementForOperationNode ? std::dynamic_pointer_cast<syrec::BinaryExpression>(existingReplacementForOperationNode->rhs) : nullptr;
+        if (!existingAssignmentRhsExprAsBinaryExpr) {
+            return std::nullopt;
+        }
+        if (!doesOperandSimplificationResultMatchExpression(lhsOperandDataChoicesAfterSimplification, existingAssignmentRhsExprAsBinaryExpr->lhs)) {
+            existingAssignmentRhsExprAsBinaryExpr->lhs = tryCreateExpressionFromOperationNodeOperandSimplification(lhsOperandDataChoicesAfterSimplification).value_or(nullptr);
+        }
+        if (!doesOperandSimplificationResultMatchExpression(rhsOperandDataChoicesAfterSimplification, existingAssignmentRhsExprAsBinaryExpr->rhs)) {
+            existingAssignmentRhsExprAsBinaryExpr->rhs = tryCreateExpressionFromOperationNodeOperandSimplification(rhsOperandDataChoicesAfterSimplification).value_or(nullptr);
+        }
+
+        if (!existingAssignmentRhsExprAsBinaryExpr->lhs || !existingAssignmentRhsExprAsBinaryExpr->rhs) {
+            wholeExpressionOfOperationNodeReplacementLookup.erase(referencedOperationNodeId);
+            return std::nullopt;
+        }
+        generatedAssignmentsContainer->storeActiveAssignment(existingReplacementForOperationNode);
+        return existingReplacementForOperationNode->lhs;
+    }
+    const std::optional<unsigned int>                                       mappedToFlagForAssignmentEnumValue = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign);
+    const std::optional<ExpressionSubstitutionGenerator::ReplacementResult> generatedReplacement               = mappedToFlagForAssignmentEnumValue.has_value() ? substitutionGenerator->generateReplacementFor(*determinedBitWidthOfAssignmentToSimplify) : std::nullopt;
+    if (!generatedReplacement.has_value()) {
+        return std::nullopt;
+    }
+
+    if (const syrec::AssignStatement::ptr assignmentFusingReplacementAndExpression = std::make_shared<syrec::AssignStatement>(generatedReplacement->foundReplacement, *mappedToFlagForAssignmentEnumValue, *fusedExpressionFromOperands); assignmentFusingReplacementAndExpression) {
+        wholeExpressionOfOperationNodeReplacementLookup.insert(std::make_pair(referencedOperationNodeId, assignmentFusingReplacementAndExpression));
+        /*
+             * Since the operands of the generated assignment, fusing the generated replacement with the expression defining the substitution, rhs expression could potentially change, we need to store said assignment as an active assignment.
+             * The optional reset of the replacement can be executed prior to any active assignment and will be stored accordingly in the generated assignment container.
+             */
+        generatedAssignmentsContainer->storeReplacementAsActiveAssignment(assignmentFusingReplacementAndExpression, generatedReplacement->requiredResetOfReplacement);
+        return generatedReplacement->foundReplacement;
+    }
+    return std::nullopt;
+}
+
 
 // TODO: can probably be removed
 bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::couldAnotherChoiceBeMadeAtPreviousDecision(const std::optional<std::size_t>& pastDecisionForOperationNodeWithIdToExclude) const {
@@ -1052,7 +1113,7 @@ syrec::AssignStatement::vec noAdditionalLineSynthesis::AssignmentWithoutAddition
     return containerForUnoptimizedTopmostAssignment;
 }
 
-std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::createFinalSimplificationResultAfterDecisionWasMade(const DecisionReference& madeDecision, const OperationOperandSimplificationResult& lhsOperandOfOperationNode, syrec_operation::operation definedOperationAtOperationNode, const OperationOperandSimplificationResult& rhsOperandOfOperationNode) const {
+std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::createFinalSimplificationResultAfterDecisionWasMade(const DecisionReference& madeDecision, const OperationOperandSimplificationResult& lhsOperandOfOperationNode, syrec_operation::operation definedOperationAtOperationNode, const OperationOperandSimplificationResult& rhsOperandOfOperationNode) {
     if (madeDecision->choosenOperand != Decision::ChoosenOperand::None) {
         /*
          * At this point no overlapping signal accesses can be contained in the rhs of the generated assignment since this would have already triggered a conflict.
@@ -1065,6 +1126,10 @@ std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> noAdditionalLin
             generatedAssignmentsContainer->invertAllAssignmentsUpToLastCutoff(numberOfAssignmentsToNotInvertStartingFromLastCreatedOne, &assignedToSignalOfGeneratedAssignment);
             return std::dynamic_pointer_cast<syrec::AssignStatement>(*generatedAssignment)->lhs;
         }
+    }
+
+    if (const std::optional<syrec::VariableAccess::ptr> generatedReplacementForWholeExpr = getAndActiveReplacementForOperationNode(madeDecision->operationNodeId, definedOperationAtOperationNode, lhsOperandOfOperationNode, rhsOperandOfOperationNode); generatedReplacementForWholeExpr.has_value()) {
+        return *generatedReplacementForWholeExpr;
     }
     const std::optional<syrec::expression::ptr> generatedExpr = tryCreateExpressionFromOperationNodeOperandSimplifications(lhsOperandOfOperationNode, definedOperationAtOperationNode, rhsOperandOfOperationNode);
     return *generatedExpr;
@@ -1167,23 +1232,25 @@ std::optional<syrec::AssignStatement::ptr> noAdditionalLineSynthesis::Assignment
 }
 
 std::optional<syrec::expression::ptr> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand) {
-    syrec::expression::ptr generatedExprLhsOperand;
-    syrec::expression::ptr generatedExprRhsOperand;
-    
-    if (const std::optional<syrec::VariableAccess::ptr> lastAssignedToSignalOfFirstOperand = simplificationResultOfFirstOperand.getAssignedToSignalOfAssignment(); lastAssignedToSignalOfFirstOperand.has_value()) {
-        generatedExprLhsOperand = std::make_shared<syrec::VariableExpression>(*lastAssignedToSignalOfFirstOperand);
+    const std::optional<syrec::expression::ptr> generatedLhsOperandExpr = tryCreateExpressionFromOperationNodeOperandSimplification(simplificationResultOfFirstOperand);
+    const std::optional<syrec::expression::ptr> generatedRhsOperandExpr = generatedLhsOperandExpr.has_value() ? tryCreateExpressionFromOperationNodeOperandSimplification(simplificationResultOfSecondOperand) : std::nullopt;
+    if (generatedRhsOperandExpr.has_value()) {
+        return fuseExpressions(*generatedLhsOperandExpr, operationNodeOperation, *generatedRhsOperandExpr);
     }
-    else {
-        generatedExprLhsOperand = *simplificationResultOfFirstOperand.getGeneratedExpr();
-    }
+    return std::nullopt;
+}
 
-    if (const std::optional<syrec::VariableAccess::ptr> lastAssignedToSignalOfSecondOperand = simplificationResultOfSecondOperand.getAssignedToSignalOfAssignment(); lastAssignedToSignalOfSecondOperand.has_value()) {
-        generatedExprRhsOperand = std::make_shared<syrec::VariableExpression>(*lastAssignedToSignalOfSecondOperand);
+std::optional<syrec::expression::ptr> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::tryCreateExpressionFromOperationNodeOperandSimplification(const OperationOperandSimplificationResult& simplificationResultOfOperand) {
+    if (const std::optional<syrec::VariableAccess::ptr> lastAssignedToSignalOfFirstOperand = simplificationResultOfOperand.getAssignedToSignalOfAssignment(); lastAssignedToSignalOfFirstOperand.has_value()) {
+        if (const syrec::expression::ptr generatedVariableExpr = std::make_shared<syrec::VariableExpression>(*lastAssignedToSignalOfFirstOperand); generatedVariableExpr) {
+            return generatedVariableExpr;
+        }
+    } else {
+        if (std::optional<syrec::expression::ptr> preexistingExpr = simplificationResultOfOperand.getGeneratedExpr(); preexistingExpr.has_value()) {
+            return preexistingExpr;
+        }
     }
-    else {
-        generatedExprRhsOperand = *simplificationResultOfSecondOperand.getGeneratedExpr();
-    }
-    return fuseExpressions(generatedExprLhsOperand, operationNodeOperation, generatedExprRhsOperand);
+    return std::nullopt;
 }
 
 bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::areAssignedToSignalPartsZero(const syrec::VariableAccess& accessedSignalParts, const SignalValueLookupCallback& signalValueLookupCallback) {
@@ -1339,12 +1406,23 @@ std::optional<unsigned> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLi
     return numberToEvaluate.isConstant() ? std::make_optional(numberToEvaluate.evaluate({})) : std::nullopt;
 }
 
+bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::doesOperandSimplificationResultMatchExpression(const OperationOperandSimplificationResult& operandSimplificationResult, const syrec::expression::ptr& exprToCheck) {
+    if (const std::optional<syrec::VariableAccess::ptr>& signalAccessDataOfOperand = operandSimplificationResult.getAssignedToSignalOfAssignment(); signalAccessDataOfOperand.has_value()) {
+        if (const std::shared_ptr<syrec::VariableExpression>& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(exprToCheck); exprAsVariableExpr) {
+            return *signalAccessDataOfOperand == exprAsVariableExpr->var;
+        }
+    } else if (const std::optional<syrec::expression::ptr>& exprDataOfOperand = operandSimplificationResult.getGeneratedExpr(); exprDataOfOperand.has_value()) {
+        return *exprDataOfOperand == exprToCheck;
+    }
+    return false;
+}
+
 std::vector<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineSignalPartsNotUsableAsPotentialReplacementCandidates(const syrec::expression& expr, const parser::SymbolTable& symbolTable) {
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr) {
         std::vector<syrec::VariableAccess::ptr> notUsableCandidatesOfLhs = determineSignalPartsNotUsableAsPotentialReplacementCandidates(*exprAsBinaryExpr->lhs, symbolTable);
         const std::vector<syrec::VariableAccess::ptr> notUsableCandidatesOfRhs = determineSignalPartsNotUsableAsPotentialReplacementCandidates(*exprAsBinaryExpr->rhs, symbolTable);
 
-        for (const syrec::VariableAccess::ptr notUsableCandidateOfRhs : notUsableCandidatesOfRhs) {
+        for (const syrec::VariableAccess::ptr& notUsableCandidateOfRhs : notUsableCandidatesOfRhs) {
             if (std::all_of(notUsableCandidatesOfLhs.cbegin(), notUsableCandidatesOfLhs.cend(), [&notUsableCandidateOfRhs, &symbolTable](const syrec::VariableAccess::ptr& notUsableCandidateOfLhs) { return !areSignalAccessesSyntacticallyEquivalent(*notUsableCandidateOfLhs, *notUsableCandidateOfRhs, symbolTable); })) {
                 notUsableCandidatesOfLhs.emplace_back(notUsableCandidateOfRhs);
             }

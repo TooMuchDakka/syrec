@@ -83,9 +83,12 @@ std::vector<unsigned> SymbolTable::fetchBitwidthsPerSharedBitwidthSignalGroupsWi
     return sortedBitwidthGroups;
 }
 
-syrec::Variable::vec SymbolTable::fetchedDeclaredAssignableSignalsHavingMatchingBitwidth(unsigned requiredBitwidth) const {
+syrec::Variable::vec SymbolTable::fetchedDeclaredAssignableSignalsHavingMatchingBitwidth(unsigned requiredBitwidth, const std::optional<std::unordered_set<std::string>>& identsOfSignalsToExclude) const {
     syrec::Variable::vec matchingSignalsForBitwidth;
     for (const auto& localsKvPair : locals) {
+        if (identsOfSignalsToExclude.has_value() && identsOfSignalsToExclude->count(localsKvPair.first)) {
+            continue;
+        }
         const std::shared_ptr<VariableSymbolTableEntry>& signalInformation = localsKvPair.second;
         if (std::holds_alternative<syrec::Variable::ptr>(signalInformation->variableInformation) && canSignalBeAssignedTo(localsKvPair.first)) {
             if (const syrec::Variable::ptr rawSignalInformation = std::get<syrec::Variable::ptr>(signalInformation->variableInformation); rawSignalInformation->bitwidth == requiredBitwidth) {

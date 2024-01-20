@@ -50,7 +50,7 @@ namespace parser {
                 const bool                                                 combineRedundantInstructions                = false,
                 const optimizations::MultiplicationSimplificationMethod    multiplicationSimplificationMethod          = optimizations::MultiplicationSimplificationMethod::None,
                 const std::optional<optimizations::LoopOptimizationConfig> optionalLoopUnrollConfig                    = std::nullopt,
-                const std::optional<NoAdditionalLineSynthesisConfig>       noAdditionalLineOptimizationConfig          = std::nullopt,
+                const std::optional<NoAdditionalLineSynthesisConfig>      noAdditionalLineOptimizationConfig          = std::nullopt,
                 std::string                                                expectedMainModuleName                      = defaultExpectedMainModuleName):
             cDefaultSignalWidth(defaultSignalWidth),
             supportBroadcastingExpressionOperands(supportBroadcastingExpressionOperands),

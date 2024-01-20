@@ -15,7 +15,8 @@ namespace noAdditionalLineSynthesis {
         using ptr = std::shared_ptr<TemporaryAssignmentsContainer>;
 
         void storeActiveAssignment(const syrec::AssignStatement::ptr& assignment);
-        void storeInitializationForSubstitution(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand);
+        void storeInitializationForReplacementOfLeafNode(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand);
+        void storeReplacementAsActiveAssignment(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand);
         void markCutoffForInvertibleAssignments();
         /**
          * \brief Invert all assignments starting from the last generated one up to the last marked cutoff position and optionally exclude a fixed number of assignments or all matching a given active assignment

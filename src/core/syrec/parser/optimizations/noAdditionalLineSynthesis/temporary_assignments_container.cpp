@@ -25,17 +25,33 @@ void TemporaryAssignmentsContainer::storeActiveAssignment(const syrec::AssignSta
     }
 }
 
-void TemporaryAssignmentsContainer::storeInitializationForSubstitution(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand) {
+void TemporaryAssignmentsContainer::storeInitializationForReplacementOfLeafNode(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand) {
     const std::shared_ptr<syrec::AssignStatement> castedAssignmentDefiningSubstitution = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentDefiningSubstitution);
     const std::shared_ptr<syrec::AssignStatement> castedRequiredResetAssignment        = optionalRequiredResetOfSubstitutionLhsOperand.has_value() ? std::dynamic_pointer_cast<syrec::AssignStatement>(*optionalRequiredResetOfSubstitutionLhsOperand) : nullptr;
 
     if (!castedAssignmentDefiningSubstitution || (optionalRequiredResetOfSubstitutionLhsOperand.has_value() && !castedRequiredResetAssignment)) {
         return;
     }
-    initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedRequiredResetAssignment);
+
+    if (castedRequiredResetAssignment) {
+        initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedRequiredResetAssignment);   
+    }
     initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedAssignmentDefiningSubstitution);
 }
 
+void TemporaryAssignmentsContainer::storeReplacementAsActiveAssignment(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand) {
+    const std::shared_ptr<syrec::AssignStatement> castedAssignmentDefiningSubstitution = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentDefiningSubstitution);
+    const std::shared_ptr<syrec::AssignStatement> castedRequiredResetAssignment        = optionalRequiredResetOfSubstitutionLhsOperand.has_value() ? std::dynamic_pointer_cast<syrec::AssignStatement>(*optionalRequiredResetOfSubstitutionLhsOperand) : nullptr;
+
+    if (!castedAssignmentDefiningSubstitution || (optionalRequiredResetOfSubstitutionLhsOperand.has_value() && !castedRequiredResetAssignment)) {
+        return;
+    }
+
+    if (castedRequiredResetAssignment) {
+        initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedRequiredResetAssignment);
+    }
+    storeActiveAssignment(castedAssignmentDefiningSubstitution);
+}
 
 void TemporaryAssignmentsContainer::markCutoffForInvertibleAssignments() {
     cutOffIndicesForInvertibleAssignments.emplace_back(generatedAssignments.size());

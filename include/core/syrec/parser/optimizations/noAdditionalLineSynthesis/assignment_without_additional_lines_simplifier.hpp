@@ -59,12 +59,10 @@ namespace noAdditionalLineSynthesis {
             };
 
             std::size_t                operationNodeId;
-            ChoosenOperand             choosenOperand;
             std::size_t                numExistingAssignmentsPriorToDecision;
-            syrec::expression::ptr     backupOfExpressionRequiringFixup;
-            syrec::VariableAccess::ptr inheritedOperandDataForChoice;
+            ChoosenOperand             choosenOperand;
             ChoiceRepetition           shouldChoiceBeRepeated;
-            
+            syrec::VariableAccess::ptr inheritedOperandDataForChoice;
         };
         using DecisionReference = std::shared_ptr<Decision>;
         std::vector<DecisionReference>          pastDecisions;
@@ -78,6 +76,7 @@ namespace noAdditionalLineSynthesis {
         AssignmentTransformer::ptr              assignmentTransformer;
         parser::NoAdditionalLineSynthesisConfig internalConfig;
         std::optional<unsigned int>             determinedBitWidthOfAssignmentToSimplify;
+        std::unordered_map<std::size_t, syrec::AssignStatement::ptr> wholeExpressionOfOperationNodeReplacementLookup;
         
         using LearnedConflictsLookupKey = std::pair<std::size_t, Decision::ChoosenOperand>;
         struct LearnedConflictsLookupKeyHasher {
@@ -150,6 +149,7 @@ namespace noAdditionalLineSynthesis {
         void                                                                            defineNotUsableReplacementCandidatesFromAssignmentForGenerator(const syrec::AssignStatement& assignment) const;
         [[nodiscard]] bool                                                              isChoiceOfSignalAccessBlockedByAnyActiveExpression(const syrec::VariableAccess& chosenOperand) const;
         [[nodiscard]] std::optional<syrec::VariableAccess::ptr>                         createReplacementForChosenOperand(const DecisionReference& decisionToReplace) const;
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>                         getAndActiveReplacementForOperationNode(std::size_t referencedOperationNodeId, syrec_operation::operation definedOperationInOperationNode, const OperationOperandSimplificationResult& lhsOperandDataChoicesAfterSimplification, const OperationOperandSimplificationResult& rhsOperandDataChoicesAfterSimplification);
 
 
         // This call should be responsible to determine conflicts, during a decision their should not arise any conflicts
@@ -215,7 +215,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<double>                                            determineCostOfNumber(const syrec::Number& number, std::size_t currentNestingLevel) const;
         [[nodiscard]] std::optional<double>                                            determineCostOfAssignments(const syrec::AssignStatement::vec& assignments) const;
         [[nodiscard]] syrec::AssignStatement::vec                                      determineMostViableAlternativeBasedOnCost(const syrec::AssignStatement::vec& generatedSimplifiedAssignments, const std::shared_ptr<syrec::AssignStatement>& originalAssignmentUnoptimized, const SignalValueLookupCallback& signalValueCallback) const;
-        [[nodiscard]] std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> createFinalSimplificationResultAfterDecisionWasMade(const DecisionReference& madeDecision, const OperationOperandSimplificationResult& lhsOperandOfOperationNode, syrec_operation::operation definedOperationAtOperationNode, const OperationOperandSimplificationResult& rhsOperandOfOperationNode) const;
+        [[nodiscard]] std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> createFinalSimplificationResultAfterDecisionWasMade(const DecisionReference& madeDecision, const OperationOperandSimplificationResult& lhsOperandOfOperationNode, syrec_operation::operation definedOperationAtOperationNode, const OperationOperandSimplificationResult& rhsOperandOfOperationNode);
 
         [[nodiscard]] static syrec::expression::ptr                      fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentForOperationNode(const syrec::VariableAccess::ptr& assignmentLhs, syrec_operation::operation op, const syrec::expression::ptr& assignmentRhs);
@@ -227,6 +227,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                                        doesExprDefineSignalAccess(const syrec::expression& expr);
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentFromOperands(Decision::ChoosenOperand chosenOperandAsAssignedToSignal, const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
         [[nodiscard]] static std::optional<syrec::expression::ptr>       tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
+        [[nodiscard]] static std::optional<syrec::expression::ptr>       tryCreateExpressionFromOperationNodeOperandSimplification(const OperationOperandSimplificationResult& simplificationResultOfOperand);
         [[nodiscard]] static bool                                        areAssignedToSignalPartsZero(const syrec::VariableAccess& accessedSignalParts, const SignalValueLookupCallback& signalValueLookupCallback);
         [[nodiscard]] static bool                                        doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperationWithNoLeafNodes(const syrec::expression& expr);
         static void                                                      tryConvertNumericToBinaryExpr(syrec::expression::ptr& expr);
@@ -242,6 +243,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                                    areSignalAccessesSyntacticallyEquivalent(const syrec::VariableAccess& firstSignalAccess, const syrec::VariableAccess& otherSignalAccess, const parser::SymbolTable& symbolTable);
         [[nodiscard]] static std::optional<unsigned int>             determineBitwidthOfSignalAccess(const syrec::VariableAccess& signalAccess);
         [[nodiscard]] static std::optional<unsigned int>             evaluateNumber(const syrec::Number& numberToEvaluate);
+        [[nodiscard]] static bool                                    doesOperandSimplificationResultMatchExpression(const OperationOperandSimplificationResult& operandSimplificationResult, const syrec::expression::ptr& exprToCheck);
 
         /**
          * \brief Determines the signal parts defined in the given expression which cannot be used as potential replacement candidates
@@ -252,7 +254,7 @@ namespace noAdditionalLineSynthesis {
          * \return The found exclusion vector containing all non-usable replacement candidate parts
          */
         [[nodiscard]] static std::vector<syrec::VariableAccess::ptr> determineSignalPartsNotUsableAsPotentialReplacementCandidates(const syrec::expression& expr, const parser::SymbolTable& symbolTable);
-        
+
         [[nodiscard]] static constexpr bool shouldLogMessageBePrinted();
         [[nodiscard]] static std::string    stringifyChosenOperandForLogMessage(Decision::ChoosenOperand chosenOperand);
         [[nodiscard]] static std::string    stringifyRepetitionOfChoice(Decision::ChoiceRepetition setRepetitionOfChoice);
