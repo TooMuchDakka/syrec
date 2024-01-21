@@ -29,9 +29,11 @@ namespace noAdditionalLineSynthesis {
         void rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(bool popCutOff);
         void resetInternals();
 
-        [[nodiscard]] syrec::AssignStatement::vec getAssignments() const;
-        [[nodiscard]] bool                        existsOverlappingAssignmentFor(const syrec::VariableAccess& assignedToSignal, const parser::SymbolTable& symbolTable) const;
-        [[nodiscard]] std::size_t                 getNumberOfAssignments() const;
+        [[nodiscard]] syrec::AssignStatement::vec                                         getAssignments() const;
+        [[nodiscard]] std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> getAssignmentsDefiningValueResetsOfGeneratedSubstitutions() const;
+        [[nodiscard]] std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> getInvertedAssignmentsUndoingValueResetsOfGeneratedSubstitutions() const;
+        [[nodiscard]] bool                                                                existsOverlappingAssignmentFor(const syrec::VariableAccess& assignedToSignal, const parser::SymbolTable& symbolTable) const;
+        [[nodiscard]] std::size_t                                                         getNumberOfAssignments() const;
     protected:
         std::vector<std::size_t>                                                        cutOffIndicesForInvertibleAssignments;
         std::vector<std::size_t>                                                        indicesOfActiveAssignments;
@@ -39,10 +41,12 @@ namespace noAdditionalLineSynthesis {
         std::vector<syrec::AssignStatement::ptr>                                        initializationAssignmentsForGeneratedSubstitutions;
         std::unordered_map<std::string, std::unordered_set<syrec::VariableAccess::ptr>> activeAssignmentsLookup;
 
-        [[nodiscard]] std::vector<std::size_t>                                          determineIndicesOfInvertibleAssignmentsStartingFrom(std::size_t firstRelevantAssignmentIndex) const;
-        void                                                                            invertAssignmentAndStoreAndMarkOriginalAsInactive(std::size_t indexOfAssignmentToInvert);
-        void                                                                            removeActiveAssignmentFromLookup(const syrec::VariableAccess::ptr& assignedToSignal);
-        static void                                                                     invertAssignment(syrec::AssignStatement& assignment);
+        [[nodiscard]] std::vector<std::size_t>                                                   determineIndicesOfInvertibleAssignmentsStartingFrom(std::size_t firstRelevantAssignmentIndex) const;
+        void                                                                                     invertAssignmentAndStoreAndMarkOriginalAsInactive(std::size_t indexOfAssignmentToInvert);
+        void                                                                                     removeActiveAssignmentFromLookup(const syrec::VariableAccess::ptr& assignedToSignal);
+        static void                                                                              invertAssignment(syrec::AssignStatement& assignment);
+        [[nodiscard]] static std::optional<std::unique_ptr<syrec::AssignStatement>>              createOwningCopyOfAssignment(const syrec::AssignStatement& assignment);
+        [[nodiscard]] static std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> createOwningCopiesOfAssignments(const syrec::AssignStatement::vec& assignments);
     };
 }
 

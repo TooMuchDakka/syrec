@@ -19,7 +19,24 @@ namespace noAdditionalLineSynthesis {
     class AssignmentWithoutAdditionalLineSimplifier {
     public:
         struct SimplificationResult {
-            syrec::AssignStatement::vec generatedAssignments;
+            using OwningCopyOfAssignment   = std::unique_ptr<syrec::AssignStatement>;
+            using OwningCopiesOfAssignment = std::vector<OwningCopyOfAssignment>;
+
+            syrec::Variable::vec     newlyGeneratedReplacementSignalDefinitions;
+            OwningCopiesOfAssignment generatedAssignments;
+            OwningCopiesOfAssignment requiredValueResetsForReplacementsTargetingExistingSignals;
+            OwningCopiesOfAssignment requiredInversionsOfValuesResetsForReplacementsTargetingExistingSignals;
+
+            [[nodiscard]] static SimplificationResult asEmptyResult() {
+                return SimplificationResult({.newlyGeneratedReplacementSignalDefinitions = {}, .generatedAssignments = {}, .requiredValueResetsForReplacementsTargetingExistingSignals = {}, .requiredInversionsOfValuesResetsForReplacementsTargetingExistingSignals = {}});
+            }
+
+            [[nodiscard]] static SimplificationResult asSingleStatement(OwningCopyOfAssignment assignment) {
+                OwningCopiesOfAssignment containerForAssignments;
+                containerForAssignments.reserve(1);
+                containerForAssignments.push_back(std::move(assignment));
+                return SimplificationResult({.newlyGeneratedReplacementSignalDefinitions = {}, .generatedAssignments = std::move(containerForAssignments), .requiredValueResetsForReplacementsTargetingExistingSignals = {}, .requiredInversionsOfValuesResetsForReplacementsTargetingExistingSignals = {}});
+            }
         };
         using SignalValueLookupCallback = std::function<std::optional<unsigned int>(const syrec::VariableAccess&)>;
         using SimplificationResultReference = std::unique_ptr<SimplificationResult>;
@@ -244,6 +261,8 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static std::optional<unsigned int>             determineBitwidthOfSignalAccess(const syrec::VariableAccess& signalAccess);
         [[nodiscard]] static std::optional<unsigned int>             evaluateNumber(const syrec::Number& numberToEvaluate);
         [[nodiscard]] static bool                                    doesOperandSimplificationResultMatchExpression(const OperationOperandSimplificationResult& operandSimplificationResult, const syrec::expression::ptr& exprToCheck);
+        [[nodiscard]] static std::optional<SimplificationResult::OwningCopyOfAssignment> createOwningCopyOfAssignment(const syrec::AssignStatement& assignment);
+        [[nodiscard]] static std::optional<SimplificationResult::OwningCopiesOfAssignment> createOwningCopiesOfAssignments(const syrec::AssignStatement::vec& assignments);
 
         /**
          * \brief Determines the signal parts defined in the given expression which cannot be used as potential replacement candidates

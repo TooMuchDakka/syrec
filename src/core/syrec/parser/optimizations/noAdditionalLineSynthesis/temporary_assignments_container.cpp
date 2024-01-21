@@ -125,12 +125,33 @@ void TemporaryAssignmentsContainer::resetInternals() {
 }
 
 syrec::AssignStatement::vec TemporaryAssignmentsContainer::getAssignments() const {
-    std::vector<syrec::AssignStatement::ptr> containerForAllGeneratedAssignmentsAndSubstitutions;
-    containerForAllGeneratedAssignmentsAndSubstitutions.reserve(initializationAssignmentsForGeneratedSubstitutions.size() + generatedAssignments.size());
+    return generatedAssignments;
+}
 
-    containerForAllGeneratedAssignmentsAndSubstitutions.insert(containerForAllGeneratedAssignmentsAndSubstitutions.cend(), initializationAssignmentsForGeneratedSubstitutions.begin(), initializationAssignmentsForGeneratedSubstitutions.end());
-    containerForAllGeneratedAssignmentsAndSubstitutions.insert(containerForAllGeneratedAssignmentsAndSubstitutions.cend(), generatedAssignments.begin(), generatedAssignments.end());
-    return containerForAllGeneratedAssignmentsAndSubstitutions;
+std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::getAssignmentsDefiningValueResetsOfGeneratedSubstitutions() const {
+    return createOwningCopiesOfAssignments(initializationAssignmentsForGeneratedSubstitutions);
+}
+
+std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::getInvertedAssignmentsUndoingValueResetsOfGeneratedSubstitutions() const {
+    std::vector<std::unique_ptr<syrec::AssignStatement>> containerForOwningCopiesOfAssignments;
+    if (initializationAssignmentsForGeneratedSubstitutions.size() > (UINT_MAX / 2)) {
+        return std::nullopt;
+    }
+
+    containerForOwningCopiesOfAssignments.reserve(initializationAssignmentsForGeneratedSubstitutions.size() * 2);
+    if (std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> owningCopiesOfInitializationAssignments = getAssignmentsDefiningValueResetsOfGeneratedSubstitutions(); owningCopiesOfInitializationAssignments.has_value()) {
+        containerForOwningCopiesOfAssignments.insert(containerForOwningCopiesOfAssignments.end(), std::make_move_iterator(owningCopiesOfInitializationAssignments->begin()), std::make_move_iterator(owningCopiesOfInitializationAssignments->end()));
+
+        for (auto&& initializationStatement: *owningCopiesOfInitializationAssignments) {
+            if (std::unique_ptr<syrec::AssignStatement> owningContainerForInversionAssignment = std::make_unique<syrec::AssignStatement>(*initializationStatement); owningContainerForInversionAssignment) {
+                invertAssignment(*owningContainerForInversionAssignment);
+                containerForOwningCopiesOfAssignments.push_back(std::move(owningContainerForInversionAssignment));
+                continue;
+            }
+            return std::nullopt;
+        }
+    }
+    return containerForOwningCopiesOfAssignments;
 }
 
 bool TemporaryAssignmentsContainer::existsOverlappingAssignmentFor(const syrec::VariableAccess& assignedToSignal, const parser::SymbolTable& symbolTable) const {
@@ -213,4 +234,27 @@ void TemporaryAssignmentsContainer::invertAssignment(syrec::AssignStatement& ass
     const auto& invertedAssignmentOperation                         = *syrec_operation::invert(matchingAssignmentOperationEnumForFlag);
     const auto& mappedToAssignmentOperationFlagForInvertedOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(invertedAssignmentOperation);
     assignment.op                                                   = *mappedToAssignmentOperationFlagForInvertedOperation;
+}
+
+std::optional<std::unique_ptr<syrec::AssignStatement>> TemporaryAssignmentsContainer::createOwningCopyOfAssignment(const syrec::AssignStatement& assignment) {
+    if (std::unique_ptr<syrec::AssignStatement> owningCopyOfAssignment = std::make_unique<syrec::AssignStatement>(assignment); owningCopyOfAssignment) {
+        return owningCopyOfAssignment;
+    }
+    return std::nullopt;
+}
+
+std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::createOwningCopiesOfAssignments(const syrec::AssignStatement::vec& assignments) {
+    std::vector<std::unique_ptr<syrec::AssignStatement>> containerForCopies;
+    containerForCopies.reserve(assignments.size());
+    
+    for (const auto& statementToTreatAsAssignment: assignments) {
+        if (const std::shared_ptr<syrec::AssignStatement> statementCastedAsAssignment = std::dynamic_pointer_cast<syrec::AssignStatement>(statementToTreatAsAssignment); statementCastedAsAssignment) {
+            if (std::optional<std::unique_ptr<syrec::AssignStatement>> copyOfAssignment = createOwningCopyOfAssignment(*statementCastedAsAssignment); copyOfAssignment.has_value()) {
+                containerForCopies.push_back(std::move(*copyOfAssignment));
+                continue;
+            }
+        }
+        return std::nullopt;
+    }
+    return containerForCopies;
 }

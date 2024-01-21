@@ -45,7 +45,13 @@
  */
 
 
-
+/*
+ * REPLACEMENT GENERATOR TODOS:
+ * - Correct reference count updates for new signals
+ * - Correct insertion of new signals into symbol table
+ * - Correct reference count updates when assignment is simplified (i.e. split into smaller subassignments)
+ * - Fixed replacement generator for example ((a + b) + (a + b)) to generate replacement __x ^= a; ... and not __x ^= (a + b) [see test case 'simpleReplacementTest']
+ */
 
 
 
@@ -61,8 +67,9 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::Simplifica
     // TODO: For a binary expression with no nested expressions as operands, should we prefer that a signal access is always the lhs operand
     const std::shared_ptr<syrec::AssignStatement> transformedAssignmentStmt = transformAssignmentPriorToSimplification(assignmentStatement, true);
     if (!transformedAssignmentStmt) {
-        SimplificationResultReference simplificationResult = std::make_unique<SimplificationResult>(SimplificationResult{generatedAssignmentsContainer->getAssignments()});
-        return simplificationResult;
+        SimplificationResult          simplificationResult          = SimplificationResult::asEmptyResult();
+        SimplificationResultReference simplificationResultContainer = std::make_unique<SimplificationResult>(std::move(simplificationResult));
+        return simplificationResultContainer;
     }
 
     expressionTraversalHelper->buildTraversalQueue(transformedAssignmentStmt->rhs, *symbolTableReference);
@@ -124,11 +131,34 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::Simplifica
      */
     generatedAssignments = assignmentTransformer->simplify(generatedAssignments, signalValueLookupCallback);
     if (wasAnyAssignmentGeneratedDuringProcessing) {
+        // TODO: Rework this check and maybe move it to if below (and also take reset and inversion of resets into account since the generated assignment do not include these)
         if (const std::shared_ptr<syrec::AssignStatement>& transformedAssignmentStmtWithoutAppliedHeuristicsForSubassignmentGeneration = transformAssignmentPriorToSimplification(assignmentStatement, false); transformedAssignmentStmtWithoutAppliedHeuristicsForSubassignmentGeneration) {
             generatedAssignments = determineMostViableAlternativeBasedOnCost(generatedAssignments, transformedAssignmentStmtWithoutAppliedHeuristicsForSubassignmentGeneration, signalValueLookupCallback);        
         }
     }
-    return std::make_unique<SimplificationResult>(SimplificationResult{generatedAssignments});
+
+    if (std::optional<SimplificationResult::OwningCopiesOfAssignment> requiredInversionsOfValueResetsAfterUsageOfGeneratedReplacements = generatedAssignmentsContainer->getInvertedAssignmentsUndoingValueResetsOfGeneratedSubstitutions(); requiredInversionsOfValueResetsAfterUsageOfGeneratedReplacements.has_value()) {
+        if (std::optional<SimplificationResult::OwningCopiesOfAssignment> owningCopiesOfGeneratedAssignments = createOwningCopiesOfAssignments(generatedAssignments); owningCopiesOfGeneratedAssignments.has_value()) {
+            if (std::optional<SimplificationResult::OwningCopiesOfAssignment> requiredValueResetsPriorToUsageOfGeneratedReplacements = generatedAssignmentsContainer->getAssignmentsDefiningValueResetsOfGeneratedSubstitutions(); requiredValueResetsPriorToUsageOfGeneratedReplacements.has_value()) {
+                const syrec::Variable::vec newlyGeneratedReplacementCandidates = substitutionGenerator ? substitutionGenerator->getDefinitionsOfReplacementsCreatedFromNewlyGeneratedSignals() : syrec::Variable::vec();
+                return std::make_unique<SimplificationResult>(SimplificationResult{
+                    newlyGeneratedReplacementCandidates,
+                    std::move(*owningCopiesOfGeneratedAssignments),
+                    std::move(*requiredValueResetsPriorToUsageOfGeneratedReplacements),
+                    std::move(*requiredInversionsOfValueResetsAfterUsageOfGeneratedReplacements)
+                });   
+            }
+        }
+    }
+
+    if (transformedAssignmentStmt) {
+        if (std::optional<SimplificationResult::OwningCopyOfAssignment> owningCopyOfTransformedAssignment = createOwningCopyOfAssignment(*transformedAssignmentStmt); owningCopyOfTransformedAssignment.has_value()) {
+            SimplificationResult result = SimplificationResult::asSingleStatement(std::move(*owningCopyOfTransformedAssignment));
+            return std::make_unique<SimplificationResult>(std::move(result));
+        }
+    }
+    SimplificationResult result = SimplificationResult::asEmptyResult();
+    return std::make_unique<SimplificationResult>(std::move(result));
 }
 
 // START OF NON-PUBLIC FUNCTION IMPLEMENTATIONS
@@ -1416,6 +1446,32 @@ bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::doesO
     }
     return false;
 }
+
+std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResult::OwningCopyOfAssignment> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::createOwningCopyOfAssignment(const syrec::AssignStatement& assignment) {
+    if (SimplificationResult::OwningCopyOfAssignment owningCopyOfAssignment = std::make_unique<syrec::AssignStatement>(assignment); owningCopyOfAssignment) {
+        return owningCopyOfAssignment;
+    }
+    return std::nullopt;
+}
+
+std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResult::OwningCopiesOfAssignment> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::createOwningCopiesOfAssignments(const syrec::AssignStatement::vec& assignments) {
+    SimplificationResult::OwningCopiesOfAssignment containerForCopies;
+    containerForCopies.reserve(assignments.size());
+
+    bool copyingSuccessful = true;
+    for (std::size_t i = 0; i < assignments.size() && copyingSuccessful; ++i) {
+        const syrec::Statement::ptr& statementToTreatAsAssignment = assignments.at(i);
+        if (const std::shared_ptr<syrec::AssignStatement> statementCastedAsAssignment = std::dynamic_pointer_cast<syrec::AssignStatement>(statementToTreatAsAssignment); statementCastedAsAssignment) {
+            if (std::optional<SimplificationResult::OwningCopyOfAssignment> copyOfAssignment = createOwningCopyOfAssignment(*statementCastedAsAssignment); copyOfAssignment.has_value()) {
+                containerForCopies.push_back(std::move(*copyOfAssignment));
+                continue;
+            }    
+        }
+        copyingSuccessful = false;
+    }
+    return copyingSuccessful ? std::make_optional(std::move(containerForCopies)) : std::nullopt;
+}
+
 
 std::vector<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineSignalPartsNotUsableAsPotentialReplacementCandidates(const syrec::expression& expr, const parser::SymbolTable& symbolTable) {
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr) {

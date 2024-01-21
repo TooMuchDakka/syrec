@@ -290,25 +290,23 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
             const auto assignmentStmtToSimplify = lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs ? std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand) : std::make_shared<syrec::AssignStatement>(assignmentStmt);
             noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SignalValueLookupCallback signalValueLookupCallback = [this](const syrec::VariableAccess& accessedSignalParts) { return tryFetchValueForAccessedSignal(accessedSignalParts); };
             if (noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResultReference simplificationResult = noAdditionalLineAssignmentSimplifier->simplify(*assignmentStmtToSimplify, signalValueLookupCallback); simplificationResult) {
-                syrec::Statement::vec generatedSimplifiedAssignmentStatements = simplificationResult->generatedAssignments;
-                if (generatedSimplifiedAssignmentStatements.empty()) {
-                    generatedSimplifiedAssignmentStatements.emplace_back(assignmentStmtToSimplify);
-                }
-
-                filterAssignmentsThatDoNotChangeAssignedToSignal(generatedSimplifiedAssignmentStatements);
-                if (generatedSimplifiedAssignmentStatements.empty()) {
-                    updateReferenceCountOf(lhsOperand->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-                    updateReferenceCountsOfSignalIdentsUsedIn(*rhsOperand, parser::SymbolTable::ReferenceCountUpdate::Decrement);
-                    return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
-                }
-
-                std::vector<std::unique_ptr<syrec::Statement>> remainingSimplifiedAssignments;
-                remainingSimplifiedAssignments.reserve(generatedSimplifiedAssignmentStatements.size());
-                for (const auto& generatedSubAssignment: generatedSimplifiedAssignmentStatements) {
-                    const auto subAssignmentCasted = std::static_pointer_cast<syrec::AssignStatement>(generatedSubAssignment);
-                    remainingSimplifiedAssignments.emplace_back(std::make_unique<syrec::AssignStatement>(subAssignmentCasted->lhs, subAssignmentCasted->op, subAssignmentCasted->rhs));
-                }
                 performAssignment(*evaluatedSignalAccessOfAssignedToSignal, *mappedToAssignmentOperationFromFlag, rhsOperandEvaluatedAsConstant);
+                
+                if (simplificationResult->generatedAssignments.empty()) {
+                    if (std::optional<std::unique_ptr<syrec::Statement>> copyOfOriginalAssignment = copyUtils::createCopyOfStmt(*assignmentStmtToSimplify); copyOfOriginalAssignment.has_value()) {
+                        return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(*copyOfOriginalAssignment));
+                    }
+                    return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
+                }
+
+                // TODO: Insert new signals into symbol table, update reference count of updated assignments, check correct replacement generation in assignment simplifier
+                std::vector<std::unique_ptr<syrec::Statement>> remainingSimplifiedAssignments;
+                remainingSimplifiedAssignments.reserve(simplificationResult->requiredValueResetsForReplacementsTargetingExistingSignals.size() + simplificationResult->generatedAssignments.size() + simplificationResult->requiredInversionsOfValuesResetsForReplacementsTargetingExistingSignals.size());
+                moveOwningCopiesOfStatementsBetweenContainers(remainingSimplifiedAssignments, std::move(simplificationResult->requiredValueResetsForReplacementsTargetingExistingSignals));
+                moveOwningCopiesOfStatementsBetweenContainers(remainingSimplifiedAssignments, std::move(simplificationResult->generatedAssignments));
+                moveOwningCopiesOfStatementsBetweenContainers(remainingSimplifiedAssignments, std::move(simplificationResult->requiredInversionsOfValuesResetsForReplacementsTargetingExistingSignals));
+                // TODO: New signals are added to active symbol table scope but are discarded after the module body was processed
+                makeNewlyGeneratedSignalsAvailableInSymbolTableScope(*activeSymbolTableScope, simplificationResult->newlyGeneratedReplacementSignalDefinitions);
                 return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(remainingSimplifiedAssignments));
             }
         // Try to replace an assignment of the form a += ... to a ^= ... of the symbol table entry for 'a' has the value 0.
@@ -892,6 +890,10 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     if (numLoopIterations.has_value() && *numLoopIterations == 1 && parserConfig.deadCodeEliminationEnabled) {
+        /*
+         * The value of loop variable should already be propagated through the statements of the loop body and thus the latter should not require second processing pass.
+         * TODO: What is constant propagation is turned off? is the value of the loop variable still propagated if only dead code elimination is activated?
+         */
         removeLoopVariableFromSymbolTable(forStatement.loopVariable);
         decrementReferenceCountsOfLoopHeaderComponents(*iterationRangeStartContainer, doIterationRangeStartAndEndContainerMatch ? std::nullopt : std::make_optional(*iterationRangeEndContainer), *iterationRangeStepSizeContainer);
 
@@ -2750,4 +2752,16 @@ const parser::SymbolTable* optimizations::Optimizer::getActiveSymbolTableForEval
         return activeSymbolTableScope->get();
     }
     return nullptr;
+}
+
+void optimizations::Optimizer::makeNewlyGeneratedSignalsAvailableInSymbolTableScope(const parser::SymbolTable::ptr& symbolTableScope, const syrec::Variable::vec& newlyGeneratedSignalsUsedForReplacements) {
+    for (const syrec::Variable::ptr& newlyGeneratedSignalUsedForReplacements : newlyGeneratedSignalsUsedForReplacements) {
+        symbolTableScope->addEntry(*newlyGeneratedSignalUsedForReplacements);
+        symbolTableScope->updateReferenceCountOfLiteral(newlyGeneratedSignalUsedForReplacements->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
+    }
+}
+
+
+void optimizations::Optimizer::moveOwningCopiesOfStatementsBetweenContainers(std::vector<std::unique_ptr<syrec::Statement>>& toBeMovedToContainer, std::vector<std::unique_ptr<syrec::AssignStatement>>&& toBeMovedFromContainer) {
+    toBeMovedToContainer.insert(toBeMovedToContainer.end(), std::make_move_iterator(toBeMovedFromContainer.begin()), std::make_move_iterator(toBeMovedFromContainer.end()));
 }

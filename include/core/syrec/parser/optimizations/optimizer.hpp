@@ -307,7 +307,9 @@ namespace optimizations {
         static void                                                                insertStatementCopiesInto(syrec::Statement::vec& containerForCopies, std::vector<std::unique_ptr<syrec::Statement>> copiesOfStatements);
         [[nodiscard]] bool                                                         optimizePeeledLoopBodyStatements(syrec::Statement::vec& containerForResult, const std::vector<std::unique_ptr<syrec::Statement>>& peeledLoopBodyStatements);
         [[nodiscard]] bool                                                         optimizeUnrolledLoopBodyStatements(syrec::Statement::vec& containerForResult, std::size_t numUnrolledIterations, optimizations::LoopUnroller::UnrolledIterationInformation& unrolledLoopBodyStatementsInformation);
-        
+        static void                                                                makeNewlyGeneratedSignalsAvailableInSymbolTableScope(const parser::SymbolTable::ptr& symbolTableScope, const syrec::Variable::vec& newlyGeneratedSignalsUsedForReplacements);
+        static void                                                                moveOwningCopiesOfStatementsBetweenContainers(std::vector<std::unique_ptr<syrec::Statement>>& toBeMovedToContainer, std::vector<std::unique_ptr<syrec::AssignStatement>>&& toBeMovedFromContainer);
+
         template<typename T>
         void removeElementsAtIndices(std::vector<T>& vectorToModify, const std::unordered_set<std::size_t>& indicesOfElementsToRemove) {
             if (indicesOfElementsToRemove.empty() || vectorToModify.empty()) {

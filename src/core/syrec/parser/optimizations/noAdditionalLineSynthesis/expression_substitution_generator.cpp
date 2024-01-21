@@ -57,7 +57,7 @@ std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::Replac
     return std::nullopt;
 }
 
-syrec::Variable::vec noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::getDefinitionsForGeneratedReplacements() const {
+syrec::Variable::vec noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::getDefinitionsOfReplacementsCreatedFromNewlyGeneratedSignals() const {
     return generatedReplacementsLookup;
 }
 
@@ -633,6 +633,7 @@ std::optional<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::ExpressionS
     }
 
     generatedSignalAccessOnReplacement->indexes = std::vector(1, containerForAccessedValueOfReplacement);
+    generatedReplacementsLookup.emplace_back(generatedReplacementSignal);
     return generatedSignalAccessOnReplacement;
 }
 

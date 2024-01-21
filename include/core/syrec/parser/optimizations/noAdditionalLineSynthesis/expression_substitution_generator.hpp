@@ -41,7 +41,7 @@ namespace noAdditionalLineSynthesis {
         void                                           resetInternals();
         // TODO: How does a generated reset of a found replacement effect an existing data flow analysis result (should the reset function as a restriction, etc.)
         [[nodiscard]] std::optional<ReplacementResult> generateReplacementFor(unsigned int requiredBitwidthOfReplacement);
-        [[nodiscard]] syrec::Variable::vec             getDefinitionsForGeneratedReplacements() const;
+        [[nodiscard]] syrec::Variable::vec             getDefinitionsOfReplacementsCreatedFromNewlyGeneratedSignals() const;
 
     protected:
         using AccessedValueOfDimension = std::optional<std::size_t>;
