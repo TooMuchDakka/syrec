@@ -12,12 +12,13 @@ namespace noAdditionalLineSynthesis {
     class TemporaryExpressionsContainer {
     public:
         using ptr = std::unique_ptr<TemporaryExpressionsContainer>;
-        TemporaryExpressionsContainer(const parser::SymbolTable::ptr& symbolTableReference): activeExpressions({}), symbolTableReference(symbolTableReference) {}
+        TemporaryExpressionsContainer(): activeExpressions({}), symbolTableReference(nullptr) {}
 
-        void               resetInternals();
-        void               activateExpression(const syrec::expression::ptr& expr);
-        void               deactivateExpression(const syrec::expression::ptr& expr);
-        [[nodiscard]] bool existsAnyExpressionDefiningOverlappingSignalAccess(const syrec::VariableAccess& accessedSignalPartsToCheckForOverlaps) const;
+        void                              resetInternals();
+        void                              defineSymbolTable(const parser::SymbolTable::ptr& symbolTable);
+        void                              activateExpression(const syrec::expression::ptr& expr);
+        void                              deactivateExpression(const syrec::expression::ptr& expr);
+        [[nodiscard]] std::optional<bool> existsAnyExpressionDefiningOverlappingSignalAccess(const syrec::VariableAccess& accessedSignalPartsToCheckForOverlaps) const;
 
     protected:
         std::unordered_set<syrec::expression::ptr> activeExpressions;

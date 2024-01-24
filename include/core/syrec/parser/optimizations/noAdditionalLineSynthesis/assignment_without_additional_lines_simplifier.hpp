@@ -41,16 +41,17 @@ namespace noAdditionalLineSynthesis {
         using SignalValueLookupCallback = std::function<std::optional<unsigned int>(const syrec::VariableAccess&)>;
         using SimplificationResultReference = std::unique_ptr<SimplificationResult>;
         [[nodiscard]] SimplificationResultReference simplify(const syrec::AssignStatement& assignmentStatement, const SignalValueLookupCallback& signalValueLookupCallback);
+        void                                        defineSymbolTable(const parser::SymbolTable::ptr& activeSymbolTableScope);
+        void                                        reloadGeneratableReplacementSignalName();
 
          virtual ~AssignmentWithoutAdditionalLineSimplifier() = default;
-        AssignmentWithoutAdditionalLineSimplifier(const parser::SymbolTable::ptr& symbolTableReference, const std::optional<parser::NoAdditionalLineSynthesisConfig>& config) {
+        AssignmentWithoutAdditionalLineSimplifier(const std::optional<parser::NoAdditionalLineSynthesisConfig>& config) {
             generatedAssignmentsContainer                     = std::make_shared<TemporaryAssignmentsContainer>();
-            temporaryExpressionsContainer                     = std::make_unique<TemporaryExpressionsContainer>(symbolTableReference);
+            temporaryExpressionsContainer                     = std::make_unique<TemporaryExpressionsContainer>();
             expressionTraversalHelper                         = std::make_shared<ExpressionTraversalHelper>();
-            this->symbolTableReference                        = symbolTableReference;
             expressionToSubAssignmentSplitterReference        = std::make_unique<ExpressionToSubAssignmentSplitter>();
             substitutionGenerator                             = config.has_value() && config.value().optionalNewReplacementSignalIdentsPrefix.has_value()
-                ? std::make_unique<ExpressionSubstitutionGenerator>(symbolTableReference, *config.value().optionalNewReplacementSignalIdentsPrefix)
+                ? std::make_unique<ExpressionSubstitutionGenerator>(*config.value().optionalNewReplacementSignalIdentsPrefix)
                 : nullptr;
 
             learnedConflictsLookup                            = std::make_unique<LearnedConflictsLookup>();
@@ -126,6 +127,10 @@ namespace noAdditionalLineSynthesis {
                 return wasManuallyCreated;
             }
 
+            void updateData(const std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr>& updatedData) {
+                data = updatedData;
+            }
+
             [[nodiscard]] static OperationOperandSimplificationResult createManuallyFrom(const std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr>& data) {
                 return OperationOperandSimplificationResult(0, data, true);
             }
@@ -154,7 +159,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] bool                             doesAssignmentToSignalLeadToConflict(const syrec::VariableAccess& assignedToSignal) const;
         [[nodiscard]] std::optional<DecisionReference> tryGetDecisionForOperationNode(const std::size_t& operationNodeId) const;
         
-        [[nodiscard]] DecisionReference           makeDecision(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const std::pair<std::reference_wrapper<const OperationOperandSimplificationResult>, std::reference_wrapper<const OperationOperandSimplificationResult>>& potentialChoices);
+        [[nodiscard]] DecisionReference           makeDecision(const ExpressionTraversalHelper::OperationNodeReference& operationNode, OperationOperandSimplificationResult& simplificationResultOfFirstOperand, OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
         [[nodiscard]] std::optional<std::size_t>  determineOperationNodeIdCausingConflict(const syrec::VariableAccess& choiceOfAssignedToSignalTriggeringSearchForCauseOfConflict) const;
         [[nodiscard]] bool                        isOperationNodeSourceOfConflict(std::size_t operationNodeId) const;
         void                                      markOperationNodeAsSourceOfConflict(std::size_t operationNodeId);
@@ -166,16 +171,15 @@ namespace noAdditionalLineSynthesis {
         void                                                                            defineNotUsableReplacementCandidatesFromAssignmentForGenerator(const syrec::AssignStatement& assignment) const;
         [[nodiscard]] bool                                                              isChoiceOfSignalAccessBlockedByAnyActiveExpression(const syrec::VariableAccess& chosenOperand) const;
         [[nodiscard]] std::optional<syrec::VariableAccess::ptr>                         createReplacementForChosenOperand(const DecisionReference& decisionToReplace) const;
-        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>                         getAndActiveReplacementForOperationNode(std::size_t referencedOperationNodeId, syrec_operation::operation definedOperationInOperationNode, const OperationOperandSimplificationResult& lhsOperandDataChoicesAfterSimplification, const OperationOperandSimplificationResult& rhsOperandDataChoicesAfterSimplification);
-
-
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>                         getAndActiveReplacementForOperationNode(std::size_t referencedOperationNodeId, syrec_operation::operation definedOperationInOperationNode, const OperationOperandSimplificationResult& lhsOperandDataChoicesAfterSimplification, const OperationOperandSimplificationResult& rhsOperandDataChoicesAfterSimplification, bool *wasExistingReplacementForOperationNodeEntryUpdated);
+        
         // This call should be responsible to determine conflicts, during a decision their should not arise any conflicts
         // The check for a conflict should take place in the operations nodes with either one or two leaf nodes by using this call before making any decisions
         // If a conflict is detected, the first decision starting from the initial one shall be our backtrack destination and all overlapping assignments for the found first decision
         // shall be recorded as learned conflicts.
         [[nodiscard]] bool                                                                                                 wereAccessedSignalPartsModifiedByActiveAssignment(const syrec::VariableAccess& accessedSignalParts) const;
         [[nodiscard]] std::optional<DecisionReference>                                                                     determineEarliestDecisionsOverlappingAccessedSignalPartsOmittingAlreadyRecordedOnes(const syrec::VariableAccess& accessedSignalParts) const;
-        void                                                                                                               handleConflict(std::size_t associatedOperationNodeIdOfAccessedSignalPartsOperand, const syrec::VariableAccess& accessedSignalPartsUsedInCheckForConflict);
+        void                                                                                                               handleConflict(std::size_t associatedOperationNodeIdOfAccessedSignalPartsOperand, Decision::ChoosenOperand chosenOperandLeadingToDetectionOfConflict, const syrec::VariableAccess& accessedSignalPartsUsedInCheckForConflict);
         [[nodiscard]] std::size_t                                                                                          determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(std::size_t operationNodeIdOfEarliestSourceOfConflict, std::size_t operationNodeIdWhereConflictWasDetected, std::unordered_set<std::size_t>* hotPathContainerFromSourceToSharedOrigin) const;
         void                                                                                                               forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(std::size_t parentOperationNodeId, const std::unordered_set<std::size_t>* idOfOperationNodesOnHotPath) const;
 
@@ -284,7 +288,9 @@ namespace noAdditionalLineSynthesis {
         static void                         logBacktrackingResult(std::size_t operationNodeIdAtStartOfBacktracking, std::size_t nextOperationNodeAfterBacktrackingFinished);
         static void                         logMarkingOfOperationNodeAsSourceOfConflict(std::size_t operationNodeId);
         static void                         logMessage(const std::string& msg);
-        static void                         logCreationOfSubstitution(std::size_t operationNodeId, Decision::ChoosenOperand substitutedOperand, const syrec::VariableAccess& generatedSubstitution);
+        static void                         logCreationOfSubstitutionOfOperandOfOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand substitutedOperand, const syrec::VariableAccess& generatedSubstitution);
+        static void                         logCreationOfSubstitutionOfExprOfOperationNode(std::size_t operationNodeId, const std::string& replacementSignalIdent, bool wasExistingEntryUpdated);
+        static void                         logLearnedConflict(std::size_t operationNodeId, Decision::ChoosenOperand learnedConflictingChoiceOfOperand);
     };
 }
 

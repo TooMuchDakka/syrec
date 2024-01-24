@@ -231,6 +231,34 @@ bool SymbolTable::addEntry(const syrec::Variable& variable) {
     return true;
 }
 
+bool SymbolTable::addNewLocalSignalsToModule(const ModuleIdentifier& moduleIdentifier, const std::vector<syrec::Variable::ptr>& newLocalSignalsToAdd) const {
+    const ModuleSymbolTableEntry* symbolTableEntryForModulesMatchingName = getEntryForModulesWithMatchingName(moduleIdentifier.moduleIdent);
+    if (!symbolTableEntryForModulesMatchingName || !symbolTableEntryForModulesMatchingName->internalDataLookup.count(moduleIdentifier.internalModuleId)) {
+        return false;
+    }
+
+    const ModuleSymbolTableEntry::InternalModuleHelperData& matchingEntryForModuleNameAndId = symbolTableEntryForModulesMatchingName->internalDataLookup.at(moduleIdentifier.internalModuleId);
+    if (!std::all_of(newLocalSignalsToAdd.cbegin(), newLocalSignalsToAdd.cend(), [](const syrec::Variable::ptr& newLocalSignal) { return newLocalSignal->type == syrec::Variable::Types::State || newLocalSignal->type == syrec::Variable::Types::Wire; })) {
+        return false;
+    }
+
+    for (const syrec::Variable::ptr newLocalSignal : newLocalSignalsToAdd) {
+        matchingEntryForModuleNameAndId.declaredModule->addVariable(newLocalSignal);   
+    }
+    return true;
+}
+
+std::optional<std::vector<syrec::Variable::ptr>> SymbolTable::getLocalSignalsOfModule(const ModuleIdentifier& moduleIdentifier) const {
+    const ModuleSymbolTableEntry* symbolTableEntryForModulesMatchingName = getEntryForModulesWithMatchingName(moduleIdentifier.moduleIdent);
+    if (!symbolTableEntryForModulesMatchingName || !symbolTableEntryForModulesMatchingName->internalDataLookup.count(moduleIdentifier.internalModuleId)) {
+        return std::nullopt;
+    }
+
+    const ModuleSymbolTableEntry::InternalModuleHelperData& matchingEntryForModuleNameAndId = symbolTableEntryForModulesMatchingName->internalDataLookup.at(moduleIdentifier.internalModuleId);
+    return matchingEntryForModuleNameAndId.declaredModule->variables;
+}
+
+
 bool SymbolTable::addEntry(const syrec::Number& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultLoopVariableValue) {
     if (!number.isLoopVariable() || number.variableName().empty() || contains(number.variableName())) {
         return false;
@@ -578,7 +606,7 @@ SymbolTable::ModuleSymbolTableEntry* SymbolTable::getEntryForModulesWithMatching
         return &(*symbolTableEntryForModule->second);
     }
 
-    if (nullptr != outer) {
+    if (outer) {
         return outer->getEntryForModulesWithMatchingName(moduleIdent);
     }
 

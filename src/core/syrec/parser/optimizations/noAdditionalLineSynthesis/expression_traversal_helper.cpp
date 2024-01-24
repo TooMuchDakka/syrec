@@ -108,8 +108,9 @@ std::optional<ExpressionTraversalHelper::OperationNodeReference> ExpressionTrave
 }
 
 bool ExpressionTraversalHelper::updateOperandData(std::size_t operationNodeId, bool updateLhsOperandData, const syrec::expression::ptr& newOperandData) {
-    const std::optional<OperationNodeReference> referencedOperationNode = getOperationNodeById(operationNodeId);
-    if (newOperandData || !std::dynamic_pointer_cast<const syrec::VariableExpression>(newOperandData) || !referencedOperationNode.has_value() 
+    const std::optional<OperationNodeReference>      referencedOperationNode      = getOperationNodeById(operationNodeId);
+    const std::shared_ptr<syrec::VariableExpression> newOperandDataAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(newOperandData);
+    if (!newOperandData || !newOperandDataAsVariableExpr || !referencedOperationNode.has_value() 
         || (updateLhsOperandData && !referencedOperationNode->get()->lhsOperand.isLeafNode()) || (!updateLhsOperandData && !referencedOperationNode->get()->rhsOperand.isLeafNode())) {
         return false;
     }
@@ -119,9 +120,15 @@ bool ExpressionTraversalHelper::updateOperandData(std::size_t operationNodeId, b
         return false;
     }
     operandNodeDataLookup.at(idOfOperandToUpdate) = newOperandData;
+    // Since this class offers a function to determine whether a signal can be used at the left-hand side of an assignment, we also need to
+    // update the lookup used by this function to also include the generated replacement signal.
+    markSignalAsAssignable(newOperandDataAsVariableExpr->var->var->name);
     return true;
 }
 
+void ExpressionTraversalHelper::markSignalAsAssignable(const std::string& assignableSignalIdent) {
+    identsOfAssignableSignals.emplace(assignableSignalIdent);
+}
 
 void ExpressionTraversalHelper::removeOperationNodeAsPotentialBacktrackOperation(std::size_t operationNodeId) {
     if (const auto& fetchedOperationNodeForId = getOperationNodeById(operationNodeId); fetchedOperationNodeForId.has_value()) {
@@ -223,7 +230,7 @@ void ExpressionTraversalHelper::handleOperationNodeDuringTraversalQueueInit(cons
 
 void ExpressionTraversalHelper::addSignalIdentAsUsableInAssignmentLhsIfAssignable(const std::string& signalIdent, const parser::SymbolTable& symbolTableReference) {
     if (!identsOfAssignableSignals.count(signalIdent) && symbolTableReference.canSignalBeAssignedTo(signalIdent).value_or(false)) {
-        identsOfAssignableSignals.emplace(signalIdent);
+        markSignalAsAssignable(signalIdent);
     }
 }
 

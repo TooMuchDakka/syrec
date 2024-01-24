@@ -46,6 +46,8 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<std::size_t>                getOperandNodeIdOfNestedOperation(std::size_t parentOperationNodeId, std::size_t nestedOperationNodeId) const;
         [[nodiscard]] bool                                      canSignalBeUsedOnAssignmentLhs(const std::string& signalIdent) const;
         [[nodiscard]] std::optional<OperationNodeReference>     getOperationNodeById(std::size_t operationNodeId) const;
+        void                                                    markSignalAsAssignable(const std::string& assignableSignalIdent);
+
         /**
          * \brief Update the operand data of a given operation node
          * \param operationNodeId The operation node containing the operand to be updated

@@ -9,6 +9,7 @@
 #include "core/syrec/parser/symbol_table_backup_helper.hpp"
 #include "core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp"
 #include "core/syrec/parser/utils/signal_access_utils.hpp"
+#include "noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
 
 /*
  * TODO: Support for VHDL like signal access (i.e. bit range structured as .bitRangeEnd:bitRangeStart instead of .bitRangeStart:bitRangeEnd)
@@ -17,7 +18,8 @@ namespace optimizations {
     class Optimizer {
     public:
         explicit Optimizer(const parser::ParserConfig& parserConfig, const parser::SymbolTable::ptr& sharedSymbolTableReference):
-            parserConfig(parserConfig), activeSymbolTableScope({!sharedSymbolTableReference ? std::make_shared<parser::SymbolTable>() : sharedSymbolTableReference}), loopUnrollerInstance(std::make_unique<optimizations::LoopUnroller>()), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(activeSymbolTableScope)) {}
+            parserConfig(parserConfig), activeSymbolTableScope({!sharedSymbolTableReference ? std::make_shared<parser::SymbolTable>() : sharedSymbolTableReference}), loopUnrollerInstance(std::make_unique<optimizations::LoopUnroller>()), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(activeSymbolTableScope)),
+            assignmentWithoutAdditionalLineSynthesisOptimizer(std::make_unique<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier>(parserConfig.noAdditionalLineOptimizationConfig)){}
 
         // TODO: Add new result flag FAILED?
         enum OptimizationResultFlag {
@@ -95,18 +97,20 @@ namespace optimizations {
     protected:
         parser::ParserConfig                                          parserConfig;
         parser::SymbolTable::ptr                                      activeSymbolTableScope;
+        parser::SymbolTable::ModuleIdentifier                         internalIdentifierOfCurrentlyProcessedModule;
         std::unique_ptr<LoopUnroller>                                 loopUnrollerInstance;
         std::size_t                                                   internalIfStatementNestingLevel = 0;
-        std::size_t                                                   internalLoopNestingLevel        = 0;
+        std::size_t                                                   internalLoopNestingLevel             = 0;
         std::optional<bool>                                           internalReferenceCountModificationEnabledFlag;
 
         struct IfStatementBranchSymbolTableBackupScope {
             std::size_t ifStatementNestingLevel;
             std::shared_ptr<parser::SymbolTableBackupHelper> backupScope;
         };
-        std::vector<IfStatementBranchSymbolTableBackupScope>          symbolTableBackupScopeContainers;
-        std::unique_ptr<LoopBodyValuePropagationBlocker>              activeDataFlowValuePropagationRestrictions;
-        syrec::Number::loop_variable_mapping                          evaluableLoopVariableLookup;
+        std::vector<IfStatementBranchSymbolTableBackupScope>                                  symbolTableBackupScopeContainers;
+        std::unique_ptr<LoopBodyValuePropagationBlocker>                                      activeDataFlowValuePropagationRestrictions;
+        syrec::Number::loop_variable_mapping                                                  evaluableLoopVariableLookup;
+        std::unique_ptr<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier> assignmentWithoutAdditionalLineSynthesisOptimizer;
 
         void                                                                                       openNewIfStatementBranchSymbolTableBackupScope(std::size_t nestingLevel);
         void                                                                                       updateBackupOfValuesChangedInScopeAndOptionallyResetMadeChanges(bool resetLocalChanges) const;
@@ -307,7 +311,7 @@ namespace optimizations {
         static void                                                                insertStatementCopiesInto(syrec::Statement::vec& containerForCopies, std::vector<std::unique_ptr<syrec::Statement>> copiesOfStatements);
         [[nodiscard]] bool                                                         optimizePeeledLoopBodyStatements(syrec::Statement::vec& containerForResult, const std::vector<std::unique_ptr<syrec::Statement>>& peeledLoopBodyStatements);
         [[nodiscard]] bool                                                         optimizeUnrolledLoopBodyStatements(syrec::Statement::vec& containerForResult, std::size_t numUnrolledIterations, optimizations::LoopUnroller::UnrolledIterationInformation& unrolledLoopBodyStatementsInformation);
-        static void                                                                makeNewlyGeneratedSignalsAvailableInSymbolTableScope(const parser::SymbolTable::ptr& symbolTableScope, const syrec::Variable::vec& newlyGeneratedSignalsUsedForReplacements);
+        [[nodiscard]] static bool                                                  makeNewlyGeneratedSignalsAvailableInSymbolTableScope(const parser::SymbolTable::ptr& symbolTableScope, const parser::SymbolTable::ModuleIdentifier& identifierOfModuleToWhichSignalsWillBeAddedTo, const syrec::Variable::vec& newlyGeneratedSignalsUsedForReplacements);
         static void                                                                moveOwningCopiesOfStatementsBetweenContainers(std::vector<std::unique_ptr<syrec::Statement>>& toBeMovedToContainer, std::vector<std::unique_ptr<syrec::AssignStatement>>&& toBeMovedFromContainer);
 
         template<typename T>

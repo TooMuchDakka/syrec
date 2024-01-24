@@ -9,6 +9,10 @@ void TemporaryExpressionsContainer::resetInternals() {
     activeExpressions.clear();
 }
 
+void TemporaryExpressionsContainer::defineSymbolTable(const parser::SymbolTable::ptr& symbolTable) {
+    symbolTableReference = symbolTable;
+}
+
 void TemporaryExpressionsContainer::activateExpression(const syrec::expression::ptr& expr) {
     activeExpressions.emplace(expr);
 }
@@ -17,7 +21,11 @@ void TemporaryExpressionsContainer::deactivateExpression(const syrec::expression
     activeExpressions.erase(expr);
 }
 
-bool TemporaryExpressionsContainer::existsAnyExpressionDefiningOverlappingSignalAccess(const syrec::VariableAccess& accessedSignalPartsToCheckForOverlaps) const {
+std::optional<bool> TemporaryExpressionsContainer::existsAnyExpressionDefiningOverlappingSignalAccess(const syrec::VariableAccess& accessedSignalPartsToCheckForOverlaps) const {
+    if (!symbolTableReference) {
+        return std::nullopt;
+    }
+
     return std::any_of(
     activeExpressions.cbegin(),
     activeExpressions.cend(),

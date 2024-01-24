@@ -52,11 +52,13 @@ namespace parser {
             [[maybe_unused]] syrec::Variable::vec determineOptimizedCallSignature(std::unordered_set<std::size_t>* indicesOfRemainingParameters) const;
         };
 
-        [[nodiscard]] std::optional<DeclaredModuleSignature>        getMatchingModuleForIdentifier(const ModuleIdentifier& moduleIdentifier) const;
-        [[nodiscard]] std::vector<DeclaredModuleSignature>          getMatchingModuleSignaturesForName(const std::string_view& moduleName) const;
-        [[nodiscard]] std::optional<DeclaredModuleSignature>        tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, const std::vector<std::string>& calleeArguments, bool areCalleeArgumentsBasedOnOptimizedSignature) const;
-        [[nodiscard]] std::optional<DeclaredModuleSignature>        tryGetOptimizedSignatureForModuleCall(const syrec::Module& callTarget) const;
-        [[nodiscard]] std::optional<std::unique_ptr<syrec::Module>> getFullDeclaredModuleInformation(const ModuleIdentifier& moduleIdentifier) const;
+        [[nodiscard]] std::optional<DeclaredModuleSignature>           getMatchingModuleForIdentifier(const ModuleIdentifier& moduleIdentifier) const;
+        [[nodiscard]] std::vector<DeclaredModuleSignature>             getMatchingModuleSignaturesForName(const std::string_view& moduleName) const;
+        [[nodiscard]] std::optional<DeclaredModuleSignature>           tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, const std::vector<std::string>& calleeArguments, bool areCalleeArgumentsBasedOnOptimizedSignature) const;
+        [[nodiscard]] std::optional<DeclaredModuleSignature>           tryGetOptimizedSignatureForModuleCall(const syrec::Module& callTarget) const;
+        [[nodiscard]] std::optional<std::unique_ptr<syrec::Module>>    getFullDeclaredModuleInformation(const ModuleIdentifier& moduleIdentifier) const;
+        [[nodiscard]] bool                                             addNewLocalSignalsToModule(const ModuleIdentifier& moduleIdentifier, const std::vector<syrec::Variable::ptr>& newLocalSignalsToAdd) const;
+        [[nodiscard]] std::optional<std::vector<syrec::Variable::ptr>> getLocalSignalsOfModule(const ModuleIdentifier& moduleIdentifier) const;
 
         [[maybe_unused]] bool addEntry(const syrec::Variable& variable);
         [[maybe_unused]] bool addEntry(const syrec::Number& number, const unsigned int bitsRequiredToStoreMaximumValue, const std::optional<unsigned int>& defaultValue);

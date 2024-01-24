@@ -36,7 +36,7 @@ void TemporaryAssignmentsContainer::storeInitializationForReplacementOfLeafNode(
     if (castedRequiredResetAssignment) {
         initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedRequiredResetAssignment);   
     }
-    initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedAssignmentDefiningSubstitution);
+    generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.emplace_back(castedAssignmentDefiningSubstitution);
 }
 
 void TemporaryAssignmentsContainer::storeReplacementAsActiveAssignment(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand) {
@@ -122,10 +122,26 @@ void TemporaryAssignmentsContainer::resetInternals() {
     activeAssignmentsLookup.clear();
     cutOffIndicesForInvertibleAssignments.clear();
     initializationAssignmentsForGeneratedSubstitutions.clear();
+    generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.clear();
 }
 
+// TODO: What should happen if we cannot fit all assignments into the container (i.e. a number larger than UINT_MAX)
 syrec::AssignStatement::vec TemporaryAssignmentsContainer::getAssignments() const {
-    return generatedAssignments;
+    if (generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.empty()) {
+        return generatedAssignments;
+    }
+    
+    std::vector<syrec::AssignStatement::ptr> combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData;
+    combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.reserve(generatedAssignments.size() + (generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.size() * 2));
+
+    combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.insert(combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.end(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.cbegin(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.cend());
+    combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.insert(combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.end(), generatedAssignments.cbegin(), generatedAssignments.cend());
+    /*
+     * To allow a reuse of the generated replacements, we need to reset our generated assignments defining the substitution of an operand of an operation node. Since the assignments defining the substitutions all use the XOR assignment operation,
+     * the inversion of said statements is achieved by simply re-adding them to our container.
+     */
+    combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.insert(combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.end(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.crbegin(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.crend());
+    return combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData;
 }
 
 std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::getAssignmentsDefiningValueResetsOfGeneratedSubstitutions() const {
@@ -133,6 +149,11 @@ std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAss
 }
 
 std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::getInvertedAssignmentsUndoingValueResetsOfGeneratedSubstitutions() const {
+    if (initializationAssignmentsForGeneratedSubstitutions.empty()) {
+        // Since the empty brace initialization is also applicable to the std::optional type, we need to use the construct below to initialize a non-empty std::optional of an empty vector
+        return std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>>(std::in_place);
+    }
+
     std::vector<std::unique_ptr<syrec::AssignStatement>> containerForOwningCopiesOfAssignments;
     if (initializationAssignmentsForGeneratedSubstitutions.size() > (UINT_MAX / 2)) {
         return std::nullopt;
@@ -244,6 +265,11 @@ std::optional<std::unique_ptr<syrec::AssignStatement>> TemporaryAssignmentsConta
 }
 
 std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::createOwningCopiesOfAssignments(const syrec::AssignStatement::vec& assignments) {
+    if (assignments.empty()) {
+        // Since the empty brace initialization is also applicable to the std::optional type, we need to use the construct below to initialize a non-empty std::optional of an empty vector
+        return std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>>(std::in_place);
+    }
+
     std::vector<std::unique_ptr<syrec::AssignStatement>> containerForCopies;
     containerForCopies.reserve(assignments.size());
     
