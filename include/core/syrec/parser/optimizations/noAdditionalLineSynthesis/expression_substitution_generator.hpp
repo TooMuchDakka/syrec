@@ -133,35 +133,34 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<syrec::VariableAccess::ptr>   findReplacementCandidateBasedOnBitwidth(unsigned int requiredMinimumBitwidth);
         [[nodiscard]] std::vector<SignalBitwidthGroup>::iterator  getFirstGroupOfSignalsWithEqualOrLargerBitwidth(unsigned int bitwidth);
         [[nodiscard]] bool                                        advanceIteratorToNextGroup(std::vector<SignalBitwidthGroup>::iterator& iterator) const;
-        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>   searchForReplacementInPotentialReplacementCandidatesFromSymbolTableWithMatchingBitwidth(unsigned int bitwidth);
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>   searchForReplacementInPotentialReplacementCandidatesFromSymbolTableWithMatchingBitwidth(unsigned int bitwidthOfGroupToBeSearched, unsigned int requiredBitwidthOfReplacement);
         [[nodiscard]] static std::optional<syrec::VariableAccess> generateSignalAccessForNotLoadedEntryFromSymbolTableForGivenBitwidth(const syrec::Variable::ptr& symbolTableEntry, unsigned int requiredBitwidth);
 
-        struct SignalAccessReplacementSearchData {
+        class SignalAccessReplacementSearchData {
+        public:
+            SignalAccessReplacementSearchData() = delete;
+            [[nodiscard]] static std::optional<SignalAccessReplacementSearchData> init(const syrec::Variable::ptr& symbolTableInformationOfReplacementCandidate, unsigned int requiredBitwidthForReplacement);
+            [[nodiscard]] std::optional<syrec::VariableAccess::ptr>               findReplacement(const parser::SymbolTable& symbolTableReferenceUsedForValueLookup, const DimensionReplacementStatus::ptr& topMostRestrictionLayer);
+        protected:
             std::size_t                                              currentlyProcessedDimension;
             std::size_t                                              numPossibleBitRangeWindowAdvances;
+            std::size_t                                              numMadeBitRangeWindowAdvances;
             std::vector<unsigned int>                                currentValuePerAccessedDimension;
             optimizations::BitRangeAccessRestriction::BitRangeAccess activeBitRangeAccess;
-            syrec::Variable::ptr                                     symbolTableInformationOfReplacementCandidate;
-
-            [[nodiscard]] static std::optional<SignalAccessReplacementSearchData> createFrom(const syrec::Variable::ptr& symbolTableInformationOfReplacementCandidate, unsigned int requiredBitwidthForReplacement) {
-                if (!symbolTableInformationOfReplacementCandidate || !symbolTableInformationOfReplacementCandidate->bitwidth || symbolTableInformationOfReplacementCandidate->bitwidth < requiredBitwidthForReplacement) {
-                    return std::nullopt;
-                }
-                return SignalAccessReplacementSearchData({
-                    .currentlyProcessedDimension                  = 0,
-                    .numPossibleBitRangeWindowAdvances            = symbolTableInformationOfReplacementCandidate->bitwidth - requiredBitwidthForReplacement,
-                    .currentValuePerAccessedDimension             = std::vector(symbolTableInformationOfReplacementCandidate->dimensions.size(), 0u),
-                    .activeBitRangeAccess                         = optimizations::BitRangeAccessRestriction::BitRangeAccess(0, requiredBitwidthForReplacement - 1),
-                    .symbolTableInformationOfReplacementCandidate = symbolTableInformationOfReplacementCandidate}
-                );
+            syrec::VariableAccess::ptr                               internalContainerHoldingCurrentSignalAccess;
+            
+            SignalAccessReplacementSearchData(const syrec::VariableAccess::ptr& containerForAccessedSignal, unsigned int requiredBitwidthOfReplacement):
+                currentlyProcessedDimension(0), numPossibleBitRangeWindowAdvances(containerForAccessedSignal->var->bitwidth - requiredBitwidthOfReplacement),
+                numMadeBitRangeWindowAdvances(0), currentValuePerAccessedDimension(std::vector(containerForAccessedSignal->var->dimensions.size(), 0u)),
+                activeBitRangeAccess(optimizations::BitRangeAccessRestriction::BitRangeAccess(0, requiredBitwidthOfReplacement - 1)),
+                internalContainerHoldingCurrentSignalAccess(containerForAccessedSignal) {
             }
 
-            [[nodiscard]] bool                                                                    incrementProcessedValueOfDimensionAndCheckForOverflow();
-            [[nodiscard]] bool                                                                    advanceToNextProcessableValueOfDimension();
-            [[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> determineBitrangeUsableForReplacement(const DimensionReplacementStatus::ptr& topMostRestrictionLayer);
-            [[nodiscard]] TransformedSignalAccess                                                 transformToInternalSignalAccess() const {
-                return TransformedSignalAccess({.signalIdent = symbolTableInformationOfReplacementCandidate->name, .accessedValuePerDimension = currentValuePerAccessedDimension, .accessedBitRange = activeBitRangeAccess});
-            }
+            [[nodiscard]] bool                setAccessedBitRange(unsigned int accessedBitRangeStart, unsigned int accessedBitRangeEnd);
+            [[nodiscard]] std::optional<bool> shiftBitRangeWindowToTheRightAndResetOnOverflow();
+            [[nodiscard]] std::optional<bool> shiftDimensionAccessOneDimensionToTheLeftOnOverflow();
+            [[nodiscard]] bool                doesIncrementOfValueOfDimensionLeadToOverflow(std::size_t indexOfDimensionToCheck) const;
+            [[nodiscard]] bool                setValueOfAccessedDimensionTo(std::size_t indexOfUpdatedDimension, unsigned int accessedValueOfDimension);
         };
         [[nodiscard]] std::optional<syrec::VariableAccess::ptr> createReplacementFromCandidate(const syrec::Variable::ptr& symbolTableEntryForReplacementCandidate, unsigned int requiredMinimumBitwidthOfReplacement);
         [[nodiscard]] std::optional<std::size_t>                loadLastGeneratedTemporarySignalNameFromSymbolTable() const;

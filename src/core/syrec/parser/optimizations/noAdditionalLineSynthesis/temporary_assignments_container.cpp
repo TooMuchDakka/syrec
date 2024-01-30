@@ -149,28 +149,26 @@ std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAss
 }
 
 std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::getInvertedAssignmentsUndoingValueResetsOfGeneratedSubstitutions() const {
-    if (initializationAssignmentsForGeneratedSubstitutions.empty()) {
+    const std::optional<unsigned int> mappedToInversionOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign);
+    if (initializationAssignmentsForGeneratedSubstitutions.empty() || !mappedToInversionOperation.has_value()) {
         // Since the empty brace initialization is also applicable to the std::optional type, we need to use the construct below to initialize a non-empty std::optional of an empty vector
         return std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>>(std::in_place);
     }
 
     std::vector<std::unique_ptr<syrec::AssignStatement>> containerForOwningCopiesOfAssignments;
-    if (initializationAssignmentsForGeneratedSubstitutions.size() > (UINT_MAX / 2)) {
-        return std::nullopt;
-    }
-
-    containerForOwningCopiesOfAssignments.reserve(initializationAssignmentsForGeneratedSubstitutions.size() * 2);
+    containerForOwningCopiesOfAssignments.reserve(initializationAssignmentsForGeneratedSubstitutions.size());
     if (std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> owningCopiesOfInitializationAssignments = getAssignmentsDefiningValueResetsOfGeneratedSubstitutions(); owningCopiesOfInitializationAssignments.has_value()) {
         containerForOwningCopiesOfAssignments.insert(containerForOwningCopiesOfAssignments.end(), std::make_move_iterator(owningCopiesOfInitializationAssignments->begin()), std::make_move_iterator(owningCopiesOfInitializationAssignments->end()));
-
-        for (auto&& initializationStatement: *owningCopiesOfInitializationAssignments) {
-            if (std::unique_ptr<syrec::AssignStatement> owningContainerForInversionAssignment = std::make_unique<syrec::AssignStatement>(*initializationStatement); owningContainerForInversionAssignment) {
-                invertAssignment(*owningContainerForInversionAssignment);
-                containerForOwningCopiesOfAssignments.push_back(std::move(owningContainerForInversionAssignment));
-                continue;
-            }
-            return std::nullopt;
+        for (auto&& initializationStatement: containerForOwningCopiesOfAssignments) {
+            /*
+             * All assignments created in this function restore the initial value of the replacements generated from existing signals thus we can use the XOR assignment operation for this step
+             * since the current value of the replacement signal is zero (and under our assumption that all signal values are non-negative integers) this XOR assignment operation is equal to the ADD assignment operation.
+             */
+            initializationStatement->op = *mappedToInversionOperation;   
         }
+    } else {
+        // Since the empty brace initialization is also applicable to the std::optional type, we need to use the construct below to initialize a non-empty std::optional of an empty vector
+        return std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>>(std::in_place);
     }
     return containerForOwningCopiesOfAssignments;
 }
