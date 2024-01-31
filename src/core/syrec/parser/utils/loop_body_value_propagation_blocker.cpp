@@ -6,7 +6,7 @@
 #include "core/syrec/parser/utils/dangerous_component_check_utils.hpp"
 #include "core/syrec/parser/utils/loop_range_utils.hpp"
 
-void optimizations::LoopBodyValuePropagationBlocker::openNewScopeAndAppendDataDataFlowAnalysisResult(const std::vector<std::reference_wrapper<const syrec::Statement>>& stmtsToAnalyze, bool* wereAnyAssignmentsPerformedInCurrentScope) {
+void optimizations::LoopBodyValuePropagationBlocker::openNewScopeAndAppendDataFlowAnalysisResult(const std::vector<std::reference_wrapper<const syrec::Statement>>& stmtsToAnalyze, bool* wereAnyAssignmentsPerformedInCurrentScope) {
     if (stmtsToAnalyze.empty()) {
         if (wereAnyAssignmentsPerformedInCurrentScope) {
             *wereAnyAssignmentsPerformedInCurrentScope = false;

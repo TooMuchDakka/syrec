@@ -14,7 +14,7 @@ namespace optimizations {
         explicit LoopBodyValuePropagationBlocker(const parser::SymbolTable::ptr& symbolTableReference)
             : symbolTableReference(symbolTableReference) {}
 
-        void openNewScopeAndAppendDataDataFlowAnalysisResult(const std::vector<std::reference_wrapper<const syrec::Statement>>& stmtsToAnalyze, bool* wereAnyAssignmentsPerformedInCurrentScope);
+        void openNewScopeAndAppendDataFlowAnalysisResult(const std::vector<std::reference_wrapper<const syrec::Statement>>& stmtsToAnalyze, bool* wereAnyAssignmentsPerformedInCurrentScope);
         void closeScopeAndDiscardDataFlowAnalysisResult();
 
         [[nodiscard]] bool isAccessBlockedFor(const syrec::VariableAccess& accessedPartsOfSignal) const;

@@ -5,6 +5,7 @@
 #include "core/syrec/parser/symbol_table.hpp"
 #include "core/syrec/variable.hpp"
 
+#include <functional>
 #include <optional>
 
 // TODO: This implementation does probably not work during function unrolling since only the symbol table entries of the current scope are considered.
@@ -14,6 +15,13 @@ namespace noAdditionalLineSynthesis {
     class ExpressionSubstitutionGenerator {
     public:
         using ptr = std::unique_ptr<ExpressionSubstitutionGenerator>;
+        /*
+         * Due to the overhead and complexity required to activate and deactivate all signal accesses that are blocked by a previous data flow analysis,
+         * we instead delegate these checks to the callback provided by the user for now. This simplifies our implementation since the value lookup is equal to an invocation
+         * of the callback but could maybe lead to worse performance due to the overhead required for such a call. Additionally, our internal container for the permanent restrictions
+         * that would otherwise be set, is for now no longer necessary but we will keep it until a final decision is made.
+         */
+        using SignalValueLookupCallback = std::function<std::optional<unsigned int>(const syrec::VariableAccess&)>;
 
         explicit ExpressionSubstitutionGenerator(const std::optional<std::string>& optionalUserProvidedNewCandidateSignalIdentPrefix):
             symbolTable(nullptr), lastGeneratedReplacementCandidateCounter(0) {
@@ -23,10 +31,7 @@ namespace noAdditionalLineSynthesis {
                 } else if (!optionalUserProvidedNewCandidateSignalIdentPrefix->rfind("__", 0))
                     generatedReplacementCandidatePrefix = optionalUserProvidedNewCandidateSignalIdentPrefix;
             }
-            dimensionReplacementStatusLookup = std::make_unique<DimensionReplacementStatusLookup>();
-            if (!dimensionReplacementStatusLookup) {
-                generatedReplacementCandidatePrefix.reset();
-            }
+            dimensionReplacementStatusLookup = DimensionReplacementStatusLookup();
         }
 
         struct ReplacementResult {
@@ -35,15 +40,24 @@ namespace noAdditionalLineSynthesis {
             bool                                       doesGeneratedReplacementReferenceExistingSignal;
         };
 
+        enum RestrictionUpdate {
+            Activation,
+            Deactivation
+        };
+
+        enum RestrictionLifetime {
+            Temporary,
+            Permanent
+        };
+
         // TODO: Return type could be rework to bool to give the user a chance to handle not creatable restrictions during initialization
-        void                                           redefineNotUsableReplacementCandidates(const std::vector<syrec::VariableAccess::ptr>& notUsableReplacementCandidates);
-        void                                           activateTemporaryRestrictions(const std::vector<syrec::VariableAccess::ptr>& temporaryNotUsableReplacementCandidates);
+        void                                           updateRestrictions(const std::vector<syrec::VariableAccess::ptr>& restrictionsDefiningNotUsableReplacementCandidates, RestrictionLifetime lifeTimeOfRestrictions, RestrictionUpdate typeOfUpdate);
         void                                           loadLastNewlyGeneratedReplacementSignalInformation();
-        void                                           clearAllRestrictions() const;
+        void                                           clearAllRestrictions();
         void                                           resetInternals(bool reloadGeneratableReplacementCandidateNameFromSymbolTable = false);
         void                                           defineSymbolTable(const parser::SymbolTable::ptr& symbolTable);
         // TODO: How does a generated reset of a found replacement effect an existing data flow analysis result (should the reset function as a restriction, etc.)
-        [[nodiscard]] std::optional<ReplacementResult> generateReplacementFor(unsigned int requiredBitwidthOfReplacement);
+        [[nodiscard]] std::optional<ReplacementResult> generateReplacementFor(unsigned int requiredBitwidthOfReplacement, const SignalValueLookupCallback& existingSignalValueLookupCallback);
         [[nodiscard]] syrec::Variable::vec             getDefinitionsOfReplacementsCreatedFromNewlyGeneratedSignals() const;
 
 
@@ -63,8 +77,7 @@ namespace noAdditionalLineSynthesis {
                 optimizations::BitRangeAccessRestriction::ptr temporaryRestrictions;
                 
                 void               clearAllTemporaryRestrictions() const;
-                void               activatePermanentRestriction(const optimizations::BitRangeAccessRestriction::BitRangeAccess& restriction) const;
-                void               activateTemporaryRestriction(const optimizations::BitRangeAccessRestriction::BitRangeAccess& restriction) const;
+                void               updateRestriction(const optimizations::BitRangeAccessRestriction::BitRangeAccess& restriction, RestrictionLifetime lifeTimeOfRestriction, RestrictionUpdate typeOfUpdate) const;
                 [[nodiscard]] bool isAccessRestrictedToBitrange(const optimizations::BitRangeAccessRestriction::BitRangeAccess& bitRange) const;
             };
 
@@ -88,7 +101,7 @@ namespace noAdditionalLineSynthesis {
             void                                                         makeValueOfDimensionAvailable(const LayerDataEntry::ptr& valueOfDimensionData);
         };
         using DimensionReplacementStatusLookup = std::map<std::string, std::shared_ptr<DimensionReplacementStatus>>;
-        std::unique_ptr<DimensionReplacementStatusLookup> dimensionReplacementStatusLookup;
+        DimensionReplacementStatusLookup dimensionReplacementStatusLookup;
 
         struct SignalBitwidthGroup {
             unsigned int             bitwidth;
@@ -110,7 +123,7 @@ namespace noAdditionalLineSynthesis {
             optimizations::BitRangeAccessRestriction::BitRangeAccess accessedBitRange;
         };
 
-        void                                                                                  activateRestriction(const syrec::VariableAccess& restrictionToCreate, bool shouldRestrictionLiveUntilNextReset);
+        void                                                                                  updateRestriction(const syrec::VariableAccess& restriction, RestrictionLifetime lifetimeOfRestriction, RestrictionUpdate typeOfUpdate);
         void                                                                                  cacheSignalBitwidth(const std::string& signalIdent, unsigned int signalBitwidth);
         void                                                                                  incrementLastNewlyGeneratedSignalCounter();
         [[nodiscard]] std::optional<std::reference_wrapper<SignalBitwidthGroup>>              getOrCreateCacheEntryForSignalBitwdith(unsigned int bitwidth);
@@ -120,9 +133,10 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<TransformedSignalAccess>                                  transformSignalAccess(const syrec::VariableAccess& signalAccess, const syrec::Variable& symbolTableEntryForReferencedSignal) const;
         
         [[maybe_unused]] std::optional<DimensionReplacementStatus::ptr>                                 getOrCreateEntryForRestriction(const syrec::Variable& symbolTableEntryForReferencedSignal);
+        [[nodiscard]] std::optional<DimensionReplacementStatus::ptr>                                    getEntryForRestriction(const syrec::Variable& symbolTableEntryForReferencedSignal) const;
         [[nodiscard]] static std::optional<DimensionReplacementStatus::ptr>                             generateDefaultDimensionReplacementStatusForIntermediateLayer(const std::vector<unsigned int>& declaredValuesPerDimension, std::size_t currDimensionToProcess, unsigned int bitwidthOfAccessedSignal);
         [[nodiscard]] static std::optional<DimensionReplacementStatus::LeafLayerData::ptr>              generateDefaultDimensionReplacementStatusForValueOfDimensionInLeafLayer(unsigned int bitwidthOfAccessedSignal);
-        [[maybe_unused]] static std::optional<DimensionReplacementStatus::ptr>                          advanceRestrictionLookupToLeafLayer(const DimensionReplacementStatus::ptr& topMostRestrictionLayer, const std::vector<unsigned int>& dimensionAccessDefiningPathToLeafLayer, unsigned int bitwidthOfAccessedSignal);
+        [[maybe_unused]] static std::optional<DimensionReplacementStatus::ptr>                          advanceRestrictionLookupToLeafLayer(const DimensionReplacementStatus::ptr& topMostRestrictionLayer, const std::vector<unsigned int>& dimensionAccessDefiningPathToLeafLayer, unsigned int bitwidthOfAccessedSignal, bool generateMissingEntries = true);
         
         struct CandidateBasedOnBitwidthSearchResult {
             std::string signalIdent;
@@ -130,17 +144,17 @@ namespace noAdditionalLineSynthesis {
             std::size_t offsetInCandidateGroup;
         };
 
-        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>   findReplacementCandidateBasedOnBitwidth(unsigned int requiredMinimumBitwidth);
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>   findReplacementCandidateBasedOnBitwidth(unsigned int requiredMinimumBitwidth, const SignalValueLookupCallback& existingSignalValueLookupCallback);
         [[nodiscard]] std::vector<SignalBitwidthGroup>::iterator  getFirstGroupOfSignalsWithEqualOrLargerBitwidth(unsigned int bitwidth);
         [[nodiscard]] bool                                        advanceIteratorToNextGroup(std::vector<SignalBitwidthGroup>::iterator& iterator) const;
-        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>   searchForReplacementInPotentialReplacementCandidatesFromSymbolTableWithMatchingBitwidth(unsigned int bitwidthOfGroupToBeSearched, unsigned int requiredBitwidthOfReplacement);
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>   searchForReplacementInPotentialReplacementCandidatesFromSymbolTableWithMatchingBitwidth(unsigned int bitwidthOfGroupToBeSearched, unsigned int requiredBitwidthOfReplacement, const SignalValueLookupCallback& existingSignalValueLookupCallback);
         [[nodiscard]] static std::optional<syrec::VariableAccess> generateSignalAccessForNotLoadedEntryFromSymbolTableForGivenBitwidth(const syrec::Variable::ptr& symbolTableEntry, unsigned int requiredBitwidth);
 
         class SignalAccessReplacementSearchData {
         public:
             SignalAccessReplacementSearchData() = delete;
             [[nodiscard]] static std::optional<SignalAccessReplacementSearchData> init(const syrec::Variable::ptr& symbolTableInformationOfReplacementCandidate, unsigned int requiredBitwidthForReplacement);
-            [[nodiscard]] std::optional<syrec::VariableAccess::ptr>               findReplacement(const parser::SymbolTable& symbolTableReferenceUsedForValueLookup, const DimensionReplacementStatus::ptr& topMostRestrictionLayer);
+            [[nodiscard]] std::optional<syrec::VariableAccess::ptr>               findReplacement(const DimensionReplacementStatus::ptr& topMostRestrictionLayer, const SignalValueLookupCallback& existingSignalValueLookupCallback);
         protected:
             std::size_t                                              currentlyProcessedDimension;
             std::size_t                                              numPossibleBitRangeWindowAdvances;
@@ -162,7 +176,7 @@ namespace noAdditionalLineSynthesis {
             [[nodiscard]] bool                doesIncrementOfValueOfDimensionLeadToOverflow(std::size_t indexOfDimensionToCheck) const;
             [[nodiscard]] bool                setValueOfAccessedDimensionTo(std::size_t indexOfUpdatedDimension, unsigned int accessedValueOfDimension);
         };
-        [[nodiscard]] std::optional<syrec::VariableAccess::ptr> createReplacementFromCandidate(const syrec::Variable::ptr& symbolTableEntryForReplacementCandidate, unsigned int requiredMinimumBitwidthOfReplacement);
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr> createReplacementFromCandidate(const syrec::Variable::ptr& symbolTableEntryForReplacementCandidate, unsigned int requiredMinimumBitwidthOfReplacement, const SignalValueLookupCallback& existingSignalValueLookupCallback);
         [[nodiscard]] std::optional<std::size_t>                loadLastGeneratedTemporarySignalNameFromSymbolTable() const;
         [[nodiscard]] std::optional<std::string>                generateNextTemporarySignalName() const;
         [[nodiscard]] std::optional<syrec::VariableAccess::ptr> generateNewTemporarySignalAsReplacementCandidate(unsigned int requiredBitwidth);
