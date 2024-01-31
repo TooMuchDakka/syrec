@@ -14,7 +14,7 @@ void DimensionPropagationBlocker::blockSubstitutionForDimension(const std::optio
         dimensionBitRangeAccessRestriction.reset();
         perValueOfDimensionBitRangeAccessRestrictionLookup.clear();
     } else {
-        perValueOfDimensionBitRangeAccessRestrictionLookup.insert_or_assign(*valueOfDimensionToBlock, std::make_shared<BitRangeAccessRestriction>(BitRangeAccessRestriction(signalInformation.bitWidth)));
+        perValueOfDimensionBitRangeAccessRestrictionLookup.insert_or_assign(*valueOfDimensionToBlock, std::make_shared<BitRangeAccessRestriction>(BitRangeAccessRestriction(signalInformation.bitWidth, BitRangeAccessRestriction::BitRangeAccess(0, signalInformation.bitWidth - 1))));
     }
 }
 
@@ -162,7 +162,7 @@ void DimensionPropagationBlocker::liftRestrictionForValueOfDimension(const unsig
         isDimensionCompletelyBlocked = false;
         for (unsigned int valueOfDimensionToBlockCompletely = 0; valueOfDimensionToBlockCompletely < numValuesForDimension; ++valueOfDimensionToBlockCompletely) {
             if (valueOfDimensionToBlockCompletely != blockedValueOfDimension) {
-                perValueOfDimensionBitRangeAccessRestrictionLookup.insert_or_assign(valueOfDimensionToBlockCompletely, std::make_shared<BitRangeAccessRestriction>(signalInformation.bitWidth));
+                perValueOfDimensionBitRangeAccessRestrictionLookup.insert_or_assign(valueOfDimensionToBlockCompletely, std::make_shared<BitRangeAccessRestriction>(signalInformation.bitWidth, BitRangeAccessRestriction::BitRangeAccess(0, signalInformation.bitWidth - 1)));
             }
         }
     }
