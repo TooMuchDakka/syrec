@@ -156,8 +156,8 @@ namespace optimizations {
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         
-        void                                                  createSymbolTableEntryForVariable(const syrec::Variable& variable) const;
-        void                                                  createSymbolTableEntriesForModuleParametersAndLocalVariables(const syrec::Module& module) const;
+        static void                                           createSymbolTableEntryForVariable(parser::SymbolTable& symbolTable, const syrec::Variable& variable);
+        static void                                           createSymbolTableEntriesForModuleParametersAndLocalVariables(parser::SymbolTable& symbolTable, const syrec::Module& module);
         [[nodiscard]] std::optional<syrec::Variable::ptr>     getSymbolTableEntryForVariable(const std::string_view& signalLiteralIdent) const;
         [[nodiscard]] std::optional<syrec::Number::ptr>       getSymbolTableEntryForLoopVariable(const std::string_view& loopVariableIdent) const;
         [[nodiscard]] std::optional<parser::SymbolTable::ptr> getActiveSymbolTableScope() const;
@@ -311,7 +311,7 @@ namespace optimizations {
         static void                                                                insertStatementCopiesInto(syrec::Statement::vec& containerForCopies, std::vector<std::unique_ptr<syrec::Statement>> copiesOfStatements);
         [[nodiscard]] bool                                                         optimizePeeledLoopBodyStatements(syrec::Statement::vec& containerForResult, const std::vector<std::unique_ptr<syrec::Statement>>& peeledLoopBodyStatements);
         [[nodiscard]] bool                                                         optimizeUnrolledLoopBodyStatements(syrec::Statement::vec& containerForResult, std::size_t numUnrolledIterations, optimizations::LoopUnroller::UnrolledIterationInformation& unrolledLoopBodyStatementsInformation);
-        [[nodiscard]] static bool                                                  makeNewlyGeneratedSignalsAvailableInSymbolTableScope(const parser::SymbolTable::ptr& symbolTableScope, const parser::SymbolTable::ModuleIdentifier& identifierOfModuleToWhichSignalsWillBeAddedTo, const syrec::Variable::vec& newlyGeneratedSignalsUsedForReplacements);
+        [[nodiscard]] static bool                                                  makeNewlyGeneratedSignalsAvailableInSymbolTableScope(parser::SymbolTable& symbolTableScope, const parser::SymbolTable::ModuleIdentifier& identifierOfModuleToWhichSignalsWillBeAddedTo, const syrec::Variable::vec& newlyGeneratedSignalsUsedForReplacements);
         static void                                                                moveOwningCopiesOfStatementsBetweenContainers(std::vector<std::unique_ptr<syrec::Statement>>& toBeMovedToContainer, std::vector<std::unique_ptr<syrec::AssignStatement>>&& toBeMovedFromContainer);
 
         template<typename T>

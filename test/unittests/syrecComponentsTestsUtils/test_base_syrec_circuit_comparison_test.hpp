@@ -405,7 +405,7 @@ protected:
         std::string errorsFromParsedCircuit;
         ASSERT_NO_THROW(errorsFromParsedCircuit = parserPublicInterface.readFromString(circuitToOptimize, config));
         if (expectedErrors.empty()) {
-            ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors";
+            ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors but errors found were actually: " << errorsFromParsedCircuit;
 
             std::string stringifiedProgram;
             ASSERT_NO_THROW(stringifiedProgram = astDumper.stringifyModules(parserPublicInterface.modules())) << "Failed to stringify parsed modules";

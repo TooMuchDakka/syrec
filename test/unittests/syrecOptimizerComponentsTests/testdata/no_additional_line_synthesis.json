@@ -1664,25 +1664,25 @@
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
-  "simplificationByReplacingWholeExprOfOperationNodeWithoutAssignmentCounterpartAndModifiedLhsOperandBeingReplacementWithReplacement": {
-    "circuit": "module main(inout a(4), inout b(4), inout c(4)) c += ((a + b) / (a + b))",
-    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= a; __rpl1 += b; a += b; __rpl2 ^= (__rpl1 / a); a -= b; __rpl1 -= b; c += __rpl2; __rpl2 ^= (__rpl1 / a); __rpl1 ^= a",
+  "simplificationByReplacingWholeExprOfOperationNodeWithoutAssignmentCounterpartAndModifiedLhsOperandBeingInheritedAssignmentByReplacementWithReplacement": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) c += (((a + b) / (a + b)) + b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= a; __rpl1 += b; a += b; __rpl2 ^= (__rpl1 / a); a -= b; __rpl1 -= b; __rpl2 += b; c += __rpl2; __rpl2 -= b; __rpl2 ^= (__rpl1 / a); __rpl1 ^= a",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
   "simplificationByReplacingWholeExprOfOperationNodeWithoutAssignmentCounterpartAndModifiedLhsOperandBeingInheritedAssignmentByReplacement": {
-    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) c += ((d + b) / (a + b))",
-    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) wire __rpl1(4) d += b; a += b; __rpl1 ^= (d / a); a -= b; d -= b; c += __rpl1; __rpl1 ^= (d / a)",
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) c += (((d + b) / (a + b)) + b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) wire __rpl1(4) d += b; a += b; __rpl1 ^= (d / a); a -= b; d -= b; __rpl1 += b; c += __rpl1; __rpl1 -= b; __rpl1 ^= (d / a)",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
   "simplificationByReplacingWholeExprOfOperationNodeWithoutAssignmentCounterpartAndModifiedRhsOperandBeingReplacementWithReplacement": {
-    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) d += ((a + 2) / ((b + c) + (b + c)))",
-    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= b; a += 2; __rpl1 += c; b += c; __rpl1 += b; b -= c; __rpl2 ^= (a / __rpl1); __rpl1 -= b; __rpl1 -= c; a -= 2; d += __rpl2; __rpl2 ^= (a / __rpl1); __rpl1 ^= b",
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) d += (((a + 2) / ((b + c) + (b + c))) + a)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= b; a += 2; __rpl1 += c; b += c; __rpl1 += b; b -= c; __rpl2 ^= (a / __rpl1); __rpl1 -= b; __rpl1 -= c; a -= 2; __rpl2 += a; d += __rpl2; __rpl2 -= a; __rpl2 ^= (a / __rpl1); __rpl1 ^= b",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl"
@@ -1728,7 +1728,7 @@
   },
   "simplificationByReplacementGeneratesNameOfReplacementCorrectlyInNextStatementOfSameModule": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) c += ((a - 2) + a); c += ((2 - b) / (2 - a))",
-    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= a; __rpl1 -= 2; __rpl1 += a; c += __rpl1; __rpl1 -= a; __rpl1 += 2; __rpl1 ^= a; __rpl1 ^= (2 - b); __rpl2 ^= (2 - a); c += (__rpl1 / __rpl2); __rpl2 ^= (2 - a); __rpl1 ^= (2 - b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= a; __rpl1 -= 2; __rpl1 += a; c += __rpl1; __rpl1 -= a; __rpl1 += 2; __rpl1 ^= a; __rpl1 ^= 2; __rpl1 -= b; __rpl2 ^= (2 - a); c += (__rpl1 / __rpl2); __rpl2 ^= (2 - a); __rpl1 ^= (2 - b)",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl"
@@ -1926,14 +1926,168 @@
   },
   "simplificationByReplacementLeavesAssignmentUnchangedIfNoLargeEnoughBitrangeWithKnownValueIsAvailableInExistingSignalsAndGenerationOfNewSignalsIsDisabled": {
     "circuit": "module main(out a[2](4), inout b(2), inout c(2)) a[0].0 ^= b.0; a[0].2 ^= c.0; a[1].1:2 ^= c; c += ((b - 2) + b)",
-    "expectedCircuit": "module main(out a[2](4), inout b(2), inout c(2)) a[0].0 ^= b.0; a[0].2 ^= c.0; a[1].1:2 ^= c; c += b; c += b; c -= 2",
+    "expectedCircuit": "module main(out a[2](4), inout b(2), inout c(2)) wire __rpl1(2) a[0].0 ^= b.0; a[0].2 ^= c.0; a[1].1:2 ^= c; __rpl1 ^= b; __rpl1 -= 2; __rpl1 += b; c += __rpl1; __rpl1 -= b; __rpl1 += 2; __rpl1 ^= b",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
       "constantPropON": "1"
     }
   },
-  "DISABLED_TODO TESTS for reuse of temporary restrictions from previous assignments in next one": {
+  "simplificationByReplacementReusesTemporarilyBlockedBitOfExistingSignalFromPreviousAssignment": {
+    "circuit": "module main(out a(2), inout b(1), inout c(1)) ++= a.0; c += (b + (b + 2)); b += (c + (c + 2))",
+    "expectedCircuit": "module main(out a(2), inout b(1), inout c(1)) ++= a.0; --= a.0; a.0 ^= b; a.0 += 2; a.0 += b; c += a.0; a.0 -= b; a.0 -= 2; a.0 ^= b; ++= a.0; --= a.0; a.0 ^= c; a.0 += 2; a.0 += c; b += a.0; a.0 -= c; a.0 -= 2; a.0 ^= c; ++= a.0",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1"
+    }
+  },
+  "simplificationByReplacementReusesTemporarilyBlockedBitRangeOfExistingSignalFromPreviousAssignment": {
+    "circuit": "module main(out a(4), inout b(2), inout c(2)) a += 7; c += (b + (b + 2)); b += (c + (c + 2))",
+    "expectedCircuit": "module main(out a(4), inout b(2), inout c(2)) a ^= 7; a.0:1 ^= 3; a.0:1 ^= b; a.0:1 += 2; a.0:1 += b; c += a.0:1; a.0:1 -= b; a.0:1 -= 2; a.0:1 ^= b; a.0:1 ^= 3; a.0:1 ^= 3; a.0:1 ^= c; a.0:1 += 2; a.0:1 += c; b += a.0:1; a.0:1 -= c; a.0:1 -= 2; a.0:1 ^= c; a.0:1 ^= 3",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1"
+    }
+  },
+  "simplificationByReplacementReusesTemporarilyBlockedValueOfDimensionOfExistingSignalFromPreviousAssignment": {
+    "circuit": "module main(out a[2](2), inout b(2), inout c(2)) a[0] += 3; a[1] += 1; c += (b + (b + 2)); b += (c + (c + 2))",
+    "expectedCircuit": "module main(out a[2](2), inout b(2), inout c(2)) a[0] ^= 3; a[1] ^= 1; a[0] ^= 3; a[0] ^= b; a[0] += 2; a[0] += b; c += a[0]; a[0] -= b; a[0] -= 2; a[0] ^= b; a[0] ^= 3; a[0] ^= 3; a[0] ^= c; a[0] += 2; a[0] += c; b += a[0]; a[0] -= c; a[0] -= 2; a[0] ^= c; a[0] ^= 3",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1"
+    }
+  },
 
+  "simplificationByReplacementReusesTemporarilyBlockedBitOfGeneratedReplacementFromPreviousAssignment": {
+    "circuit": "module main(out a(2), inout b(1), inout c(1)) a.0 += b; a.1 += c; c += (b + (b + 2)); b += (c + (c + 2))",
+    "expectedCircuit": "module main(out a(2), inout b(1), inout c(1)) wire __rpl1(1) a.0 ^= b; a.1 ^= c; __rpl1 ^= b; __rpl1 += 2; __rpl1 += b; c += __rpl1; __rpl1 -= b; __rpl1 -= 2; __rpl1 -= b; __rpl1 ^= c; __rpl1 += 2; __rpl1 += c; b += __rpl1; __rpl1 -= c; __rpl1 -= 2; __rpl1 ^= c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1"
+    }
+  },
+  "simplificationByReplacementReusesTemporarilyBlockedBitRangeOfGeneratedReplacementFromPreviousAssignment": {
+    "circuit": "module main(out a(4), inout b(2), inout c(2)) a.0:1 += b; a.2:3 += c; c += (b + (b + 2)); b += (c + (c + 2))",
+    "expectedCircuit": "module main(out a(4), inout b(2), inout c(2)) wire __rpl1(2) a.0:1 ^= b; a.2:3 ^= c; __rpl1 ^= b; __rpl1 += 2; __rpl1 += b; c += __rpl1; __rpl1 -= b; __rpl1 -= 2; __rpl1 ^= b; __rpl1 ^= c; __rpl1 += 2; __rpl1 += c; b += __rpl1; __rpl1 -= c; __rpl1 -= 2; __rpl1 ^= c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1"
+    }
+  },
+  "simplificationByReplacementReusesTemporarilyBlockedValueOfDimensionOfGeneratedReplacementFromPreviousAssignment": {
+    "circuit": "module main(out a[2](2), inout b(2), inout c(2)) a[0] += b; a[1] += c; c += (b + (b + 2)); b += (c + (c + 2))",
+    "expectedCircuit": "module main(out a[2](2), inout b(2), inout c(2)) wire __rpl1(2) a[0] ^= b; a[1] ^= c; __rpl1 ^= b; __rpl1 += 2; __rpl1 += b; c += __rpl1; __rpl1 -= b; __rpl1 -= 2; __rpl1 ^= b; __rpl1 ^= c; __rpl1 += 2; __rpl1 += c; b += __rpl1; __rpl1 -= c; __rpl1 -= 2; __rpl1 ^= c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1"
+    }
+  },
+
+  "simplificationByReplacementRemovesResetAssignmentsFromNewlyGeneratedReplacementsIfDeadStoreEliminationIsEnabled": {
+    "circuit": "module main(inout b(2), inout c(2)) c += (b + (b + 2))",
+    "expectedCircuit": "module main(inout b(2), inout c(2)) wire __rpl1(2) __rpl1 ^= b; __rpl1 += 2; __rpl1 += b; c += __rpl1",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deadStoreElimON": "1"
+    }
+  },
+  "simplificationByReplacementRemovesResetAssignmentsFromNewlyGeneratedReplacementsInTrueBranchIfDeadStoreEliminationIsEnabled": {
+    "circuit": "module main(inout b(2), inout c(2)) if (b = c) then c += (b + (b + 2)) else c += b fi (b = c)",
+    "expectedCircuit": "module main(inout b(2), inout c(2)) wire __rpl1(2) if (b = c) then __rpl1 ^= b; __rpl1 += 2; __rpl1 += b; c += __rpl1 else c += b fi (b = c)",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deadStoreElimON": "1"
+    }
+  },
+  "simplificationByReplacementRemovesResetAssignmentsFromNewlyGeneratedReplacementsInFalseBranchIfDeadStoreEliminationIsEnabled": {
+    "circuit": "module main(inout b(2), inout c(2)) if (b = c) then c += b else c += (b + (b + 2)) fi (b = c)",
+    "expectedCircuit": "module main(inout b(2), inout c(2)) wire __rpl1(2) if (b = c) then c += b else __rpl1 ^= b; __rpl1 += 2; __rpl1 += b; c += __rpl1 fi (b = c)",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deadStoreElimON": "1"
+    }
+  },
+  "simplificationByReplacementRemovesNewlyGeneratedReplacementSignalsInDeadTrueBranchIfDeadCodeElimnationIsEnabled": {
+    "circuit": "module main(inout b(2), inout c(2)) if (2 < 1) then c += (b + (b + 2)) else c += b fi (2 < 1)",
+    "expectedCircuit": "module main(inout b(2), inout c(2)) c += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deadCodeElimON": "1"
+    }
+  },
+  "simplificationByReplacementRemovedNewlyGeneratedReplacementSignalsInDeadFalseBranchIfDeadCodeEliminationIsEnabled": {
+    "circuit": "module main(inout b(2), inout c(2)) if (2 > 1) then c += b else c += (b + (b + 2)) fi (2 > 1)",
+    "expectedCircuit": "module main(inout b(2), inout c(2)) c += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deadCodeElimON": "1"
+    }
+  },
+
+  "simplificationByReplacementDoesNotRemovesResetAssignmentsFromReusedExistingSignalForReplacementIfDeadStoreEliminationIsEnabled": {
+    "circuit": "module main(out a(2), inout b(2), inout c(2)) c += (b + (b + 2))",
+    "expectedCircuit": "module main(out a(2), inout b(2), inout c(2)) a ^= b; a += 2; a += b; c += a; a -= b; a -= 2; a ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1"
+    }
+  },
+  "simplificationByReplacementDoesNotRemovesResetAssignmentsFromReusedExistingSignalForReplacementInTrueBranchIfDeadStoreEliminationIsEnabled": {
+    "circuit": "module main(out a(2), inout b(2), inout c(2)) if (b = c) then c += (b + (b + 2)) else c += b fi (b = c)",
+    "expectedCircuit": "module main(out a(2), inout b(2), inout c(2)) if (b = c) then a ^= b; a += 2; a += b; c += a; a -= b; a -= 2; a ^= b else c += b fi (b = c)",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deadStoreElimON": "1"
+    }
+  },
+  "simplificationByReplacementDoesNotRemovesResetAssignmentsFromReusedExistingSignalForReplacementInFalseBranchIfDeadStoreEliminationIsEnabled": {
+    "circuit": "module main(out a(2), inout b(2), inout c(2)) if (b = c) then c += b else c += (b + (b + 2)) fi (b = c)",
+    "expectedCircuit": "module main(out a(2), inout b(2), inout c(2)) if (b = c) then c += b else a ^= b; a += 2; a += b; c += a; a -= b; a -= 2; a ^= b fi (b = c)",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deadStoreElimON": "1"
+    }
+  },
+  "simplificationByReplacementRemovesGeneratedAssignmentsFromExistingSignalUsedAsReplacementInDeadTrueBranchIfDeadCodeElimnationIsEnabled": {
+    "circuit": "module main(out a(2), inout b(2), inout c(2)) if (2 < 1) then c += (b + (b + 2)) else c += b fi (2 < 1)",
+    "expectedCircuit": "module main(inout b(2), inout c(2)) c += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deadCodeElimON": "1"
+    }
+  },
+  "simplificationByReplacementRemoveDoesNotRemovesResetAssignmentsFromReusedExistingSignalForReplacementInDeadFalseBranchIfDeadCodeEliminationIsEnabled": {
+    "circuit": "module main(out a(2), inout b(2), inout c(2)) if (2 > 1) then c += b else c += (b + (b + 2)) fi (2 > 1)",
+    "expectedCircuit": "module main(inout b(2), inout c(2)) c += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deadCodeElimON": "1"
+    }
   }
 }
 
