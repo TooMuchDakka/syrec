@@ -45,9 +45,7 @@
  */
 
 // TODO: We should probably also validate that the optimized circuit that is created after a successful parse is also correct
-// TODO: Check in test case 'simplificationByReplacementResusesNotBlockedBitrangeOfExistingSignalThatWasAlsoNotUsedOnRhsOfAssignmentExpr' why ADD_ASSIGN operation is not replaced with XOR_ASSIGN for bit accesses
 // TODO: Correct update of reference counts for simplification of assignments with no additional lines
-// TODO: Check that resets of replacements are not removed by dead store generation? They should be removed if the signal is no longer be used 
 
 /*
  * REPLACEMENT GENERATOR TODOS:
@@ -291,6 +289,7 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
     while (continueProcessingOfNonLeafNode) {
        OperationNodeProcessingResult resultOfNonLeafNode = processNextOperationNode(signalValueLookupCallback);
         if (resultOfNonLeafNode.derivedConflictInOtherNode) {
+           generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
            return std::nullopt;
         }
         simplificationResultOfOperationNodeOperand = std::move(resultOfNonLeafNode.simplificationResult);
