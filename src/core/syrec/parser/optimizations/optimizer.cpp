@@ -1678,8 +1678,8 @@ std::optional<optimizations::Optimizer::EvaluatedSignalAccess> optimizations::Op
         std::vector<std::reference_wrapper<const syrec::expression>> accessedValueOfDimensionWithoutOwnership;
         accessedValueOfDimensionWithoutOwnership.reserve(accessedSignalParts.indexes.size());
 
-        for (std::size_t i = 0; i < accessedSignalParts.indexes.size(); ++i) {
-            accessedValueOfDimensionWithoutOwnership.emplace_back(*accessedSignalParts.indexes.at(i));
+        for (const auto& indexe: accessedSignalParts.indexes) {
+            accessedValueOfDimensionWithoutOwnership.emplace_back(*indexe);
         }
 
         std::optional<std::pair<const syrec::Number*, const syrec::Number*>> accessedBitRangeWithoutOwnership;
@@ -2802,6 +2802,13 @@ bool optimizations::Optimizer::makeNewlyGeneratedSignalsAvailableInSymbolTableSc
 }
 
 
-void optimizations::Optimizer::moveOwningCopiesOfStatementsBetweenContainers(std::vector<std::unique_ptr<syrec::Statement>>& toBeMovedToContainer, std::vector<std::unique_ptr<syrec::AssignStatement>>&& toBeMovedFromContainer) {
-    toBeMovedToContainer.insert(toBeMovedToContainer.end(), std::make_move_iterator(toBeMovedFromContainer.begin()), std::make_move_iterator(toBeMovedFromContainer.end()));
+void optimizations::Optimizer::moveOwningCopiesOfStatementsBetweenContainers(std::vector<std::unique_ptr<syrec::Statement>>& toBeMovedToContainer, std::vector<InternalOwningAssignmentType>&& toBeMovedFromContainer) {
+    for (InternalOwningAssignmentType& i: toBeMovedFromContainer) {
+        InternalOwningAssignmentType toBeMovedAssignmentFromContainer = std::move(i);
+        if (std::holds_alternative<std::unique_ptr<syrec::AssignStatement>>(toBeMovedAssignmentFromContainer)) {
+            toBeMovedToContainer.push_back(std::get<std::unique_ptr<syrec::AssignStatement>>(std::move(toBeMovedAssignmentFromContainer)));
+        } else if (std::holds_alternative<std::unique_ptr<syrec::UnaryStatement>>(toBeMovedAssignmentFromContainer)) {
+            toBeMovedToContainer.push_back(std::get<std::unique_ptr<syrec::UnaryStatement>>(std::move(toBeMovedAssignmentFromContainer)));
+        }
+    }
 }

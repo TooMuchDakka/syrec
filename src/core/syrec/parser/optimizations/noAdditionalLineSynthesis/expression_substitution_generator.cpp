@@ -44,19 +44,46 @@ std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::Replac
         if (!currentValueOfFoundReplacement.has_value()) {
             return std::nullopt;
         }
-        std::optional<syrec::AssignStatement::ptr> requiredResetPriorToUsageOfReplacement;
+
+        ReplacementResult::OptionalResetAssignment requiredResetPriorToUsageOfReplacement;
+        bool                                       wasGenerationOfReplacementSuccessful = true;
         if (*currentValueOfFoundReplacement) {
-             // Resetting the value of a signal with current value X can be done either via a subtraction or via an XOR operation and since the latter is a cheaper operation it is the preferred operation for such a reset
-            if (const std::optional<unsigned int> mappedToAssignmentFlagForEnum = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign); mappedToAssignmentFlagForEnum.has_value()) {
-                const syrec::Number::ptr containerForAssignmentRhsValue = std::make_shared<syrec::Number>(*currentValueOfFoundReplacement);
-                if (const syrec::NumericExpression::ptr containerForAssignmentRhsValueExpr = containerForAssignmentRhsValue ? std::make_shared<syrec::NumericExpression>(containerForAssignmentRhsValue, BitHelpers::getRequiredBitsToStoreValue(*currentValueOfFoundReplacement)) : nullptr) {
-                    requiredResetPriorToUsageOfReplacement = std::make_shared<syrec::AssignStatement>(*foundReplacement, *mappedToAssignmentFlagForEnum, containerForAssignmentRhsValueExpr);
+            /*
+             * For chosen replacement candidate signal R with a current value of 1, using an unary assignment statement of the form --= R should be more optimal than an assignment of the form R ^= 1.
+             * The reasoning behind this was derived from traditional programming languages like C where such an assignment would be equal to R = R ^ 1, whether our assumption is correct needs to be verified.
+             */
+            if (currentValueOfFoundReplacement == 1) {
+                if (const std::optional<unsigned int> mappedToAssignmentFlagForEnum = syrec_operation::tryMapUnaryAssignmentOperationEnumToFlag(syrec_operation::operation::DecrementAssign); mappedToAssignmentFlagForEnum.has_value()) {
+                    const std::shared_ptr<syrec::UnaryStatement> temporaryContainerForRequiredReset = std::make_shared<syrec::UnaryStatement>(*mappedToAssignmentFlagForEnum, *foundReplacement);
+                    requiredResetPriorToUsageOfReplacement                                          = temporaryContainerForRequiredReset;
+                    wasGenerationOfReplacementSuccessful                                            = temporaryContainerForRequiredReset != nullptr;
+                }
+                else {
+                    wasGenerationOfReplacementSuccessful = false;
+                }
+            }
+            else {
+                // Resetting the value of a signal with current value X can be done either via a subtraction or via an XOR operation and since the latter is a cheaper operation it is the preferred operation for such a reset
+                if (const std::optional<unsigned int> mappedToAssignmentFlagForEnum = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign); mappedToAssignmentFlagForEnum.has_value()) {
+                    const syrec::Number::ptr containerForAssignmentRhsValue = std::make_shared<syrec::Number>(*currentValueOfFoundReplacement);
+                    if (const syrec::NumericExpression::ptr containerForAssignmentRhsValueExpr = containerForAssignmentRhsValue ? std::make_shared<syrec::NumericExpression>(containerForAssignmentRhsValue, BitHelpers::getRequiredBitsToStoreValue(*currentValueOfFoundReplacement)) : nullptr) {
+                        const std::shared_ptr<syrec::AssignStatement> temporaryContainerForRequiredReset = std::make_shared<syrec::AssignStatement>(*foundReplacement, *mappedToAssignmentFlagForEnum, containerForAssignmentRhsValueExpr);
+                        requiredResetPriorToUsageOfReplacement                                           = temporaryContainerForRequiredReset;
+                        wasGenerationOfReplacementSuccessful                                             = temporaryContainerForRequiredReset != nullptr;
+                    }
+                    else {
+                        wasGenerationOfReplacementSuccessful = false;
+                    }
+                } else {
+                    wasGenerationOfReplacementSuccessful = false;
                 }
             }
         }
-        return ReplacementResult({.foundReplacement = *foundReplacement, .requiredResetOfReplacement = requiredResetPriorToUsageOfReplacement, .doesGeneratedReplacementReferenceExistingSignal = true});
+        if (wasGenerationOfReplacementSuccessful) {
+            return ReplacementResult({.foundReplacement = *foundReplacement, .requiredResetOfReplacement = requiredResetPriorToUsageOfReplacement, .doesGeneratedReplacementReferenceExistingSignal = true});   
+        }
     }
-    if (const std::optional<syrec::VariableAccess::ptr> newlyGeneratedReplacement = generateNewTemporarySignalAsReplacementCandidate(requiredBitwidthOfReplacement); newlyGeneratedReplacement.has_value()) {
+    else if (const std::optional<syrec::VariableAccess::ptr> newlyGeneratedReplacement = generateNewTemporarySignalAsReplacementCandidate(requiredBitwidthOfReplacement); newlyGeneratedReplacement.has_value()) {
         return ReplacementResult({.foundReplacement = *newlyGeneratedReplacement, .requiredResetOfReplacement = std::nullopt, .doesGeneratedReplacementReferenceExistingSignal = false});
     }
     return std::nullopt;

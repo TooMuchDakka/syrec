@@ -1963,7 +1963,7 @@
 
   "simplificationByReplacementReusesTemporarilyBlockedBitOfGeneratedReplacementFromPreviousAssignment": {
     "circuit": "module main(out a(2), inout b(1), inout c(1)) a.0 += b; a.1 += c; c += (b + (b + 2)); b += (c + (c + 2))",
-    "expectedCircuit": "module main(out a(2), inout b(1), inout c(1)) wire __rpl1(1) a.0 ^= b; a.1 ^= c; __rpl1 ^= b; __rpl1 += 2; __rpl1 += b; c += __rpl1; __rpl1 -= b; __rpl1 -= 2; __rpl1 -= b; __rpl1 ^= c; __rpl1 += 2; __rpl1 += c; b += __rpl1; __rpl1 -= c; __rpl1 -= 2; __rpl1 ^= c",
+    "expectedCircuit": "module main(out a(2), inout b(1), inout c(1)) wire __rpl1(1) a.0 ^= b; a.1 ^= c; __rpl1 ^= b; __rpl1 += 2; __rpl1 += b; c += __rpl1; __rpl1 -= b; __rpl1 -= 2; __rpl1 ^= b; __rpl1 ^= c; __rpl1 += 2; __rpl1 += c; b += __rpl1; __rpl1 -= c; __rpl1 -= 2; __rpl1 ^= c",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl",
@@ -2087,6 +2087,15 @@
       "noAddLineSynNewSignalPrefix": "__rpl",
       "constantPropON": "1",
       "deadCodeElimON": "1"
+    }
+  },
+  "simplificationByReplacedReusingExistingSignalWithValueOfOneReplacesBinaryAssingmentWithUnaryOne": {
+    "circuit": "module main(out a(2), inout b(2), inout c(2)) a += 1; c += (b + (b + 2))",
+    "expectedCircuit": "module main(out a(2), inout b(2), inout c(2)) a ^= 1; --= a; a ^= b; a += 2; a += b; c += a; a -= b; a -= 2; a ^= b; ++= a",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1"
     }
   }
 }

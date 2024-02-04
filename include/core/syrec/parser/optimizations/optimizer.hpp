@@ -95,6 +95,8 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::expression>   handleExpr(const syrec::expression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::Number>       handleNumber(const syrec::Number& number) const;
     protected:
+        using InternalOwningAssignmentType = std::variant<std::unique_ptr<syrec::AssignStatement>, std::unique_ptr<syrec::UnaryStatement>>;
+
         parser::ParserConfig                                          parserConfig;
         parser::SymbolTable::ptr                                      activeSymbolTableScope;
         parser::SymbolTable::ModuleIdentifier                         internalIdentifierOfCurrentlyProcessedModule;
@@ -312,7 +314,7 @@ namespace optimizations {
         [[nodiscard]] bool                                                         optimizePeeledLoopBodyStatements(syrec::Statement::vec& containerForResult, const std::vector<std::unique_ptr<syrec::Statement>>& peeledLoopBodyStatements);
         [[nodiscard]] bool                                                         optimizeUnrolledLoopBodyStatements(syrec::Statement::vec& containerForResult, std::size_t numUnrolledIterations, optimizations::LoopUnroller::UnrolledIterationInformation& unrolledLoopBodyStatementsInformation);
         [[nodiscard]] static bool                                                  makeNewlyGeneratedSignalsAvailableInSymbolTableScope(parser::SymbolTable& symbolTableScope, const parser::SymbolTable::ModuleIdentifier& identifierOfModuleToWhichSignalsWillBeAddedTo, const syrec::Variable::vec& newlyGeneratedSignalsUsedForReplacements);
-        static void                                                                moveOwningCopiesOfStatementsBetweenContainers(std::vector<std::unique_ptr<syrec::Statement>>& toBeMovedToContainer, std::vector<std::unique_ptr<syrec::AssignStatement>>&& toBeMovedFromContainer);
+        static void                                                                moveOwningCopiesOfStatementsBetweenContainers(std::vector<std::unique_ptr<syrec::Statement>>& toBeMovedToContainer, std::vector<InternalOwningAssignmentType>&& toBeMovedFromContainer);
 
         template<typename T>
         void removeElementsAtIndices(std::vector<T>& vectorToModify, const std::unordered_set<std::size_t>& indicesOfElementsToRemove) {

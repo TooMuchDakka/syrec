@@ -2,39 +2,69 @@
 
 using namespace noAdditionalLineSynthesis;
 
-syrec::AssignStatement::vec AssignmentTransformer::simplify(const syrec::AssignStatement::vec& assignmentsToSimplify, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback) {
+std::vector<AssignmentTransformer::SharedAssignmentReference> AssignmentTransformer::simplify(const std::vector<AssignmentTransformer::SharedAssignmentReference>& assignmentsToSimplify, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback) {
     resetInternals();
-    syrec::AssignStatement::vec generatedAssignments;
+    std::vector<SharedAssignmentReference> generatedAssignments;
 
-    for (const syrec::AssignStatement::ptr& assignment: assignmentsToSimplify) {
-        const std::shared_ptr<syrec::AssignStatement> assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment);
-        if (!assignmentCasted) {
+    for (const SharedAssignmentReference& assignment: assignmentsToSimplify) {
+        std::shared_ptr<syrec::AssignStatement> assignmentAsBinaryOne;
+        std::shared_ptr<syrec::UnaryStatement>  assignmentAsUnaryOne;
+
+        if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(assignment)) {
+            assignmentAsBinaryOne = std::get<std::shared_ptr<syrec::AssignStatement>>(assignment);
+        } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(assignment)) {
+            assignmentAsUnaryOne = std::get<std::shared_ptr<syrec::UnaryStatement>>(assignment);
+        }
+
+        if (!assignmentAsBinaryOne && !assignmentAsUnaryOne) {
+            continue;
+        }
+        
+        if ((assignmentAsBinaryOne && !syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentAsBinaryOne->op).has_value())
+            || (assignmentAsUnaryOne && !syrec_operation::tryMapUnaryAssignmentOperationFlagToEnum(assignmentAsUnaryOne->op).has_value())) {
             continue;
         }
 
-        const std::optional<syrec_operation::operation> matchingAssignmentOperationEnumValueForFlag = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op);
-        if (!matchingAssignmentOperationEnumValueForFlag.has_value()) {
-            continue;
-        }
-
-        if (areMoreInversionsRequiredToReachOriginalSignalValue(assignmentCasted->lhs)) {
-            if (doesAssignmentMatchWatchForInvertedAssignment(*assignmentCasted)) {
-                tryRemoveWatchForInversionOfAssignment(*assignmentCasted);
+        if (assignmentAsBinaryOne) {
+            if (areMoreInversionsRequiredToReachOriginalSignalValue(assignmentAsBinaryOne->lhs)) {
+                if (doesAssignmentMatchWatchForInvertedAssignment(*assignmentAsBinaryOne)) {
+                    tryRemoveWatchForInversionOfAssignment(*assignmentAsBinaryOne);
+                }
+                else {
+                    addWatchForInversionOfAssignment(*assignmentAsBinaryOne);
+                }
             } else {
-                addWatchForInversionOfAssignment(*assignmentCasted);
+                createSignalValueLookupCacheEntry(assignmentAsBinaryOne->lhs, initialSignalValueLookupCallback);
+                addWatchForInversionOfAssignment(*assignmentAsBinaryOne);
             }
-        } else {
-            createSignalValueLookupCacheEntry(assignmentCasted->lhs, initialSignalValueLookupCallback);
-            addWatchForInversionOfAssignment(*assignmentCasted);
-        }
 
-        syrec::AssignStatement::vec generatedSubAssignments = trySplitAssignmentRhsExpr(assignment);
-        for (const syrec::AssignStatement::ptr& generatedSubAssignment: generatedSubAssignments) {
-            const std::shared_ptr<syrec::AssignStatement>   subAssignmentCasted                                 = std::dynamic_pointer_cast<syrec::AssignStatement>(generatedSubAssignment);
-            const std::optional<syrec_operation::operation> mappedToOperationEnumValueForSubassignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(subAssignmentCasted->op);
-            tryReplaceAddAssignOperationWithXorOperation(*subAssignmentCasted);
-            updateEntryInValueLookupCacheByPerformingAssignment(subAssignmentCasted->lhs, *mappedToOperationEnumValueForSubassignmentOperation, *subAssignmentCasted->rhs);
-            generatedAssignments.emplace_back(subAssignmentCasted);
+            syrec::AssignStatement::vec generatedSubAssignments = trySplitAssignmentRhsExpr(assignmentAsBinaryOne);
+            for (const syrec::AssignStatement::ptr& generatedSubAssignment: generatedSubAssignments) {
+                const std::shared_ptr<syrec::AssignStatement>   subAssignmentCasted                                 = std::dynamic_pointer_cast<syrec::AssignStatement>(generatedSubAssignment);
+                const std::optional<syrec_operation::operation> mappedToOperationEnumValueForSubassignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(subAssignmentCasted->op);
+                tryReplaceAddAssignOperationWithXorOperation(*subAssignmentCasted);
+                updateEntryInValueLookupCacheByPerformingAssignment(subAssignmentCasted->lhs, *mappedToOperationEnumValueForSubassignmentOperation, *subAssignmentCasted->rhs);
+
+                if (const std::optional<std::shared_ptr<syrec::UnaryStatement>> binaryAssignmentAsUnaryOne = tryReplaceBinaryAssignmentWithUnaryOne(*subAssignmentCasted); binaryAssignmentAsUnaryOne.has_value()) {
+                    generatedAssignments.emplace_back(*binaryAssignmentAsUnaryOne);   
+                }
+                else {
+                    generatedAssignments.emplace_back(subAssignmentCasted);    
+                }
+            }   
+        } else if (assignmentAsUnaryOne) {
+            if (areMoreInversionsRequiredToReachOriginalSignalValue(assignmentAsUnaryOne->var)) {
+                if (doesAssignmentMatchWatchForInvertedAssignment(*assignmentAsUnaryOne)) {
+                    tryRemoveWatchForInversionOfAssignment(*assignmentAsUnaryOne);
+                } else {
+                    addWatchForInversionOfAssignment(*assignmentAsUnaryOne);
+                }
+            } else {
+                createSignalValueLookupCacheEntry(assignmentAsUnaryOne->var, initialSignalValueLookupCallback);
+                addWatchForInversionOfAssignment(*assignmentAsUnaryOne);
+            }
+
+            generatedAssignments.emplace_back(assignmentAsUnaryOne);
         }
     }
     return generatedAssignments.size() >= assignmentsToSimplify.size() ? generatedAssignments : assignmentsToSimplify;
@@ -77,7 +107,7 @@ void AssignmentTransformer::SignalValueLookupCacheEntry::updateValueTo(const std
 
 
 void AssignmentTransformer::resetInternals() {
-    awaitedAssignmentsLookup.clear();
+    awaitedInversionsOfBinaryAssignmentsLookup.clear();
     signalValueLookupCache.clear();
 }
 
@@ -85,33 +115,80 @@ void AssignmentTransformer::addWatchForInversionOfAssignment(const syrec::Assign
     const std::optional<syrec_operation::operation> mappedToAssignmentOperationEnumValueFromFlag = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
     const std::optional<syrec_operation::operation> invertedAssignmentOperation                  = mappedToAssignmentOperationEnumValueFromFlag.has_value() ? syrec_operation::invert(*mappedToAssignmentOperationEnumValueFromFlag) : std::nullopt;
         
-    if (!awaitedAssignmentsLookup.count(assignment.lhs)) {
-        AwaitedInversionsOfAssignedToSignalsParts awaitedInversionOfAssignedToSignalParts = std::make_shared<std::unordered_map<syrec::expression::ptr, syrec_operation::operation>>();
-        if (awaitedInversionOfAssignedToSignalParts && invertedAssignmentOperation.has_value()) {
-            awaitedInversionOfAssignedToSignalParts->emplace(std::make_pair(assignment.rhs, *invertedAssignmentOperation));
+    if (!awaitedInversionsOfBinaryAssignmentsLookup.count(assignment.lhs)) {
+        auto awaitedInversionOfAssignedToSignalParts = AwaitedInversionsByBinaryAssignmentLookupEntry();
+        if (invertedAssignmentOperation.has_value()) {
+            awaitedInversionOfAssignedToSignalParts.emplace(std::make_pair(assignment.rhs, *invertedAssignmentOperation));
         }
-        awaitedAssignmentsLookup.emplace(std::make_pair(assignment.lhs, awaitedInversionOfAssignedToSignalParts));
-    } else if (AwaitedInversionsOfAssignedToSignalsParts existingWaitsOnInversion = awaitedAssignmentsLookup.at(assignment.lhs); existingWaitsOnInversion) {
+        awaitedInversionsOfBinaryAssignmentsLookup.emplace(std::make_pair(assignment.lhs, awaitedInversionOfAssignedToSignalParts));
+    } else {
+        AwaitedInversionsByBinaryAssignmentLookupEntry& existingWaitsOnInversion = awaitedInversionsOfBinaryAssignmentsLookup.at(assignment.lhs);
         if (!invertedAssignmentOperation.has_value()) {
-            existingWaitsOnInversion = nullptr;
+            awaitedInversionsOfBinaryAssignmentsLookup.erase(assignment.lhs);
         } else {
-            existingWaitsOnInversion->emplace(std::make_pair(assignment.rhs, *invertedAssignmentOperation));
+            existingWaitsOnInversion.emplace(std::make_pair(assignment.rhs, *invertedAssignmentOperation));
         }
     }
 }
 
-void AssignmentTransformer::tryRemoveWatchForInversionOfAssignment(const syrec::AssignStatement& assignment) const {
-    if (!awaitedAssignmentsLookup.count(assignment.lhs)) {
+void AssignmentTransformer::addWatchForInversionOfAssignment(const syrec::UnaryStatement& assignment) {
+    const std::optional<syrec_operation::operation> mappedToUnaryAssignmentOperationEnumValueFromFlag = syrec_operation::tryMapUnaryAssignmentOperationFlagToEnum(assignment.op);
+    const std::optional<syrec_operation::operation> invertedUnaryAssignmentOperation                  = mappedToUnaryAssignmentOperationEnumValueFromFlag.has_value() ? syrec_operation::invert(*mappedToUnaryAssignmentOperationEnumValueFromFlag) : std::nullopt;
+
+    if (!awaitedInversionsOfUnaryAssignmentsLookup.count(assignment.var)) {
+        const auto newWaitsForInversionOfAssignedToSignalParts = AwaitedInversionsByUnaryAssignmentLookupEntry({.awaitedInvertedAssignmentOperation = *invertedUnaryAssignmentOperation, .numWaits = 1});
+        awaitedInversionsOfUnaryAssignmentsLookup.emplace(std::make_pair(assignment.var, newWaitsForInversionOfAssignedToSignalParts));
+    } else {
+        AwaitedInversionsByUnaryAssignmentLookupEntry& existingWaitsForAssignedToSignalParts = awaitedInversionsOfUnaryAssignmentsLookup.at(assignment.var);
+        if (!invertedUnaryAssignmentOperation.has_value()) {
+            awaitedInversionsOfUnaryAssignmentsLookup.erase(assignment.var);
+        } else {
+            ++existingWaitsForAssignedToSignalParts.numWaits;
+        }
+    }
+}
+
+
+void AssignmentTransformer::tryRemoveWatchForInversionOfAssignment(const syrec::AssignStatement& assignment) {
+    if (!awaitedInversionsOfBinaryAssignmentsLookup.count(assignment.lhs)) {
         return;
     }
 
     const std::optional<syrec_operation::operation> mappedToAssignmentOperationEnumValueFromFlag = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
-    if (const AwaitedInversionsOfAssignedToSignalsParts existingWaitsOnInversion = awaitedAssignmentsLookup.at(assignment.lhs); existingWaitsOnInversion && mappedToAssignmentOperationEnumValueFromFlag.has_value()) {
-        if (existingWaitsOnInversion->count(assignment.rhs) && existingWaitsOnInversion->at(assignment.rhs) == *mappedToAssignmentOperationEnumValueFromFlag) {
-            existingWaitsOnInversion->erase(assignment.rhs);
+    const std::optional<syrec_operation::operation> mappedToInversionOfAssignmentOperation       = mappedToAssignmentOperationEnumValueFromFlag.has_value() ? syrec_operation::invert(*mappedToAssignmentOperationEnumValueFromFlag) : std::nullopt;
+    if (!mappedToInversionOfAssignmentOperation.has_value()) {
+        return;
+    }
+
+    AwaitedInversionsByBinaryAssignmentLookupEntry& existingWaitsForAssignedToSignal = awaitedInversionsOfBinaryAssignmentsLookup.at(assignment.lhs);
+    if(existingWaitsForAssignedToSignal.count(assignment.rhs) && *mappedToInversionOfAssignmentOperation == existingWaitsForAssignedToSignal.at(assignment.rhs)) {
+        existingWaitsForAssignedToSignal.erase(assignment.rhs);
+        if (existingWaitsForAssignedToSignal.empty()) {
+            awaitedInversionsOfBinaryAssignmentsLookup.erase(assignment.lhs);
         }
     }
 }
+
+void AssignmentTransformer::tryRemoveWatchForInversionOfAssignment(const syrec::UnaryStatement& assignment) {
+    if (!awaitedInversionsOfUnaryAssignmentsLookup.count(assignment.var)) {
+        return;
+    }
+
+    const std::optional<syrec_operation::operation> mappedToAssignmentOperationEnumValueFromFlag = syrec_operation::tryMapUnaryAssignmentOperationFlagToEnum(assignment.op);
+    const std::optional<syrec_operation::operation> mappedToInversionOfAssignmentOperation       = mappedToAssignmentOperationEnumValueFromFlag.has_value() ? syrec_operation::invert(*mappedToAssignmentOperationEnumValueFromFlag) : std::nullopt;
+    if (!mappedToInversionOfAssignmentOperation.has_value()) {
+        return;
+    }
+
+    AwaitedInversionsByUnaryAssignmentLookupEntry& existingWaitsForAssignedToSignal = awaitedInversionsOfUnaryAssignmentsLookup.at(assignment.var);
+    if (existingWaitsForAssignedToSignal.numWaits == 1) {
+        --existingWaitsForAssignedToSignal.numWaits;
+        awaitedInversionsOfUnaryAssignmentsLookup.erase(assignment.var);
+    } else {
+        --existingWaitsForAssignedToSignal.numWaits;
+    }
+}
+
 
 void AssignmentTransformer::updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::expression& expr) const {
     std::optional<unsigned int> valueOfExpr;
@@ -169,26 +246,31 @@ void AssignmentTransformer::createSignalValueLookupCacheEntry(const syrec::Varia
 
 
 bool AssignmentTransformer::areMoreInversionsRequiredToReachOriginalSignalValue(const syrec::VariableAccess::ptr& accessedSignalParts) const {
-    if (!awaitedAssignmentsLookup.count(accessedSignalParts)) {
-        return false;
-    }
-
-    const AwaitedInversionsOfAssignedToSignalsParts stillAwaitedAssignmentInversions = awaitedAssignmentsLookup.at(accessedSignalParts);
-    return stillAwaitedAssignmentInversions ? !stillAwaitedAssignmentInversions->empty() : true;
+    return awaitedInversionsOfBinaryAssignmentsLookup.count(accessedSignalParts) || awaitedInversionsOfUnaryAssignmentsLookup.count(accessedSignalParts);
 }
 
 bool AssignmentTransformer::doesAssignmentMatchWatchForInvertedAssignment(const syrec::AssignStatement& assignment) const {
-    if (!awaitedAssignmentsLookup.count(assignment.lhs)) {
+    if (!awaitedInversionsOfBinaryAssignmentsLookup.count(assignment.lhs)) {
         return false;
     }
 
     const std::optional<syrec_operation::operation> mappedToAssignmentOperationEnumValueFromFlag = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
-    if (!mappedToAssignmentOperationEnumValueFromFlag.has_value() || !awaitedAssignmentsLookup.at(assignment.lhs)->count(assignment.rhs)) {
+    if (!mappedToAssignmentOperationEnumValueFromFlag.has_value() || !awaitedInversionsOfBinaryAssignmentsLookup.at(assignment.lhs).count(assignment.rhs)) {
         return false;
     }
 
-    const syrec_operation::operation expectedInvertedAssignmentOperation = awaitedAssignmentsLookup.at(assignment.lhs)->at(assignment.rhs);
+    const syrec_operation::operation expectedInvertedAssignmentOperation = awaitedInversionsOfBinaryAssignmentsLookup.at(assignment.lhs).at(assignment.rhs);
     return expectedInvertedAssignmentOperation == *mappedToAssignmentOperationEnumValueFromFlag;
+}
+
+bool AssignmentTransformer::doesAssignmentMatchWatchForInvertedAssignment(const syrec::UnaryStatement& assignment) const {
+    if (!awaitedInversionsOfUnaryAssignmentsLookup.count(assignment.var)) {
+        return false;
+    }
+
+    const std::optional<syrec_operation::operation> mappedToUnaryAssignmentOperationEnumValueFromFlag = syrec_operation::tryMapUnaryAssignmentOperationFlagToEnum(assignment.op);
+    const std::optional<syrec_operation::operation> invertedUnaryAssignmentOperationEnumValueFromFlag = mappedToUnaryAssignmentOperationEnumValueFromFlag.has_value() ? syrec_operation::invert(*mappedToUnaryAssignmentOperationEnumValueFromFlag) : std::nullopt;
+    return invertedUnaryAssignmentOperationEnumValueFromFlag.has_value() && awaitedInversionsOfUnaryAssignmentsLookup.at(assignment.var).awaitedInvertedAssignmentOperation == *invertedUnaryAssignmentOperationEnumValueFromFlag;
 }
 
 
@@ -209,4 +291,32 @@ syrec::AssignStatement::vec AssignmentTransformer::trySplitAssignmentRhsExpr(con
 
 AssignmentTransformer::SignalValueLookupCacheEntryReference AssignmentTransformer::getSignalValueCacheEntryFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const {
     return signalValueLookupCache.count(assignedToSignalParts) ? signalValueLookupCache.at(assignedToSignalParts) : nullptr;
+}
+
+std::optional<std::shared_ptr<syrec::UnaryStatement>> AssignmentTransformer::tryReplaceBinaryAssignmentWithUnaryOne(const syrec::AssignStatement& assignment) {
+    const std::optional<syrec_operation::operation> mappedToAssignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
+    if (!mappedToAssignmentOperation.has_value()) {
+        return std::nullopt;
+    }
+
+    std::optional<unsigned int> mappedToUnaryAssignmentOperationEnumValueToFlag;
+    if (const std::shared_ptr<syrec::NumericExpression> assignmentRhsExprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(assignment.rhs); assignmentRhsExprAsNumericExpr) {
+        if (!assignmentRhsExprAsNumericExpr->value->isConstant() || !assignmentRhsExprAsNumericExpr->value->evaluate({})) {
+            return std::nullopt;
+        }
+        
+        if (*mappedToAssignmentOperation == syrec_operation::operation::AddAssign) {
+            mappedToUnaryAssignmentOperationEnumValueToFlag = syrec_operation::tryMapUnaryAssignmentOperationEnumToFlag(syrec_operation::operation::IncrementAssign);
+        } else if (*mappedToAssignmentOperation == syrec_operation::operation::MinusAssign) {
+            mappedToUnaryAssignmentOperationEnumValueToFlag = syrec_operation::tryMapUnaryAssignmentOperationEnumToFlag(syrec_operation::operation::DecrementAssign);
+        }
+    }
+
+    if (!mappedToUnaryAssignmentOperationEnumValueToFlag.has_value()) {
+        return std::nullopt;
+    }
+    if (const std::shared_ptr<syrec::UnaryStatement> generatedUnaryAssignment = std::make_shared<syrec::UnaryStatement>(*mappedToUnaryAssignmentOperationEnumValueToFlag, assignment.lhs); generatedUnaryAssignment) {
+        return generatedUnaryAssignment;
+    }
+    return std::nullopt;
 }

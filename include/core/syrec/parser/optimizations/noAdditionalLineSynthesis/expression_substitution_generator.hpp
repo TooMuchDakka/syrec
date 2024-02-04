@@ -35,9 +35,10 @@ namespace noAdditionalLineSynthesis {
         }
 
         struct ReplacementResult {
-            syrec::VariableAccess::ptr                 foundReplacement;
-            std::optional<syrec::AssignStatement::ptr> requiredResetOfReplacement;
-            bool                                       doesGeneratedReplacementReferenceExistingSignal;
+            using OptionalResetAssignment = std::optional<std::variant<std::shared_ptr<syrec::AssignStatement>, std::shared_ptr<syrec::UnaryStatement>>>;
+            syrec::VariableAccess::ptr foundReplacement;
+            OptionalResetAssignment    requiredResetOfReplacement;
+            bool                       doesGeneratedReplacementReferenceExistingSignal;
         };
 
         enum RestrictionUpdate {

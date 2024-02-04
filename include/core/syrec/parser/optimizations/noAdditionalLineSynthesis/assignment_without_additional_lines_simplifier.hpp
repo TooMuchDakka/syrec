@@ -19,7 +19,7 @@ namespace noAdditionalLineSynthesis {
     class AssignmentWithoutAdditionalLineSimplifier {
     public:
         struct SimplificationResult {
-            using OwningCopyOfAssignment   = std::unique_ptr<syrec::AssignStatement>;
+            using OwningCopyOfAssignment   = std::variant<std::unique_ptr<syrec::AssignStatement>, std::unique_ptr<syrec::UnaryStatement>>;
             using OwningCopiesOfAssignment = std::vector<OwningCopyOfAssignment>;
 
             syrec::Variable::vec     newlyGeneratedReplacementSignalDefinitions;
@@ -36,6 +36,14 @@ namespace noAdditionalLineSynthesis {
                 containerForAssignments.reserve(1);
                 containerForAssignments.push_back(std::move(assignment));
                 return SimplificationResult({.newlyGeneratedReplacementSignalDefinitions = {}, .generatedAssignments = std::move(containerForAssignments), .requiredValueResetsForReplacementsTargetingExistingSignals = {}, .requiredInversionsOfValuesResetsForReplacementsTargetingExistingSignals = {}});
+            }
+
+            [[nodiscard]] static SimplificationResult asCopyOf(SimplificationResult simplificationResult) {
+                return SimplificationResult({simplificationResult.newlyGeneratedReplacementSignalDefinitions,
+                                             std::move(simplificationResult.generatedAssignments),
+                                             std::move(simplificationResult.requiredValueResetsForReplacementsTargetingExistingSignals),
+                                             std::move(simplificationResult.requiredInversionsOfValuesResetsForReplacementsTargetingExistingSignals)}
+                );
             }
         };
 
@@ -239,8 +247,9 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<double>                                            determineCostOfExpr(const syrec::expression& expr, std::size_t currentNestingLevel) const;
         [[nodiscard]] std::optional<double>                                            determineCostOfAssignment(const syrec::AssignStatement& assignment) const;
         [[nodiscard]] std::optional<double>                                            determineCostOfNumber(const syrec::Number& number, std::size_t currentNestingLevel) const;
-        [[nodiscard]] std::optional<double>                                            determineCostOfAssignments(const syrec::AssignStatement::vec& assignments) const;
-        [[nodiscard]] syrec::AssignStatement::vec                                      determineMostViableAlternativeBasedOnCost(const syrec::AssignStatement::vec& generatedSimplifiedAssignments, const std::shared_ptr<syrec::AssignStatement>& originalAssignmentUnoptimized, const SignalValueLookupCallback& signalValueCallback) const;
+        [[nodiscard]] std::optional<double>                                            determineCostOfAssignments(const std::vector<AssignmentTransformer::SharedAssignmentReference>& assignmentsToCheck) const;
+        [[nodiscard]] std::optional<double>                                            determineCostOfAssignments(SimplificationResult::OwningCopiesOfAssignment& assignments) const;
+        [[nodiscard]] SimplificationResultReference                                    determineMostViableAlternativeBasedOnCost(SimplificationResultReference& generatedSimplifiedAssignments, const std::shared_ptr<syrec::AssignStatement>& originalAssignmentUnoptimized, const SignalValueLookupCallback& signalValueCallback) const;
         [[nodiscard]] std::variant<syrec::VariableAccess::ptr, syrec::expression::ptr> createFinalSimplificationResultAfterDecisionWasMade(const DecisionReference& madeDecision, const OperationOperandSimplificationResult& lhsOperandOfOperationNode, syrec_operation::operation definedOperationAtOperationNode, const OperationOperandSimplificationResult& rhsOperandOfOperationNode, const SignalValueLookupCallback& callbackForValueLookupOfExistingSymbolTableSignals);
 
         [[nodiscard]] static syrec::expression::ptr                      fuseExpressions(const syrec::expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::expression::ptr& rhsOperand);
@@ -271,8 +280,9 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static std::optional<unsigned int>             evaluateNumber(const syrec::Number& numberToEvaluate);
         [[nodiscard]] static bool                                    doesOperandSimplificationResultMatchExpression(const OperationOperandSimplificationResult& operandSimplificationResult, const syrec::expression::ptr& exprToCheck);
         [[nodiscard]] static std::optional<SimplificationResult::OwningCopyOfAssignment> createOwningCopyOfAssignment(const syrec::AssignStatement& assignment);
-        [[nodiscard]] static std::optional<SimplificationResult::OwningCopiesOfAssignment> createOwningCopiesOfAssignments(const syrec::AssignStatement::vec& assignments);
-
+        [[nodiscard]] static std::optional<SimplificationResult::OwningCopyOfAssignment>   createOwningCopyOfAssignment(const syrec::UnaryStatement& assignment);
+        [[nodiscard]] static std::optional<SimplificationResult::OwningCopiesOfAssignment> createOwningCopiesOfAssignments(const std::vector<TemporaryAssignmentsContainer::SharedAssignmentReference>& assignments);
+         static void                                                          tryAddCosts(std::optional<double>& currentSumOfCosts, const std::optional<double>& costsToAdd);
         /**
          * \brief Determines the signal parts defined in the given expression which cannot be used as potential replacement candidates
          * \param expr The expression which shall be checked

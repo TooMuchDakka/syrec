@@ -15,17 +15,24 @@ namespace noAdditionalLineSynthesis {
     public:
         using ptr = std::unique_ptr<AssignmentTransformer>;
         using InitialSignalValueLookupCallback = std::function<std::optional<unsigned int>(syrec::VariableAccess& accessedSignalParts)>;
+        using SharedAssignmentReference = std::variant<std::shared_ptr<syrec::AssignStatement>, std::shared_ptr<syrec::UnaryStatement>>;
 
         AssignmentTransformer() {
             assignmentRhsExprSplitter = std::make_unique<ExpressionToSubAssignmentSplitter>();
         }
 
         virtual ~AssignmentTransformer() = default;
-        [[nodiscard]] syrec::AssignStatement::vec simplify(const syrec::AssignStatement::vec& assignmentsToSimplify, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback);
+        [[nodiscard]] std::vector<SharedAssignmentReference> simplify(const std::vector<SharedAssignmentReference>& assignmentsToSimplify, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback);
         
     protected:
-        using AwaitedInversionsOfAssignedToSignalsParts = std::shared_ptr<std::unordered_map<syrec::expression::ptr, syrec_operation::operation>>;
-        using AwaitedInversionOfAssignedToSignalPartsLookup = std::unordered_map<syrec::VariableAccess::ptr, AwaitedInversionsOfAssignedToSignalsParts>;
+        using AwaitedInversionsByBinaryAssignmentLookupEntry = std::unordered_map<syrec::expression::ptr, syrec_operation::operation>;
+        using AwaitedInversionOfAssignedToSignalPartsByBinaryAssignmentLookup = std::unordered_map<syrec::VariableAccess::ptr, AwaitedInversionsByBinaryAssignmentLookupEntry>;
+
+        struct AwaitedInversionsByUnaryAssignmentLookupEntry {
+            syrec_operation::operation awaitedInvertedAssignmentOperation;
+            std::size_t                numWaits;
+        };
+        using AwaitedInversionsOfAssignedToSignalPartsByUnaryAssignmentLookup = std::unordered_map<syrec::VariableAccess::ptr, AwaitedInversionsByUnaryAssignmentLookupEntry>;
 
         struct SignalValueLookupCacheEntry {
             enum ActiveValueEntry {
@@ -51,24 +58,29 @@ namespace noAdditionalLineSynthesis {
         using SignalValueLookupCacheEntryReference = std::shared_ptr<SignalValueLookupCacheEntry>;
         using SignalValueLookupCache = std::unordered_map<syrec::VariableAccess::ptr, SignalValueLookupCacheEntryReference>;
 
-        AwaitedInversionOfAssignedToSignalPartsLookup awaitedAssignmentsLookup;
+        AwaitedInversionsOfAssignedToSignalPartsByUnaryAssignmentLookup awaitedInversionsOfUnaryAssignmentsLookup;
+        AwaitedInversionOfAssignedToSignalPartsByBinaryAssignmentLookup awaitedInversionsOfBinaryAssignmentsLookup;
         SignalValueLookupCache                        signalValueLookupCache;
         ExpressionToSubAssignmentSplitter::ptr        assignmentRhsExprSplitter;
 
         virtual void       resetInternals();
         void               addWatchForInversionOfAssignment(const syrec::AssignStatement& assignment);
-        void               tryRemoveWatchForInversionOfAssignment(const syrec::AssignStatement& assignment) const;
+        void               addWatchForInversionOfAssignment(const syrec::UnaryStatement& assignment);
+        void               tryRemoveWatchForInversionOfAssignment(const syrec::AssignStatement& assignment);
+        void               tryRemoveWatchForInversionOfAssignment(const syrec::UnaryStatement& assignment);
         void               updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::expression& expr) const;
         void               tryReplaceAddAssignOperationWithXorOperation(syrec::AssignStatement& assignment) const;
         void               invalidateSignalValueLookupEntryFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void               handleAllExpectedInversionsOfAssignedToSignalPartsDefined(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void               createSignalValueLookupCacheEntry(const syrec::VariableAccess::ptr& assignedToSignalParts, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback);
 
-        [[nodiscard]] bool                                 areMoreInversionsRequiredToReachOriginalSignalValue(const syrec::VariableAccess::ptr& accessedSignalParts) const;
-        [[nodiscard]] bool                                 doesAssignmentMatchWatchForInvertedAssignment(const syrec::AssignStatement& assignment) const;
-        [[nodiscard]] std::optional<unsigned int>          fetchCurrentValueOfAssignedToSignal(const syrec::VariableAccess::ptr& accessedSignalParts) const;
-        [[nodiscard]] syrec::AssignStatement::vec          trySplitAssignmentRhsExpr(const syrec::AssignStatement::ptr& assignment) const;
-        [[nodiscard]] SignalValueLookupCacheEntryReference getSignalValueCacheEntryFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
+        [[nodiscard]] bool                                                         areMoreInversionsRequiredToReachOriginalSignalValue(const syrec::VariableAccess::ptr& accessedSignalParts) const;
+        [[nodiscard]] bool                                                         doesAssignmentMatchWatchForInvertedAssignment(const syrec::AssignStatement& assignment) const;
+        [[nodiscard]] bool                                                         doesAssignmentMatchWatchForInvertedAssignment(const syrec::UnaryStatement& assignment) const;
+        [[nodiscard]] std::optional<unsigned int>                                  fetchCurrentValueOfAssignedToSignal(const syrec::VariableAccess::ptr& accessedSignalParts) const;
+        [[nodiscard]] syrec::AssignStatement::vec                                  trySplitAssignmentRhsExpr(const syrec::AssignStatement::ptr& assignment) const;
+        [[nodiscard]] SignalValueLookupCacheEntryReference                         getSignalValueCacheEntryFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
+        [[nodiscard]] static std::optional<std::shared_ptr<syrec::UnaryStatement>> tryReplaceBinaryAssignmentWithUnaryOne(const syrec::AssignStatement& assignment);
     };
 }
 #endif

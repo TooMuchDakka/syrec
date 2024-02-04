@@ -7,48 +7,59 @@
 
 using namespace noAdditionalLineSynthesis;
 
-void TemporaryAssignmentsContainer::storeActiveAssignment(const syrec::AssignStatement::ptr& assignment) {
-    if (const auto& assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment); assignmentCasted) {
-        const auto& assignedToSignalIdent = assignmentCasted->lhs->var->name;
-        if (!activeAssignmentsLookup.count(assignedToSignalIdent)) {
-            std::unordered_set<syrec::VariableAccess::ptr> assignedToSignalParts;
-            assignedToSignalParts.insert(assignmentCasted->lhs);
-            activeAssignmentsLookup.insert(std::make_pair(assignedToSignalIdent, assignedToSignalParts));
-        } else {
-            auto& existingAssignedToSignalParts = activeAssignmentsLookup.at(assignedToSignalIdent);
-            if (!existingAssignedToSignalParts.count(assignmentCasted->lhs)) {
-                existingAssignedToSignalParts.insert(assignmentCasted->lhs);
-            }
+void TemporaryAssignmentsContainer::storeActiveAssignment(const SharedAssignmentReference& assignment) {
+    std::optional<std::string> assignedToSignalIdent;
+    std::optional<syrec::VariableAccess::ptr> assignedToSignalParts;
+    if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(assignment)) {
+        if (const auto& assignmentCastedAsBinaryOne = std::get<std::shared_ptr<syrec::AssignStatement>>(assignment); assignmentCastedAsBinaryOne) {
+            assignedToSignalParts = assignmentCastedAsBinaryOne->lhs;
+            assignedToSignalIdent = assignmentCastedAsBinaryOne->lhs->var->name;
         }
-        generatedAssignments.emplace_back(assignment);
-        indicesOfActiveAssignments.emplace_back(generatedAssignments.size() - 1);
+    } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(assignment)) {
+        if (const auto& assignmentCastedAsUnaryOne = std::get<std::shared_ptr<syrec::UnaryStatement>>(assignment); assignmentCastedAsUnaryOne) {
+            assignedToSignalParts = assignmentCastedAsUnaryOne->var;
+            assignedToSignalIdent = assignmentCastedAsUnaryOne->var->var->name;
+        }
     }
-}
 
-void TemporaryAssignmentsContainer::storeInitializationForReplacementOfLeafNode(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand) {
-    const std::shared_ptr<syrec::AssignStatement> castedAssignmentDefiningSubstitution = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentDefiningSubstitution);
-    const std::shared_ptr<syrec::AssignStatement> castedRequiredResetAssignment        = optionalRequiredResetOfSubstitutionLhsOperand.has_value() ? std::dynamic_pointer_cast<syrec::AssignStatement>(*optionalRequiredResetOfSubstitutionLhsOperand) : nullptr;
-
-    if (!castedAssignmentDefiningSubstitution || (optionalRequiredResetOfSubstitutionLhsOperand.has_value() && !castedRequiredResetAssignment)) {
+    if (!assignedToSignalIdent.has_value() || !assignedToSignalParts.has_value()) {
         return;
     }
+    
+    if (!activeAssignmentsLookup.count(*assignedToSignalIdent)) {
+        std::unordered_set<syrec::VariableAccess::ptr> lookupForAssignedToPartsOfSignal;
+        lookupForAssignedToPartsOfSignal.insert(*assignedToSignalParts);
+        activeAssignmentsLookup.insert(std::make_pair(*assignedToSignalIdent, lookupForAssignedToPartsOfSignal));
+    } else {
+        auto& existingAssignedToSignalParts = activeAssignmentsLookup.at(*assignedToSignalIdent);
+        if (!existingAssignedToSignalParts.count(*assignedToSignalParts)) {
+            existingAssignedToSignalParts.insert(*assignedToSignalParts);
+        }
+    }
+    generatedAssignments.emplace_back(assignment);
+    indicesOfActiveAssignments.emplace_back(generatedAssignments.size() - 1);
+}
 
-    if (castedRequiredResetAssignment) {
-        initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedRequiredResetAssignment);   
+void TemporaryAssignmentsContainer::storeInitializationForReplacementOfLeafNode(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<SharedAssignmentReference>& optionalRequiredResetOfSubstitutionLhsOperand) {
+    const std::shared_ptr<syrec::AssignStatement> castedAssignmentDefiningSubstitution = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentDefiningSubstitution);
+    if (!castedAssignmentDefiningSubstitution || (optionalRequiredResetOfSubstitutionLhsOperand.has_value() && !castedAssignmentDefiningSubstitution)) {
+        return;
+    }
+    
+    if (optionalRequiredResetOfSubstitutionLhsOperand.has_value()) {
+        initializationAssignmentsForGeneratedSubstitutions.emplace_back(*optionalRequiredResetOfSubstitutionLhsOperand);   
     }
     generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.emplace_back(castedAssignmentDefiningSubstitution);
 }
 
-void TemporaryAssignmentsContainer::storeReplacementAsActiveAssignment(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<syrec::AssignStatement::ptr>& optionalRequiredResetOfSubstitutionLhsOperand) {
+void TemporaryAssignmentsContainer::storeReplacementAsActiveAssignment(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<SharedAssignmentReference>& optionalRequiredResetOfSubstitutionLhsOperand) {
     const std::shared_ptr<syrec::AssignStatement> castedAssignmentDefiningSubstitution = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentDefiningSubstitution);
-    const std::shared_ptr<syrec::AssignStatement> castedRequiredResetAssignment        = optionalRequiredResetOfSubstitutionLhsOperand.has_value() ? std::dynamic_pointer_cast<syrec::AssignStatement>(*optionalRequiredResetOfSubstitutionLhsOperand) : nullptr;
-
-    if (!castedAssignmentDefiningSubstitution || (optionalRequiredResetOfSubstitutionLhsOperand.has_value() && !castedRequiredResetAssignment)) {
+    if (!castedAssignmentDefiningSubstitution || (optionalRequiredResetOfSubstitutionLhsOperand.has_value() && !castedAssignmentDefiningSubstitution)) {
         return;
     }
-
-    if (castedRequiredResetAssignment) {
-        initializationAssignmentsForGeneratedSubstitutions.emplace_back(castedRequiredResetAssignment);
+    
+    if (optionalRequiredResetOfSubstitutionLhsOperand.has_value()) {
+        initializationAssignmentsForGeneratedSubstitutions.emplace_back(*optionalRequiredResetOfSubstitutionLhsOperand);
     }
     storeActiveAssignment(castedAssignmentDefiningSubstitution);
 }
@@ -66,9 +77,16 @@ void TemporaryAssignmentsContainer::invertAllAssignmentsUpToLastCutoff(std::size
     }
 
     for (auto activeAssignmentIndicesIterator = relevantIndicesOfActiveAssignments.rbegin(); activeAssignmentIndicesIterator != relevantIndicesOfActiveAssignments.rend(); ++activeAssignmentIndicesIterator) {
-        const syrec::AssignStatement::ptr& referenceActiveAssignment = generatedAssignments.at(*activeAssignmentIndicesIterator);
-        if (const auto& referenceAssignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(referenceActiveAssignment); referenceAssignmentCasted) {
-            if (!optionalExcludedFromInversionAssignmentsFilter || referenceAssignmentCasted->lhs != *optionalExcludedFromInversionAssignmentsFilter) {
+        const SharedAssignmentReference& activeReferenceAssignment = generatedAssignments.at(*activeAssignmentIndicesIterator);
+        if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(activeReferenceAssignment)) {
+            const std::shared_ptr<syrec::AssignStatement> activeReferenceAssignmentAsBinaryOne = std::get<std::shared_ptr<syrec::AssignStatement>>(activeReferenceAssignment);
+            if (activeReferenceAssignmentAsBinaryOne && (!optionalExcludedFromInversionAssignmentsFilter || activeReferenceAssignmentAsBinaryOne->lhs != *optionalExcludedFromInversionAssignmentsFilter)) {
+                invertAssignmentAndStoreAndMarkOriginalAsInactive(*activeAssignmentIndicesIterator);   
+            }
+
+        } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(activeReferenceAssignment)) {
+            const std::shared_ptr<syrec::UnaryStatement> activeReferenceAssignmentAsUnaryOne = std::get<std::shared_ptr<syrec::UnaryStatement>>(activeReferenceAssignment);
+            if (activeReferenceAssignmentAsUnaryOne && (!optionalExcludedFromInversionAssignmentsFilter || activeReferenceAssignmentAsUnaryOne->var != *optionalExcludedFromInversionAssignmentsFilter)) {
                 invertAssignmentAndStoreAndMarkOriginalAsInactive(*activeAssignmentIndicesIterator);   
             }
         }
@@ -80,7 +98,6 @@ void TemporaryAssignmentsContainer::popLastCutoffForInvertibleAssignments() {
         cutOffIndicesForInvertibleAssignments.pop_back();
     }
 }
-
 
 void TemporaryAssignmentsContainer::rollbackLastXAssignments(std::size_t numberOfAssignmentsToRemove) {
     const std::size_t actualNumberOfAssignmentsRemoved = std::min(numberOfAssignmentsToRemove, generatedAssignments.size());
@@ -97,8 +114,15 @@ void TemporaryAssignmentsContainer::rollbackLastXAssignments(std::size_t numberO
     }), indicesOfActiveAssignments.end());
     
     for (auto generatedAssignmentsToBeRemovedIterator = std::next(generatedAssignments.begin(), indexOfFirstRemovedAssignment); generatedAssignmentsToBeRemovedIterator != generatedAssignments.end();) {
-        if (const auto& referencedAssignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(*generatedAssignmentsToBeRemovedIterator); referencedAssignmentCasted) {
-            removeActiveAssignmentFromLookup(referencedAssignmentCasted->lhs);   
+        std::optional<syrec::VariableAccess::ptr> assignedToSignalPartsToBeRemovedFromLookup;
+        if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(*generatedAssignmentsToBeRemovedIterator)) {
+            assignedToSignalPartsToBeRemovedFromLookup = std::get<std::shared_ptr<syrec::AssignStatement>>(*generatedAssignmentsToBeRemovedIterator)->lhs;
+        } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(*generatedAssignmentsToBeRemovedIterator)) {
+            assignedToSignalPartsToBeRemovedFromLookup = std::get<std::shared_ptr<syrec::UnaryStatement>>(*generatedAssignmentsToBeRemovedIterator)->var;
+        }
+
+        if (assignedToSignalPartsToBeRemovedFromLookup.has_value()) {
+            removeActiveAssignmentFromLookup(*assignedToSignalPartsToBeRemovedFromLookup);   
         }
         generatedAssignmentsToBeRemovedIterator = generatedAssignments.erase(generatedAssignmentsToBeRemovedIterator);
     }
@@ -115,7 +139,6 @@ void TemporaryAssignmentsContainer::rollbackAssignmentsMadeSinceLastCutoffAndOpt
     rollbackLastXAssignments(generatedAssignments.size() - indexOfFirstRemovedAssignment);
 }
 
-
 void TemporaryAssignmentsContainer::resetInternals() {
     generatedAssignments.clear();
     indicesOfActiveAssignments.clear();
@@ -125,13 +148,13 @@ void TemporaryAssignmentsContainer::resetInternals() {
     generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.clear();
 }
 
-// TODO: What should happen if we cannot fit all assignments into the container (i.e. a number larger than UINT_MAX)
-syrec::AssignStatement::vec TemporaryAssignmentsContainer::getAssignments() const {
+//// TODO: What should happen if we cannot fit all assignments into the container (i.e. a number larger than UINT_MAX)
+std::vector<TemporaryAssignmentsContainer::SharedAssignmentReference> TemporaryAssignmentsContainer::getAssignments() const {
     if (generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.empty()) {
         return generatedAssignments;
     }
     
-    std::vector<syrec::AssignStatement::ptr> combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData;
+    std::vector<SharedAssignmentReference> combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData;
     combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.reserve(generatedAssignments.size() + (generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.size() * 2));
 
     combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.insert(combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.end(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.cbegin(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.cend());
@@ -144,31 +167,42 @@ syrec::AssignStatement::vec TemporaryAssignmentsContainer::getAssignments() cons
     return combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData;
 }
 
-std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::getAssignmentsDefiningValueResetsOfGeneratedSubstitutions() const {
+std::optional<std::vector<TemporaryAssignmentsContainer::OwningAssignmentReference>> TemporaryAssignmentsContainer::getAssignmentsDefiningValueResetsOfGeneratedSubstitutions() const {
     return createOwningCopiesOfAssignments(initializationAssignmentsForGeneratedSubstitutions);
 }
 
-std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::getInvertedAssignmentsUndoingValueResetsOfGeneratedSubstitutions() const {
-    const std::optional<unsigned int> mappedToInversionOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign);
-    if (initializationAssignmentsForGeneratedSubstitutions.empty() || !mappedToInversionOperation.has_value()) {
+std::optional < std::vector < TemporaryAssignmentsContainer::OwningAssignmentReference>> TemporaryAssignmentsContainer::getInvertedAssignmentsUndoingValueResetsOfGeneratedSubstitutions() const {
+    const std::optional<unsigned int> mappedToInversionOperationForBinaryAssignments = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign);
+    const std::optional<unsigned int> mappedToInversionOperationForUnaryAssignments   = syrec_operation::tryMapUnaryAssignmentOperationEnumToFlag(syrec_operation::operation::IncrementAssign);
+    if (initializationAssignmentsForGeneratedSubstitutions.empty() || !mappedToInversionOperationForBinaryAssignments.has_value() || !mappedToInversionOperationForUnaryAssignments.has_value()) {
         // Since the empty brace initialization is also applicable to the std::optional type, we need to use the construct below to initialize a non-empty std::optional of an empty vector
-        return std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>>(std::in_place);
+        return std::optional<std::vector<OwningAssignmentReference>>(std::in_place);
     }
 
-    std::vector<std::unique_ptr<syrec::AssignStatement>> containerForOwningCopiesOfAssignments;
+    std::vector<OwningAssignmentReference> containerForOwningCopiesOfAssignments;
     containerForOwningCopiesOfAssignments.reserve(initializationAssignmentsForGeneratedSubstitutions.size());
-    if (std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> owningCopiesOfInitializationAssignments = getAssignmentsDefiningValueResetsOfGeneratedSubstitutions(); owningCopiesOfInitializationAssignments.has_value()) {
+    if (std::optional<std::vector<OwningAssignmentReference>> owningCopiesOfInitializationAssignments = getAssignmentsDefiningValueResetsOfGeneratedSubstitutions(); owningCopiesOfInitializationAssignments.has_value()) {
         containerForOwningCopiesOfAssignments.insert(containerForOwningCopiesOfAssignments.end(), std::make_move_iterator(owningCopiesOfInitializationAssignments->begin()), std::make_move_iterator(owningCopiesOfInitializationAssignments->end()));
         for (auto&& initializationStatement: containerForOwningCopiesOfAssignments) {
+            OwningAssignmentReference temporaryOwnershipOfInitializationStatement = std::move(initializationStatement);
+            
             /*
              * All assignments created in this function restore the initial value of the replacements generated from existing signals thus we can use the XOR assignment operation for this step
              * since the current value of the replacement signal is zero (and under our assumption that all signal values are non-negative integers) this XOR assignment operation is equal to the ADD assignment operation.
              */
-            initializationStatement->op = *mappedToInversionOperation;   
+            if (std::holds_alternative<std::unique_ptr<syrec::AssignStatement>>(temporaryOwnershipOfInitializationStatement)) {
+                std::unique_ptr<syrec::AssignStatement> temporaryOwnerOfBinaryAssignment = std::get<std::unique_ptr<syrec::AssignStatement>>(std::move(temporaryOwnershipOfInitializationStatement));
+                temporaryOwnerOfBinaryAssignment->op                                     = *mappedToInversionOperationForBinaryAssignments;
+                initializationStatement                                                  = std::move(temporaryOwnerOfBinaryAssignment);
+            } else if (std::holds_alternative<std::unique_ptr<syrec::UnaryStatement>>(temporaryOwnershipOfInitializationStatement)) {
+                std::unique_ptr<syrec::UnaryStatement> temporaryOwnerOfUnaryAssignment = std::get<std::unique_ptr<syrec::UnaryStatement>>(std::move(temporaryOwnershipOfInitializationStatement));
+                temporaryOwnerOfUnaryAssignment->op                                    = *mappedToInversionOperationForUnaryAssignments;
+                initializationStatement                                                = std::move(temporaryOwnerOfUnaryAssignment);
+            }
         }
     } else {
         // Since the empty brace initialization is also applicable to the std::optional type, we need to use the construct below to initialize a non-empty std::optional of an empty vector
-        return std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>>(std::in_place);
+        return std::optional<std::vector<OwningAssignmentReference>>(std::in_place);
     }
     return containerForOwningCopiesOfAssignments;
 }
@@ -195,7 +229,7 @@ std::size_t TemporaryAssignmentsContainer::getNumberOfAssignments() const {
     return generatedAssignments.size();
 }
 
-// START OF NON-PUBLIC FUNCTIONS
+//// START OF NON-PUBLIC FUNCTIONS
 std::vector<std::size_t> TemporaryAssignmentsContainer::determineIndicesOfInvertibleAssignmentsStartingFrom(std::size_t firstRelevantAssignmentIndex) const {
     const auto& indexOfFirstActiveAssignmentWithLargerIndex = std::find_if(
             indicesOfActiveAssignments.cbegin(),
@@ -217,22 +251,42 @@ void TemporaryAssignmentsContainer::invertAssignmentAndStoreAndMarkOriginalAsIna
      * Perform a search for the index of the reference active assignment and mark it as inactive by removing said index from the indices of the active assignments
      */
     const auto& referenceGeneratedAssignment = generatedAssignments.at(indexOfAssignmentToInvert);
-    if (const auto& referenceAssignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(referenceGeneratedAssignment); referenceAssignmentCasted) {
-        const auto& indexOfActiveAssignmentToRemove = std::find_if(
-                indicesOfActiveAssignments.cbegin(),
-                indicesOfActiveAssignments.cend(),
-                [&indexOfAssignmentToInvert](const std::size_t indexOfActiveAssignment) {
-                    return indexOfAssignmentToInvert == indexOfActiveAssignment;
-                });
-        if (indexOfActiveAssignmentToRemove != indicesOfActiveAssignments.cend()) {
-            indicesOfActiveAssignments.erase(indexOfActiveAssignmentToRemove);
+    const auto& indexOfActiveAssignmentToRemove = std::find_if(
+            indicesOfActiveAssignments.cbegin(),
+            indicesOfActiveAssignments.cend(),
+            [&indexOfAssignmentToInvert](const std::size_t indexOfActiveAssignment) {
+                return indexOfAssignmentToInvert == indexOfActiveAssignment;
+            });
+    if (indexOfActiveAssignmentToRemove != indicesOfActiveAssignments.cend()) {
+        indicesOfActiveAssignments.erase(indexOfActiveAssignmentToRemove);
+    }
+
+    if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(referenceGeneratedAssignment)) {
+        const std::shared_ptr<syrec::AssignStatement> castedBinaryAssignmentStatement = std::get<std::shared_ptr<syrec::AssignStatement>>(referenceGeneratedAssignment);
+        removeActiveAssignmentFromLookup(castedBinaryAssignmentStatement->lhs);
+
+        std::shared_ptr<syrec::AssignStatement> generatedInvertedAssignment = copyUtils::createDeepCopyOfAssignmentStmt(*castedBinaryAssignmentStatement);
+        if (!generatedInvertedAssignment) {
+            return;
         }
-
-        removeActiveAssignmentFromLookup(referenceAssignmentCasted->lhs);
-
-        std::shared_ptr<syrec::AssignStatement> generatedInvertedAssignment = copyUtils::createDeepCopyOfAssignmentStmt(*referenceAssignmentCasted);
         invertAssignment(*generatedInvertedAssignment);
         generatedAssignments.emplace_back(generatedInvertedAssignment);
+
+    } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(referenceGeneratedAssignment)) {
+        const std::shared_ptr<syrec::UnaryStatement> castedUnaryAssignmentStatement = std::get<std::shared_ptr<syrec::UnaryStatement>>(referenceGeneratedAssignment);
+        removeActiveAssignmentFromLookup(castedUnaryAssignmentStatement->var);
+
+        const std::shared_ptr<syrec::Statement> invertedUnaryAssignmentStatement = copyUtils::createCopyOfStmt(*castedUnaryAssignmentStatement);
+        if (!invertedUnaryAssignmentStatement) {
+            return;
+        }
+
+        std::shared_ptr<syrec::UnaryStatement> castedInvertedUnaryAssignmentStatement = std::dynamic_pointer_cast<syrec::UnaryStatement>(invertedUnaryAssignmentStatement);
+        if (!castedInvertedUnaryAssignmentStatement) {
+            return;
+        }
+        invertAssignment(*castedInvertedUnaryAssignmentStatement);
+        generatedAssignments.emplace_back(castedInvertedUnaryAssignmentStatement);
     }
 }
 
@@ -249,36 +303,61 @@ void TemporaryAssignmentsContainer::removeActiveAssignmentFromLookup(const syrec
 }
 
 void TemporaryAssignmentsContainer::invertAssignment(syrec::AssignStatement& assignment) {
-    const auto& matchingAssignmentOperationEnumForFlag              = *syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
-    const auto& invertedAssignmentOperation                         = *syrec_operation::invert(matchingAssignmentOperationEnumForFlag);
-    const auto& mappedToAssignmentOperationFlagForInvertedOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(invertedAssignmentOperation);
-    assignment.op                                                   = *mappedToAssignmentOperationFlagForInvertedOperation;
+    const std::optional<syrec_operation::operation> matchingAssignmentOperationEnumForFlag              = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
+    const std::optional<syrec_operation::operation> invertedAssignmentOperation                         = matchingAssignmentOperationEnumForFlag.has_value() ? syrec_operation::invert(*matchingAssignmentOperationEnumForFlag) : std::nullopt;
+    if (const std::optional<unsigned int> mappedToAssignmentOperationFlagForInvertedOperation = invertedAssignmentOperation.has_value() ? syrec_operation::tryMapAssignmentOperationEnumToFlag(*invertedAssignmentOperation) : std::nullopt; mappedToAssignmentOperationFlagForInvertedOperation.has_value()) {
+        assignment.op = *mappedToAssignmentOperationFlagForInvertedOperation;   
+    }
 }
 
-std::optional<std::unique_ptr<syrec::AssignStatement>> TemporaryAssignmentsContainer::createOwningCopyOfAssignment(const syrec::AssignStatement& assignment) {
+void TemporaryAssignmentsContainer::invertAssignment(syrec::UnaryStatement& assignment) {
+    const std::optional<syrec_operation::operation> matchingUnaryAssignmentOperationEnumForFlag     = syrec_operation::tryMapUnaryAssignmentOperationFlagToEnum(assignment.op);
+    const std::optional<syrec_operation::operation> invertedUnaryAssignmentOperation                = matchingUnaryAssignmentOperationEnumForFlag.has_value() ? syrec_operation::invert(*matchingUnaryAssignmentOperationEnumForFlag) : std::nullopt;
+    const std::optional<unsigned int>               mappedToFlagForInvertedUnaryAssignmentOperation = invertedUnaryAssignmentOperation.has_value() ? syrec_operation::tryMapUnaryAssignmentOperationEnumToFlag(*invertedUnaryAssignmentOperation) : std::nullopt;
+    if (mappedToFlagForInvertedUnaryAssignmentOperation.has_value()) {
+        assignment.op = *mappedToFlagForInvertedUnaryAssignmentOperation;
+    }
+}
+
+std::optional<TemporaryAssignmentsContainer::OwningAssignmentReference> TemporaryAssignmentsContainer::createOwningCopyOfAssignment(const syrec::AssignStatement& assignment) {
     if (std::unique_ptr<syrec::AssignStatement> owningCopyOfAssignment = std::make_unique<syrec::AssignStatement>(assignment); owningCopyOfAssignment) {
         return owningCopyOfAssignment;
     }
     return std::nullopt;
 }
 
-std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>> TemporaryAssignmentsContainer::createOwningCopiesOfAssignments(const syrec::AssignStatement::vec& assignments) {
+std::optional<TemporaryAssignmentsContainer::OwningAssignmentReference> TemporaryAssignmentsContainer::createOwningCopyOfAssignment(const syrec::UnaryStatement& assignment) {
+    if (std::unique_ptr<syrec::UnaryStatement> owningCopyOfAssignment = std::make_unique<syrec::UnaryStatement>(assignment); owningCopyOfAssignment) {
+        return owningCopyOfAssignment;
+    }
+    return std::nullopt;
+}
+
+
+std::optional<std::vector<TemporaryAssignmentsContainer::OwningAssignmentReference>> TemporaryAssignmentsContainer::createOwningCopiesOfAssignments(const std::vector<SharedAssignmentReference>& assignments) {
     if (assignments.empty()) {
         // Since the empty brace initialization is also applicable to the std::optional type, we need to use the construct below to initialize a non-empty std::optional of an empty vector
-        return std::optional<std::vector<std::unique_ptr<syrec::AssignStatement>>>(std::in_place);
+        return std::optional<std::vector<OwningAssignmentReference>>(std::in_place);
     }
 
-    std::vector<std::unique_ptr<syrec::AssignStatement>> containerForCopies;
+    std::vector<OwningAssignmentReference> containerForCopies;
     containerForCopies.reserve(assignments.size());
-    
+
     for (const auto& statementToTreatAsAssignment: assignments) {
-        if (const std::shared_ptr<syrec::AssignStatement> statementCastedAsAssignment = std::dynamic_pointer_cast<syrec::AssignStatement>(statementToTreatAsAssignment); statementCastedAsAssignment) {
-            if (std::optional<std::unique_ptr<syrec::AssignStatement>> copyOfAssignment = createOwningCopyOfAssignment(*statementCastedAsAssignment); copyOfAssignment.has_value()) {
-                containerForCopies.push_back(std::move(*copyOfAssignment));
-                continue;
+        std::optional<OwningAssignmentReference> copyOfAssignment;
+        if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(statementToTreatAsAssignment)) {
+            if (const std::shared_ptr<syrec::AssignStatement> statementCastedAsBinaryAssignment = std::get<std::shared_ptr<syrec::AssignStatement>>(statementToTreatAsAssignment); statementCastedAsBinaryAssignment) {
+                copyOfAssignment = createOwningCopyOfAssignment(*statementCastedAsBinaryAssignment);
+            }
+        } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(statementToTreatAsAssignment)) {
+            if (const std::shared_ptr<syrec::UnaryStatement> statementCastedAsUnaryAssignment = std::get<std::shared_ptr<syrec::UnaryStatement>>(statementToTreatAsAssignment); statementCastedAsUnaryAssignment) {
+                copyOfAssignment = createOwningCopyOfAssignment(*statementCastedAsUnaryAssignment);
             }
         }
-        return std::nullopt;
+        if (!copyOfAssignment.has_value()) {
+            return std::nullopt;
+        }
+        containerForCopies.push_back(std::move(*copyOfAssignment));
     }
     return containerForCopies;
 }
