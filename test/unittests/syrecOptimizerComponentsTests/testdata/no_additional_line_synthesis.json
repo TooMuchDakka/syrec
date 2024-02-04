@@ -1815,7 +1815,7 @@
   },
   "simplificationByReplacementResusesNotBlockedBitrangeOfExistingSignalThatWasAlsoNotUsedOnRhsOfAssignmentExpr": {
     "circuit": "module main(out a(6), inout b(1), inout c(1)) a += 12; a.0 += b.0; a.1 += b.0; b += (((c - 2) + c) + a.1)",
-    "expectedCircuit": "module main(out a(6), inout b(1), inout c(1)) a ^= 12; a.0 ^= b.0; a.1 ^= b.0; a.2 ^= 1; a.2 ^= c; a.2 -= 2; a.2 += c; a.2 += a.1; b += a.2; a.2 -= a.1; a.2 -= c; a.2 += 2; a.2 ^= c; a.2 ^= 1",
+    "expectedCircuit": "module main(out a(6), inout b(1), inout c(1)) a ^= 12; a.0 ^= b.0; a.1 ^= b.0; --= a.2; a.2 ^= c; a.2 -= 2; a.2 += c; a.2 += a.1; b += a.2; a.2 -= a.1; a.2 -= c; a.2 += 2; a.2 ^= c; ++= a.2",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl",
@@ -1889,7 +1889,7 @@
   },
   "simplificationByReplacementDoesNotReuseBitOfExistingSignalWithUnknownValueDueToBeingBlockedByDataflowAnalysis": {
     "circuit": "module main(out a(4), inout b(1), inout c(1)) a += 6; for $i = 0 to 2 step 1 do c += ((b - 2) + b); ++= a.0 rof",
-    "expectedCircuit": "module main(out a(4), inout b(1), inout c(1)) a ^= 6; for $i = 0 to 2 step 1 do a.1 ^= 1; a.1 ^= b; a.1 -= 2; a.1 += b; c += a.1; a.1 -= b; a.1 += 2; a.1 ^= b; a.1 ^= 1; ++= a.0 rof",
+    "expectedCircuit": "module main(out a(4), inout b(1), inout c(1)) a ^= 6; for $i = 0 to 2 step 1 do --= a.1; a.1 ^= b; a.1 -= 2; a.1 += b; c += a.1; a.1 -= b; a.1 += 2; a.1 ^= b; ++= a.1; ++= a.0 rof",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl",

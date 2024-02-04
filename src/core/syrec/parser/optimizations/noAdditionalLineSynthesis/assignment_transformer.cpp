@@ -301,7 +301,7 @@ std::optional<std::shared_ptr<syrec::UnaryStatement>> AssignmentTransformer::try
 
     std::optional<unsigned int> mappedToUnaryAssignmentOperationEnumValueToFlag;
     if (const std::shared_ptr<syrec::NumericExpression> assignmentRhsExprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(assignment.rhs); assignmentRhsExprAsNumericExpr) {
-        if (!assignmentRhsExprAsNumericExpr->value->isConstant() || !assignmentRhsExprAsNumericExpr->value->evaluate({})) {
+        if (!assignmentRhsExprAsNumericExpr->value->isConstant() || assignmentRhsExprAsNumericExpr->value->evaluate({}) != 1) {
             return std::nullopt;
         }
         
