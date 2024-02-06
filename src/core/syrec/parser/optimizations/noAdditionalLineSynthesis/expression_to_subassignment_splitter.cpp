@@ -10,15 +10,21 @@ using namespace noAdditionalLineSynthesis;
 syrec::AssignStatement::vec ExpressionToSubAssignmentSplitter::createSubAssignmentsBySplitOfExpr(const syrec::AssignStatement::ptr& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
     resetInternals();
     const auto& assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment);
+    bool        wasOriginalXorAssignOperationTransformedToAddAssignOp = false;
     if (assignmentCasted) {
         transformTwoSubsequentMinusOperations(*assignmentCasted);
-        // We have to perform this sort of revert of a previous optimization so that our split precondition holds (which would not be the case for an assignment of 
-        transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(*assignmentCasted, currentValueOfAssignedToSignal);
-        transformAddAssignOperationToXorAssignOperationIfTopmostOpOfRhsExprIsBitwiseXor(*assignmentCasted, currentValueOfAssignedToSignal);
+        // We have to perform this sort of revert of a previous optimization so that our split precondition holds.
+        wasOriginalXorAssignOperationTransformedToAddAssignOp = transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(*assignmentCasted, currentValueOfAssignedToSignal);
+        transformAddAssignOperationToXorAssignOperationIfAssignedToSignalValueIsZeroAndTopmostOpOfRhsExprIsBitwiseXor(*assignmentCasted, currentValueOfAssignedToSignal);
     }
     const std::optional<syrec_operation::operation> mappedToAssignmentOperationFromFlag = assignmentCasted ? syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op) : std::nullopt;
     if (mappedToAssignmentOperationFromFlag.has_value() && isPreconditionSatisfied(*mappedToAssignmentOperationFromFlag, *assignmentCasted->rhs, currentValueOfAssignedToSignal)) {
-        init(assignmentCasted->lhs, *mappedToAssignmentOperationFromFlag, currentValueOfAssignedToSignal);
+        /*
+         * Since a prior transformation of the XOR_ASSIGN to an ADD_ASSIGN operation could have taken place to satisfy the precondition, we use a flag
+         * to revert this transformation to fix the assignment operation for the first sub operand of the rhs expression of the original assignment that would otherwise
+         * be an ADD_ASSIGN operation instead.
+         */
+        init(assignmentCasted->lhs, wasOriginalXorAssignOperationTransformedToAddAssignOp ? syrec_operation::operation::XorAssign : *mappedToAssignmentOperationFromFlag, currentValueOfAssignedToSignal);
         if (!handleExpr(assignmentCasted->rhs)) {
             storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *mappedToAssignmentOperationFromFlag, assignmentCasted->rhs));
         }
@@ -71,7 +77,7 @@ void ExpressionToSubAssignmentSplitter::init(const syrec::VariableAccess::ptr& f
     fixedSubAssignmentOperationsQueue.clear();
     fixedSubAssignmentOperationsQueueIdx = 0;
     fixedSubAssignmentOperationsQueue.emplace_back(initialAssignmentOperation);
-    currentAssignedToSignalValue               = initialAssignmentOperation != syrec_operation::operation::MinusAssign ? initialValueOfAssignedToSignalOfOriginalAssignment : std::nullopt;
+    currentAssignedToSignalValue = initialValueOfAssignedToSignalOfOriginalAssignment;
 }
 
 void ExpressionToSubAssignmentSplitter::updateOperationInversionFlag(syrec_operation::operation operationDeterminingInversionFlag) {
@@ -321,9 +327,9 @@ void ExpressionToSubAssignmentSplitter::transformTwoSubsequentMinusOperations(sy
     }
 }
 
-void ExpressionToSubAssignmentSplitter::transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
+bool ExpressionToSubAssignmentSplitter::transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
     if (!currentValueOfAssignedToSignal.has_value() || *currentValueOfAssignedToSignal) {
-        return;
+        return false;
     }
     const std::optional<syrec_operation::operation>               usedAssignmentOperation       = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
     const std::optional<std::shared_ptr<syrec::BinaryExpression>> assignmentRhsExprAsBinaryExpr = usedAssignmentOperation.has_value() ? std::make_optional(std::dynamic_pointer_cast<syrec::BinaryExpression>(assignment.rhs)) : std::nullopt;
@@ -331,12 +337,14 @@ void ExpressionToSubAssignmentSplitter::transformXorOperationToAddAssignOperatio
 
     if (usedBinaryOperation.has_value() && *usedBinaryOperation != syrec_operation::operation::BitwiseXor && *usedAssignmentOperation == syrec_operation::operation::XorAssign) {
         if (const std::optional<unsigned int> flagForAddAssignOperation = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::AddAssign); flagForAddAssignOperation.has_value()) {
-            assignment.op = *flagForAddAssignOperation;    
+            assignment.op = *flagForAddAssignOperation;
+            return true;
         }
     }
+    return false;
 }
 
-void ExpressionToSubAssignmentSplitter::transformAddAssignOperationToXorAssignOperationIfTopmostOpOfRhsExprIsBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned>& currentValueOfAssignedToSignal) {
+void ExpressionToSubAssignmentSplitter::transformAddAssignOperationToXorAssignOperationIfAssignedToSignalValueIsZeroAndTopmostOpOfRhsExprIsBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned>& currentValueOfAssignedToSignal) {
     if (!currentValueOfAssignedToSignal.has_value() || *currentValueOfAssignedToSignal) {
         return;
     }

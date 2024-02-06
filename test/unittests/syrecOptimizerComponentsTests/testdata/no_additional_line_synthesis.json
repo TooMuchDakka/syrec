@@ -2089,13 +2089,35 @@
       "deadCodeElimON": "1"
     }
   },
-  "simplificationByReplacedReusingExistingSignalWithValueOfOneReplacesBinaryAssingmentWithUnaryOne": {
+  "simplificationByReplacmentReusingExistingSignalWithValueOfOneReplacesBinaryAssingmentWithUnaryOne": {
     "circuit": "module main(out a(2), inout b(2), inout c(2)) a += 1; c += (b + (b + 2))",
     "expectedCircuit": "module main(out a(2), inout b(2), inout c(2)) a ^= 1; --= a; a ^= b; a += 2; a += b; c += a; a -= b; a -= 2; a ^= b; ++= a",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl",
       "constantPropON": "1"
+    }
+  },
+  "simplificationByReplacementReusingExistingSignalToReplaceOperandOfOperationNodeUpdatesReferenceCountsCorrectly": {
+    "circuit": "module main(out a(2), inout b(2), inout c(2)) c += (b + (b + 2)); a += 0",
+    "expectedCircuit": "module main(out a(2), inout b(2), inout c(2)) a ^= b; a += 2; a += b; c += a; a -= b; a -= 2; a ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deatStoreElimON": "1",
+      "deadCodeElimON": "1"
+    }
+  },
+  "simplificationByReplacementReusingExistingSignalToReplaceWholeExprUpdatesReferenceCountsCorrectly": {
+    "circuit": "module main(out a(2), inout b(2), inout c(2)) c += (b + (b / 2)); a += 0",
+    "expectedCircuit": "module main(out a(2), inout b(2), inout c(2)) a ^= (b / 2); a += b; c += a; a -= b; a ^= (b / 2)",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl",
+      "constantPropON": "1",
+      "deatStoreElimON": "1",
+      "deadCodeElimON": "1"
     }
   }
 }

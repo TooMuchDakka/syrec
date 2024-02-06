@@ -72,6 +72,7 @@ namespace parser {
 
         void                  markModuleVariableAsUnused(const ModuleIdentifier& moduleIdentifier, const std::string_view& literalIdent, bool doesIdentReferenceModuleParameter) const;
         void                  updateReferenceCountOfLiteral(const std::string_view& literalIdent, ReferenceCountUpdate typeOfUpdate) const;
+        void                  updateReferenceCountOfLiteralNTimes(const std::string_view& literalIdent, std::size_t numberOfUpdates, ReferenceCountUpdate typeOfUpdate) const;
         void                  updateReferenceCountOfModulesMatchingSignature(const std::vector<ModuleIdentifier>& moduleIdentifiers, ReferenceCountUpdate typeOfUpdate) const;
         [[maybe_unused]] bool changeStatementsOfModule(const ModuleIdentifier& moduleIdentifier, const syrec::Statement::vec& updatedModuleBodyStatements) const;
         [[nodiscard]] bool    isVariableUsedAnywhereBasedOnReferenceCount(const std::string_view& literalIdent) const;
@@ -164,7 +165,7 @@ namespace parser {
         [[nodiscard]] std::optional<DeclaredModuleSignature>                                           tryGetOptimizedSignatureForModuleCall(const std::string_view& moduleName, std::size_t& internalModuleId) const;
         [[nodiscard]] static std::optional<::optimizations::BitRangeAccessRestriction::BitRangeAccess> tryTransformAccessedBitRange(const syrec::VariableAccess::ptr& accessedSignalParts, bool considerUnknownBitRangeStartAndEndAsWholeSignalAccess = true);
         [[nodiscard]] static std::vector<std::optional<unsigned int>>                                  tryTransformAccessedDimensions(const syrec::VariableAccess::ptr& accessedSignalParts, bool isAccessedSignalLoopVariable);
-        static void                                                                                    performReferenceCountUpdate(std::size_t& currentReferenceCount, ReferenceCountUpdate typeOfUpdate);
+        static void                                                                                    performNReferenceCountUpdates(std::size_t& currentReferenceCount, std::size_t numberOfUpdates, ReferenceCountUpdate typeOfUpdate);
         static void                                                                                    addIndexOfDroppedParameterToOptimizedModule(ModuleSymbolTableEntry::InternalModuleHelperData& optimizedModuleData, std::size_t indexOfOptimizedAwayParameter);
         [[nodiscard]] static bool                                                                      doesVariableTypeAllowAssignment(syrec::Variable::Types variableTypeFlag);
         [[nodiscard]] static std::optional<syrec::Variable::Types>                                     convertVariableTypeFlagToEnum(unsigned int variableTypeFlag);

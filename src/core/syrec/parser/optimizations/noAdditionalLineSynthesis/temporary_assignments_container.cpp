@@ -265,13 +265,12 @@ void TemporaryAssignmentsContainer::invertAssignmentAndStoreAndMarkOriginalAsIna
         const std::shared_ptr<syrec::AssignStatement> castedBinaryAssignmentStatement = std::get<std::shared_ptr<syrec::AssignStatement>>(referenceGeneratedAssignment);
         removeActiveAssignmentFromLookup(castedBinaryAssignmentStatement->lhs);
 
-        std::shared_ptr<syrec::AssignStatement> generatedInvertedAssignment = copyUtils::createDeepCopyOfAssignmentStmt(*castedBinaryAssignmentStatement);
-        if (!generatedInvertedAssignment) {
-            return;
+        if (std::shared_ptr<syrec::Statement> copyOfOriginalAssignment = copyUtils::createCopyOfStmt(*castedBinaryAssignmentStatement); copyOfOriginalAssignment) {
+            if (std::shared_ptr<syrec::AssignStatement> generatedInvertedAssignment = std::dynamic_pointer_cast<syrec::AssignStatement>(copyOfOriginalAssignment); generatedInvertedAssignment) {
+                invertAssignment(*generatedInvertedAssignment);
+                generatedAssignments.emplace_back(generatedInvertedAssignment);
+            }
         }
-        invertAssignment(*generatedInvertedAssignment);
-        generatedAssignments.emplace_back(generatedInvertedAssignment);
-
     } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(referenceGeneratedAssignment)) {
         const std::shared_ptr<syrec::UnaryStatement> castedUnaryAssignmentStatement = std::get<std::shared_ptr<syrec::UnaryStatement>>(referenceGeneratedAssignment);
         removeActiveAssignmentFromLookup(castedUnaryAssignmentStatement->var);

@@ -344,6 +344,12 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
                             moveOwningCopiesOfStatementsBetweenContainers(remainingSimplifiedAssignments, std::move(simplificationResult->generatedAssignments));
                             moveOwningCopiesOfStatementsBetweenContainers(remainingSimplifiedAssignments, std::move(simplificationResult->requiredInversionsOfValuesResetsForReplacementsTargetingExistingSignals));
                             if (makeNewlyGeneratedSignalsAvailableInSymbolTableScope(**activeSymbolTableScope, internalIdentifierOfCurrentlyProcessedModule, simplificationResult->newlyGeneratedReplacementSignalDefinitions)) {
+                                const ReferenceCountLookupForStatement referenceCountsOfOriginalStatement = ReferenceCountLookupForStatement::createFromStatement(*assignmentStmtToSimplify);
+                                ReferenceCountLookupForStatement       referenceCountsOfUpdatedStatements = ReferenceCountLookupForStatement();
+                                for (const std::unique_ptr<syrec::Statement>& simplifiedAssignment : remainingSimplifiedAssignments) {
+                                    referenceCountsOfUpdatedStatements = referenceCountsOfUpdatedStatements.mergeWith(ReferenceCountLookupForStatement::createFromStatement(*simplifiedAssignment));
+                                }
+                                updateReferenceCountsOfOptimizedAssignments(**activeSymbolTableScope, referenceCountsOfOriginalStatement.getDifferencesBetweenThisAndOther(referenceCountsOfUpdatedStatements));
                                 return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(remainingSimplifiedAssignments));
                             }
                         }
@@ -2796,7 +2802,10 @@ bool optimizations::Optimizer::makeNewlyGeneratedSignalsAvailableInSymbolTableSc
     
     for (const syrec::Variable::ptr& newlyGeneratedSignalUsedForReplacements : newlyGeneratedSignalsUsedForReplacements) {
         createSymbolTableEntryForVariable(symbolTableScope, *newlyGeneratedSignalUsedForReplacements);
-        symbolTableScope.updateReferenceCountOfLiteral(newlyGeneratedSignalUsedForReplacements->name, parser::SymbolTable::ReferenceCountUpdate::Increment);
+        /*
+         * We do not update the reference counts of the newly generated replacement signals not referencing existing signals here since the updates of the reference counts
+         * is done in a later step when the information of all signals is available in the symbol table. Which is the case after this call.
+         */
     }
     return true;
 }
@@ -2810,5 +2819,113 @@ void optimizations::Optimizer::moveOwningCopiesOfStatementsBetweenContainers(std
         } else if (std::holds_alternative<std::unique_ptr<syrec::UnaryStatement>>(toBeMovedAssignmentFromContainer)) {
             toBeMovedToContainer.push_back(std::get<std::unique_ptr<syrec::UnaryStatement>>(std::move(toBeMovedAssignmentFromContainer)));
         }
+    }
+}
+
+optimizations::Optimizer::ReferenceCountLookupForStatement& optimizations::Optimizer::ReferenceCountLookupForStatement::mergeWith(const ReferenceCountLookupForStatement& other) {
+    for (const auto& [signalIdent, referenceCounts] : other.signalReferenceCountLookup) {
+        if (signalReferenceCountLookup.count(signalIdent)) {
+            const std::size_t currentReferenceCountsForSignal = signalReferenceCountLookup.at(signalIdent);
+            if ((SIZE_MAX - currentReferenceCountsForSignal) < referenceCounts) {
+                signalReferenceCountLookup[signalIdent] = SIZE_MAX;
+            }
+            else {
+                signalReferenceCountLookup[signalIdent] += referenceCounts;
+            }
+        }
+        else {
+            signalReferenceCountLookup.insert(std::make_pair(signalIdent, referenceCounts));
+        }
+    }
+    return *this;
+}
+
+optimizations::Optimizer::ReferenceCountLookupForStatement optimizations::Optimizer::ReferenceCountLookupForStatement::createFromStatement(const syrec::Statement& statement) {
+    if (const auto& stmtAsUnaryAssignmentStmt = dynamic_cast<const syrec::UnaryStatement*>(&statement);stmtAsUnaryAssignmentStmt) {
+        return createFromSignalAccess(*stmtAsUnaryAssignmentStmt->var);
+    }
+    if (const auto& stmtAsBinaryAssignmentStmt = dynamic_cast<const syrec::AssignStatement*>(&statement); stmtAsBinaryAssignmentStmt) {
+        return createFromSignalAccess(*stmtAsBinaryAssignmentStmt->lhs).mergeWith(createFromExpression(*stmtAsBinaryAssignmentStmt->rhs));
+    }
+    return {};
+}
+
+optimizations::Optimizer::ReferenceCountLookupForStatement optimizations::Optimizer::ReferenceCountLookupForStatement::createFromExpression(const syrec::expression& expression) {
+    if (const auto& exprAsVariableExpr = dynamic_cast<const syrec::VariableExpression*>(&expression); exprAsVariableExpr) {
+        return createFromSignalAccess(*exprAsVariableExpr->var);
+    }
+    if (const auto& exprAsShiftExpr = dynamic_cast<const syrec::ShiftExpression*>(&expression); exprAsShiftExpr) {
+        return createFromExpression(*exprAsShiftExpr->lhs).mergeWith(createFromNumber(*exprAsShiftExpr->rhs));
+    }
+    if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expression); exprAsBinaryExpr) {
+        return createFromExpression(*exprAsBinaryExpr->lhs).mergeWith(createFromExpression(*exprAsBinaryExpr->rhs));
+    }
+    if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expression); exprAsNumericExpr) {
+        return createFromNumber(*exprAsNumericExpr->value);
+    }
+    return {};
+}
+
+optimizations::Optimizer::ReferenceCountLookupForStatement optimizations::Optimizer::ReferenceCountLookupForStatement::createFromNumber(const syrec::Number& number) {
+    if (!number.isCompileTimeConstantExpression()) {
+        return {};
+    }
+    const syrec::Number::CompileTimeConstantExpression& numberAsCompileTimeConstantExpression = number.getExpression();
+    return createFromNumber(*numberAsCompileTimeConstantExpression.lhsOperand).mergeWith(createFromNumber(*numberAsCompileTimeConstantExpression.rhsOperand));
+}
+
+optimizations::Optimizer::ReferenceCountLookupForStatement optimizations::Optimizer::ReferenceCountLookupForStatement::createFromSignalAccess(const syrec::VariableAccess& signalAccess) {
+    ReferenceCountLookupForStatement aggregateLookup = ReferenceCountLookupForStatement();
+    aggregateLookup.signalReferenceCountLookup.insert(std::make_pair(signalAccess.var->name, 1));
+    for (const syrec::expression::ptr& exprDefiningAccessedValueOfDimension: signalAccess.indexes) {
+        aggregateLookup = aggregateLookup.mergeWith(createFromExpression(*exprDefiningAccessedValueOfDimension));
+    }
+    if (signalAccess.range.has_value()) {
+        const syrec::Number::ptr& bitRangeStart = signalAccess.range->first;
+        const syrec::Number::ptr& bitRangeEnd = signalAccess.range->second;
+        return aggregateLookup.mergeWith(createFromNumber(*bitRangeStart).mergeWith(createFromNumber(*bitRangeEnd)));
+    }
+    return aggregateLookup;
+}
+
+optimizations::Optimizer::ReferenceCountLookupForStatement::ReferenceCountDifferences optimizations::Optimizer::ReferenceCountLookupForStatement::getDifferencesBetweenThisAndOther(const ReferenceCountLookupForStatement& other) const {
+    std::unordered_map<std::string, std::size_t> lookupOfSignalsWithIncrementedSignalCounts;
+    std::unordered_map<std::string, std::size_t> lookupOfSignalsWithDecrementedSignalCounts;
+
+    for (const auto& [signalIdent, referenceCount] : other.signalReferenceCountLookup) {
+        if (!signalReferenceCountLookup.count(signalIdent)) {
+            lookupOfSignalsWithIncrementedSignalCounts.insert(std::make_pair(signalIdent, referenceCount));
+        }
+        else {
+            const std::size_t referenceCountsInThisLookup = signalReferenceCountLookup.at(signalIdent);
+            if (referenceCount != referenceCountsInThisLookup) {
+                if (referenceCount < referenceCountsInThisLookup) {
+                    lookupOfSignalsWithDecrementedSignalCounts.insert(std::make_pair(signalIdent, referenceCountsInThisLookup - referenceCount));
+                }
+                else {
+                    lookupOfSignalsWithIncrementedSignalCounts.insert(std::make_pair(signalIdent, referenceCount - referenceCountsInThisLookup));
+                }
+            }
+            else {
+                lookupOfSignalsWithIncrementedSignalCounts.insert(std::make_pair(signalIdent, 0));
+            }
+        }
+    }
+
+    for (const auto& [signalIdent, referenceCount] : signalReferenceCountLookup) {
+        if(!lookupOfSignalsWithIncrementedSignalCounts.count(signalIdent)) {
+            lookupOfSignalsWithDecrementedSignalCounts.insert(std::make_pair(signalIdent, referenceCount));
+        }
+    }
+
+    return ReferenceCountDifferences({lookupOfSignalsWithIncrementedSignalCounts, lookupOfSignalsWithDecrementedSignalCounts});
+}
+
+void optimizations::Optimizer::updateReferenceCountsOfOptimizedAssignments(const parser::SymbolTable& symbolTable, const ReferenceCountLookupForStatement::ReferenceCountDifferences& referenceCountDifferences) {
+    for (const auto& [signalIdent, incrementedReferenceCounts] : referenceCountDifferences.lookupOfSignalsWithIncrementedReferenceCounts) {
+        symbolTable.updateReferenceCountOfLiteralNTimes(signalIdent, incrementedReferenceCounts, parser::SymbolTable::ReferenceCountUpdate::Increment);
+    }
+    for (const auto& [signalIdent, decrementedReferenceCounts]: referenceCountDifferences.lookupOfSignalsWithDecrementedReferenceCounts) {
+        symbolTable.updateReferenceCountOfLiteralNTimes(signalIdent, decrementedReferenceCounts, parser::SymbolTable::ReferenceCountUpdate::Decrement);
     }
 }

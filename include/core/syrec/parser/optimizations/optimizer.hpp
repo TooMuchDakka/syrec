@@ -331,6 +331,22 @@ namespace optimizations {
                 vectorToModify.erase(std::next(vectorToModify.begin(), *indicesIterator));
             }
         }
+
+        struct ReferenceCountLookupForStatement {
+            struct ReferenceCountDifferences {
+                std::unordered_map<std::string, std::size_t> lookupOfSignalsWithIncrementedReferenceCounts;
+                std::unordered_map<std::string, std::size_t> lookupOfSignalsWithDecrementedReferenceCounts;
+            };
+            std::unordered_map<std::string, std::size_t> signalReferenceCountLookup;
+
+            [[nodiscard]] ReferenceCountDifferences               getDifferencesBetweenThisAndOther(const ReferenceCountLookupForStatement& other) const;
+            [[nodiscard]] ReferenceCountLookupForStatement&       mergeWith(const ReferenceCountLookupForStatement& other);
+            [[nodiscard]] static ReferenceCountLookupForStatement createFromStatement(const syrec::Statement& statement);
+            [[nodiscard]] static ReferenceCountLookupForStatement createFromExpression(const syrec::expression& expression);
+            [[nodiscard]] static ReferenceCountLookupForStatement createFromNumber(const syrec::Number& number);
+            [[nodiscard]] static ReferenceCountLookupForStatement createFromSignalAccess(const syrec::VariableAccess& signalAccess);
+        };
+        static void updateReferenceCountsOfOptimizedAssignments(const parser::SymbolTable& symbolTable, const ReferenceCountLookupForStatement::ReferenceCountDifferences& referenceCountDifferences);
     private:
         [[nodiscard]] const parser::SymbolTable* getActiveSymbolTableForEvaluation() const;
     };

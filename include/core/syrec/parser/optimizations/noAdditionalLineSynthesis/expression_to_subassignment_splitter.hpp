@@ -90,9 +90,9 @@ namespace noAdditionalLineSynthesis {
          * an += operation with a ^= operation if the symbol table entry for the assigned to signal value is zero. The latter will not be checked here and only the assignment will be transformed.
          * \param assignment The assignment which shall be checked
          */
-        static void transformTwoSubsequentMinusOperations(syrec::AssignStatement& assignment);
-        static void transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal);
-        static void transformAddAssignOperationToXorAssignOperationIfTopmostOpOfRhsExprIsBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal);
+        static void                  transformTwoSubsequentMinusOperations(syrec::AssignStatement& assignment);
+        [[maybe_unused]] static bool transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal);
+        static void                  transformAddAssignOperationToXorAssignOperationIfAssignedToSignalValueIsZeroAndTopmostOpOfRhsExprIsBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal);
         /**
          * \brief Check whether the given \p expr does not defined any operations without a matching assignment operation counterpart when one or both operands are nested expressions <br>
          * \remarks This function assumes that numeric expressions that defined compile time constant expression where already converted to binary expressions

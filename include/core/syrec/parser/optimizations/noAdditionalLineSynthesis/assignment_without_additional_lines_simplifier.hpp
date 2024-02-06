@@ -62,16 +62,18 @@ namespace noAdditionalLineSynthesis {
             temporaryExpressionsContainer                     = std::make_unique<TemporaryExpressionsContainer>();
             expressionTraversalHelper                         = std::make_shared<ExpressionTraversalHelper>();
             expressionToSubAssignmentSplitterReference        = std::make_unique<ExpressionToSubAssignmentSplitter>();
-            substitutionGenerator                             = config.has_value() && config.value().optionalNewReplacementSignalIdentsPrefix.has_value()
-                ? std::make_unique<ExpressionSubstitutionGenerator>(*config.value().optionalNewReplacementSignalIdentsPrefix)
-                : nullptr;
 
-            learnedConflictsLookup                            = std::make_unique<LearnedConflictsLookup>();
-            disabledValueLookupToggle                         = false;
-            assignmentTransformer                             = std::make_unique<AssignmentTransformer>();
             if (config.has_value()) {
                 internalConfig = *config;
+                if (config->optionalNewReplacementSignalIdentsPrefix.has_value()) {
+                    substitutionGenerator = std::make_unique<ExpressionSubstitutionGenerator>(config->optionalNewReplacementSignalIdentsPrefix.value());
+                }
+                assignmentTransformer = std::make_unique<AssignmentTransformer>();
+            } else {
+                assignmentTransformer = nullptr;
             }
+            learnedConflictsLookup                            = std::make_unique<LearnedConflictsLookup>();
+            disabledValueLookupToggle                         = false;
         }
 
     protected:

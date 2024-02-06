@@ -60,16 +60,15 @@ namespace noAdditionalLineSynthesis {
 
         AwaitedInversionsOfAssignedToSignalPartsByUnaryAssignmentLookup awaitedInversionsOfUnaryAssignmentsLookup;
         AwaitedInversionOfAssignedToSignalPartsByBinaryAssignmentLookup awaitedInversionsOfBinaryAssignmentsLookup;
-        SignalValueLookupCache                        signalValueLookupCache;
-        ExpressionToSubAssignmentSplitter::ptr        assignmentRhsExprSplitter;
+        SignalValueLookupCache                                          signalValueLookupCache;
+        ExpressionToSubAssignmentSplitter::ptr                          assignmentRhsExprSplitter;
 
         virtual void       resetInternals();
         void               addWatchForInversionOfAssignment(const syrec::AssignStatement& assignment);
         void               addWatchForInversionOfAssignment(const syrec::UnaryStatement& assignment);
-        void               tryRemoveWatchForInversionOfAssignment(const syrec::AssignStatement& assignment);
+        void               tryRemoveWatchForInversionOfAssignment(const syrec::AssignStatement& assignment, bool& wasLastExistingWatchRemoved);
         void               tryRemoveWatchForInversionOfAssignment(const syrec::UnaryStatement& assignment);
         void               updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::expression& expr) const;
-        void               tryReplaceAddAssignOperationWithXorOperation(syrec::AssignStatement& assignment) const;
         void               invalidateSignalValueLookupEntryFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void               handleAllExpectedInversionsOfAssignedToSignalPartsDefined(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void               createSignalValueLookupCacheEntry(const syrec::VariableAccess::ptr& assignedToSignalParts, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback);

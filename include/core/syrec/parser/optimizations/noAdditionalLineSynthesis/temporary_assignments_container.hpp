@@ -40,7 +40,7 @@ namespace noAdditionalLineSynthesis {
         std::vector<std::size_t>                                                        cutOffIndicesForInvertibleAssignments;
         std::vector<std::size_t>                                                        indicesOfActiveAssignments;
         std::vector<SharedAssignmentReference>                                          generatedAssignments;
-        std::vector<SharedAssignmentReference>                                          generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode;
+        std::vector<std::shared_ptr<syrec::AssignStatement>>                            generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode;
         std::vector<SharedAssignmentReference>                                          initializationAssignmentsForGeneratedSubstitutions;
         std::unordered_map<std::string, std::unordered_set<syrec::VariableAccess::ptr>> activeAssignmentsLookup;
 

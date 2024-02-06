@@ -347,16 +347,21 @@ void SymbolTable::markModuleVariableAsUnused(const ModuleIdentifier& moduleIdent
 }
 
 void SymbolTable::updateReferenceCountOfLiteral(const std::string_view& literalIdent, ReferenceCountUpdate typeOfUpdate) const {
+    updateReferenceCountOfLiteralNTimes(literalIdent, 1, typeOfUpdate);
+}
+
+void SymbolTable::updateReferenceCountOfLiteralNTimes(const std::string_view& literalIdent, std::size_t numberOfUpdates, ReferenceCountUpdate typeOfUpdate) const {
     if (const auto& foundSymbolTableEntryForLiteral = getEntryForVariable(literalIdent); foundSymbolTableEntryForLiteral) {
-        performReferenceCountUpdate(foundSymbolTableEntryForLiteral->referenceCount, typeOfUpdate);
+        performNReferenceCountUpdates(foundSymbolTableEntryForLiteral->referenceCount, numberOfUpdates, typeOfUpdate);
     }
 }
+
 
 void SymbolTable::updateReferenceCountOfModulesMatchingSignature(const std::vector<SymbolTable::ModuleIdentifier>& moduleIdentifiers, SymbolTable::ReferenceCountUpdate typeOfUpdate) const {
     if (const auto& symbolTableEntryForModulesMatchingIdent = getEntryForModulesWithMatchingName(moduleIdentifiers.front().moduleIdent); symbolTableEntryForModulesMatchingIdent) {
         for (const auto& moduleIdentifier : moduleIdentifiers) {
             if (const auto& internalDataOfModuleMatchingId = symbolTableEntryForModulesMatchingIdent->internalDataLookup.find(moduleIdentifier.internalModuleId); internalDataOfModuleMatchingId != symbolTableEntryForModulesMatchingIdent->internalDataLookup.end()) {
-                performReferenceCountUpdate(internalDataOfModuleMatchingId->second.referenceCount, typeOfUpdate);
+                performNReferenceCountUpdates(internalDataOfModuleMatchingId->second.referenceCount, 1, typeOfUpdate);
             }
         }
     }
@@ -787,14 +792,22 @@ void SymbolTable::swap(const syrec::VariableAccess::ptr& swapLhsOperand, const s
     );
 }
 
-void SymbolTable::performReferenceCountUpdate(std::size_t& currentReferenceCount, ReferenceCountUpdate typeOfUpdate) {
+void SymbolTable::performNReferenceCountUpdates(std::size_t& currentReferenceCount, std::size_t numberOfUpdates, ReferenceCountUpdate typeOfUpdate) {
+    if (!numberOfUpdates) {
+        return;
+    }
+
     if (typeOfUpdate == ReferenceCountUpdate::Increment) {
-        if (currentReferenceCount != SIZE_MAX) {
-            currentReferenceCount++;
+        if ((SIZE_MAX - currentReferenceCount) > numberOfUpdates) {
+            currentReferenceCount += numberOfUpdates;
+        } else {
+            currentReferenceCount = SIZE_MAX;
         }
     } else if (typeOfUpdate == ReferenceCountUpdate::Decrement) {
-        if (currentReferenceCount) {
-            currentReferenceCount--;
+        if (currentReferenceCount < numberOfUpdates) {
+            currentReferenceCount = 0;
+        } else {
+            currentReferenceCount -= numberOfUpdates;
         }
     }
 }
