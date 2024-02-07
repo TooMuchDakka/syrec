@@ -62,39 +62,39 @@
     "expectedCircuit": "module main() skip"
   },
   "deadStoreInLoopWithMoreThanOneStatementRemovedIfLoopPerformsOnlyOneIteration": {
-    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; for 2 to 2 step 2 do skip; ++= c rof",
+    "circuit": "module main(out b(4)) wire c(4) ++= b; for 2 to 2 step 2 do skip; ++= c rof",
     "expectedCircuit": "module main(out b(4)) ++= b; skip"
   },
   "deadStoreInLoopWithMoreThanOneStatementNotRemovedIfLoopPerformsMoreThanOneIteration": {
     "circuit": "module main(out b(4)) wire c(4) ++= b; for 0 to 2 step 2 do skip; ++= c rof"
   },
   "loopWithSingleStatementRemovedCompletelyIfStatementWasDeadStoreAndLoopPerformsOnlyOneIteration": {
-    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; for 0 to 2 step 3 do ++= c rof",
+    "circuit": "module main(out b(4)) wire c(4) ++= b; for 0 to 2 step 3 do ++= c rof",
     "expectedCircuit": "module main(out b(4)) ++= b"
   },
   "loopWithSingleStatementLeftUnchangedIfStatementWasDeadStoreAndLoopPerformsMoreThanOneIteration": {
     "circuit": "module main(out b(4)) wire c(4) ++= b; for 0 to 2 step 2 do ++= c rof"
   },
   "loopWithSingleStatementLeftunchangedIfStatementWasDeadStoreAndLoopIterationRangeContainsUnknownValue": {
-    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; for $i = 0 to 5 step 1 do for 0 to $i step 1 do ++= c rof rof",
+    "circuit": "module main(out b(4)) wire c(4) ++= b; for $i = 0 to 5 step 1 do for 0 to $i step 1 do ++= c rof rof",
     "expectedCircuit": "module main(out b(4)) wire c(4) ++= b; for $i = 0 to 5 step 1 do for 0 to $i step 1 do ++= c rof rof"
   },
 
 
   "assignmentInTrueBranchDoesNotMakeDeadStoreInFalseBranchLiveAgain": {
-    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c; b += c else ++= c fi (b = c)",
+    "circuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then ++= c; b += c else ++= c fi (b = c)",
     "expectedCircuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then ++= c; b += c else skip fi (b = c)"
   },
   "assignmentInFalseBranchDoesNotMakeDeadStoreInTrueBranchLiveAgain": {
-    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c else --= c; b += c fi (b = c)",
+    "circuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then ++= c else --= c; b += c fi (b = c)",
     "expectedCircuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then skip else --= c; b += c fi (b = c)"
   },
   "deadStoresLocalToBranchesAreMadeLiveByUsageOfAssignedToSignalAfterIfStatement": {
-    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c.0 else --= c.3 fi (b = c); b += c",
+    "circuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then ++= c.0 else --= c.3 fi (b = c); b += c",
     "expectedCircuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then ++= c.0 else --= c.3 fi (b = c); b += c"
   },
   "deadStoresLocalToBranchesRemoved": {
-    "circuit": "module main(in a(4), out b(4)) wire c(4) ++= b; if (b = c) then ++= c.0 else --= c.3 fi (b = c)",
+    "circuit": "module main(out b(4)) wire c(4) ++= b; if (b = c) then ++= c.0 else --= c.3 fi (b = c)",
     "expectedCircuit": "module main(out b(4)) ++= b"
   },
   "assignmentInTrueBranchDoesNotMakeDeadStoreInStatementsOfFalseBranchWithNestedIfLiveAgain": {
@@ -134,7 +134,27 @@
     "circuit": "module add(in a(4), in b(4)) wire c(4) c += (a + b) module main(in a(4), in b(4), out c(4)) call add(a, b); uncall add(a, b)",
     "expectedCircuit": "module main() skip"
   },
-
+  "calledModuleWithOnlyDeadStoresNotRemovedAndEmptyBodyAppendedWithSingleSkipStatementIfDeadCodeElimnationIsNotEnabled": {
+    "circuit": "module add(in a(4), in b(4)) wire c(4) ++= c module main(in a(4), in b(4), out c(4)) call add(a, b); uncall add(a, b)",
+    "expectedCircuit": "module add(in a(4), in b(4)) wire c(4) skip module main(in a(4), in b(4), out c(4)) call add(a, b); uncall add(a, b)",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
+  "mainModuleBodyClearedAndAppendedWithSingleSkipStatementIfBodyContainedOnlyDeadStoresButDeadCodeEliminationWasDisabled": {
+    "circuit": "module main() wire c(4) ++= c; --= c",
+    "expectedCircuit": "module main() wire c(4) skip",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
+  "TODO_DEAD_STORES_AS_ASSIGNMENT_WITH_IDENTITY_ELEMENT_REMOVED_WHEN_DEAD_CODE_ELIMINATION_IS_DISABLED": {
+    "circuit": "",
+    "expectedCircuit": "",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
   "deadStoreMadeLiveByAccessOnWholeSignal": {
     "circuit": "module main(out a(4)) wire c(4) ++= c; a += c"
   },

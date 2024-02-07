@@ -200,9 +200,10 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
     }
 
     /*
-     * The declared main module body cannot be empty as defined by the SyReC grammar, thus we append a single skip statement in this case.
+     * As defined in the SyReC grammar, a module body cannot be empty (if the dead code elimination is not enabled) and will get a single SKIP statement added. Since the main module cannot be
+     * removed by the dead code elimination, a valid SyReC module needs at least one module defined, so this case will also be checked here.
      */
-    if (isCurrentModuleMainModule && copyOfModule->statements.empty()) {
+    if (copyOfModule->statements.empty() && (!parserConfig.deadCodeEliminationEnabled || isCurrentModuleMainModule)) {
         const auto& generatedSkipStmtForMainModuleWithEmptyBody = std::make_shared<syrec::SkipStatement>();
         copyOfModule->statements.emplace_back(generatedSkipStmtForMainModuleWithEmptyBody);
     }
@@ -277,6 +278,12 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
     
     syrec::expression::ptr rhsOperand = assignmentStmt.rhs;
+
+    if (const auto& x = std::dynamic_pointer_cast<syrec::VariableExpression>(rhsOperand); x) {
+        if (x->var->var->name == "c" && x->var->indexes.size() == 1) {
+            int y = 0;
+        }
+    }
     if (auto simplificationResultOfRhsExpr = handleExpr(*assignmentStmt.rhs); simplificationResultOfRhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         rhsOperand = std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front());
     }
@@ -307,6 +314,17 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     std::optional<unsigned int>                manuallySetMappedToAssignmentOperationFlag;
     const std::optional<EvaluatedSignalAccess> evaluatedSignalAccessOfAssignedToSignal = !doesAssignmentNotModifyAssignedToSignalValue ? tryEvaluateDefinedSignalAccess(*lhsOperand) : std::nullopt;
     if (!evaluatedSignalAccessOfAssignedToSignal.has_value()) {
+        /*
+         * If the optimized rhs expr defined the identity element of the given assignment operation while the unoptimized rhs expr did not evaluate to a constant
+         * and the dead code elimination optimization is not being enabled, we will create an assignment with the optimized rhs expr. Otherwise, the assignment is left unchanged.
+         */
+        if (const std::shared_ptr<syrec::NumericExpression>& rhsOperandAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(assignmentStmt.rhs); (!rhsOperandAsNumericExpr 
+            || !rhsOperandAsNumericExpr->value->isConstant()) && rhsOperandEvaluatedAsConstant.has_value()) {
+            if (std::unique_ptr<syrec::AssignStatement> simplifiedAssignment = std::make_unique<syrec::AssignStatement>(lhsOperand, assignmentStmt.op, rhsOperand); simplifiedAssignment) {
+                return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::move(simplifiedAssignment));
+            }
+        }
+
         // TODO: This premature exit could lead to problems but since the error handling in the optimizer is work in progress it is ok for now.
         return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
     }
@@ -315,8 +333,9 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         if (!mappedToAssignmentOperationFromFlag.has_value()) {
             invalidateValueOfAccessedSignalParts(*evaluatedSignalAccessOfAssignedToSignal);
         } else {
-            // Try to replace an assignment of the form a += ... to a ^= ... of the symbol table entry for 'a' has the value 0.
-            if (const std::optional<unsigned int> fetchedValueOfAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(*evaluatedSignalAccessOfAssignedToSignal); fetchedValueOfAssignedToSignal.has_value() && !*fetchedValueOfAssignedToSignal && *mappedToAssignmentOperationFromFlag == syrec_operation::operation::AddAssign) {
+            // Try to replace an assignment of the form a += ... to a ^= ... of the symbol table entry for 'a' has the value 0 if the operation strength reduction is enabled.
+            if (const std::optional<unsigned int> fetchedValueOfAssignedToSignal = tryFetchValueFromEvaluatedSignalAccess(*evaluatedSignalAccessOfAssignedToSignal); fetchedValueOfAssignedToSignal.has_value() && !*fetchedValueOfAssignedToSignal 
+                    && *mappedToAssignmentOperationFromFlag == syrec_operation::operation::AddAssign && parserConfig.operationStrengthReductionEnabled) {
                 manuallySetMappedToAssignmentOperationFlag = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign);
             }
 
@@ -375,7 +394,6 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
 
     if (const auto moduleCallGuessResolver = parser::ModuleCallGuess::tryInitializeWithModulesMatchingName(*symbolTableScope, callStatement.target->name); moduleCallGuessResolver.has_value()) {
-        // TODO:
         const auto moduleIdsOfInitialGuess = moduleCallGuessResolver->get()->getInternalIdsOfModulesMatchingGuess();
 
         bool callerArgumentsOk = true;
