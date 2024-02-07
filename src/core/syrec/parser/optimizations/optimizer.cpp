@@ -278,12 +278,6 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     }
     
     syrec::expression::ptr rhsOperand = assignmentStmt.rhs;
-
-    if (const auto& x = std::dynamic_pointer_cast<syrec::VariableExpression>(rhsOperand); x) {
-        if (x->var->var->name == "c" && x->var->indexes.size() == 1) {
-            int y = 0;
-        }
-    }
     if (auto simplificationResultOfRhsExpr = handleExpr(*assignmentStmt.rhs); simplificationResultOfRhsExpr.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         rhsOperand = std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front());
     }
