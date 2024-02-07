@@ -324,8 +324,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
             * If the value of the rhs expr does not modify the value of the assigned to signal but no dead code elimination is enabled, we can skip the application of the assignment
             */
             if (!doesAssignmentNotModifyAssignedToSignalValue) {
-                performAssignment(*evaluatedSignalAccessOfAssignedToSignal, *mappedToAssignmentOperationFromFlag, rhsOperandEvaluatedAsConstant);
-
+               
                 if (!skipCheckForSplitOfAssignmentInSubAssignments && assignmentWithoutAdditionalLineSynthesisOptimizer) {
                     std::unique_ptr<syrec::AssignStatement> assignmentStmtToSimplify;
                     if (lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs) {
@@ -358,6 +357,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
             }
         }
     }
+    performAssignment(*evaluatedSignalAccessOfAssignedToSignal, *mappedToAssignmentOperationFromFlag, rhsOperandEvaluatedAsConstant);
     
     if (lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs || manuallySetMappedToAssignmentOperationFlag.has_value()) {
         return OptimizationResult<syrec::Statement>::fromOptimizedContainer(std::make_unique<syrec::AssignStatement>(lhsOperand, manuallySetMappedToAssignmentOperationFlag.value_or(assignmentStmt.op), rhsOperand));
@@ -1891,13 +1891,17 @@ void optimizations::Optimizer::performSwapAndCreateBackupOfOperands(const syrec:
 }
 
 std::optional<unsigned> optimizations::Optimizer::tryFetchValueFromEvaluatedSignalAccess(const EvaluatedSignalAccess& accessedSignalParts) const {
+    if (!parserConfig.performConstantPropagation) {
+        return std::nullopt;
+    }
+
     if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
         std::optional<bool> areAnyComponentsOfAssignedToSignalAccessOutOfRange;
         bool                didAllDefinedIndicesEvaluateToConstants;
         if (auto transformedSignalAccess = transformEvaluatedSignalAccess(accessedSignalParts, &areAnyComponentsOfAssignedToSignalAccessOutOfRange, &didAllDefinedIndicesEvaluateToConstants); transformedSignalAccess != nullptr) {
             if (!areAnyComponentsOfAssignedToSignalAccessOutOfRange.value_or(false) && didAllDefinedIndicesEvaluateToConstants && !isValueLookupBlockedByDataFlowAnalysisRestriction(*transformedSignalAccess)) {
                 const std::shared_ptr<syrec::VariableAccess> sharedTransformedSignalAccess = std::move(transformedSignalAccess);
-                return activeSymbolTableScope->get()->tryFetchValueForLiteral(sharedTransformedSignalAccess);
+                return !isValueLookupBlockedByDataFlowAnalysisRestriction(*sharedTransformedSignalAccess) ? activeSymbolTableScope->get()->tryFetchValueForLiteral(sharedTransformedSignalAccess) : std::nullopt;
             }
         }        
     }

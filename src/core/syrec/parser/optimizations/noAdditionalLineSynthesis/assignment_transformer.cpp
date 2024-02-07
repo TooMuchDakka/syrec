@@ -279,7 +279,8 @@ bool AssignmentTransformer::doesAssignmentMatchWatchForInvertedAssignment(const 
 
 std::optional<unsigned> AssignmentTransformer::fetchCurrentValueOfAssignedToSignal(const syrec::VariableAccess::ptr& accessedSignalParts) const {
     if (signalValueLookupCache.count(accessedSignalParts)) {
-        return signalValueLookupCache.at(accessedSignalParts)->currentValue;
+        const SignalValueLookupCacheEntryReference& signalValueCacheEntry = signalValueLookupCache.at(accessedSignalParts);
+        return signalValueCacheEntry->activeValueEntry != SignalValueLookupCacheEntry::ActiveValueEntry::None ? signalValueCacheEntry->currentValue : std::nullopt;
     }
     return std::nullopt;
 }

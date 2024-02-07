@@ -90,7 +90,7 @@ namespace noAdditionalLineSynthesis {
          * an += operation with a ^= operation if the symbol table entry for the assigned to signal value is zero. The latter will not be checked here and only the assignment will be transformed.
          * \param assignment The assignment which shall be checked
          */
-        static void                  transformTwoSubsequentMinusOperations(syrec::AssignStatement& assignment);
+        static void                  transformTwoSubsequentMinusOperations(const syrec::AssignStatement::ptr& assignment);
         [[maybe_unused]] static bool transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal);
         static void                  transformAddAssignOperationToXorAssignOperationIfAssignedToSignalValueIsZeroAndTopmostOpOfRhsExprIsBitwiseXor(syrec::AssignStatement& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal);
         /**

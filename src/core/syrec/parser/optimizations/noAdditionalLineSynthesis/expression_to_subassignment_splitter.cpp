@@ -1,5 +1,7 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_to_subassignment_splitter.hpp"
 
+#include "core/syrec/parser/utils/copy_utils.hpp"
+
 using namespace noAdditionalLineSynthesis;
 
 // TODO: Tests for split of subassignments when topmost one is subtraction (i.e. if nested expression contains operations without assignment equivalent)
@@ -9,10 +11,10 @@ using namespace noAdditionalLineSynthesis;
 // Handling or split of subexpressions should also work under for this example currently does not
 syrec::AssignStatement::vec ExpressionToSubAssignmentSplitter::createSubAssignmentsBySplitOfExpr(const syrec::AssignStatement::ptr& assignment, const std::optional<unsigned int>& currentValueOfAssignedToSignal) {
     resetInternals();
-    const auto& assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment);
+    const std::shared_ptr<syrec::AssignStatement> assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment);
     bool        wasOriginalXorAssignOperationTransformedToAddAssignOp = false;
     if (assignmentCasted) {
-        transformTwoSubsequentMinusOperations(*assignmentCasted);
+        transformTwoSubsequentMinusOperations(assignmentCasted);
         // We have to perform this sort of revert of a previous optimization so that our split precondition holds.
         wasOriginalXorAssignOperationTransformedToAddAssignOp = transformXorOperationToAddAssignOperationIfTopmostOpOfRhsExprIsNotBitwiseXor(*assignmentCasted, currentValueOfAssignedToSignal);
         transformAddAssignOperationToXorAssignOperationIfAssignedToSignalValueIsZeroAndTopmostOpOfRhsExprIsBitwiseXor(*assignmentCasted, currentValueOfAssignedToSignal);
@@ -24,9 +26,17 @@ syrec::AssignStatement::vec ExpressionToSubAssignmentSplitter::createSubAssignme
          * to revert this transformation to fix the assignment operation for the first sub operand of the rhs expression of the original assignment that would otherwise
          * be an ADD_ASSIGN operation instead.
          */
-        init(assignmentCasted->lhs, wasOriginalXorAssignOperationTransformedToAddAssignOp ? syrec_operation::operation::XorAssign : *mappedToAssignmentOperationFromFlag, currentValueOfAssignedToSignal);
+        syrec_operation::operation topmostAssignmentOperation = wasOriginalXorAssignOperationTransformedToAddAssignOp ? syrec_operation::operation::XorAssign : *mappedToAssignmentOperationFromFlag;
+        init(assignmentCasted->lhs, topmostAssignmentOperation, currentValueOfAssignedToSignal);
         if (!handleExpr(assignmentCasted->rhs)) {
-            storeAssignment(createAssignmentFrom(fixedAssignmentLhs, *mappedToAssignmentOperationFromFlag, assignmentCasted->rhs));
+            /*
+            * In case the rhs expression of the assignment to simplify does not define a nested subexpression, we can only check whether the defined ADD_ASSIGN assignment operation
+            * can be replaced with an XOR_ASSIGN operation in case the value of the assigned to signal of the original assignment is zero.
+            */
+            if (currentValueOfAssignedToSignal.has_value() && !*currentValueOfAssignedToSignal && topmostAssignmentOperation == syrec_operation::operation::AddAssign) {
+                topmostAssignmentOperation = syrec_operation::operation::XorAssign;
+            }
+            storeAssignment(createAssignmentFrom(fixedAssignmentLhs, topmostAssignmentOperation, assignmentCasted->rhs));
         }
     } else {
         storeAssignment(assignment);
@@ -207,7 +217,7 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithTwoLeafNodes(const syrec::
 
 void ExpressionToSubAssignmentSplitter::storeAssignment(const syrec::AssignStatement::ptr& assignment) {
     if (const auto& assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment); assignmentCasted) {
-        transformTwoSubsequentMinusOperations(*assignmentCasted);
+        transformTwoSubsequentMinusOperations(assignmentCasted);
         updateValueOfAssignedToSignalViaAssignment(syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op), assignmentCasted->rhs.get());
     } else {
         updateValueOfAssignedToSignalViaAssignment(std::nullopt, nullptr);
@@ -307,21 +317,34 @@ std::optional<std::pair<bool, bool>> ExpressionToSubAssignmentSplitter::determin
     return std::nullopt;
 }
 
-void ExpressionToSubAssignmentSplitter::transformTwoSubsequentMinusOperations(syrec::AssignStatement& assignment) {
+void ExpressionToSubAssignmentSplitter::transformTwoSubsequentMinusOperations(const syrec::AssignStatement::ptr& assignment) {
+    std::shared_ptr<syrec::AssignStatement> assignmentCasted = std::dynamic_pointer_cast<syrec::AssignStatement>(assignment);
+    if (!assignmentCasted) {
+        return;
+    }
+
     /*
      * Try perform transformation of expression <assignedToSignal> -= (<subExpr_1> - <subExpr_2>) to <assignedToSignal += (<subExpr_2> - <subExpr_1>) to enable the optimization of replacing
      * an += operation with a ^= operation if the symbol table entry for the assigned to signal value is zero. The latter will not be checked here and only the assignment will be transformed.
      */
-    const std::optional<syrec_operation::operation>               usedAssignmentOperation       = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op);
-    const std::optional<std::shared_ptr<syrec::BinaryExpression>> assignmentRhsExprAsBinaryExpr = usedAssignmentOperation.has_value() ? std::make_optional(std::dynamic_pointer_cast<syrec::BinaryExpression>(assignment.rhs)) : std::nullopt;
+    const std::optional<syrec_operation::operation>               usedAssignmentOperation       = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentCasted->op);
+    const std::optional<std::shared_ptr<syrec::BinaryExpression>> assignmentRhsExprAsBinaryExpr = usedAssignmentOperation.has_value() ? std::make_optional(std::dynamic_pointer_cast<syrec::BinaryExpression>(assignmentCasted->rhs)) : std::nullopt;
 
     if (usedAssignmentOperation.has_value() && *usedAssignmentOperation == syrec_operation::operation::MinusAssign && assignmentRhsExprAsBinaryExpr.has_value() && *assignmentRhsExprAsBinaryExpr) {
         if (const std::optional<syrec_operation::operation> binaryOperationOfRhsExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(assignmentRhsExprAsBinaryExpr->get()->op); binaryOperationOfRhsExpr.has_value() && *binaryOperationOfRhsExpr == syrec_operation::operation::Subtraction) {
             if (const std::optional<unsigned int> mappedToOperationFlagFromEnum = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::AddAssign); mappedToOperationFlagFromEnum.has_value()) {
-                const syrec::expression::ptr backupOfAssignmentRhsExprLhsOperand = assignmentRhsExprAsBinaryExpr->get()->lhs;
-                assignmentRhsExprAsBinaryExpr->get()->lhs                        = assignmentRhsExprAsBinaryExpr->get()->rhs;
-                assignmentRhsExprAsBinaryExpr->get()->rhs                        = backupOfAssignmentRhsExprLhsOperand;
-                assignment.op                                                    = *mappedToOperationFlagFromEnum;
+                /*
+                 * Since the inversion statement for the given assignment statement reused the smart pointer for the rhs expression, we need to first create a copy of the latter and then switch the operands.
+                 * Otherwise, we would not only switch the operands in the inversion assignment rhs expression but all expression that share the same smart pointer to the rhs expression of our given assignment.
+                 */
+                const std::shared_ptr<syrec::expression> copyOfAssignmentRhsExpr = copyUtils::createDeepCopyOfExpression(**assignmentRhsExprAsBinaryExpr);
+                if (std::shared_ptr<syrec::BinaryExpression> copyOfAssignmentRhsExprCasted = copyOfAssignmentRhsExpr ? std::dynamic_pointer_cast<syrec::BinaryExpression>(copyOfAssignmentRhsExpr) : nullptr; copyOfAssignmentRhsExprCasted) {
+                    const syrec::expression::ptr backupOfAssignmentRhsExprLhsOperand = copyOfAssignmentRhsExprCasted->lhs;
+                    copyOfAssignmentRhsExprCasted->lhs                               = copyOfAssignmentRhsExprCasted->rhs;
+                    copyOfAssignmentRhsExprCasted->rhs                               = backupOfAssignmentRhsExprLhsOperand;
+                    assignmentCasted->op                                             = *mappedToOperationFlagFromEnum;
+                    assignmentCasted->rhs                                            = copyOfAssignmentRhsExprCasted;
+                }
             }
         }
     }
