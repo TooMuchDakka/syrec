@@ -134,22 +134,23 @@ void DimensionPropagationBlocker::liftRestrictionForBitRange(const std::optional
     }
     else {
         isDimensionCompletelyBlocked = false;
+        const auto bitRangeAccessOnWholeSignal = BitRangeAccessRestriction::BitRangeAccess(0, signalInformation.bitWidth - 1);
         /*
          * Since the unblocked bit range leaves some of the signal still blocked, we need to either create the remaining restriction on a dimension or per value of dimension wide level
          */
         if (!blockedValueOfDimension.has_value()) {
             if (!dimensionBitRangeAccessRestriction.has_value()) {
-                dimensionBitRangeAccessRestriction = std::make_shared<BitRangeAccessRestriction>(signalInformation.bitWidth);
+                dimensionBitRangeAccessRestriction = std::make_shared<BitRangeAccessRestriction>(signalInformation.bitWidth, bitRangeAccessOnWholeSignal);
                 (*dimensionBitRangeAccessRestriction)->liftRestrictionFor(blockedBitRange);
             }
         } else {
-            BitRangeAccessRestriction remainingRestrictionForUnblockedValueOfDimension = BitRangeAccessRestriction(signalInformation.bitWidth);
+            BitRangeAccessRestriction remainingRestrictionForUnblockedValueOfDimension = BitRangeAccessRestriction(signalInformation.bitWidth, bitRangeAccessOnWholeSignal);
             remainingRestrictionForUnblockedValueOfDimension.liftRestrictionFor(blockedBitRange);
 
             for (unsigned int valueOfDimension = 0; valueOfDimension < numValuesForDimension; ++valueOfDimension) {
                 const auto restrictionForValueOfDimension = valueOfDimension == *blockedValueOfDimension
                     ? remainingRestrictionForUnblockedValueOfDimension
-                    : BitRangeAccessRestriction(signalInformation.bitWidth);
+                    : BitRangeAccessRestriction(signalInformation.bitWidth, bitRangeAccessOnWholeSignal);
 
                 perValueOfDimensionBitRangeAccessRestrictionLookup.insert(std::make_pair(valueOfDimension, std::make_shared<BitRangeAccessRestriction>(restrictionForValueOfDimension)));
             }
