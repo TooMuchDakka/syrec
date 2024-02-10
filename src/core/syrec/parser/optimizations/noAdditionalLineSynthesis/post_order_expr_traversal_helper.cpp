@@ -16,7 +16,7 @@ std::vector<PostOrderExprTraversalHelper::GeneratedSubAssignment> PostOrderExprT
     return queueOfLeafNodesInPostOrder;
 }
 
-void PostOrderExprTraversalHelper::buildPostOrderQueue(syrec_operation::operation assignmentOperation, const syrec::expression::ptr& expr, bool isValueOfAssignedToSignalZeroPriorToAssignment) {
+void PostOrderExprTraversalHelper::buildPostOrderQueue(syrec_operation::operation assignmentOperation, const syrec::Expression::ptr& expr, bool isValueOfAssignedToSignalZeroPriorToAssignment) {
     if (!canHandleAssignmentOperation(assignmentOperation) || (!isValueOfAssignedToSignalZeroPriorToAssignment && assignmentOperation == syrec_operation::operation::XorAssign)) {
         return;
     }
@@ -28,11 +28,11 @@ void PostOrderExprTraversalHelper::buildPostOrderQueue(syrec_operation::operatio
     buildPostOrderTraversalQueueFor(expr);
 }
 
-bool PostOrderExprTraversalHelper::doesExprDefineNestedExpr(const syrec::expression::ptr& expr) {
+bool PostOrderExprTraversalHelper::doesExprDefineNestedExpr(const syrec::Expression::ptr& expr) {
     return std::dynamic_pointer_cast<syrec::BinaryExpression>(expr) != nullptr;
 }
 
-bool PostOrderExprTraversalHelper::doesExprDefinedVariableAccess(const syrec::expression::ptr& expr) {
+bool PostOrderExprTraversalHelper::doesExprDefinedVariableAccess(const syrec::Expression::ptr& expr) {
     return std::dynamic_pointer_cast<syrec::VariableExpression>(expr) != nullptr;
 }
 
@@ -47,21 +47,21 @@ bool PostOrderExprTraversalHelper::canHandleAssignmentOperation(syrec_operation:
     }
 }
 
-void PostOrderExprTraversalHelper::trySwitchSignalAccessOperandToLhs(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand) {
+void PostOrderExprTraversalHelper::trySwitchSignalAccessOperandToLhs(syrec::Expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::Expression::ptr& rhsOperand) {
     if (doesExprDefineNestedExpr(lhsOperand) || doesExprDefinedVariableAccess(lhsOperand) || !doesExprDefinedVariableAccess(rhsOperand) || !syrec_operation::isCommutative(operationToBeApplied)) {
         return;
     }
     switchOperands(lhsOperand, rhsOperand);
 }
 
-void PostOrderExprTraversalHelper::trySwitchNestedExprOnRhsToLhsIfLatterIsConstantOrLoopVariable(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand) {
+void PostOrderExprTraversalHelper::trySwitchNestedExprOnRhsToLhsIfLatterIsConstantOrLoopVariable(syrec::Expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::Expression::ptr& rhsOperand) {
     if (doesExprDefinedVariableAccess(lhsOperand) || doesExprDefineNestedExpr(lhsOperand) || !doesExprDefineNestedExpr(rhsOperand) || !syrec_operation::isCommutative(operationToBeApplied)) {
         return;
     }
     switchOperands(lhsOperand, rhsOperand);
 }
 
-bool PostOrderExprTraversalHelper::trySwitchOperandsForXorOperationIfRhsIsNestedExprWithLhsBeingNotNested(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand) {
+bool PostOrderExprTraversalHelper::trySwitchOperandsForXorOperationIfRhsIsNestedExprWithLhsBeingNotNested(syrec::Expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::Expression::ptr& rhsOperand) {
     if (operationToBeApplied != syrec_operation::operation::BitwiseXor || doesExprDefineNestedExpr(lhsOperand) == doesExprDefineNestedExpr(rhsOperand)) {
         return false;
     }
@@ -73,7 +73,7 @@ bool PostOrderExprTraversalHelper::trySwitchOperandsForXorOperationIfRhsIsNested
     return true;
 }
 
-bool PostOrderExprTraversalHelper::tryTransformExpressionIfOperationShouldBeInverted(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand, bool shouldOperationBeInverted) {
+bool PostOrderExprTraversalHelper::tryTransformExpressionIfOperationShouldBeInverted(syrec::Expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::Expression::ptr& rhsOperand, bool shouldOperationBeInverted) {
     if (shouldOperationBeInverted && operationToBeApplied == syrec_operation::operation::Subtraction) {
         switchOperands(lhsOperand, rhsOperand);
         return true;
@@ -81,7 +81,7 @@ bool PostOrderExprTraversalHelper::tryTransformExpressionIfOperationShouldBeInve
     return false;
 }
 
-void PostOrderExprTraversalHelper::switchOperands(syrec::expression::ptr& lhsOperand, syrec::expression::ptr& rhsOperand) {
+void PostOrderExprTraversalHelper::switchOperands(syrec::Expression::ptr& lhsOperand, syrec::Expression::ptr& rhsOperand) {
     const auto backupOfLhsOperand = lhsOperand;
     lhsOperand                    = rhsOperand;
     rhsOperand                    = backupOfLhsOperand;
@@ -95,7 +95,7 @@ syrec_operation::operation PostOrderExprTraversalHelper::determineFinalAssignmen
     return *syrec_operation::invert(currentAssignmentOperation);
 }
 
-void PostOrderExprTraversalHelper::buildPostOrderTraversalQueueFor(const syrec::expression::ptr& expr) {
+void PostOrderExprTraversalHelper::buildPostOrderTraversalQueueFor(const syrec::Expression::ptr& expr) {
     if (!doesExprDefineNestedExpr(expr)) {
         queueOfLeafNodesInPostOrder.emplace_back(GeneratedSubAssignment(nextSubExpressionInitialAssignmentOperation.front(), expr));
         return;
@@ -103,7 +103,7 @@ void PostOrderExprTraversalHelper::buildPostOrderTraversalQueueFor(const syrec::
     buildPostOrderTraversalQueueForSubExpr(expr);
 }
 
-void PostOrderExprTraversalHelper::buildPostOrderTraversalQueueForSubExpr(const syrec::expression::ptr& expr) {
+void PostOrderExprTraversalHelper::buildPostOrderTraversalQueueForSubExpr(const syrec::Expression::ptr& expr) {
     const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     if (exprAsBinaryExpr == nullptr) {
         return;

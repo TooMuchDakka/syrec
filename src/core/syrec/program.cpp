@@ -5,7 +5,7 @@
 
 using namespace syrec;
 
-std::string program::read(const std::string& filename, const ReadProgramSettings settings) {
+std::string Program::read(const std::string& filename, const ReadProgramSettings settings) {
     std::string foundErrorBuffer;
     const auto& readFileContent = tryReadFileContent(filename, &foundErrorBuffer);
     if (!foundErrorBuffer.empty() || !readFileContent.has_value()) {
@@ -15,13 +15,13 @@ std::string program::read(const std::string& filename, const ReadProgramSettings
 }
 
 // TODO: Replace ReadProgramSettings with ParserConfig
-std::string program::readFromString(const std::string& circuitStringified, const ReadProgramSettings settings) {
+std::string Program::readFromString(const std::string& circuitStringified, const ReadProgramSettings settings) {
     std::string foundErrorBuffer;
     parseFileContent(circuitStringified, settings, &foundErrorBuffer);
     return foundErrorBuffer;
 }
 
-std::optional<std::string> program::tryReadFileContent(const std::string_view& fileName, std::string* foundFileHandlingErrors) {
+std::optional<std::string> Program::tryReadFileContent(const std::string_view& fileName, std::string* foundFileHandlingErrors) {
     if (std::ifstream inputFileStream(fileName.data(), std::ifstream::in | std::ifstream::binary); inputFileStream.is_open()) {
         inputFileStream.ignore(std::numeric_limits<std::streamsize>::max());
         const auto fileContentLength = inputFileStream.gcount();
@@ -46,7 +46,7 @@ std::optional<std::string> program::tryReadFileContent(const std::string_view& f
 }
 
 
-bool program::parseFileContent(std::string_view programToBeParsed, const ReadProgramSettings& config, std::string* foundErrors) {
+bool Program::parseFileContent(std::string_view programToBeParsed, const ReadProgramSettings& config, std::string* foundErrors) {
     const auto& parserConfigToUse = ::parser::ParserConfig(config.defaultBitwidth,
                                                            false,
                                                            false,
@@ -99,12 +99,12 @@ bool program::parseFileContent(std::string_view programToBeParsed, const ReadPro
     return false;
 }
 
-bool program::readFile(const std::string& filename, const ReadProgramSettings settings, std::string* error) {
+bool Program::readFile(const std::string& filename, const ReadProgramSettings settings, std::string* error) {
     *error = read(filename, settings);
     return error->empty();
 }
 
-std::vector<std::reference_wrapper<const syrec::Module>> program::prepareParsingResultForOptimizations(const syrec::Module::vec& foundModules) {
+std::vector<std::reference_wrapper<const syrec::Module>> Program::prepareParsingResultForOptimizations(const syrec::Module::vec& foundModules) {
     std::vector<std::reference_wrapper<const syrec::Module>> transformedModuleReferences;
     for (const auto& foundModule: foundModules) {
         transformedModuleReferences.emplace_back(*foundModule.get());
@@ -112,7 +112,7 @@ std::vector<std::reference_wrapper<const syrec::Module>> program::prepareParsing
     return transformedModuleReferences;
 }
 
-syrec::Module::vec program::transformProgramOptimizationResult(std::vector<std::unique_ptr<syrec::Module>>&& optimizedProgram) {
+syrec::Module::vec Program::transformProgramOptimizationResult(std::vector<std::unique_ptr<syrec::Module>>&& optimizedProgram) {
     syrec::Module::vec resultContainer(optimizedProgram.size(), nullptr);
     for (std::size_t i = 0; i < optimizedProgram.size(); ++i) {
         resultContainer.at(i) = std::move(optimizedProgram.at(i));

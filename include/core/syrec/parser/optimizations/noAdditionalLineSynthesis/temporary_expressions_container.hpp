@@ -16,14 +16,14 @@ namespace noAdditionalLineSynthesis {
 
         void                              resetInternals();
         void                              defineSymbolTable(const parser::SymbolTable::ptr& symbolTable);
-        void                              activateExpression(const syrec::expression::ptr& expr);
-        void                              deactivateExpression(const syrec::expression::ptr& expr);
+        void                              activateExpression(const syrec::Expression::ptr& expr);
+        void                              deactivateExpression(const syrec::Expression::ptr& expr);
         [[nodiscard]] std::optional<bool> existsAnyExpressionDefiningOverlappingSignalAccess(const syrec::VariableAccess& accessedSignalPartsToCheckForOverlaps) const;
 
     protected:
-        std::unordered_set<syrec::expression::ptr> activeExpressions;
+        std::unordered_set<syrec::Expression::ptr> activeExpressions;
         parser::SymbolTable::ptr                   symbolTableReference;
-        [[nodiscard]] static bool                  doesExpressionDefineOverlappingSignalAccess(const syrec::expression& expr, const syrec::VariableAccess& accessedSignalPartsToCheckForOverlaps, const parser::SymbolTable& symbolTableReference);
+        [[nodiscard]] static bool                  doesExpressionDefineOverlappingSignalAccess(const syrec::Expression& expr, const syrec::VariableAccess& accessedSignalPartsToCheckForOverlaps, const parser::SymbolTable& symbolTableReference);
     };
 }
 

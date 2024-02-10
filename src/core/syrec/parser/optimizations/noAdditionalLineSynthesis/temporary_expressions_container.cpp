@@ -13,11 +13,11 @@ void TemporaryExpressionsContainer::defineSymbolTable(const parser::SymbolTable:
     symbolTableReference = symbolTable;
 }
 
-void TemporaryExpressionsContainer::activateExpression(const syrec::expression::ptr& expr) {
+void TemporaryExpressionsContainer::activateExpression(const syrec::Expression::ptr& expr) {
     activeExpressions.emplace(expr);
 }
 
-void TemporaryExpressionsContainer::deactivateExpression(const syrec::expression::ptr& expr) {
+void TemporaryExpressionsContainer::deactivateExpression(const syrec::Expression::ptr& expr) {
     activeExpressions.erase(expr);
 }
 
@@ -29,13 +29,13 @@ std::optional<bool> TemporaryExpressionsContainer::existsAnyExpressionDefiningOv
     return std::any_of(
     activeExpressions.cbegin(),
     activeExpressions.cend(),
-    [&accessedSignalPartsToCheckForOverlaps, this](const syrec::expression::ptr& exprFromInternalLookup) {
+    [&accessedSignalPartsToCheckForOverlaps, this](const syrec::Expression::ptr& exprFromInternalLookup) {
         return doesExpressionDefineOverlappingSignalAccess(*exprFromInternalLookup, accessedSignalPartsToCheckForOverlaps, *symbolTableReference);
     });
 }
 
 // BEGIN: NON-PUBLIC Functions
-bool TemporaryExpressionsContainer::doesExpressionDefineOverlappingSignalAccess(const syrec::expression& expr, const syrec::VariableAccess& accessedSignalPartsToCheckForOverlaps, const parser::SymbolTable& symbolTableReference) {
+bool TemporaryExpressionsContainer::doesExpressionDefineOverlappingSignalAccess(const syrec::Expression& expr, const syrec::VariableAccess& accessedSignalPartsToCheckForOverlaps, const parser::SymbolTable& symbolTableReference) {
     if (const auto& exprAsVariableExpr = dynamic_cast<const syrec::VariableExpression*>(&expr); exprAsVariableExpr) {
         const SignalAccessUtils::SignalAccessEquivalenceResult& equivalenceCheckResult = SignalAccessUtils::areSignalAccessesEqual(
             accessedSignalPartsToCheckForOverlaps, *exprAsVariableExpr->var, 

@@ -578,7 +578,7 @@ bool SyReCStatementVisitor::areAccessedValuesForDimensionAndBitsConstant(const s
     areAllAccessedSignalAccessComponentsCompileTimeConstants &= std::all_of(
             accessedSignalParts.indexes.cbegin(),
             accessedSignalParts.indexes.cend(),
-            [](const syrec::expression::ptr& valueOfDimensionExpr) {
+            [](const syrec::Expression::ptr& valueOfDimensionExpr) {
                 if (const auto& numericExpr = dynamic_cast<const syrec::NumericExpression*>(&*valueOfDimensionExpr); numericExpr != nullptr) {
                     return numericExpr->value->isConstant();
                 }
@@ -587,7 +587,7 @@ bool SyReCStatementVisitor::areAccessedValuesForDimensionAndBitsConstant(const s
     return areAllAccessedSignalAccessComponentsCompileTimeConstants;
 }
 
-std::vector<std::optional<unsigned int>> SyReCStatementVisitor::evaluateAccessedValuePerDimension(const syrec::expression::vec& accessedValuePerDimension) {
+std::vector<std::optional<unsigned int>> SyReCStatementVisitor::evaluateAccessedValuePerDimension(const syrec::Expression::vec& accessedValuePerDimension) {
     std::vector<std::optional<unsigned int>> containerForEvaluatedValuesPerDimension;
     containerForEvaluatedValuesPerDimension.reserve(accessedValuePerDimension.size());
 
@@ -595,7 +595,7 @@ std::vector<std::optional<unsigned int>> SyReCStatementVisitor::evaluateAccessed
             accessedValuePerDimension.cbegin(),
             accessedValuePerDimension.cend(),
             std::back_inserter(containerForEvaluatedValuesPerDimension),
-            [&](const syrec::expression::ptr& expr) -> std::optional<unsigned int> {
+            [&](const syrec::Expression::ptr& expr) -> std::optional<unsigned int> {
                 if (const auto& exprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expr); exprAsNumericExpr != nullptr) {
                     return tryEvaluateNumber(*exprAsNumericExpr->value, nullptr);
                 }

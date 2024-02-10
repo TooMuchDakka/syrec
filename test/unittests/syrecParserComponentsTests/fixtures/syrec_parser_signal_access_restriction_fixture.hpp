@@ -4,10 +4,8 @@
 
 #include "core/syrec/variable.hpp"
 #include "core/syrec/parser/signal_access_restriction.hpp"
-#include "core/syrec/parser/signal_access_restriction.hpp"
 
 #include "gtest/gtest.h"
-#include <googletest/googletest/include/gtest/gtest.h>
 
 namespace parser {
     using RestrictionPtr                                         = std::shared_ptr<SignalAccessRestriction>;

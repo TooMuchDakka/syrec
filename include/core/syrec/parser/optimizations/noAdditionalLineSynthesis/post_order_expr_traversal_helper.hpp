@@ -11,15 +11,15 @@ namespace noAdditionalLineSynthesis {
     public:
         struct GeneratedSubAssignment {
             syrec_operation::operation assignmentOperation;
-            syrec::expression::ptr     assignmentRhsOperand;
+            syrec::Expression::ptr     assignmentRhsOperand;
 
-            explicit GeneratedSubAssignment(syrec_operation::operation assignmentOperation, syrec::expression::ptr expr):
+            explicit GeneratedSubAssignment(syrec_operation::operation assignmentOperation, syrec::Expression::ptr expr):
                 assignmentOperation(assignmentOperation), assignmentRhsOperand(std::move(expr)) {}
         };
 
         [[nodiscard]] std::optional<GeneratedSubAssignment> tryGetNextElement();
         [[nodiscard]] std::vector<GeneratedSubAssignment>   getAll();
-        void                                                buildPostOrderQueue(syrec_operation::operation assignmentOperation, const syrec::expression::ptr& expr, bool isValueOfAssignedToSignalZeroPriorToAssignment);
+        void                                                buildPostOrderQueue(syrec_operation::operation assignmentOperation, const syrec::Expression::ptr& expr, bool isValueOfAssignedToSignalZeroPriorToAssignment);
 
         PostOrderExprTraversalHelper():
             shouldCurrentOperationBeInverted(false), processedAnySubExpression(false), isInversionOfAssignmentOperationsNecessary(false), postOrderContainerIdx(0) {}
@@ -32,11 +32,11 @@ namespace noAdditionalLineSynthesis {
         bool                                   isInversionOfAssignmentOperationsNecessary;
         std::size_t                            postOrderContainerIdx;
 
-        [[nodiscard]] static bool doesExprDefineNestedExpr(const syrec::expression::ptr& expr);
-        [[nodiscard]] static bool doesExprDefinedVariableAccess(const syrec::expression::ptr& expr);
+        [[nodiscard]] static bool doesExprDefineNestedExpr(const syrec::Expression::ptr& expr);
+        [[nodiscard]] static bool doesExprDefinedVariableAccess(const syrec::Expression::ptr& expr);
         [[nodiscard]] static bool canHandleAssignmentOperation(syrec_operation::operation assignmentOperation);
-        [[nodiscard]] static bool trySwitchOperandsForXorOperationIfRhsIsNestedExprWithLhsBeingNotNested(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand);
-        [[nodiscard]] static bool tryTransformExpressionIfOperationShouldBeInverted(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand, bool shouldOperationBeInverted);
+        [[nodiscard]] static bool trySwitchOperandsForXorOperationIfRhsIsNestedExprWithLhsBeingNotNested(syrec::Expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::Expression::ptr& rhsOperand);
+        [[nodiscard]] static bool tryTransformExpressionIfOperationShouldBeInverted(syrec::Expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::Expression::ptr& rhsOperand, bool shouldOperationBeInverted);
         
         /*
          * \brief Perform a switch of the operands of a give operation node if: <br>
@@ -47,14 +47,14 @@ namespace noAdditionalLineSynthesis {
          * \param rhsOperand The rhs operand of the binary expression in post order
          * 
          */
-        static void               trySwitchSignalAccessOperandToLhs(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand);
-        static void               trySwitchNestedExprOnRhsToLhsIfLatterIsConstantOrLoopVariable(syrec::expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::expression::ptr& rhsOperand);
-        static void               switchOperands(syrec::expression::ptr& lhsOperand, syrec::expression::ptr& rhsOperand);
+        static void               trySwitchSignalAccessOperandToLhs(syrec::Expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::Expression::ptr& rhsOperand);
+        static void               trySwitchNestedExprOnRhsToLhsIfLatterIsConstantOrLoopVariable(syrec::Expression::ptr& lhsOperand, syrec_operation::operation operationToBeApplied, syrec::Expression::ptr& rhsOperand);
+        static void               switchOperands(syrec::Expression::ptr& lhsOperand, syrec::Expression::ptr& rhsOperand);
 
         [[nodiscard]] syrec_operation::operation determineFinalAssignmentOperation(syrec_operation::operation currentAssignmentOperation) const;
 
-        void                      buildPostOrderTraversalQueueFor(const syrec::expression::ptr& expr);
-        void                      buildPostOrderTraversalQueueForSubExpr(const syrec::expression::ptr& expr);
+        void                      buildPostOrderTraversalQueueFor(const syrec::Expression::ptr& expr);
+        void                      buildPostOrderTraversalQueueForSubExpr(const syrec::Expression::ptr& expr);
         void                      resetInternalData();
     };
 }

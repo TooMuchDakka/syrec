@@ -26,7 +26,7 @@ namespace optimizations {
         void liftRestrictionForBitRange(const std::optional<unsigned int>& blockedValueOfDimension, const BitRangeAccessRestriction::BitRangeAccess& blockedBitRange);
         void liftRestrictionForValueOfDimension(unsigned int blockedValueOfDimension);
 
-        [[nodiscard]] bool tryTrimAlreadyBlockedPartsFromRestriction(const std::optional<unsigned int>& accessedValueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange, BitRangeAccessRestriction& bitRangeAccess) const;
+        [[maybe_unused]] bool tryTrimAlreadyBlockedPartsFromRestriction(const std::optional<unsigned int>& accessedValueOfDimension, const std::optional<BitRangeAccessRestriction::BitRangeAccess>& accessedBitRange, BitRangeAccessRestriction& bitRangeAccess) const;
 
     private:
         bool                                                    isDimensionCompletelyBlocked;

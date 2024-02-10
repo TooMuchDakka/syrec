@@ -114,11 +114,11 @@ namespace deadStoreElimination {
          *
          */
         [[nodiscard]] bool                        doesAssignmentContainPotentiallyUnsafeOperation(const syrec::Statement::ptr& stmt) const;
-        [[nodiscard]] bool                        doesExpressionContainPotentiallyUnsafeOperation(const syrec::expression::ptr& expr) const;
+        [[nodiscard]] bool                        doesExpressionContainPotentiallyUnsafeOperation(const syrec::Expression::ptr& expr) const;
         [[nodiscard]] bool                        wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(const syrec::VariableAccess::ptr& signalAccess) const;
         [[nodiscard]] bool                        isAssignedToSignalAModifiableParameter(const std::string_view& assignedToSignalIdent) const;
         [[nodiscard]] static std::optional<unsigned int>        tryEvaluateNumber(const syrec::Number& number);
-        [[nodiscard]] static std::optional<unsigned int> tryEvaluateExprToConstant(const syrec::expression& expr);
+        [[nodiscard]] static std::optional<unsigned int> tryEvaluateExprToConstant(const syrec::Expression& expr);
 
         [[nodiscard]] bool isNextDeadStoreInSameBranch(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores, std::size_t currentNestingLevel) const;
 
@@ -129,13 +129,13 @@ namespace deadStoreElimination {
         void               markAccessedVariablePartsAsLive(const syrec::VariableAccess::ptr& signalAccess, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingSignalAccess);
         [[nodiscard]] bool isAccessedVariablePartLive(const syrec::VariableAccess::ptr& signalAccess) const;
 
-        [[nodiscard]] std::vector<std::optional<unsigned int>>                                transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::expression::ptr>& dimensionAccess) const;
+        [[nodiscard]] std::vector<std::optional<unsigned int>>                                transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::Expression::ptr>& dimensionAccess) const;
         [[nodiscard]] std::optional<optimizations::BitRangeAccessRestriction::BitRangeAccess> transformUserDefinedBitRangeAccess(unsigned int accessedSignalBitwidth, const std::optional<std::pair<syrec::Number::ptr, syrec::Number::ptr>>& bitRangeAccess) const;
         [[nodiscard]] std::vector<AssignmentStatementIndexInControlFlowGraph>                 combineAndSortDeadRemainingDeadStores();
 
         [[nodiscard]] static std::size_t getBlockTypePrecedence(StatementIterationHelper::BlockType blockType);
 
-        void markAccessedSignalsAsLiveInExpression(const syrec::expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression);
+        void markAccessedSignalsAsLiveInExpression(const syrec::Expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression);
         void markAccessedSignalsAsLiveInCallStatement(const std::shared_ptr<syrec::CallStatement>& callStmt, const AssignmentStatementIndexInControlFlowGraph& indexOfCallStmt);
         void insertPotentiallyDeadAssignmentStatement(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::vector<StatementIterationHelper::StatementIndexInBlock>& relativeIndexOfStatementInControlFlowGraph);
         void removeNoLongerDeadStores(const std::string& accessedSignalIdent, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingSignalAccess);
@@ -145,7 +145,7 @@ namespace deadStoreElimination {
         void removeDeadStoresFrom(syrec::Statement::vec& statementList, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores, std::size_t& currDeadStoreIndex, std::size_t nestingLevelOfCurrentBlock) const;
 
         void decrementReferenceCountOfUsedSignalsInStatement(const syrec::Statement::ptr& statement) const;
-        void decrementReferenceCountsOfUsedSignalsInExpression(const syrec::expression::ptr& expr) const;
+        void decrementReferenceCountsOfUsedSignalsInExpression(const syrec::Expression::ptr& expr) const;
         void decrementReferenceCountForAccessedSignal(const syrec::VariableAccess::ptr& accessedSignal) const;
         void decrementReferenceCountOfNumber(const syrec::Number::ptr& number) const;
 
@@ -157,10 +157,10 @@ namespace deadStoreElimination {
         [[nodiscard]] bool                                    doesAssignmentOverlapAnyAccessedPartOfSignal(const syrec::VariableAccess::ptr& assignedToSignalParts, const syrec::VariableAccess::ptr& accessedSignalParts) const;
         [[nodiscard]] static bool                             doBitRangesOverlap(const optimizations::BitRangeAccessRestriction::BitRangeAccess& assignedToBitRange, const optimizations::BitRangeAccessRestriction::BitRangeAccess& accessedBitRange);
         [[nodiscard]] static bool                             doDimensionAccessesOverlap(const std::vector<std::optional<unsigned>>& assignedToDimensionAccess, const std::vector<std::optional<unsigned int>>& accessedDimensionAccess);
-        [[nodiscard]] std::vector<syrec::VariableAccess::ptr> getAccessedLocalSignalsFromExpression(const syrec::expression::ptr& expr) const;
+        [[nodiscard]] std::vector<syrec::VariableAccess::ptr> getAccessedLocalSignalsFromExpression(const syrec::Expression::ptr& expr) const;
 
         // TODO: Renaming of all calls below of this comment
-        void                                                  markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(const syrec::expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression);
+        void                                                  markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(const syrec::Expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression);
         void                                                  markAccessedLocalSignalsInStatementAsUsedInNonLocalAssignment(const syrec::Statement::ptr& stmt, const AssignmentStatementIndexInControlFlowGraph& indexOfStatement);
         void                                                  markAccessedLocalSignalAsUsedInNonLocalAssignment(const syrec::VariableAccess::ptr& accessedSignal, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementDefiningAccess);
         [[nodiscard]] bool                                    isAccessedSignalLocalOfModule(const syrec::VariableAccess::ptr& accessedSignal) const;

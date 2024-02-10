@@ -11,7 +11,7 @@
 namespace noAdditionalLineSynthesis {
     class InorderOperationNodeTraversalHelper {
     public:
-        explicit InorderOperationNodeTraversalHelper(const syrec::expression::ptr& expr, parser::SymbolTable::ptr symbolTable):
+        explicit InorderOperationNodeTraversalHelper(const syrec::Expression::ptr& expr, parser::SymbolTable::ptr symbolTable):
             symbolTableReference(std::move(symbolTable))
         {
             buildOperationNodesQueue(expr);
@@ -34,7 +34,7 @@ namespace noAdditionalLineSynthesis {
 
             [[nodiscard]] std::optional<std::shared_ptr<syrec::NumericExpression>>  getAsNumber() const;
             [[nodiscard]] std::optional<std::shared_ptr<syrec::VariableExpression>> getAsSignalAccess() const;
-            [[nodiscard]] syrec::expression::ptr                        getData() const;
+            [[nodiscard]] syrec::Expression::ptr                        getData() const;
         private:
             std::variant<std::shared_ptr<syrec::NumericExpression>, std::shared_ptr<syrec::VariableExpression>> nodeVariantData;
         };
@@ -68,16 +68,16 @@ namespace noAdditionalLineSynthesis {
         std::vector<std::size_t>                          operationNodeTraversalQueue;
         const parser::SymbolTable::ptr                    symbolTableReference;
 
-        void                                                                                               buildOperationNodesQueue(const syrec::expression::ptr& expr);
-        [[maybe_unused]] TraversalNode                                                                     buildOperationNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentNodeId);
+        void                                                                                               buildOperationNodesQueue(const syrec::Expression::ptr& expr);
+        [[maybe_unused]] TraversalNode                                                                     buildOperationNode(const syrec::Expression::ptr& expr, const std::optional<std::size_t>& parentNodeId);
         [[nodiscard]] TraversalNode                                                                        buildOperationNode(const syrec::Number::ptr& number, unsigned int expectedBitwidthOfOperation);
         [[nodiscard]] std::optional<bool>                                                                  areAllOperandsOfOperationNodeLeafNodes(const OperationNodeReference& operationNode) const;
         [[nodiscard]] std::optional<OperationNodeReference>                                                getOperationNodeForId(std::size_t operationNodeId) const;
-        [[nodiscard]] unsigned int                                                                         determineBitwidthOfExpr(const syrec::expression::ptr& expr) const;
+        [[nodiscard]] unsigned int                                                                         determineBitwidthOfExpr(const syrec::Expression::ptr& expr) const;
         [[nodiscard]] unsigned int                                                                         determineBitwidthOfSignalAccess(const syrec::VariableAccess::ptr& signalAccess) const;
         [[nodiscard]] std::optional<std::size_t>                                                           findNextOperationNodeInOneOfParents(const OperationNodeReference& operationNode) const;
 
-        [[nodiscard]] static bool                                      doesExprDefineSignalAccess(const syrec::expression::ptr& expr);
+        [[nodiscard]] static bool                                      doesExprDefineSignalAccess(const syrec::Expression::ptr& expr);
 
     };
 }

@@ -1,3 +1,10 @@
+# add MQT::Core target
+set(BUILD_MQT_CORE_TESTS
+    OFF
+    CACHE BOOL "Build MQT Core tests")
+add_subdirectory("${PROJECT_SOURCE_DIR}/extern/mqt-core" "extern/mqt-core" EXCLUDE_FROM_ALL)
+add_subdirectory("${PROJECT_SOURCE_DIR}/extern/fmt" "extern/fmt" EXCLUDE_FROM_ALL)
+
 add_library( 
       ${PROJECT_NAME}
       ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/syrec_synthesis.cpp
@@ -8,14 +15,14 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/dd_synthesis.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/synthesis/encoding.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/algorithms/optimization/esop_minimization.cpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/optimization/esop_minimization.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/simulation/simple_simulation.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/simulation/circuit_to_truthtable.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/syrec_synthesis.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/syrec_cost_aware_synthesis.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/syrec_line_aware_synthesis.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/dd_synthesis.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/algorithms/synthesis/encoding.hpp
+      ${PROJECT_SOURCE_DIR}/include/algorithms/optimization/esop_minimization.hpp
+      ${PROJECT_SOURCE_DIR}/include/algorithms/simulation/simple_simulation.hpp
+      ${PROJECT_SOURCE_DIR}/include/algorithms/simulation/circuit_to_truthtable.hpp
+      ${PROJECT_SOURCE_DIR}/include/algorithms/synthesis/syrec_synthesis.hpp
+      ${PROJECT_SOURCE_DIR}/include/algorithms/synthesis/syrec_cost_aware_synthesis.hpp
+      ${PROJECT_SOURCE_DIR}/include/algorithms/synthesis/syrec_line_aware_synthesis.hpp
+      ${PROJECT_SOURCE_DIR}/include/algorithms/synthesis/dd_synthesis.hpp
+      ${PROJECT_SOURCE_DIR}/include/algorithms/synthesis/encoding.hpp
 
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/program.cpp
@@ -100,105 +107,102 @@ add_library(
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/signal_access_utils.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/core/syrec/parser/utils/syrec_ast_dump_utils.cpp
 
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/gate.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/circuit.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/custom_semantic_errors.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_comparer.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/expression_evaluation_result.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/module_call_guess.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/module_call_stack.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/operation.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/parser_config.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/range_check.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_access_restriction.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/signal_evaluation_result.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/symbol_table_backup_helper.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/value_broadcaster.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor_shared_data.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_expression_visitor.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_module_visitor.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_parser_interface.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/combine_redundant_instructions.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/dead_code_elimination.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/loop_optimizer.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/no_additional_line_assignment.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operation_strength_reduction.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/optimizer.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/reassociate_expression.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/bit_range_access_restriction.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/dimension_propagation_blocker.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/shared_dimension_blocking_information.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/gate.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/circuit.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/expression.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/grammar.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/module.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/number.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/program.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/statement.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/variable.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/utils/timer.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/truthTable/truth_table.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/io/pla_parser.hpp
 
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.tpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/layer_data.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/custom_semantic_errors.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/expression_comparer.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/expression_evaluation_result.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/module_call_guess.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/module_call_stack.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/operation.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/parser_config.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/range_check.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/signal_access_restriction.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/signal_evaluation_result.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/symbol_table.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/symbol_table_backup_helper.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/value_broadcaster.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_custom_base_visitor_shared_data.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_expression_visitor.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_module_visitor.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_parser_interface.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/antlr/parserComponents/syrec_statement_visitor.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/combine_redundant_instructions.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/dead_code_elimination.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/loop_optimizer.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/no_additional_line_assignment.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/operation_strength_reduction.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/optimizer.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/reassociate_expression.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/bit_range_access_restriction.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/dimension_propagation_blocker.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/shared_dimension_blocking_information.hpp
 
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/deadStoreElimination/dead_store_eliminator.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/deadStoreElimination/dead_store_status_lookup.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/deadStoreElimination/statement_iteration_helper.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.tpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/base_value_lookup.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/layer_data.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/constantPropagation/valueLookup/signal_value_lookup.hpp
 
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_transformer.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_none_reversible_operations_and_unique_signal_occurrences_simplifier.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_only_reversible_operations_simplifier.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_reversible_ops_and_multilevel_signal_occurrence_simplifier.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/base_assignment_simplifier.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_substitution_generator.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_to_subassignment_splitter.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/inorder_operation_node_traversal_helper.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/main_additional_line_for_assignment_simplifier.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/post_order_expr_traversal_helper.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_assignments_container.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_expressions_container.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/deadStoreElimination/dead_store_eliminator.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/deadStoreElimination/dead_store_status_lookup.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/deadStoreElimination/statement_iteration_helper.hpp
 
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/binary_factoring_multiplication_simplifier.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_transformer.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_none_reversible_operations_and_unique_signal_occurrences_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_only_reversible_operations_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_with_reversible_ops_and_multilevel_signal_occurrence_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/base_assignment_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_substitution_generator.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_to_subassignment_splitter.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/inorder_operation_node_traversal_helper.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/main_additional_line_for_assignment_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/post_order_expr_traversal_helper.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_assignments_container.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_expressions_container.hpp
 
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/bit_helpers.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/binary_expression_simplifier.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/copy_utils.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/dangerous_component_check_utils.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/loop_range_utils.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/message_utils.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/signal_access_utils.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser/utils/syrec_ast_dump_utils.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/binary_factoring_multiplication_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/operationSimplification/binary_multiplication_simplifier.hpp
 
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/expression.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/grammar.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/module.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/number.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/parser.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/program.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/statement.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/syrec/variable.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/utils/timer.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/truthTable/truth_table.hpp
-      ${${PROJECT_NAME}_SOURCE_DIR}/include/core/io/pla_parser.hpp)
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/utils/bit_helpers.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/utils/binary_expression_simplifier.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/utils/copy_utils.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/utils/dangerous_component_check_utils.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/utils/loop_body_value_propagation_blocker.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/utils/loop_range_utils.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/utils/message_utils.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/utils/signal_access_utils.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/utils/syrec_ast_dump_utils.hpp)
 
 # set include directories
-target_include_directories(${PROJECT_NAME}
-                           PUBLIC $<BUILD_INTERFACE:${${PROJECT_NAME}_SOURCE_DIR}/include>)
+target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include
+                                                  ${PROJECT_BINARY_DIR}/include)
 
-target_include_directories(${PROJECT_NAME}
-                           PRIVATE $<BUILD_INTERFACE:${${PROJECT_NAME}_SOURCE_DIR}/src/core/syrec/parser/antlr>)
+target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/src/core/syrec/parser/antlr)
 
 # set required C++ standard and disable compiler specific extensions
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
 set_target_properties(${PROJECT_NAME} PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
 
-# add MQT::qfr library
-add_subdirectory("${PROJECT_SOURCE_DIR}/extern/qfr" "extern/qfr" EXCLUDE_FROM_ALL)
-target_link_libraries(${PROJECT_NAME} PUBLIC MQT::qfr_dd)
+# link to the MQT::qfr DD library
+target_link_libraries(${PROJECT_NAME} PUBLIC MQT::CoreDD)
 
 # add fmt library
-add_subdirectory("${PROJECT_SOURCE_DIR}/extern/fmt" "extern/fmt" EXCLUDE_FROM_ALL)
 target_link_libraries(${PROJECT_NAME} PUBLIC fmt::fmt)
 
 # add header-only part of the Boost library
@@ -206,46 +210,6 @@ set(BOOST_USE_MULTITHREADED ON)
 set(BOOST_USE_STATIC_RUNTIME OFF)
 find_package(Boost 1.71 REQUIRED)
 target_link_libraries(${PROJECT_NAME} PUBLIC Boost::boost)
-
-# enable interprocedural optimization if it is supported
-include(CheckIPOSupported)
-check_ipo_supported(RESULT ipo_supported)
-if(ipo_supported)
-  set_target_properties(${PROJECT_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif()
-
-# set compiler flags depending on compiler
-if(MSVC)
-  target_compile_options(${PROJECT_NAME} PUBLIC /utf-8)
-else()
-  target_compile_options(${PROJECT_NAME} PUBLIC -Wall -Wextra $<$<CONFIG:DEBUG>:-Og>)
-  if(BINDINGS)
-    # adjust visibility settings for building Python bindings
-    target_compile_options(${PROJECT_NAME} PUBLIC -fvisibility=hidden)
-  endif()
-  if(NOT DEPLOY)
-    # only include machine-specific optimizations when building for the host machine
-    target_compile_options(${PROJECT_NAME} PUBLIC -mtune=native)
-    include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag(-march=native HAS_MARCH_NATIVE)
-    if(HAS_MARCH_NATIVE)
-      target_compile_options(${PROJECT_NAME} PUBLIC -march=native)
-    endif()
-  endif()
-endif()
-
-if(GENERATE_POSITION_INDEPENDENT_CODE OR BINDINGS)
-  include(CheckPIESupported)
-  check_pie_supported()
-  set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
-endif()
-
-# add coverage compiler and linker flag to the library and all targets that link against it, if
-# COVERAGE is set
-if(COVERAGE)
-  target_compile_options(${PROJECT_NAME} PUBLIC --coverage)
-  target_link_libraries(${PROJECT_NAME} PUBLIC --coverage)
-endif()
 
 # ANTLR specific instructions
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
@@ -270,3 +234,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE antlr4_static)
 
 # add MQT alias
 add_library(MQT::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+
+if(BUILD_MQT_SYREC_BINDINGS)
+  add_subdirectory(python)
+endif()

@@ -2,6 +2,7 @@
 #define SYREC_SIGNAL_OPERAND_BUILDER_HPP
 #pragma once
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>

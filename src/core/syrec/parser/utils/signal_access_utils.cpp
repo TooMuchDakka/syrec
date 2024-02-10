@@ -4,7 +4,7 @@
 
 using namespace SignalAccessUtils;
 
-std::optional<unsigned int> tryFetchValueOfExpr(const syrec::expression& expr, const parser::SymbolTable& symbolTable) {
+std::optional<unsigned int> tryFetchValueOfExpr(const syrec::Expression& expr, const parser::SymbolTable& symbolTable) {
     if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr != nullptr) {
         return tryEvaluateNumber(*exprAsNumericExpr->value, symbolTable);
     }
@@ -94,7 +94,7 @@ bool areBitRangesEqualAccordingToCriteria(const std::pair<unsigned int, unsigned
     }
 }
 
-std::optional<std::vector<unsigned int>> tryEvaluateDimensionAccess(const syrec::expression::vec& definedDimensionAccess, const parser::SymbolTable& symbolTable){
+std::optional<std::vector<unsigned int>> tryEvaluateDimensionAccess(const syrec::Expression::vec& definedDimensionAccess, const parser::SymbolTable& symbolTable){
     std::vector<unsigned int> evaluatedDimensionAccess(definedDimensionAccess.size(), 0);
     for (std::size_t i = 0; i < definedDimensionAccess.size(); ++i) {
         if (const auto& valueOfDimensionEvaluated = tryFetchValueOfExpr(*definedDimensionAccess.at(i), symbolTable); valueOfDimensionEvaluated.has_value()) {

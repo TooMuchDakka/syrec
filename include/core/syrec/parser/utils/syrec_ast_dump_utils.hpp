@@ -75,7 +75,7 @@ namespace syrecAstDumpUtils {
         [[nodiscard]] std::string stringifyForStatement(const syrec::ForStatement& forStmt);
         [[nodiscard]] std::string stringifyIfStatement(const syrec::IfStatement& ifStmt);
 
-        [[nodiscard]] static std::string stringifyExpression(const syrec::expression::ptr& expression);
+        [[nodiscard]] static std::string stringifyExpression(const syrec::Expression::ptr& expression);
         [[nodiscard]] static std::string stringifyBinaryExpression(const syrec::BinaryExpression& binaryExpr);
         [[nodiscard]] static std::string stringifyNumericExpression(const syrec::NumericExpression& numericExpr);
         [[nodiscard]] static std::string stringifyShiftExpression(const syrec::ShiftExpression& shiftExpr);
@@ -87,7 +87,7 @@ namespace syrecAstDumpUtils {
         [[nodiscard]] static std::string stringifyVariableAccess(const syrec::VariableAccess::ptr& variableAccess);
         [[nodiscard]] static std::string stringifyNumber(const syrec::Number::ptr& number);
 
-        [[nodiscard]] static std::string stringifyDimensionExpression(const syrec::expression::ptr& expr);
+        [[nodiscard]] static std::string stringifyDimensionExpression(const syrec::Expression::ptr& expr);
         [[nodiscard]] static std::string stringifyDimensions(const std::vector<unsigned int>& dimensions);
         [[nodiscard]] static std::string stringifyDimension(const unsigned int& dimension);
 

@@ -7,7 +7,7 @@
 namespace optimizations {
     class BinaryFactoringMultiplicationSimplifier : public BinaryMultiplicationSimplifier {
     public:
-        [[nodiscard]] std::optional<syrec::expression::ptr> trySimplify(const std::shared_ptr<syrec::BinaryExpression>&) override;
+        [[nodiscard]] std::optional<syrec::Expression::ptr> trySimplify(const std::shared_ptr<syrec::BinaryExpression>&) override;
     protected:
         std::map<unsigned int, std::vector<unsigned int>> factorizingCache;
 

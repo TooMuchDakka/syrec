@@ -50,31 +50,31 @@ namespace noAdditionalLineSynthesis {
         std::map<std::string_view, std::vector<SignalSubstitution>>                activeSignalSubstitutions;
         std::map<std::string_view, std::vector<NotUsableAsReplacementSignalParts>> activeAssignments;
 
-        [[nodiscard]] static bool isExpressionEitherBinaryOrShiftExpression(const syrec::expression::ptr& expr);
+        [[nodiscard]] static bool isExpressionEitherBinaryOrShiftExpression(const syrec::Expression::ptr& expr);
         /**
          * \brief Precondition for transformation rule R1
          * \param expr The expression to check
          * \return Whether the expression only contained reversible assignment operations
          */
-        [[nodiscard]] static bool                                      doesExpressionOnlyContainReversibleOperations(const syrec::expression::ptr& expr);
-        [[nodiscard]] static bool                                      doesExpressionDefineSignalAccess(const syrec::expression::ptr& expr);
-        [[nodiscard]] static bool                                      isExpressionConstantNumber(const syrec::expression::ptr& expr);
+        [[nodiscard]] static bool                                      doesExpressionOnlyContainReversibleOperations(const syrec::Expression::ptr& expr);
+        [[nodiscard]] static bool                                      doesExpressionDefineSignalAccess(const syrec::Expression::ptr& expr);
+        [[nodiscard]] static bool                                      isExpressionConstantNumber(const syrec::Expression::ptr& expr);
         [[nodiscard]] static bool                                      doVariableAccessesOverlap(const syrec::VariableAccess::ptr& signalPartsToCheck, const syrec::VariableAccess::ptr& signalPartsToBeCheckedForOverlap, const parser::SymbolTable::ptr& symbolTable);
         [[nodiscard]] static syrec::Statement::vec                     invertAssignments(const syrec::AssignStatement::vec& assignments);
         [[nodiscard]] static std::optional<unsigned int>               tryEvaluateNumberAsConstant(const syrec::Number::ptr& number);
         [[nodiscard]] static bool                                      doBitRangesOverlap(const optimizations::BitRangeAccessRestriction::BitRangeAccess& thisBitRange, const optimizations::BitRangeAccessRestriction::BitRangeAccess& thatBitRange);
         [[nodiscard]] static bool                                      doDimensionAccessesOverlap(const TransformedDimensionAccess& thisDimensionAccess, const TransformedDimensionAccess& thatDimensionAccess);
-        [[nodiscard]] static std::optional<syrec::expression::ptr>     tryConvertCompileTimeConstantExpressionToBinaryExpression(const syrec::Number::ptr& potentialCompileTimeExpression, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable);
+        [[nodiscard]] static std::optional<syrec::Expression::ptr>     tryConvertCompileTimeConstantExpressionToBinaryExpression(const syrec::Number::ptr& potentialCompileTimeExpression, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable);
         [[nodiscard]] static std::optional<syrec_operation::operation> tryMapCompileTimeConstantOperation(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression);
-        [[nodiscard]] static std::optional<syrec::expression::ptr>     tryMapNumberToExpression(const syrec::Number::ptr& number, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable);
-        [[nodiscard]] static std::optional<syrec::expression::ptr>     tryPerformReorderingOfSubexpressions(const syrec::expression::ptr& expr);
+        [[nodiscard]] static std::optional<syrec::Expression::ptr>     tryMapNumberToExpression(const syrec::Number::ptr& number, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable);
+        [[nodiscard]] static std::optional<syrec::Expression::ptr>     tryPerformReorderingOfSubexpressions(const syrec::Expression::ptr& expr);
         /**
          * \brief Performs the transformation (<subExpr_1> - (<subExpr_2> - <subExpr_3>)) to (<subExpr_1> + (<subExpr_3> - <subExpr_2>)) <br>
          * <b>IMPORTANT:</b> This transformation is a speculative heuristic and could lead to a worse result when trying to optimize the transformed expression.
          * \param expr The expression of which the transformation shall be applied
          * \return The transformed expression if such a transformation took place otherwise nothing
          */
-        [[nodiscard]] static std::optional<syrec::expression::ptr>     tryPerformReorderingOfSubtractionOperationsWithNestedSubexpressions(const syrec::expression::ptr& expr);
+        [[nodiscard]] static std::optional<syrec::Expression::ptr>     tryPerformReorderingOfSubtractionOperationsWithNestedSubexpressions(const syrec::Expression::ptr& expr);
 
         struct VariableAccessCountPair {
             std::size_t                accessCount;
@@ -109,8 +109,8 @@ namespace noAdditionalLineSynthesis {
             }
         };
         
-        [[nodiscard]] std::shared_ptr<VariableAccessCountLookup> buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const;
-        void                                                     buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, std::shared_ptr<VariableAccessCountLookup>& lookupToFill, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const;
+        [[nodiscard]] std::shared_ptr<VariableAccessCountLookup> buildVariableAccessCountsForExpr(const syrec::Expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const;
+        void                                                     buildVariableAccessCountsForExpr(const syrec::Expression::ptr& expr, std::shared_ptr<VariableAccessCountLookup>& lookupToFill, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const;
         [[nodiscard]] bool                                       doesSignalAccessMatchExpectedSize(const syrec::VariableAccess::ptr& signalAccessToCheck, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered) const;
         [[nodiscard]] EstimatedSignalAccessSize                  getSizeOfSignalAccess(const syrec::VariableAccess::ptr& signalAccess) const;
 
@@ -132,19 +132,19 @@ namespace noAdditionalLineSynthesis {
          * \param expr The expression to be checked 
          * \return Whether a given expression contains any signal access that overlaps the given accessed signal parts
          */
-        //[[nodiscard]] static bool                                  areAccessedSignalPartsOnlyAccessedOnce(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::expression::ptr& expr);
+        //[[nodiscard]] static bool                                  areAccessedSignalPartsOnlyAccessedOnce(const syrec::VariableAccess::ptr& accessedSignalParts, const syrec::Expression::ptr& expr);
 
-        [[nodiscard]] std::optional<syrec::expression::ptr>      findExpressionContainingSignalAccessDefinedOnlyOnceInAssignmentRhs(const syrec::BinaryExpression::ptr& assignmentStatement, bool& isLhsRelevantSignalAccess);
+        [[nodiscard]] std::optional<syrec::Expression::ptr>      findExpressionContainingSignalAccessDefinedOnlyOnceInAssignmentRhs(const syrec::BinaryExpression::ptr& assignmentStatement, bool& isLhsRelevantSignalAccess);
         
         /**
          * \brief Create a lookup of signal accesses which cannot be used as a replacement for another signal of the same size
          * \param expr The expression for which the lookup should be created
          * \return The created lookup containing the currently existing assignments as well as all non overlapping signal accesses of the expression
          */
-        [[nodiscard]] LookupOfExcludedSignalsForReplacement     createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable) const;
-        void                                                    createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, LookupOfExcludedSignalsForReplacement& lookupToFill, const parser::SymbolTable::ptr& symbolTable) const;
+        [[nodiscard]] LookupOfExcludedSignalsForReplacement     createLookupForSignalsNotUsableAsReplacementsFor(const syrec::Expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable) const;
+        void                                                    createLookupForSignalsNotUsableAsReplacementsFor(const syrec::Expression::ptr& expr, LookupOfExcludedSignalsForReplacement& lookupToFill, const parser::SymbolTable::ptr& symbolTable) const;
         [[nodiscard]] bool                                      doesAssignmentToAccessedSignalPartsAlreadyExists(const syrec::VariableAccess::ptr& accessedSignalParts) const;
-        [[nodiscard]] std::optional<syrec::VariableAccess::ptr> tryCreateSubstituteForExpr(const syrec::expression::ptr& expr, const LookupOfExcludedSignalsForReplacement& signalPartsToExcludeAsPotentialReplacements);
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr> tryCreateSubstituteForExpr(const syrec::Expression::ptr& expr, const LookupOfExcludedSignalsForReplacement& signalPartsToExcludeAsPotentialReplacements);
 
         /**
          * \brief R1: S op_a (E_1 op_a E_2) can be replaced with: <br>
@@ -173,7 +173,7 @@ namespace noAdditionalLineSynthesis {
 
         void markAccessedSignalPartsAsNotUsableForReplacement(const syrec::VariableAccess::ptr& accessedSignalParts) const;
         void markAccessedSignalPartsAsUsableForReplacement(const syrec::VariableAccess::ptr& accessedSignalParts) const;
-        [[nodiscard]] static syrec::expression::ptr transformNumericExpressionsToBinary(const syrec::expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable);
+        [[nodiscard]] static syrec::Expression::ptr transformNumericExpressionsToBinary(const syrec::Expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable);
     };
 }
 

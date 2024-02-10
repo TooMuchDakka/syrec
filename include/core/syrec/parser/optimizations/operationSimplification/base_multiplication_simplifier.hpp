@@ -14,13 +14,13 @@ namespace optimizations {
 	class BaseMultiplicationSimplifier {
     public:
         virtual ~BaseMultiplicationSimplifier()                                                                                             = default;
-        [[nodiscard]] virtual std::optional<syrec::expression::ptr> trySimplify(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) = 0;
+        [[nodiscard]] virtual std::optional<syrec::Expression::ptr> trySimplify(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) = 0;
 
 	protected:
         [[nodiscard]] bool isOperationOfExpressionMultiplicationAndHasAtleastOneConstantOperand(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) const;
-        [[nodiscard]] bool isOperandConstant(const syrec::expression::ptr& expressionOperand) const;
-        [[nodiscard]] std::optional<unsigned int> tryDetermineValueOfConstant(const syrec::expression::ptr& operandOfBinaryExpr) const;
-        [[nodiscard]] std::optional<syrec::expression::ptr> replaceMultiplicationWithShiftIfConstantTermIsPowerOfTwo(unsigned int constantTerm, const syrec::expression::ptr& nonConstantTerm) const;
+        [[nodiscard]] bool isOperandConstant(const syrec::Expression::ptr& expressionOperand) const;
+        [[nodiscard]] std::optional<unsigned int> tryDetermineValueOfConstant(const syrec::Expression::ptr& operandOfBinaryExpr) const;
+        [[nodiscard]] std::optional<syrec::Expression::ptr> replaceMultiplicationWithShiftIfConstantTermIsPowerOfTwo(unsigned int constantTerm, const syrec::Expression::ptr& nonConstantTerm) const;
 	};
 }
 

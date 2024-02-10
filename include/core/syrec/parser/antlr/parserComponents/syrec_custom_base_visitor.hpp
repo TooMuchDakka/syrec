@@ -55,7 +55,7 @@ namespace parser {
         [[nodiscard]] bool                                      isSignalAssignableOtherwiseCreateError(unsigned int signalType, const std::string_view& signalIdent, const messageUtils::Message::Position& signalIdentTokenPosition);
         [[nodiscard]] std::optional<syrec_operation::operation> getDefinedOperation(const antlr4::Token* definedOperationToken);
         [[nodiscard]] std::optional<unsigned int>               tryDetermineBitwidthAfterVariableAccess(const syrec::VariableAccess& variableAccess, const messageUtils::Message::Position* evaluationErrorPositionHelper);
-        [[nodiscard]] std::optional<unsigned int>               tryDetermineExpressionBitwidth(const syrec::expression& expression, const messageUtils::Message::Position& evaluationErrorPosition);
+        [[nodiscard]] std::optional<unsigned int>               tryDetermineExpressionBitwidth(const syrec::Expression& expression, const messageUtils::Message::Position& evaluationErrorPosition);
 
         [[nodiscard]] bool                                      canEvaluateNumber(const syrec::Number& number) const;
         [[nodiscard]] std::optional<unsigned int>               tryEvaluateNumber(const syrec::Number& numberContainer, const messageUtils::Message::Position* evaluationErrorPositionHelper);
@@ -123,8 +123,8 @@ namespace parser {
         [[nodiscard]] bool                                                             existsRestrictionForAccessedSignalParts(const syrec::VariableAccess& accessedSignalPart, const messageUtils::Message::Position* optionalEvaluationErrorPosition);
         [[nodiscard]] static std::string                                               stringifyCompileTimeConstantExpressionOperation(syrec::Number::CompileTimeConstantExpression::Operation ctcOperation);
         [[nodiscard]] static std::optional<syrec::BinaryExpression::ptr>               tryConvertCompileTimeConstantExpressionToBinaryExpr(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpression, const parser::SymbolTable& symbolTable);
-        [[nodiscard]] static std::optional<syrec::Number::ptr>                         tryConvertExpressionToCompileTimeConstantOne(const syrec::expression& expr);
-        [[nodiscard]] static std::optional<syrec::expression::ptr>                     tryConvertNumberToExpr(const syrec::Number& number, const parser::SymbolTable& symbolTable);
+        [[nodiscard]] static std::optional<syrec::Number::ptr>                         tryConvertExpressionToCompileTimeConstantOne(const syrec::Expression& expr);
+        [[nodiscard]] static std::optional<syrec::Expression::ptr>                     tryConvertNumberToExpr(const syrec::Number& number, const parser::SymbolTable& symbolTable);
         [[nodiscard]] static std::string                                               combineValuePerDimensionMissmatch(const std::vector<valueBroadcastCheck::AccessedValuesOfDimensionMissmatch>& valuePerNotExplicitlyAccessedDimensionMissmatch);
     };
 }

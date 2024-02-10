@@ -55,19 +55,19 @@ namespace noAdditionalLineSynthesis {
          * \param currentValueOfAssignedToSignal The current value of the assigned to signal parts prior to the assignment
          * \return Whether the simplified split "algorithm" can be applied.
          */
-        [[nodiscard]] bool isPreconditionSatisfied(syrec_operation::operation operation, const syrec::expression& topmostAssignmentRhsExpr, const std::optional<unsigned int>& currentValueOfAssignedToSignal) const;
+        [[nodiscard]] bool isPreconditionSatisfied(syrec_operation::operation operation, const syrec::Expression& topmostAssignmentRhsExpr, const std::optional<unsigned int>& currentValueOfAssignedToSignal) const;
 
         void                                                           updateOperationInversionFlag(syrec_operation::operation operationDeterminingInversionFlag);
-        [[nodiscard]] bool                                             handleExpr(const syrec::expression::ptr& expr);
-        [[nodiscard]] bool                                             handleExprWithNoLeafNodes(const syrec::expression::ptr& expr);
-        [[nodiscard]] bool                                             handleExprWithOneLeafNode(const syrec::expression::ptr& expr);
-        [[nodiscard]] bool                                             handleExprWithTwoLeafNodes(const syrec::expression::ptr& expr);
+        [[nodiscard]] bool                                             handleExpr(const syrec::Expression::ptr& expr);
+        [[nodiscard]] bool                                             handleExprWithNoLeafNodes(const syrec::Expression::ptr& expr);
+        [[nodiscard]] bool                                             handleExprWithOneLeafNode(const syrec::Expression::ptr& expr);
+        [[nodiscard]] bool                                             handleExprWithTwoLeafNodes(const syrec::Expression::ptr& expr);
         void                                                           storeAssignment(const syrec::AssignStatement::ptr& assignment);
         [[nodiscard]] std::optional<syrec_operation::operation>        getOperationOfNextSubAssignment(bool markAsConsumed = true);
         [[nodiscard]] bool                                             createBackupOfInversionFlagStatus() const;
         void                                                           restorePreviousInversionStatusFlag(bool previousInversionStatus);
         void                                                           fixNextSubAssignmentOperation(syrec_operation::operation operation);
-        void                                                           updateValueOfAssignedToSignalViaAssignment(const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::expression* assignmentRhsExpr);
+        void                                                           updateValueOfAssignedToSignalViaAssignment(const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::Expression* assignmentRhsExpr);
         
         /**
          * \brief Determine whether a given expression can be further split into sub-assignments assuming that the expression is the operand of an operation node defining a bitwise xor operation
@@ -77,13 +77,13 @@ namespace noAdditionalLineSynthesis {
          * \param expr The expression which shall be checked whether it can be further split
          * \return Whether a split can take place
          */
-        [[nodiscard]] bool                                             isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(const syrec::expression& expr) const;
+        [[nodiscard]] bool                                             isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(const syrec::Expression& expr) const;
 
         [[nodiscard]] std::optional<syrec_operation::operation>             determineAssignmentOperationToUse(syrec_operation::operation operation) const;
-        [[nodiscard]] static syrec::AssignStatement::ptr                    createAssignmentFrom(const syrec::VariableAccess::ptr& assignedToSignalParts, syrec_operation::operation operation, const syrec::expression::ptr& assignmentRhsExpr);
-        [[nodiscard]] static bool                                           doesExprDefineSubExpression(const syrec::expression& expr);
-        [[nodiscard]] static bool                                           doesOperandDefineLeafNode(const syrec::expression& expr);
-        [[nodiscard]] static std::optional<std::pair<bool, bool>>           determineLeafNodeStatusForOperandsOfExpr(const syrec::expression& expr);
+        [[nodiscard]] static syrec::AssignStatement::ptr                    createAssignmentFrom(const syrec::VariableAccess::ptr& assignedToSignalParts, syrec_operation::operation operation, const syrec::Expression::ptr& assignmentRhsExpr);
+        [[nodiscard]] static bool                                           doesExprDefineSubExpression(const syrec::Expression& expr);
+        [[nodiscard]] static bool                                           doesOperandDefineLeafNode(const syrec::Expression& expr);
+        [[nodiscard]] static std::optional<std::pair<bool, bool>>           determineLeafNodeStatusForOperandsOfExpr(const syrec::Expression& expr);
 
         /**
          * \brief Try perform transformation of expression <assignedToSignal> -= (<subExpr_1> - <subExpr_2>) to <assignedToSignal += (<subExpr_2> - <subExpr_1>) to enable the optimization of replacing <br>
@@ -99,7 +99,7 @@ namespace noAdditionalLineSynthesis {
          * \param expr The expression to check
          * \return Whether all defined operations of the expression had a matching assignment operation counterpart defined
          */
-        [[nodiscard]] static bool doesExprNotContainAnyOperationWithoutAssignmentCounterpartWhenBothOperandsAreNestedExpr(const syrec::expression& expr);
+        [[nodiscard]] static bool doesExprNotContainAnyOperationWithoutAssignmentCounterpartWhenBothOperandsAreNestedExpr(const syrec::Expression& expr);
     };
 }
 

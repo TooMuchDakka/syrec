@@ -3,7 +3,7 @@
 
 using namespace optimizations;
 
-std::optional<syrec::expression::ptr> BaseMultiplicationSimplifier::trySimplify(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
+std::optional<syrec::Expression::ptr> BaseMultiplicationSimplifier::trySimplify(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
     if (!isOperationOfExpressionMultiplicationAndHasAtleastOneConstantOperand(binaryExpr)) {
         return std::nullopt;
     }
@@ -23,14 +23,14 @@ bool BaseMultiplicationSimplifier::isOperationOfExpressionMultiplicationAndHasAt
     return binaryExpr->op == syrec::BinaryExpression::Multiply && (isOperandConstant(binaryExpr->lhs) || isOperandConstant(binaryExpr->rhs));
 }
 
-bool BaseMultiplicationSimplifier::isOperandConstant(const syrec::expression::ptr& expressionOperand) const {
+bool BaseMultiplicationSimplifier::isOperandConstant(const syrec::Expression::ptr& expressionOperand) const {
     if (const auto& operandAsNumericExpression = std::dynamic_pointer_cast<syrec::NumericExpression>(expressionOperand); operandAsNumericExpression != nullptr) {
         return operandAsNumericExpression->value->isConstant();
     }
     return false;
 }
 
-std::optional<unsigned> BaseMultiplicationSimplifier::tryDetermineValueOfConstant(const syrec::expression::ptr& operandOfBinaryExpr) const {
+std::optional<unsigned> BaseMultiplicationSimplifier::tryDetermineValueOfConstant(const syrec::Expression::ptr& operandOfBinaryExpr) const {
     if (const auto operandAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(operandOfBinaryExpr); operandAsNumericExpr != nullptr) {
         if (operandAsNumericExpr->value->isConstant()) {
             return std::make_optional(operandAsNumericExpr->value->evaluate({}));
@@ -39,7 +39,7 @@ std::optional<unsigned> BaseMultiplicationSimplifier::tryDetermineValueOfConstan
     return std::nullopt;
 }
 
-std::optional<syrec::expression::ptr> BaseMultiplicationSimplifier::replaceMultiplicationWithShiftIfConstantTermIsPowerOfTwo(unsigned int constantTerm, const syrec::expression::ptr& nonConstantTerm) const {
+std::optional<syrec::Expression::ptr> BaseMultiplicationSimplifier::replaceMultiplicationWithShiftIfConstantTermIsPowerOfTwo(unsigned int constantTerm, const syrec::Expression::ptr& nonConstantTerm) const {
     if (constantTerm % 2 != 0 || constantTerm == 0) {
         return std::nullopt;
     }

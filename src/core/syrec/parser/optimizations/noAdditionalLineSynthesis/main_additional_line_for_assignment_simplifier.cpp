@@ -155,8 +155,8 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
     return {assignmentStmtCasted};
     
     // TODO: Ignore this for now
-    /*syrec::expression::ptr     lhsExprOfTopMostExprOfAssignmentRhs;
-    syrec::expression::ptr     rhsExprOfTopMostExprOfAssignmentRhs = nullptr;
+    /*syrec::Expression::ptr     lhsExprOfTopMostExprOfAssignmentRhs;
+    syrec::Expression::ptr     rhsExprOfTopMostExprOfAssignmentRhs = nullptr;
     std::optional<syrec_operation::operation> topMostOperationNodeOfRhsExpr;
 
     if (assignmentStmtRhsExprAsBinaryExpr != nullptr) {
@@ -229,11 +229,11 @@ syrec::AssignStatement::vec MainAdditionalLineForAssignmentSimplifier::tryReduce
     //return generatedAssignments;
 }
 
-bool MainAdditionalLineForAssignmentSimplifier::isExpressionEitherBinaryOrShiftExpression(const syrec::expression::ptr& expr) {
+bool MainAdditionalLineForAssignmentSimplifier::isExpressionEitherBinaryOrShiftExpression(const syrec::Expression::ptr& expr) {
     return std::dynamic_pointer_cast<syrec::BinaryExpression>(expr) != nullptr || std::dynamic_pointer_cast<syrec::ShiftExpression>(expr) != nullptr;
 }
 
-bool MainAdditionalLineForAssignmentSimplifier::doesExpressionOnlyContainReversibleOperations(const syrec::expression::ptr& expr) {
+bool MainAdditionalLineForAssignmentSimplifier::doesExpressionOnlyContainReversibleOperations(const syrec::Expression::ptr& expr) {
     if (const auto exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         const auto mappedToOperationFlagOfBinaryExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
         if (!mappedToOperationFlagOfBinaryExpr.has_value() || !syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationFlagOfBinaryExpr).has_value() 
@@ -264,11 +264,11 @@ bool MainAdditionalLineForAssignmentSimplifier::doesExpressionOnlyContainReversi
     return false;
 }
 
-bool MainAdditionalLineForAssignmentSimplifier::doesExpressionDefineSignalAccess(const syrec::expression::ptr& expr) {
+bool MainAdditionalLineForAssignmentSimplifier::doesExpressionDefineSignalAccess(const syrec::Expression::ptr& expr) {
     return std::dynamic_pointer_cast<syrec::VariableExpression>(expr) != nullptr;
 }
 
-bool MainAdditionalLineForAssignmentSimplifier::isExpressionConstantNumber(const syrec::expression::ptr& expr) {
+bool MainAdditionalLineForAssignmentSimplifier::isExpressionConstantNumber(const syrec::Expression::ptr& expr) {
     if (const auto exprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expr); exprAsNumericExpr != nullptr) {
         return exprAsNumericExpr->value->isConstant();
     }
@@ -333,7 +333,7 @@ bool MainAdditionalLineForAssignmentSimplifier::doDimensionAccessesOverlap(const
         }).first != thisDimensionAccess.cend();
 }
 
-std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryConvertCompileTimeConstantExpressionToBinaryExpression(const syrec::Number::ptr& potentialCompileTimeExpression, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable) {
+std::optional<syrec::Expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryConvertCompileTimeConstantExpressionToBinaryExpression(const syrec::Number::ptr& potentialCompileTimeExpression, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable) {
     if (!potentialCompileTimeExpression->isCompileTimeConstantExpression()) {
         return std::nullopt;
     }
@@ -372,7 +372,7 @@ std::optional<syrec_operation::operation> MainAdditionalLineForAssignmentSimplif
     }
 }
 
-std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryMapNumberToExpression(const syrec::Number::ptr& number, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable) {
+std::optional<syrec::Expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryMapNumberToExpression(const syrec::Number::ptr& number, unsigned int expectedBitWidth, const parser::SymbolTable::ptr& symbolTable) {
     if (number->isConstant()) {
         return std::make_shared<syrec::NumericExpression>(number, expectedBitWidth);
     }
@@ -388,7 +388,7 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
     return tryConvertCompileTimeConstantExpressionToBinaryExpression(number, expectedBitWidth, symbolTable);
 }
 
-std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryPerformReorderingOfSubexpressions(const syrec::expression::ptr& expr) {
+std::optional<syrec::Expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryPerformReorderingOfSubexpressions(const syrec::Expression::ptr& expr) {
     const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     const auto& exprAsShiftExpr = exprAsBinaryExpr == nullptr ? std::dynamic_pointer_cast<syrec::ShiftExpression>(expr) : nullptr;
 
@@ -413,8 +413,8 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
         && mappedToOperationFromFlag.has_value()
         && syrec_operation::isCommutative(*mappedToOperationFromFlag)) {
 
-        syrec::expression::ptr newExprLhs = exprAsBinaryExpr->rhs;
-        syrec::expression::ptr newExprRhs = exprAsBinaryExpr->lhs;
+        syrec::Expression::ptr newExprLhs = exprAsBinaryExpr->rhs;
+        syrec::Expression::ptr newExprRhs = exprAsBinaryExpr->lhs;
         if (const auto& reorderResultOfRhs = tryPerformReorderingOfSubexpressions(exprAsBinaryExpr->rhs); reorderResultOfRhs.has_value()) {
             newExprRhs = *reorderResultOfRhs;
         }
@@ -426,7 +426,7 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
     return std::make_optional(expr);
 }
 
-std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryPerformReorderingOfSubtractionOperationsWithNestedSubexpressions(const syrec::expression::ptr& expr) {
+std::optional<syrec::Expression::ptr> MainAdditionalLineForAssignmentSimplifier::tryPerformReorderingOfSubtractionOperationsWithNestedSubexpressions(const syrec::Expression::ptr& expr) {
     const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     
     if (exprAsBinaryExpr == nullptr) {
@@ -464,13 +464,13 @@ std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier:
     return std::nullopt;
 }
 
-std::shared_ptr<MainAdditionalLineForAssignmentSimplifier::VariableAccessCountLookup> MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const {
+std::shared_ptr<MainAdditionalLineForAssignmentSimplifier::VariableAccessCountLookup> MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::Expression::ptr& expr, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const {
     auto buildLookup = std::make_shared<VariableAccessCountLookup>();
     buildVariableAccessCountsForExpr(expr, buildLookup, requiredSizeForSignalAccessToBeConsidered, symbolTable);
     return buildLookup;
 }
 
-void MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::expression::ptr& expr, std::shared_ptr<VariableAccessCountLookup>& lookupToFill, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const {
+void MainAdditionalLineForAssignmentSimplifier::buildVariableAccessCountsForExpr(const syrec::Expression::ptr& expr, std::shared_ptr<VariableAccessCountLookup>& lookupToFill, const EstimatedSignalAccessSize& requiredSizeForSignalAccessToBeConsidered, const parser::SymbolTable::ptr& symbolTable) const {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         buildVariableAccessCountsForExpr(exprAsBinaryExpr->lhs, lookupToFill, requiredSizeForSignalAccessToBeConsidered, symbolTable);
         buildVariableAccessCountsForExpr(exprAsBinaryExpr->rhs, lookupToFill, requiredSizeForSignalAccessToBeConsidered, symbolTable);
@@ -560,11 +560,11 @@ bool MainAdditionalLineForAssignmentSimplifier::canAddAssignmentBeReplacedWithXo
 }
 
 // TODO: Implement me
-std::optional<syrec::expression::ptr> MainAdditionalLineForAssignmentSimplifier::findExpressionContainingSignalAccessDefinedOnlyOnceInAssignmentRhs(const syrec::BinaryExpression::ptr& assignmentStatement, bool& isLhsRelevantSignalAccess) {
+std::optional<syrec::Expression::ptr> MainAdditionalLineForAssignmentSimplifier::findExpressionContainingSignalAccessDefinedOnlyOnceInAssignmentRhs(const syrec::BinaryExpression::ptr& assignmentStatement, bool& isLhsRelevantSignalAccess) {
     return std::nullopt;
 }
 
-MainAdditionalLineForAssignmentSimplifier::LookupOfExcludedSignalsForReplacement MainAdditionalLineForAssignmentSimplifier::createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable) const {
+MainAdditionalLineForAssignmentSimplifier::LookupOfExcludedSignalsForReplacement MainAdditionalLineForAssignmentSimplifier::createLookupForSignalsNotUsableAsReplacementsFor(const syrec::Expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable) const {
     LookupOfExcludedSignalsForReplacement createdLookup = std::make_unique<std::map<std::string_view, std::vector<NotUsableAsReplacementSignalParts>>>();
     for (const auto& [signalIdent, existingAssignmentsForSignal] : activeAssignments) {
         createdLookup->insert(std::make_pair(signalIdent, existingAssignmentsForSignal));
@@ -573,7 +573,7 @@ MainAdditionalLineForAssignmentSimplifier::LookupOfExcludedSignalsForReplacement
     return createdLookup;
 }
 
-void MainAdditionalLineForAssignmentSimplifier::createLookupForSignalsNotUsableAsReplacementsFor(const syrec::expression::ptr& expr, LookupOfExcludedSignalsForReplacement& lookupToFill, const parser::SymbolTable::ptr& symbolTable) const {
+void MainAdditionalLineForAssignmentSimplifier::createLookupForSignalsNotUsableAsReplacementsFor(const syrec::Expression::ptr& expr, LookupOfExcludedSignalsForReplacement& lookupToFill, const parser::SymbolTable::ptr& symbolTable) const {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         createLookupForSignalsNotUsableAsReplacementsFor(exprAsBinaryExpr->lhs, lookupToFill, symbolTable);
         createLookupForSignalsNotUsableAsReplacementsFor(exprAsBinaryExpr->rhs, lookupToFill, symbolTable);
@@ -607,11 +607,11 @@ bool MainAdditionalLineForAssignmentSimplifier::doesAssignmentToAccessedSignalPa
 }
 
 // TODO: Implement me
-std::optional<syrec::VariableAccess::ptr> MainAdditionalLineForAssignmentSimplifier::tryCreateSubstituteForExpr(const syrec::expression::ptr& expr, const LookupOfExcludedSignalsForReplacement& signalPartsToExcludeAsPotentialReplacements) {
+std::optional<syrec::VariableAccess::ptr> MainAdditionalLineForAssignmentSimplifier::tryCreateSubstituteForExpr(const syrec::Expression::ptr& expr, const LookupOfExcludedSignalsForReplacement& signalPartsToExcludeAsPotentialReplacements) {
     return std::nullopt;
 }
 
-syrec::expression::ptr MainAdditionalLineForAssignmentSimplifier::transformNumericExpressionsToBinary(const syrec::expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable) {
+syrec::Expression::ptr MainAdditionalLineForAssignmentSimplifier::transformNumericExpressionsToBinary(const syrec::Expression::ptr& expr, const parser::SymbolTable::ptr& symbolTable) {
     if (const auto& exprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expr); exprAsNumericExpr != nullptr) {
         return tryMapNumberToExpression(exprAsNumericExpr->value, 0, symbolTable).value_or(expr);
     } else if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {

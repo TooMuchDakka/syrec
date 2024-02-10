@@ -53,7 +53,7 @@ protected:
 
     syrecAstDumpUtils::SyrecASTDumper astDumper;
     syrec::ReadProgramSettings        config;
-    syrec::program                    parserPublicInterface;
+    syrec::Program                    parserPublicInterface;
 
     std::string circuitToOptimize;
     std::vector<std::string> expectedOptimizedCircuits;
@@ -97,7 +97,7 @@ protected:
 
     void checkThatExpectedCircuitsAreWellFormed(const std::vector<std::string>& expectedOptimizedCircuits) const {
         for (const std::string& expectedOptimizedCircuit : expectedOptimizedCircuits) {
-            syrec::program internalParserInterface;
+            syrec::Program internalParserInterface;
             std::string errorsFromParsedCircuit;
             ASSERT_NO_THROW(errorsFromParsedCircuit = internalParserInterface.readFromString(expectedOptimizedCircuit, config)) << "Unexpected crash during parsing of expected optimized circuit '" << expectedOptimizedCircuit << "'";
             ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected optimized circuit '" << expectedOptimizedCircuit << "' to be represent a well formed SyReC program but the following errors where found: " << errorsFromParsedCircuit;
@@ -351,7 +351,12 @@ protected:
         }));
         }
         if (wereNoAdditionalLineSynthesisConfigOperationsDefined) {
-            generatedConfig.optionalNoAdditionalLineSynthesisConfig.emplace(parser::NoAdditionalLineSynthesisConfig({.useGeneratedAssignmentsByDecisionAsTieBreaker = shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker, .preferAssignmentsGeneratedByChoiceRegardlessOfCost = preferAssignmentGeneratedByChoiceRegardlessOfCosts, .optionalNewReplacementSignalIdentsPrefix = newSignalIdentsGeneratedByNoAdditionalLineSynthesisPrefix}));
+            generatedConfig.optionalNoAdditionalLineSynthesisConfig.emplace(parser::NoAdditionalLineSynthesisConfig({
+                .useGeneratedAssignmentsByDecisionAsTieBreaker = shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker,
+                .preferAssignmentsGeneratedByChoiceRegardlessOfCost = preferAssignmentGeneratedByChoiceRegardlessOfCosts,
+                .expressionNestingPenalty                           = 0,
+                .expressionNestingPenaltyScalingPerNestingLevel     = 0,
+                .optionalNewReplacementSignalIdentsPrefix = newSignalIdentsGeneratedByNoAdditionalLineSynthesisPrefix}));
         }
 
         parsedProgramSettings.emplace(generatedConfig);
@@ -390,6 +395,8 @@ protected:
             mergedOptions.optionalNoAdditionalLineSynthesisConfig.emplace(parser::NoAdditionalLineSynthesisConfig({
                 .useGeneratedAssignmentsByDecisionAsTieBreaker      = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisTieBreakerByAssignmentsOfChoice, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->useGeneratedAssignmentsByDecisionAsTieBreaker, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->useGeneratedAssignmentsByDecisionAsTieBreaker),
                 .preferAssignmentsGeneratedByChoiceRegardlessOfCost = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost),
+                .expressionNestingPenalty = 0,
+                .expressionNestingPenaltyScalingPerNestingLevel = 0,
                 .optionalNewReplacementSignalIdentsPrefix           = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisNewSignalIdentsPrefix, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix)
             }));
         } else if (!userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig.has_value() && defaultParserConfig.optionalNoAdditionalLineSynthesisConfig.has_value()) {

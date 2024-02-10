@@ -242,7 +242,7 @@ bool SymbolTable::addNewLocalSignalsToModule(const ModuleIdentifier& moduleIdent
         return false;
     }
 
-    for (const syrec::Variable::ptr newLocalSignal : newLocalSignalsToAdd) {
+    for (const syrec::Variable::ptr& newLocalSignal : newLocalSignalsToAdd) {
         matchingEntryForModuleNameAndId.declaredModule->addVariable(newLocalSignal);   
     }
     return true;
@@ -643,7 +643,7 @@ bool               SymbolTable::doesVariableAccessAllowValueLookup(const Variabl
             && std::none_of(
                 variableAccess->indexes.cbegin(),
                 variableAccess->indexes.cend(),
-                [](const syrec::expression::ptr& accessedValueOfDimensionExpr) {
+                [](const syrec::Expression::ptr& accessedValueOfDimensionExpr) {
                     if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr) {
                         return !numericExpr->value->isConstant();
                     }
@@ -696,7 +696,7 @@ std::vector<std::optional<unsigned>> SymbolTable::tryTransformAccessedDimensions
                 accessedSignalParts->indexes.cbegin(),
                 accessedSignalParts->indexes.cend(),
                 std::back_inserter(transformedDimensionAccess),
-                [](const syrec::expression::ptr& accessedValueOfDimensionExpr) -> std::optional<unsigned int> {
+                [](const syrec::Expression::ptr& accessedValueOfDimensionExpr) -> std::optional<unsigned int> {
                     if (const auto& numericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimensionExpr); numericExpr) {
                         if (numericExpr->value->isConstant()) {
                             return std::make_optional(numericExpr->value->evaluate({}));

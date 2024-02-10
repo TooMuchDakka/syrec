@@ -202,7 +202,7 @@ std::optional<optimizations::LoopBodyValuePropagationBlocker::ScopeLocalAssignme
     assignedToSignal.indexes.cbegin(),
     assignedToSignal.indexes.cend(),
     std::back_inserter(transformedAccessedValuePerDimension),
-    [](const syrec::expression::ptr& accessedValueOfDimension) -> std::optional<unsigned int> {
+    [](const syrec::Expression::ptr& accessedValueOfDimension) -> std::optional<unsigned int> {
         if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&*accessedValueOfDimension); exprAsNumericExpr) {
             return tryEvaluateNumberToConstant(*exprAsNumericExpr->value);
         }
@@ -226,7 +226,7 @@ std::optional<unsigned> optimizations::LoopBodyValuePropagationBlocker::tryEvalu
     return number.isConstant() ? std::make_optional(number.evaluate({})) : std::nullopt;
 }
 
-std::optional<unsigned> optimizations::LoopBodyValuePropagationBlocker::tryEvaluateExpressionToConstant(const syrec::expression& expr) {
+std::optional<unsigned> optimizations::LoopBodyValuePropagationBlocker::tryEvaluateExpressionToConstant(const syrec::Expression& expr) {
     if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr) {
         return tryEvaluateNumberToConstant(*exprAsNumericExpr->value);
     }
@@ -302,7 +302,7 @@ void optimizations::LoopBodyValuePropagationBlocker::restrictAccessTo(const syre
             assignedToSignalParts.indexes.cbegin(),
             assignedToSignalParts.indexes.cend(),
             std::back_inserter(transformedAccessedValuePerDimension),
-            [](const syrec::expression::ptr& accessedValueOfDimension) -> std::optional<unsigned int> {
+            [](const syrec::Expression::ptr& accessedValueOfDimension) -> std::optional<unsigned int> {
                 if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&*accessedValueOfDimension); exprAsNumericExpr) {
                     return tryEvaluateNumberToConstant(*exprAsNumericExpr->value);
                 }

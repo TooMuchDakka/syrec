@@ -424,7 +424,7 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineBitwidthAfterVariabl
     return std::nullopt;
 }
 
-std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(const syrec::expression& expression, const messageUtils::Message::Position& evaluationErrorPosition) {
+std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(const syrec::Expression& expression, const messageUtils::Message::Position& evaluationErrorPosition) {
     if (auto const* numericExpression = dynamic_cast<const syrec::NumericExpression*>(&expression)) {
         return tryEvaluateNumber(*numericExpression->value, &evaluationErrorPosition);
     }
@@ -601,7 +601,7 @@ std::optional<syrec::BinaryExpression::ptr> SyReCCustomBaseVisitor::tryConvertCo
     return std::nullopt;
 }
 
-std::optional<syrec::Number::ptr> SyReCCustomBaseVisitor::tryConvertExpressionToCompileTimeConstantOne(const syrec::expression& expr) {
+std::optional<syrec::Number::ptr> SyReCCustomBaseVisitor::tryConvertExpressionToCompileTimeConstantOne(const syrec::Expression& expr) {
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr != nullptr) {
         const auto& convertedLhsOperand = tryConvertExpressionToCompileTimeConstantOne(*exprAsBinaryExpr->lhs);
         const auto& convertedBinaryExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
@@ -644,7 +644,7 @@ std::optional<syrec::Number::ptr> SyReCCustomBaseVisitor::tryConvertExpressionTo
     return std::nullopt;
 }
 
-std::optional<syrec::expression::ptr> SyReCCustomBaseVisitor::tryConvertNumberToExpr(const syrec::Number& number, const parser::SymbolTable& symbolTable) {
+std::optional<syrec::Expression::ptr> SyReCCustomBaseVisitor::tryConvertNumberToExpr(const syrec::Number& number, const parser::SymbolTable& symbolTable) {
     if (number.isConstant()) {
         if (const auto& constantValueOfNumber = SignalAccessUtils::tryEvaluateNumber(number, symbolTable); constantValueOfNumber.has_value()) {
             return std::make_shared<syrec::NumericExpression>(std::make_shared<syrec::Number>(*constantValueOfNumber), BitHelpers::getRequiredBitsToStoreValue(*constantValueOfNumber));
@@ -680,7 +680,7 @@ std::vector<std::optional<unsigned>> SyReCCustomBaseVisitor::determineAccessedVa
     signalAccess.indexes.cbegin(),
     signalAccess.indexes.cend(),
     std::back_inserter(resultContainer),
-    [&](const syrec::expression::ptr& exprDefiningAccessedValueOfDimension) -> std::optional<unsigned int> {
+    [&](const syrec::Expression::ptr& exprDefiningAccessedValueOfDimension) -> std::optional<unsigned int> {
         if (const auto& exprAsNumericExpr = std::dynamic_pointer_cast<const syrec::NumericExpression>(exprDefiningAccessedValueOfDimension); exprAsNumericExpr != nullptr) {
             return tryEvaluateNumber(*exprAsNumericExpr->value, nullptr);
         }

@@ -20,7 +20,7 @@ namespace optimizations {
             92n = 23n << 2
             93n = 92n + n
          */
-        [[nodiscard]] std::optional<syrec::expression::ptr> trySimplify(const std::shared_ptr<syrec::BinaryExpression>&) override;
+        [[nodiscard]] std::optional<syrec::Expression::ptr> trySimplify(const std::shared_ptr<syrec::BinaryExpression>&) override;
 
     protected:
         struct ShiftAndAddOrSubOperationStep {
@@ -36,7 +36,7 @@ namespace optimizations {
         [[nodiscard]] static std::size_t                                determineShiftAmount(std::size_t currentOneBitPosition, std::optional<std::size_t> previousOneBitPosition);
         static void                                                     reverseAndUpdateBitPositionsOfNumber(std::vector<std::size_t>& oneBitPositionsOfNumber);
         [[nodiscard]] static std::vector<ShiftAndAddOrSubOperationStep> generateOperationSteps(std::size_t constantToSimplify, bool aggregateOneBitSequences);
-        [[nodiscard]] static syrec::BinaryExpression::ptr               generateExpressionFromSimplificationSteps(const std::vector<ShiftAndAddOrSubOperationStep>& simplificationStepsOfConstantOperand, const syrec::expression::ptr& nonConstantOperand);
+        [[nodiscard]] static syrec::BinaryExpression::ptr               generateExpressionFromSimplificationSteps(const std::vector<ShiftAndAddOrSubOperationStep>& simplificationStepsOfConstantOperand, const syrec::Expression::ptr& nonConstantOperand);
     };
 }
 

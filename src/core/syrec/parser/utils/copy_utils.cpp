@@ -54,7 +54,7 @@ std::unique_ptr<syrec::Statement> copyUtils::createCopyOfStmt(const syrec::State
     return nullptr;
 }
 
-std::unique_ptr<syrec::expression> copyUtils::createCopyOfExpression(const syrec::expression& expr) {
+std::unique_ptr<syrec::Expression> copyUtils::createCopyOfExpression(const syrec::Expression& expr) {
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr) {
         return std::make_unique<syrec::BinaryExpression>(
                 exprAsBinaryExpr->lhs,
@@ -92,16 +92,16 @@ std::unique_ptr<syrec::Number> copyUtils::createCopyOfNumber(const syrec::Number
 }
 
 std::unique_ptr<syrec::AssignStatement> copyUtils::createDeepCopyOfAssignmentStmt(const syrec::AssignStatement& stmt) {
-    if (std::unique_ptr<syrec::expression> copyOfRhsOperand = createDeepCopyOfExpression(*stmt.rhs); copyOfRhsOperand) {
+    if (std::unique_ptr<syrec::Expression> copyOfRhsOperand = createDeepCopyOfExpression(*stmt.rhs); copyOfRhsOperand) {
         return std::make_unique<syrec::AssignStatement>(stmt.lhs, stmt.op, std::move(copyOfRhsOperand));    
     }
     return nullptr;
 }
 
-std::unique_ptr<syrec::expression> copyUtils::createDeepCopyOfExpression(const syrec::expression& expr) {
+std::unique_ptr<syrec::Expression> copyUtils::createDeepCopyOfExpression(const syrec::Expression& expr) {
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr) {
-        std::unique_ptr<syrec::expression> deepCopyOfLhsOperand = createDeepCopyOfExpression(*exprAsBinaryExpr->lhs);
-        std::unique_ptr<syrec::expression> deepCopyOfRhsOperand = createDeepCopyOfExpression(*exprAsBinaryExpr->rhs);
+        std::unique_ptr<syrec::Expression> deepCopyOfLhsOperand = createDeepCopyOfExpression(*exprAsBinaryExpr->lhs);
+        std::unique_ptr<syrec::Expression> deepCopyOfRhsOperand = createDeepCopyOfExpression(*exprAsBinaryExpr->rhs);
         if (deepCopyOfLhsOperand && deepCopyOfRhsOperand) {
             return std::make_unique<syrec::BinaryExpression>(
                     std::move(deepCopyOfLhsOperand),
@@ -110,7 +110,7 @@ std::unique_ptr<syrec::expression> copyUtils::createDeepCopyOfExpression(const s
         }
     }
     if (const auto& exprAsShiftExpr = dynamic_cast<const syrec::ShiftExpression*>(&expr); exprAsShiftExpr) {
-        std::unique_ptr<syrec::expression> deepCopyOfShiftExpr = createDeepCopyOfExpression(*exprAsShiftExpr->lhs);
+        std::unique_ptr<syrec::Expression> deepCopyOfShiftExpr = createDeepCopyOfExpression(*exprAsShiftExpr->lhs);
         std::unique_ptr<syrec::Number>     deepCopyOfShiftAmount = createCopyOfNumber(*exprAsShiftExpr->rhs);
 
         if (deepCopyOfShiftExpr && deepCopyOfShiftAmount) {

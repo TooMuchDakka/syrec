@@ -7,15 +7,15 @@
 
 using namespace optimizations;
 
-std::optional<syrec::expression::ptr> LineAwareOptimization::TreeTraversalNode::fetchStoredExpr() const {
+std::optional<syrec::Expression::ptr> LineAwareOptimization::TreeTraversalNode::fetchStoredExpr() const {
     if (!isInternalNode && std::holds_alternative<LeafData>(nodeData)) {
         const auto& leafData = std::get<LeafData>(nodeData);
 
         if (std::holds_alternative<std::shared_ptr<syrec::VariableExpression>>(leafData)) {
-            return std::make_optional<syrec::expression::ptr>(std::get<std::shared_ptr<syrec::VariableExpression>>(leafData));
+            return std::make_optional<syrec::Expression::ptr>(std::get<std::shared_ptr<syrec::VariableExpression>>(leafData));
         }
         if (std::holds_alternative<std::shared_ptr<syrec::NumericExpression>>(leafData)) {
-            return std::make_optional<syrec::expression::ptr>(std::get<std::shared_ptr<syrec::NumericExpression>>(leafData));
+            return std::make_optional<syrec::Expression::ptr>(std::get<std::shared_ptr<syrec::NumericExpression>>(leafData));
         }
     }
     return std::nullopt;
@@ -202,7 +202,7 @@ std::optional<LineAwareOptimization::PostOrderTreeTraversal> LineAwareOptimizati
 }
 
 // TODO:
-void LineAwareOptimization::traverseExpressionOperand(const syrec::expression::ptr& expr, std::vector<TreeTraversalNode>& postOrderTraversalContainer, bool& canContinueTraversal) {
+void LineAwareOptimization::traverseExpressionOperand(const syrec::Expression::ptr& expr, std::vector<TreeTraversalNode>& postOrderTraversalContainer, bool& canContinueTraversal) {
     if (isExpressionOperandLeafNode(expr)) {
         if (const auto& exprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableAccess != nullptr) {
             postOrderTraversalContainer.emplace_back(TreeTraversalNode::CreateLeafNode(exprAsVariableAccess));
@@ -212,8 +212,8 @@ void LineAwareOptimization::traverseExpressionOperand(const syrec::expression::p
     }
     else {
         TreeTraversalNode::ReferenceExpr referenceExprVariant;
-        syrec::expression::ptr lhsExprOfCurrentExpr;
-        syrec::expression::ptr rhsExprOfCurrentExpr;
+        syrec::Expression::ptr lhsExprOfCurrentExpr;
+        syrec::Expression::ptr rhsExprOfCurrentExpr;
         syrec_operation::operation operationOfOperationNode;
         if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
             referenceExprVariant     = exprAsBinaryExpr;
@@ -258,7 +258,7 @@ void LineAwareOptimization::traverseExpressionOperand(const syrec::expression::p
     }
 }
 
-bool LineAwareOptimization::isExpressionOperandLeafNode(const syrec::expression::ptr& expr) {
+bool LineAwareOptimization::isExpressionOperandLeafNode(const syrec::Expression::ptr& expr) {
     if (const auto& exprAsVariableAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableAccess != nullptr) {
         return true;
     }
@@ -314,7 +314,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithOn
     syrec::AssignStatement::vec createdAssignStatements;
 
     std::set<std::size_t> visitedStatusPerNode;
-    std::map<std::size_t, syrec::expression::ptr> exprPerInternalNodeLookup;
+    std::map<std::size_t, syrec::Expression::ptr> exprPerInternalNodeLookup;
     /*
      * The deepest node in the post order traversal is also the first node in our container storing the elements in post order
      */
@@ -349,7 +349,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeAssignStatementWithOn
 
         const bool needToInvertAssignmentOperation = assignmentOperand == syrec_operation::operation::MinusAssign;
         syrec_operation::operation assignmentOperandToUse          = assignmentOperand;
-        syrec::expression::ptr     rhsExprOfAssignment;
+        syrec::Expression::ptr     rhsExprOfAssignment;
 
         if (!childNodesOfOperationNode.first.isInternalNode || !childNodesOfOperationNode.second.isInternalNode) {
             const auto& childLeafNode = !childNodesOfOperationNode.first.isInternalNode
@@ -437,7 +437,7 @@ syrec::AssignStatement::vec LineAwareOptimization::optimizeComplexAssignStatemen
             continue;
         }
 
-        syrec::expression::ptr     assignmentStmtRhsOperand;
+        syrec::Expression::ptr     assignmentStmtRhsOperand;
         syrec::VariableAccess::ptr assignmentStmtLhsOperand = assignStmtLhs;
 
         if (isLeftChildALeaf ^ isRightChildALeaf) {
@@ -556,8 +556,8 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
             }
 
             const auto& referenceExpr = *operationNode.fetchReferenceExpr();
-            syrec::expression::ptr lhsExpr;
-            syrec::expression::ptr rhsExpr;
+            syrec::Expression::ptr lhsExpr;
+            syrec::Expression::ptr rhsExpr;
             if (std::holds_alternative<std::shared_ptr<syrec::BinaryExpression>>(referenceExpr)) {
                 const auto& referenceExprAsBinaryOne = std::get<std::shared_ptr<syrec::BinaryExpression>>(referenceExpr);
                 lhsExpr                              = referenceExprAsBinaryOne->lhs;
@@ -585,7 +585,7 @@ LineAwareOptimization::LineAwareOptimizationResult LineAwareOptimization::optimi
             continue;
         }
 
-        syrec::expression::ptr     assignmentStmtRhsOperand;
+        syrec::Expression::ptr     assignmentStmtRhsOperand;
         syrec::VariableAccess::ptr assignmentStmtLhsOperand = assignStmtLhs;
 
         if (isLeftChildALeaf ^ isRightChildALeaf) {

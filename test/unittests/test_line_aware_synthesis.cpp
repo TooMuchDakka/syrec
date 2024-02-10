@@ -72,7 +72,7 @@ INSTANTIATE_TEST_SUITE_P(SyrecSynthesisTest, SyrecSynthesisTest,
 
 TEST_P(SyrecSynthesisTest, GenericSynthesisTest) {
     Circuit             circ;
-    program             prog;
+    Program             prog;
     ReadProgramSettings settings;
     std::string         errorString;
 
@@ -88,4 +88,18 @@ TEST_P(SyrecSynthesisTest, GenericSynthesisTest) {
     EXPECT_EQ(expectedLines, circ.getLines());
     EXPECT_EQ(expectedQc, qc);
     EXPECT_EQ(expectedTc, tc);
+}
+
+TEST_P(SyrecSynthesisTest, GenericSynthesisQASMTest) {
+    Circuit             circ;
+    Program             prog;
+    ReadProgramSettings settings;
+
+    const auto errorString = prog.read(fileName, settings);
+    EXPECT_TRUE(errorString.empty());
+    EXPECT_TRUE(LineAwareSynthesis::synthesize(circ, prog));
+
+    const auto lastIndex      = fileName.find_last_of('.');
+    const auto outputFileName = fileName.substr(0, lastIndex);
+    EXPECT_TRUE(circ.toQasmFile(outputFileName + ".qasm"));
 }

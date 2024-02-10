@@ -3,7 +3,7 @@
 
 using namespace optimizations;
 
-std::optional<syrec::expression::ptr> BinaryMultiplicationSimplifier::trySimplify(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
+std::optional<syrec::Expression::ptr> BinaryMultiplicationSimplifier::trySimplify(const std::shared_ptr<syrec::BinaryExpression>& binaryExpr) {
     if (!isOperationOfExpressionMultiplicationAndHasAtleastOneConstantOperand(binaryExpr)) {
         const auto lhsOperandAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(binaryExpr->lhs);
         const auto simplificationResultOfLhsOperand = lhsOperandAsBinaryExpr != nullptr ? trySimplify(lhsOperandAsBinaryExpr) : std::nullopt;
@@ -99,7 +99,7 @@ std::vector<BinaryMultiplicationSimplifier::ShiftAndAddOrSubOperationStep> Binar
     return operationSteps;
 }
 
-syrec::BinaryExpression::ptr BinaryMultiplicationSimplifier::generateExpressionFromSimplificationSteps(const std::vector<ShiftAndAddOrSubOperationStep>& simplificationStepsOfConstantOperand, const syrec::expression::ptr& nonConstantOperand) {
+syrec::BinaryExpression::ptr BinaryMultiplicationSimplifier::generateExpressionFromSimplificationSteps(const std::vector<ShiftAndAddOrSubOperationStep>& simplificationStepsOfConstantOperand, const syrec::Expression::ptr& nonConstantOperand) {
     auto nonConstantShiftExprOperand = nonConstantOperand;
     for (const auto& simplificationStep : simplificationStepsOfConstantOperand) {
         const auto generatedShiftExpr    = std::make_shared<syrec::ShiftExpression>(nonConstantShiftExprOperand, syrec::ShiftExpression::Left, std::make_shared<syrec::Number>(simplificationStep.shiftAmount));

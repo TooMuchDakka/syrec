@@ -42,7 +42,7 @@ namespace optimizations {
                 return TreeTraversalNode(false, leafData);
             }
 
-            [[nodiscard]] std::optional<syrec::expression::ptr>      fetchStoredExpr() const;
+            [[nodiscard]] std::optional<syrec::Expression::ptr>      fetchStoredExpr() const;
             [[nodiscard]] std::optional<ReferenceExpr> fetchReferenceExpr() const;
             [[nodiscard]] std::optional<syrec_operation::operation>  fetchStoredOperation() const;
 		private:
@@ -88,8 +88,8 @@ namespace optimizations {
 
         [[nodiscard]] static std::optional<syrec_operation::operation> tryMapAssignmentOperand(unsigned int assignmentOperand);
         [[nodiscard]] static std::optional<PostOrderTreeTraversal>     createPostOrderRepresentation(const syrec::BinaryExpression::ptr& topLevelBinaryExpr);
-        static void                                                    traverseExpressionOperand(const syrec::expression::ptr& expr, std::vector<TreeTraversalNode>& postOrderTraversalContainer, bool& canContinueTraversal);
-        [[nodiscard]] static bool                                      isExpressionOperandLeafNode(const syrec::expression::ptr& expr);
+        static void                                                    traverseExpressionOperand(const syrec::Expression::ptr& expr, std::vector<TreeTraversalNode>& postOrderTraversalContainer, bool& canContinueTraversal);
+        [[nodiscard]] static bool                                      isExpressionOperandLeafNode(const syrec::Expression::ptr& expr);
         [[nodiscard]] static bool                                      isOperationAdditionSubtractionOrXor(syrec_operation::operation operation);
         [[nodiscard]] static bool                                      isOperationAssociative(syrec_operation::operation operation);
 

@@ -3,7 +3,7 @@
 
 using namespace optimizations;
 
-bool optimizations::tryPerformOperationStrengthReduction(syrec::expression::ptr& expr) {
+bool optimizations::tryPerformOperationStrengthReduction(syrec::Expression::ptr& expr) {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         const auto mappedToBinaryExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
         if (!mappedToBinaryExpr.has_value() || *mappedToBinaryExpr != syrec_operation::operation::Multiplication || *mappedToBinaryExpr != syrec_operation::operation::Division) {

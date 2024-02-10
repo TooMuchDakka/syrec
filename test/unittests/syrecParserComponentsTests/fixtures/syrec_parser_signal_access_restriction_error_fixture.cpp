@@ -1,4 +1,3 @@
-#include <googletest/googletest/include/gtest/gtest.h>
 #include "gtest/gtest.h"
 
 #include "syrec_parser_signal_access_restriction_error_fixture.hpp"
@@ -8,7 +7,7 @@ using namespace SignalAccessRestrictionParserTests;
 TEST_P(SyrecParserSignalAccessRestrictionErrorFixture, CheckThatRestrictionChanged){
     const auto testData = createTestData(assignmentLhsOperand, excludedTestCases);
     for (const auto& test : testData) {
-        syrec::program parserInterface;
+        syrec::Program parserInterface;
         std::string actualErrorsConcatinated;
 
         const auto& programToParse = test.first;

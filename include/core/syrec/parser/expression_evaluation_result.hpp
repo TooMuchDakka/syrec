@@ -16,9 +16,9 @@ namespace parser {
 
         [[nodiscard]] bool isConstantValue() const;
         [[nodiscard]] std::optional<unsigned int> getAsConstant() const;
-        [[nodiscard]] std::optional<syrec::expression::ptr> getAsExpression() const;
+        [[nodiscard]] std::optional<syrec::Expression::ptr> getAsExpression() const;
         [[nodiscard]] static ExpressionEvaluationResult::ptr createFromConstantValue(unsigned int constantValue, const std::optional<unsigned int>& optionalExpectedSignalWidth);
-        [[nodiscard]] static ExpressionEvaluationResult::ptr createFromExpression(const syrec::expression::ptr&expression, const std::vector<std::optional<unsigned int>>& explicitlyAccessedValuesPerDimension);
+        [[nodiscard]] static ExpressionEvaluationResult::ptr createFromExpression(const syrec::Expression::ptr& expression, const std::vector<std::optional<unsigned int>>& explicitlyAccessedValuesPerDimension);
 
         struct OperandSizeInformation {
             const std::size_t numDeclaredDimensionOfOperand;
@@ -37,7 +37,7 @@ namespace parser {
             evaluationResult = std::make_pair(constantValue, optionalExpectedSignalWidth.has_value() ? *optionalExpectedSignalWidth : BitHelpers::getRequiredBitsToStoreValue(constantValue));
         }
 
-        ExpressionEvaluationResult(const syrec::expression::ptr& expression, std::size_t numDeclaredDimensionOfExpr, std::vector<std::optional<unsigned int>> explicitlyAccessedValuesPerDimension, std::vector<unsigned int> numValuesPerNotExplicitlyAccessedDimension):
+        ExpressionEvaluationResult(const syrec::Expression::ptr& expression, std::size_t numDeclaredDimensionOfExpr, std::vector<std::optional<unsigned int>> explicitlyAccessedValuesPerDimension, std::vector<unsigned int> numValuesPerNotExplicitlyAccessedDimension):
             isConstant(false),
             optionalExpectedSignalWidthForConstantValue(std::nullopt),
             numDeclaredDimensionsOfEvaluationResult(numDeclaredDimensionOfExpr),
@@ -47,7 +47,7 @@ namespace parser {
         }
 
         using ConstantValueAndBitwidthPair = std::pair<unsigned int, unsigned int>;
-        using AvailableOptions = std::variant<syrec::expression::ptr, ConstantValueAndBitwidthPair>;
+        using AvailableOptions = std::variant<syrec::Expression::ptr, ConstantValueAndBitwidthPair>;
 
         bool                                     isConstant;
         std::optional<unsigned int>              optionalExpectedSignalWidthForConstantValue;

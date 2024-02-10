@@ -71,7 +71,7 @@ std::optional<bool> BaseAssignmentSimplifier::isEveryLhsOperandOfAnyBinaryExprDe
     return std::nullopt;
 }
 
-std::optional<bool> BaseAssignmentSimplifier::doesExprOnlyContainUniqueSignalAccesses(const syrec::expression::ptr& exprToCheck, RestrictionMap& alreadyDefinedSignalAccesses) {
+std::optional<bool> BaseAssignmentSimplifier::doesExprOnlyContainUniqueSignalAccesses(const syrec::Expression::ptr& exprToCheck, RestrictionMap& alreadyDefinedSignalAccesses) {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprToCheck); exprAsBinaryExpr != nullptr) {
         return doesExprOnlyContainUniqueSignalAccesses(exprAsBinaryExpr->lhs, alreadyDefinedSignalAccesses) && doesExprOnlyContainUniqueSignalAccesses(exprAsBinaryExpr->rhs, alreadyDefinedSignalAccesses);
     } if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(exprToCheck); exprAsShiftExpr != nullptr) {
@@ -123,22 +123,22 @@ void BaseAssignmentSimplifier::invalidateSignalWithPreviousValueOfZero(const syr
     }
 }
 
-bool BaseAssignmentSimplifier::isExprConstantNumber(const syrec::expression::ptr& expr) {
+bool BaseAssignmentSimplifier::isExprConstantNumber(const syrec::Expression::ptr& expr) {
     if (const auto& exprAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(expr); exprAsNumericExpr != nullptr) {
         return exprAsNumericExpr->value->isConstant();
     }
     return false;
 }
 
-bool BaseAssignmentSimplifier::doesExprDefineVariableAccess(const syrec::expression::ptr& expr) {
+bool BaseAssignmentSimplifier::doesExprDefineVariableAccess(const syrec::Expression::ptr& expr) {
     return std::dynamic_pointer_cast<syrec::VariableExpression>(expr) != nullptr;
 }
 
-bool BaseAssignmentSimplifier::doesExprDefineNestedExpr(const syrec::expression::ptr& expr) {
+bool BaseAssignmentSimplifier::doesExprDefineNestedExpr(const syrec::Expression::ptr& expr) {
     return std::dynamic_pointer_cast<syrec::BinaryExpression>(expr) != nullptr;
 }
 
-bool BaseAssignmentSimplifier::doesExprOnlyContainReversibleOperations(const syrec::expression::ptr& expr) {
+bool BaseAssignmentSimplifier::doesExprOnlyContainReversibleOperations(const syrec::Expression::ptr& expr) {
     if (const auto exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         const auto mappedToOperationFlagOfBinaryExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
         if (!mappedToOperationFlagOfBinaryExpr.has_value() || !syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationFlagOfBinaryExpr).has_value() || !syrec_operation::invert(*syrec_operation::getMatchingAssignmentOperationForOperation(*mappedToOperationFlagOfBinaryExpr)).has_value() || !syrec_operation::invert(*mappedToOperationFlagOfBinaryExpr).has_value()) {

@@ -44,7 +44,7 @@ syrec::AssignStatement::vec ExpressionToSubAssignmentSplitter::createSubAssignme
     return generatedAssignments;
 }
 
-bool ExpressionToSubAssignmentSplitter::isPreconditionSatisfied(syrec_operation::operation operation, const syrec::expression& topmostAssignmentRhsExpr, const std::optional<unsigned int>& currentValueOfAssignedToSignal) const {
+bool ExpressionToSubAssignmentSplitter::isPreconditionSatisfied(syrec_operation::operation operation, const syrec::Expression& topmostAssignmentRhsExpr, const std::optional<unsigned int>& currentValueOfAssignedToSignal) const {
     if (!syrec_operation::isOperationAssignmentOperation(operation)) {
         return false;
     }
@@ -53,7 +53,7 @@ bool ExpressionToSubAssignmentSplitter::isPreconditionSatisfied(syrec_operation:
         return true;
     }
 
-    syrec::expression::ptr                          expressionToCheck      = std::make_shared<syrec::BinaryExpression>(topmostExprOfRhsAsBinaryExpr->lhs, topmostExprOfRhsAsBinaryExpr->op, topmostExprOfRhsAsBinaryExpr->rhs);
+    syrec::Expression::ptr                          expressionToCheck      = std::make_shared<syrec::BinaryExpression>(topmostExprOfRhsAsBinaryExpr->lhs, topmostExprOfRhsAsBinaryExpr->op, topmostExprOfRhsAsBinaryExpr->rhs);
     const std::optional<syrec_operation::operation> operationOfTopmostExpr = syrec_operation::tryMapBinaryOperationFlagToEnum(topmostExprOfRhsAsBinaryExpr->op);
     if (!operationOfTopmostExpr.has_value()) {
         return false;
@@ -94,7 +94,7 @@ void ExpressionToSubAssignmentSplitter::updateOperationInversionFlag(syrec_opera
     operationInversionFlag = operationDeterminingInversionFlag == syrec_operation::operation::Subtraction || operationDeterminingInversionFlag == syrec_operation::operation::MinusAssign;
 }
 
-bool ExpressionToSubAssignmentSplitter::handleExpr(const syrec::expression::ptr& expr) {
+bool ExpressionToSubAssignmentSplitter::handleExpr(const syrec::Expression::ptr& expr) {
     if (const std::optional<std::pair<bool, bool>> optionalLeafNodeStatusPerOperandOfExpr = determineLeafNodeStatusForOperandsOfExpr(*expr); optionalLeafNodeStatusPerOperandOfExpr.has_value()) {
         if (optionalLeafNodeStatusPerOperandOfExpr->first && optionalLeafNodeStatusPerOperandOfExpr->second) {
             return handleExprWithTwoLeafNodes(expr);
@@ -107,7 +107,7 @@ bool ExpressionToSubAssignmentSplitter::handleExpr(const syrec::expression::ptr&
     return false;
 }
 
-bool ExpressionToSubAssignmentSplitter::handleExprWithNoLeafNodes(const syrec::expression::ptr& expr) {
+bool ExpressionToSubAssignmentSplitter::handleExprWithNoLeafNodes(const syrec::Expression::ptr& expr) {
     const std::shared_ptr<syrec::BinaryExpression> exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     if (!exprAsBinaryExpr) {
         return false;
@@ -144,7 +144,7 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithNoLeafNodes(const syrec::e
     return true;
 }
 
-bool ExpressionToSubAssignmentSplitter::handleExprWithOneLeafNode(const syrec::expression::ptr& expr) {
+bool ExpressionToSubAssignmentSplitter::handleExprWithOneLeafNode(const syrec::Expression::ptr& expr) {
     const std::shared_ptr<syrec::BinaryExpression> exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
     if (!exprAsBinaryExpr) {
         return false;
@@ -195,7 +195,7 @@ bool ExpressionToSubAssignmentSplitter::handleExprWithOneLeafNode(const syrec::e
     return false;
 }
 
-bool ExpressionToSubAssignmentSplitter::handleExprWithTwoLeafNodes(const syrec::expression::ptr& expr) {
+bool ExpressionToSubAssignmentSplitter::handleExprWithTwoLeafNodes(const syrec::Expression::ptr& expr) {
     const std::optional<syrec_operation::operation> assignmentOperationOfLhsExpr = getOperationOfNextSubAssignment();
     const auto&                                     exprAsBinaryExpr             = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr);
 
@@ -255,7 +255,7 @@ void ExpressionToSubAssignmentSplitter::fixNextSubAssignmentOperation(syrec_oper
     fixedSubAssignmentOperationsQueue.emplace_back(operation);
 }
 
-void ExpressionToSubAssignmentSplitter::updateValueOfAssignedToSignalViaAssignment(const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::expression* assignmentRhsExpr) {
+void ExpressionToSubAssignmentSplitter::updateValueOfAssignedToSignalViaAssignment(const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::Expression* assignmentRhsExpr) {
     if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(assignmentRhsExpr); exprAsNumericExpr) {
         if (exprAsNumericExpr->value->isConstant()) {
             currentAssignedToSignalValue = assignmentOperation.has_value()
@@ -268,7 +268,7 @@ void ExpressionToSubAssignmentSplitter::updateValueOfAssignedToSignalViaAssignme
     }
 }
 
-bool ExpressionToSubAssignmentSplitter::isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(const syrec::expression& expr) const {
+bool ExpressionToSubAssignmentSplitter::isSplitOfXorOperationIntoSubAssignmentsAllowedForExpr(const syrec::Expression& expr) const {
     if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr) {
         if (!exprAsNumericExpr->value->isCompileTimeConstantExpression()) {
             return true;
@@ -279,7 +279,7 @@ bool ExpressionToSubAssignmentSplitter::isSplitOfXorOperationIntoSubAssignmentsA
     return currentAssignedToSignalValue.has_value() && !currentAssignedToSignalValue.value();
 }
 
-syrec::AssignStatement::ptr ExpressionToSubAssignmentSplitter::createAssignmentFrom(const syrec::VariableAccess::ptr& assignedToSignalParts, syrec_operation::operation operation, const syrec::expression::ptr& assignmentRhsExpr) {
+syrec::AssignStatement::ptr ExpressionToSubAssignmentSplitter::createAssignmentFrom(const syrec::VariableAccess::ptr& assignedToSignalParts, syrec_operation::operation operation, const syrec::Expression::ptr& assignmentRhsExpr) {
     if (!syrec_operation::isOperationAssignmentOperation(operation)) {
         operation = *syrec_operation::getMatchingAssignmentOperationForOperation(operation);
     }
@@ -287,7 +287,7 @@ syrec::AssignStatement::ptr ExpressionToSubAssignmentSplitter::createAssignmentF
     return generatedAssignment;
 }
 
-bool ExpressionToSubAssignmentSplitter::doesExprDefineSubExpression(const syrec::expression& expr) {
+bool ExpressionToSubAssignmentSplitter::doesExprDefineSubExpression(const syrec::Expression& expr) {
     return dynamic_cast<const syrec::BinaryExpression*>(&expr) != nullptr;
 }
 
@@ -299,11 +299,11 @@ std::optional<syrec_operation::operation> ExpressionToSubAssignmentSplitter::det
     return matchingAssignmentOperation;
 }
 
-bool ExpressionToSubAssignmentSplitter::doesOperandDefineLeafNode(const syrec::expression& expr) {
+bool ExpressionToSubAssignmentSplitter::doesOperandDefineLeafNode(const syrec::Expression& expr) {
     return !doesExprDefineSubExpression(expr);
 }
 
-std::optional<std::pair<bool, bool>> ExpressionToSubAssignmentSplitter::determineLeafNodeStatusForOperandsOfExpr(const syrec::expression& expr) {
+std::optional<std::pair<bool, bool>> ExpressionToSubAssignmentSplitter::determineLeafNodeStatusForOperandsOfExpr(const syrec::Expression& expr) {
     if (!doesExprDefineSubExpression(expr)) {
         return std::nullopt;
     }
@@ -337,9 +337,9 @@ void ExpressionToSubAssignmentSplitter::transformTwoSubsequentMinusOperations(co
                  * Since the inversion statement for the given assignment statement reused the smart pointer for the rhs expression, we need to first create a copy of the latter and then switch the operands.
                  * Otherwise, we would not only switch the operands in the inversion assignment rhs expression but all expression that share the same smart pointer to the rhs expression of our given assignment.
                  */
-                const std::shared_ptr<syrec::expression> copyOfAssignmentRhsExpr = copyUtils::createDeepCopyOfExpression(**assignmentRhsExprAsBinaryExpr);
+                const std::shared_ptr<syrec::Expression> copyOfAssignmentRhsExpr = copyUtils::createDeepCopyOfExpression(**assignmentRhsExprAsBinaryExpr);
                 if (std::shared_ptr<syrec::BinaryExpression> copyOfAssignmentRhsExprCasted = copyOfAssignmentRhsExpr ? std::dynamic_pointer_cast<syrec::BinaryExpression>(copyOfAssignmentRhsExpr) : nullptr; copyOfAssignmentRhsExprCasted) {
-                    const syrec::expression::ptr backupOfAssignmentRhsExprLhsOperand = copyOfAssignmentRhsExprCasted->lhs;
+                    const syrec::Expression::ptr backupOfAssignmentRhsExprLhsOperand = copyOfAssignmentRhsExprCasted->lhs;
                     copyOfAssignmentRhsExprCasted->lhs                               = copyOfAssignmentRhsExprCasted->rhs;
                     copyOfAssignmentRhsExprCasted->rhs                               = backupOfAssignmentRhsExprLhsOperand;
                     assignmentCasted->op                                             = *mappedToOperationFlagFromEnum;
@@ -383,7 +383,7 @@ void ExpressionToSubAssignmentSplitter::transformAddAssignOperationToXorAssignOp
 }
 
 
-bool ExpressionToSubAssignmentSplitter::doesExprNotContainAnyOperationWithoutAssignmentCounterpartWhenBothOperandsAreNestedExpr(const syrec::expression& expr) {
+bool ExpressionToSubAssignmentSplitter::doesExprNotContainAnyOperationWithoutAssignmentCounterpartWhenBothOperandsAreNestedExpr(const syrec::Expression& expr) {
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr) {
         const std::optional<syrec_operation::operation> mappedToBinaryOperationEnumValueFromFlag = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
         if (!mappedToBinaryOperationEnumValueFromFlag.has_value()) {

@@ -33,14 +33,14 @@ bool ExpressionTraversalHelper::OperationNode::areBothOperandsLeafNodes() const 
 
 
 std::optional<syrec::VariableExpression::ptr> ExpressionTraversalHelper::getOperandAsVariableExpr(std::size_t operandNodeId) const {
-    if (std::optional<syrec::expression::ptr> operandData = getDataOfOperand(operandNodeId); operandData.has_value() && std::dynamic_pointer_cast<syrec::VariableExpression>(*operandData)) {
+    if (std::optional<syrec::Expression::ptr> operandData = getDataOfOperand(operandNodeId); operandData.has_value() && std::dynamic_pointer_cast<syrec::VariableExpression>(*operandData)) {
         return operandData;
     }
     return std::nullopt;
 }
 
-std::optional<syrec::expression::ptr> ExpressionTraversalHelper::getOperandAsExpr(std::size_t operandNodeId) const {
-    if (std::optional<syrec::expression::ptr> operandData = getDataOfOperand(operandNodeId); operandData.has_value() && std::dynamic_pointer_cast<syrec::VariableExpression>(*operandData) == nullptr) {
+std::optional<syrec::Expression::ptr> ExpressionTraversalHelper::getOperandAsExpr(std::size_t operandNodeId) const {
+    if (std::optional<syrec::Expression::ptr> operandData = getDataOfOperand(operandNodeId); operandData.has_value() && std::dynamic_pointer_cast<syrec::VariableExpression>(*operandData) == nullptr) {
         return operandData;
     }
     return std::nullopt;
@@ -107,7 +107,7 @@ std::optional<ExpressionTraversalHelper::OperationNodeReference> ExpressionTrave
     return operationNodeDataLookup.at(operationNodeId);
 }
 
-bool ExpressionTraversalHelper::updateOperandData(std::size_t operationNodeId, bool updateLhsOperandData, const syrec::expression::ptr& newOperandData) {
+bool ExpressionTraversalHelper::updateOperandData(std::size_t operationNodeId, bool updateLhsOperandData, const syrec::Expression::ptr& newOperandData) {
     const std::optional<OperationNodeReference>      referencedOperationNode      = getOperationNodeById(operationNodeId);
     const std::shared_ptr<syrec::VariableExpression> newOperandDataAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(newOperandData);
     if (!newOperandData || !newOperandDataAsVariableExpr || !referencedOperationNode.has_value() 
@@ -152,7 +152,7 @@ void ExpressionTraversalHelper::backtrackOnePastNode(std::size_t operationNodeId
     backtrackToNode(operationNodeId, true);
 }
 
-void ExpressionTraversalHelper::buildTraversalQueue(const syrec::expression::ptr& expr, const parser::SymbolTable& symbolTableReference) {
+void ExpressionTraversalHelper::buildTraversalQueue(const syrec::Expression::ptr& expr, const parser::SymbolTable& symbolTableReference) {
     resetInternals();
     const auto& generatedOperationNode = createOperationNode(expr, std::nullopt);
     operationNodeDataLookup.insert(std::make_pair(generatedOperationNode->id, generatedOperationNode));
@@ -243,14 +243,14 @@ void ExpressionTraversalHelper::backtrackToNode(std::size_t operationNodeId, boo
 }
 
 
-std::optional<syrec::expression::ptr> ExpressionTraversalHelper::getDataOfOperand(std::size_t operandNodeId) const {
+std::optional<syrec::Expression::ptr> ExpressionTraversalHelper::getDataOfOperand(std::size_t operandNodeId) const {
     if (!operandNodeDataLookup.count(operandNodeId)) {
         return std::nullopt;   
     }
     return operandNodeDataLookup.at(operandNodeId);
 }
 
-ExpressionTraversalHelper::OperandNode ExpressionTraversalHelper::createOperandNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId) {
+ExpressionTraversalHelper::OperandNode ExpressionTraversalHelper::createOperandNode(const syrec::Expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId) {
     std::size_t generatedOperandNodeId;
     std::optional<std::size_t> referencedOperationNodeId;
 
@@ -267,7 +267,7 @@ ExpressionTraversalHelper::OperandNode ExpressionTraversalHelper::createOperandN
     return OperandNode({generatedOperandNodeId, referencedOperationNodeId});
 }
 
-ExpressionTraversalHelper::OperationNodeReference ExpressionTraversalHelper::createOperationNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId) {
+ExpressionTraversalHelper::OperationNodeReference ExpressionTraversalHelper::createOperationNode(const syrec::Expression::ptr& expr, const std::optional<std::size_t>& parentOperationNodeId) {
     /*
      * We are assuming that this function is only called when trying to create an operation node for either a binary or shift expression, which we can guarantee
      * to a high degree of confidence by making this function only available to this class as well as for derived classes and placing the responsibility for a
@@ -295,12 +295,12 @@ ExpressionTraversalHelper::OperationNodeReference ExpressionTraversalHelper::cre
     return operationNodeReference;
 }
 
-inline bool ExpressionTraversalHelper::doesExpressionContainNestedExprAsOperand(const syrec::expression& expr) {
+inline bool ExpressionTraversalHelper::doesExpressionContainNestedExprAsOperand(const syrec::Expression& expr) {
     // We are assuming here that compile time constant expressions were already converted to binary expressions
     return dynamic_cast<const syrec::BinaryExpression*>(&expr) != nullptr || dynamic_cast<const syrec::ShiftExpression*>(&expr) != nullptr;
 }
 
-inline syrec::expression::ptr ExpressionTraversalHelper::createExpressionForNumber(const syrec::Number::ptr& number, unsigned expectedBitwidth) {
+inline syrec::Expression::ptr ExpressionTraversalHelper::createExpressionForNumber(const syrec::Number::ptr& number, unsigned expectedBitwidth) {
     const auto& exprForNumber = std::make_shared<syrec::NumericExpression>(number, expectedBitwidth);
     return exprForNumber;
 }

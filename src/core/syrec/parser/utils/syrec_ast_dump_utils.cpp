@@ -171,7 +171,7 @@ std::string SyrecASTDumper::stringifyIfStatement(const syrec::IfStatement& ifStm
     return stringifiedCondition;
 }
 
-std::string SyrecASTDumper::stringifyExpression(const syrec::expression::ptr& expression) {
+std::string SyrecASTDumper::stringifyExpression(const syrec::Expression::ptr& expression) {
     if (auto const* numberExpr = dynamic_cast<syrec::NumericExpression*>(expression.get())) {
         return stringifyNumericExpression(*numberExpr);
     }
@@ -309,7 +309,7 @@ std::string SyrecASTDumper::stringifyVariableAccess(const syrec::VariableAccess:
     std::string bitAccess;
 
     if (!variableAccess->indexes.empty()) {
-        accessedDimension = stringifyAndJoinManyComplex<syrec::expression>(variableAccess->indexes, "", stringifyDimensionExpression);
+        accessedDimension = stringifyAndJoinManyComplex<syrec::Expression>(variableAccess->indexes, "", stringifyDimensionExpression);
     }
 
     if (variableAccess->range.has_value()) {
@@ -358,7 +358,7 @@ inline std::string SyrecASTDumper::stringifyNumber(const syrec::Number::ptr& num
     return std::to_string(number->evaluate({}));
 }
 
-inline std::string SyrecASTDumper::stringifyDimensionExpression(const syrec::expression::ptr& expr) {
+inline std::string SyrecASTDumper::stringifyDimensionExpression(const syrec::Expression::ptr& expr) {
     return "[" + stringifyExpression(expr) + "]";
 }
 

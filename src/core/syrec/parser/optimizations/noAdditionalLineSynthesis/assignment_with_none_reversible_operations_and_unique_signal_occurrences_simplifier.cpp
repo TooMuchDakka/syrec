@@ -105,7 +105,7 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
     } else {
         if (hasOperationAssignmentCounterpart) {
             std::optional<syrec::VariableAccess::ptr> potentialAssignmentCandidateLhs;
-            std::optional<syrec::expression::ptr>     potentialAssignmentCandidateRhs;
+            std::optional<syrec::Expression::ptr>     potentialAssignmentCandidateRhs;
             if (!simplificationResultOfLhsSubexpression->generatedAssignments.empty()) {
                 potentialAssignmentCandidateLhs = std::dynamic_pointer_cast<syrec::AssignStatement>(simplificationResultOfLhsSubexpression->generatedAssignments.front())->lhs;
                 potentialAssignmentCandidateRhs = simplificationResultOfRhsSubexpression->expressionsRequiringFixup.front();
@@ -125,14 +125,14 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
                 globalCreatedAssignmentContainer.emplace_back(generatedAssignmentStmt);
             }
             else {
-                syrec::expression::ptr generatedExprLhsOperand;
+                syrec::Expression::ptr generatedExprLhsOperand;
                 if (!simplificationResultOfLhsSubexpression->expressionsRequiringFixup.empty()) {
                     generatedExprLhsOperand = simplificationResultOfLhsSubexpression->expressionsRequiringFixup.front();
                 } else {
                     generatedExprLhsOperand = std::make_shared<syrec::VariableExpression>(std::dynamic_pointer_cast<syrec::AssignStatement>(simplificationResultOfLhsSubexpression->generatedAssignments.front())->lhs);
                 }
 
-                syrec::expression::ptr generatedExprRhsOperand;
+                syrec::Expression::ptr generatedExprRhsOperand;
                 if (!simplificationResultOfRhsSubexpression->expressionsRequiringFixup.empty()) {
                     generatedExprRhsOperand = simplificationResultOfRhsSubexpression->expressionsRequiringFixup.front();
                 } else {
@@ -142,7 +142,7 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
                 generatedSimplificationScope->expressionsRequiringFixup.emplace_back(createExpressionFor(generatedExprLhsOperand, operationNode->operation, generatedExprRhsOperand));
             }
         } else {
-            syrec::expression::ptr generatedExprLhsOperand;
+            syrec::Expression::ptr generatedExprLhsOperand;
             if (!simplificationResultOfLhsSubexpression->expressionsRequiringFixup.empty()) {
                 generatedExprLhsOperand = simplificationResultOfLhsSubexpression->expressionsRequiringFixup.front();
             }
@@ -150,7 +150,7 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
                 generatedExprLhsOperand = std::make_shared<syrec::VariableExpression>(std::dynamic_pointer_cast<syrec::AssignStatement>(simplificationResultOfLhsSubexpression->generatedAssignments.front())->lhs);
             }
 
-            syrec::expression::ptr generatedExprRhsOperand;
+            syrec::Expression::ptr generatedExprRhsOperand;
             if (!simplificationResultOfRhsSubexpression->expressionsRequiringFixup.empty()) {
                 generatedExprRhsOperand = simplificationResultOfRhsSubexpression->expressionsRequiringFixup.front();
             } else {
@@ -210,7 +210,7 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
     
     auto generatedScope = std::make_unique<SimplificationScope>();
 
-    syrec::expression::ptr generatedStatementRhs;
+    syrec::Expression::ptr generatedStatementRhs;
     bool                   didRhsGeneratedAssignmentStmt = false;
     if (!simplificationResultOfNonLeafNode->expressionsRequiringFixup.empty()) {
         generatedStatementRhs = simplificationResultOfNonLeafNode->expressionsRequiringFixup.front();
@@ -237,7 +237,7 @@ AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::Simpl
 
     if (isOperationReversible && !shouldExpressionInsteadOfAssignmentBeCreated) {
         syrec::VariableAccess::ptr assignedToSignal;
-        syrec::expression::ptr     assignmentRhs;
+        syrec::Expression::ptr     assignmentRhs;
 
         if (!leafNode.value()->getAsSignalAccess().has_value()) {
             assignedToSignal = std::dynamic_pointer_cast<syrec::AssignStatement>(simplificationResultOfNonLeafNode->generatedAssignments.back())->lhs;
@@ -303,7 +303,7 @@ syrec::Statement::vec AssignmentWithNonReversibleOperationsAndUniqueSignalOccurr
     }
 
     auto                   finalAssignmentOperation = *syrec_operation::tryMapAssignmentOperationFlagToEnum(initialAssignmentOperation);
-    syrec::expression::ptr finalAssignmentRhsExpr;
+    syrec::Expression::ptr finalAssignmentRhsExpr;
 
     
    bool isValueOfAssignedToSignalZeroPriorToAssignment = false;
@@ -421,7 +421,7 @@ void AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::
     scope->expressionsRequiringFixup.emplace_back(createExpressionFor(exprLhsOperand, operation, exprRhsOperand));
 }
 
-syrec::expression::ptr AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::createExpressionFor(const syrec::expression::ptr& lhsOperand, syrec_operation::operation operation, const syrec::expression::ptr& rhsOperand) {
+syrec::Expression::ptr AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::createExpressionFor(const syrec::Expression::ptr& lhsOperand, syrec_operation::operation operation, const syrec::Expression::ptr& rhsOperand) {
     if (operation == syrec_operation::operation::ShiftLeft || operation == syrec_operation::operation::ShiftRight) {
         return std::make_shared<syrec::ShiftExpression>(
             lhsOperand,
@@ -436,7 +436,7 @@ syrec::expression::ptr AssignmentWithNonReversibleOperationsAndUniqueSignalOccur
     );
 }
 
-bool AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::isMinusAndXorOperationOnlyDefinedForLeaveNodesInAST(const syrec::expression::ptr& exprToCheck) {
+bool AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::isMinusAndXorOperationOnlyDefinedForLeaveNodesInAST(const syrec::Expression::ptr& exprToCheck) {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprToCheck); exprAsBinaryExpr != nullptr) {
         return exprAsBinaryExpr->op == syrec::BinaryExpression::Exor || exprAsBinaryExpr->op == syrec::BinaryExpression::Subtract
             ? ((doesExprDefineNestedExpr(exprAsBinaryExpr->lhs) ? isMinusAndXorOperationOnlyDefinedForLeaveNodesInAST(exprAsBinaryExpr->lhs) : true)
@@ -449,7 +449,7 @@ bool AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::
     return true;
 }
 
-bool AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::checkNoConsecutiveNonReversibleOperationsDefinedInExpressionAST(const syrec::expression::ptr& exprToCheck, const std::optional<syrec_operation::operation>& parentNodeOperation) {
+bool AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::checkNoConsecutiveNonReversibleOperationsDefinedInExpressionAST(const syrec::Expression::ptr& exprToCheck, const std::optional<syrec_operation::operation>& parentNodeOperation) {
     std::optional<syrec_operation::operation> currentExprOperation;
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(exprToCheck); exprAsBinaryExpr != nullptr) {
         currentExprOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);
@@ -546,7 +546,7 @@ std::vector<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimpl
     return createdSubAssignments;
 }
 
-std::vector<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::SplitAssignmentExprPartReference> AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::splitAssignmentSubexpression(syrec_operation::operation parentBinaryExprOperation, const syrec::expression::ptr& subExpr) {
+std::vector<AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::SplitAssignmentExprPartReference> AssignmentWithNonReversibleOperationsAndUniqueSignalOccurrencesSimplifier::splitAssignmentSubexpression(syrec_operation::operation parentBinaryExprOperation, const syrec::Expression::ptr& subExpr) {
     const auto& binaryExprCasted = std::dynamic_pointer_cast<syrec::BinaryExpression>(subExpr);
     const auto& matchingAssignmentOperationForGivenParentOperation = *syrec_operation::getMatchingAssignmentOperationForOperation(parentBinaryExprOperation);
 

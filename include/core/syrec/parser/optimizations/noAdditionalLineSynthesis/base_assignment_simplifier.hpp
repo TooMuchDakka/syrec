@@ -29,10 +29,10 @@ namespace noAdditionalLineSynthesis {
         const parser::SymbolTable::ptr symbolTable;
         LocallyDisabledSignalMapReference locallyDisabledSignalWithValueOfZeroMap;
 
-        [[nodiscard]] static bool                        isExprConstantNumber(const syrec::expression::ptr& expr);
-        [[nodiscard]] static bool                        doesExprDefineVariableAccess(const syrec::expression::ptr& expr);
-        [[nodiscard]] static bool                        doesExprDefineNestedExpr(const syrec::expression::ptr& expr);
-        [[nodiscard]] static bool                        doesExprOnlyContainReversibleOperations(const syrec::expression::ptr& expr);
+        [[nodiscard]] static bool                        isExprConstantNumber(const syrec::Expression::ptr& expr);
+        [[nodiscard]] static bool                        doesExprDefineVariableAccess(const syrec::Expression::ptr& expr);
+        [[nodiscard]] static bool                        doesExprDefineNestedExpr(const syrec::Expression::ptr& expr);
+        [[nodiscard]] static bool                        doesExprOnlyContainReversibleOperations(const syrec::Expression::ptr& expr);
         [[nodiscard]] static syrec::Statement::vec       invertAssignmentsButIgnoreSome(const syrec::Statement::vec& assignmentsToInvert, std::size_t numStatementsToIgnoreStartingFromLastOne);
         
         [[nodiscard]] bool wasAccessOnSignalAlreadyDefined(const syrec::VariableAccess::ptr& accessedSignalParts, const RestrictionMap& notUsableSignals) const;
@@ -45,7 +45,7 @@ namespace noAdditionalLineSynthesis {
         */
         [[nodiscard]] std::optional<bool> isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(const syrec::BinaryExpression::ptr& rootExpr) const;
         [[nodiscard]] std::optional<bool> isEveryLhsOperandOfAnyBinaryExprDefinedOnceOnEveryLevelOfTheAST(const syrec::BinaryExpression::ptr& exprToCheck, bool isRootExpr, RestrictionMap& notUsableSignals) const;
-        [[nodiscard]] std::optional<bool> doesExprOnlyContainUniqueSignalAccesses(const syrec::expression::ptr&, RestrictionMap& alreadyDefinedSignalAccesses);
+        [[nodiscard]] std::optional<bool> doesExprOnlyContainUniqueSignalAccesses(const syrec::Expression::ptr&, RestrictionMap& alreadyDefinedSignalAccesses);
 
         // TODO: Define new function that every lhs operand of any binary expr is defined once on every lhs of any expr (how do we deal with switches correctly ?)
 

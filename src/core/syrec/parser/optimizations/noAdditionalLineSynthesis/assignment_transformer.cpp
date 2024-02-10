@@ -210,7 +210,7 @@ void AssignmentTransformer::tryRemoveWatchForInversionOfAssignment(const syrec::
 }
 
 
-void AssignmentTransformer::updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::expression& expr) const {
+void AssignmentTransformer::updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::Expression& expr) const {
     std::optional<unsigned int> valueOfExpr;
     if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr && exprAsNumericExpr->value->isConstant()) {
         valueOfExpr = exprAsNumericExpr->value->evaluate({});

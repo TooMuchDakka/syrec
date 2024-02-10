@@ -1,5 +1,5 @@
 #include "test_signal_value_lookup.hpp"
-#include <googletest/googletest/include/gtest/gtest.h>
+#include "gtest/gtest.h"
 
 using namespace valueLookup;
 

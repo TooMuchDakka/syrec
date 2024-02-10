@@ -10,7 +10,7 @@ static std::unordered_map<size_t, size_t> expressionSubTypeCaseOffsetLookup {};
 // TODO: Refactor into own namespace ?
 // TODO: Fix missing annotations for fall through ?
 // TODO: Check safety of code
-bool parser::areSyntacticallyEquivalent(const syrec::expression::ptr& referenceExpr, const syrec::expression::ptr& exprToCheck) {
+bool parser::areSyntacticallyEquivalent(const syrec::Expression::ptr& referenceExpr, const syrec::Expression::ptr& exprToCheck) {
     const size_t& exprToCheckTypeInfo = typeid(*referenceExpr.get()).hash_code();
     switch (size_t& subTypeOffset = expressionSubTypeCaseOffsetLookup[exprToCheckTypeInfo]) {
         default: {
@@ -45,7 +45,7 @@ bool parser::areSyntacticallyEquivalent(const syrec::expression::ptr& referenceE
     return false;
 }
 
-bool parser::isNumericExpressionAndEquivalentToReference(const std::shared_ptr<syrec::NumericExpression>& referenceExpr, const syrec::expression::ptr& exprToCheck) {
+bool parser::isNumericExpressionAndEquivalentToReference(const std::shared_ptr<syrec::NumericExpression>& referenceExpr, const syrec::Expression::ptr& exprToCheck) {
     if (!referenceExpr || !exprToCheck) {
         return false;
     }
@@ -54,7 +54,7 @@ bool parser::isNumericExpressionAndEquivalentToReference(const std::shared_ptr<s
     return exprToCheckCasted && isNumberAndEquivalentToReference(referenceExpr->value, exprToCheckCasted->value);
 }
 
-bool parser::isVariableExpressionAndEquivalentToReference(const std::shared_ptr<syrec::VariableExpression>& referenceExpr, const syrec::expression::ptr& exprToCheck) {
+bool parser::isVariableExpressionAndEquivalentToReference(const std::shared_ptr<syrec::VariableExpression>& referenceExpr, const syrec::Expression::ptr& exprToCheck) {
     if (!referenceExpr || !exprToCheck) {
         return false;
     }
@@ -63,7 +63,7 @@ bool parser::isVariableExpressionAndEquivalentToReference(const std::shared_ptr<
     return exprToCheckCasted && isVariableAccessAndEquivalentToReference(referenceExpr->var, exprToCheckCasted->var);
 }
 
-bool parser::isBinaryExpressionAndEquivalentToReference(const std::shared_ptr<syrec::BinaryExpression>& referenceExpr, const syrec::expression::ptr& exprToCheck) {
+bool parser::isBinaryExpressionAndEquivalentToReference(const std::shared_ptr<syrec::BinaryExpression>& referenceExpr, const syrec::Expression::ptr& exprToCheck) {
     if (!referenceExpr || !exprToCheck) {
         return false;
     }
@@ -75,7 +75,7 @@ bool parser::isBinaryExpressionAndEquivalentToReference(const std::shared_ptr<sy
         && areSyntacticallyEquivalent(referenceExpr->rhs, exprToCheckCasted->rhs);
 }
 
-bool parser::isShiftExpressionAndEquivalentToReference(const std::shared_ptr<syrec::ShiftExpression>& referenceExpr, const syrec::expression::ptr& exprToCheck) {
+bool parser::isShiftExpressionAndEquivalentToReference(const std::shared_ptr<syrec::ShiftExpression>& referenceExpr, const syrec::Expression::ptr& exprToCheck) {
     if (!referenceExpr || !exprToCheck) {
         return false;
     }
@@ -99,7 +99,7 @@ bool parser::isVariableAccessAndEquivalentToReference(const syrec::VariableAcces
             referenceVariableAccess->indexes.cend(),
             variableAccessToCheck->indexes.cbegin(),
             variableAccessToCheck->indexes.cend(),
-            [](const syrec::expression::ptr& referenceDimensionAccess, const syrec::expression::ptr& variableToCheckDimensionAccess) {
+            [](const syrec::Expression::ptr& referenceDimensionAccess, const syrec::Expression::ptr& variableToCheckDimensionAccess) {
                 return areSyntacticallyEquivalent(referenceDimensionAccess, variableToCheckDimensionAccess);
             });
 
@@ -125,19 +125,19 @@ bool parser::isNumberAndEquivalentToReference(const syrec::Number::ptr& referenc
     return numberToCheck->isLoopVariable() && referenceNumber->variableName() == numberToCheck->variableName();
 }
 
-bool parser::isBinaryExpression(const syrec::expression::ptr& exprToCheck) {
+bool parser::isBinaryExpression(const syrec::Expression::ptr& exprToCheck) {
     return std::dynamic_pointer_cast<syrec::BinaryExpression>(exprToCheck) != nullptr;
 }
 
-bool parser::isNumericExpression(const syrec::expression::ptr& exprToCheck) {
+bool parser::isNumericExpression(const syrec::Expression::ptr& exprToCheck) {
     return std::dynamic_pointer_cast<syrec::NumericExpression>(exprToCheck) != nullptr;
 }
 
-bool parser::isShiftExpression(const syrec::expression::ptr& exprToCheck) {
+bool parser::isShiftExpression(const syrec::Expression::ptr& exprToCheck) {
     return std::dynamic_pointer_cast<syrec::ShiftExpression>(exprToCheck) != nullptr;
 }
 
-bool parser::isVariableExpression(const syrec::expression::ptr& exprToCheck) {
+bool parser::isVariableExpression(const syrec::Expression::ptr& exprToCheck) {
     return std::dynamic_pointer_cast<syrec::VariableExpression>(exprToCheck) != nullptr;
 }
 

@@ -12,7 +12,7 @@ ExpressionEvaluationResult::ptr ExpressionEvaluationResult::createFromConstantVa
     return std::shared_ptr<ExpressionEvaluationResult>(new ExpressionEvaluationResult(constantValue, optionalExpectedSignalWidth));
 }
 
-ExpressionEvaluationResult::ptr ExpressionEvaluationResult::createFromExpression(const syrec::expression::ptr& expression, const std::vector<std::optional<unsigned int>>& explicitlyAccessedValuesPerDimension) {
+ExpressionEvaluationResult::ptr ExpressionEvaluationResult::createFromExpression(const syrec::Expression::ptr& expression, const std::vector<std::optional<unsigned int>>& explicitlyAccessedValuesPerDimension) {
     if (const auto& exprAsSignalAccessExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(expression); exprAsSignalAccessExpr != nullptr) {
         return createFromExprDefiningSignalAccess(exprAsSignalAccessExpr, explicitlyAccessedValuesPerDimension);
     }
@@ -36,13 +36,13 @@ std::optional<unsigned int> ExpressionEvaluationResult::getAsConstant() const {
     return std::make_optional(std::get<ConstantValueAndBitwidthPair>(this->evaluationResult.value()).first);
 }
 
-std::optional<syrec::expression::ptr> ExpressionEvaluationResult::getAsExpression() const {
+std::optional<syrec::Expression::ptr> ExpressionEvaluationResult::getAsExpression() const {
     if (!this->evaluationResult.has_value()) {
         return std::nullopt;
     }
 
     if (!isConstantValue()) {
-        return std::make_optional(std::get<syrec::expression::ptr>(this->evaluationResult.value()));
+        return std::make_optional(std::get<syrec::Expression::ptr>(this->evaluationResult.value()));
     }
 
     const auto& constantValueAndBitwidthPair = std::get<ConstantValueAndBitwidthPair>(this->evaluationResult.value());

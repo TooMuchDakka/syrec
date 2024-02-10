@@ -65,7 +65,7 @@ namespace parser {
         
         [[nodiscard]] bool                              areAccessedValuesForDimensionAndBitsConstant(const syrec::VariableAccess& accessedSignalParts) const;
         [[nodiscard]] inline std::optional<std::string> tryGetLoopVariableIdent(SyReCParser::ForStatementContext* loopContext) const;
-        [[nodiscard]] std::vector<std::optional<unsigned int>> evaluateAccessedValuePerDimension(const syrec::expression::vec& accessedValuePerDimension);
+        [[nodiscard]] std::vector<std::optional<unsigned int>> evaluateAccessedValuePerDimension(const syrec::Expression::vec& accessedValuePerDimension);
     };
 } // namespace parser
 #endif

@@ -8,6 +8,7 @@
 #include "core/syrec/parser/optimizations/constantPropagation/valueLookup/layer_data.hpp"
 
 #include <any>
+#include <iterator>
 #include <optional>
 #include <vector>
 
@@ -97,18 +98,7 @@ namespace valueLookup {
         void applyToBitsOfLastLayerWithRelativeDimensionAccessInformationStartingFrom(std::size_t dimensionToStartFrom, std::size_t currentDimension, const std::vector<std::optional<unsigned int>>& accessedDimensions, std::size_t numAccessedBits, std::vector<unsigned int>& relativeDimensionAccess, Fn&& applyLambda);
 
         static void                                     mergeActualWithRelativeDimensionAccess(std::vector<std::optional<unsigned int>>& dimensionAccessContainer, std::size_t offsetToRelativeDimensionInOriginalDimensionAccess, const std::vector<unsigned int>& relativeDimensionAccess);
-        static std::vector<std::optional<unsigned int>> transformRelativeToActualDimensionAccess(const std::vector<unsigned int>& relativeDimensionAccess);
-        
-        /*
-        void liftRestrictionIfBitIsNotRestrictedAndHasValue(
-                const std::vector<unsigned int>&                                relativeDimensionAccess,
-                unsigned int                                                    relativeBitAccess,
-                const optimizations::BitRangeAccessRestriction::BitRangeAccess& accessedBitRangeOfLhsAssignmentOperand,
-                const optimizations::BitRangeAccessRestriction::BitRangeAccess& accessedBitRangeOfRhsAssignmentOperand,
-                const std::vector<unsigned int>&                                transformedDimensionAccessOfLhsAssignmentOperand,
-                const std::vector<unsigned int>&                                transformedDimensionAccessOfRhsAssignmentOperand,
-                const BaseValueLookup<Vt>&                                      valueLookupOfLhsOperand);
-        */
+        [[nodiscard]] static std::vector<std::optional<unsigned int>> transformRelativeToActualDimensionAccess(const std::vector<unsigned int>& relativeDimensionAccess);
     };
     /*
      * Since we would also like the split into definition/implementation for this templated class,

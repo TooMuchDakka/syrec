@@ -65,7 +65,7 @@ namespace messageUtils {
 
         template<typename ...T>
         [[nodiscard]] Message createError(Message::ErrorCategory errorCategory, Message::Position position, const std::string_view& messageFormat, T&&... args) const {
-            return createMessage(errorCategory, position, Message::Severity::Error, messageFormat, std::forward<T>(args));
+            return createMessage(errorCategory, position, Message::Severity::Error, messageFormat, std::forward<T>(args)...);
         }
         
     private:

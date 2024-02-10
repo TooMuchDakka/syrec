@@ -16,7 +16,7 @@ std::optional<std::shared_ptr<syrec::VariableExpression>> InorderOperationNodeTr
     return std::nullopt;
 }
 
-syrec::expression::ptr InorderOperationNodeTraversalHelper::OperationNodeLeaf::getData() const {
+syrec::Expression::ptr InorderOperationNodeTraversalHelper::OperationNodeLeaf::getData() const {
     if (const auto& dataAsSignalAccess = getAsSignalAccess(); dataAsSignalAccess.has_value()) {
         return *dataAsSignalAccess;
     }
@@ -109,11 +109,11 @@ std::optional<std::size_t> InorderOperationNodeTraversalHelper::getNodeIdOfLastO
 }
 
 
-void InorderOperationNodeTraversalHelper::buildOperationNodesQueue(const syrec::expression::ptr& expr) {
+void InorderOperationNodeTraversalHelper::buildOperationNodesQueue(const syrec::Expression::ptr& expr) {
     buildOperationNode(expr, std::nullopt);
 }
 
-InorderOperationNodeTraversalHelper::TraversalNode InorderOperationNodeTraversalHelper::buildOperationNode(const syrec::expression::ptr& expr, const std::optional<std::size_t>& parentNodeId) {
+InorderOperationNodeTraversalHelper::TraversalNode InorderOperationNodeTraversalHelper::buildOperationNode(const syrec::Expression::ptr& expr, const std::optional<std::size_t>& parentNodeId) {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         const auto operationNodeId = operationNodeIdCounter++;
         operationNodeTraversalQueue.emplace_back(operationNodeId);
@@ -181,11 +181,11 @@ std::optional<std::pair<InorderOperationNodeTraversalHelper::OperationNodeLeafRe
     return std::make_optional(std::make_pair(leafNodesLookup.at(operationNode->lhs.nodeId), leafNodesLookup.at(operationNode->rhs.nodeId)));
 }
 
-bool InorderOperationNodeTraversalHelper::doesExprDefineSignalAccess(const syrec::expression::ptr& expr) {
+bool InorderOperationNodeTraversalHelper::doesExprDefineSignalAccess(const syrec::Expression::ptr& expr) {
     return std::dynamic_pointer_cast<syrec::VariableExpression>(expr) != nullptr;
 }
 
-unsigned InorderOperationNodeTraversalHelper::determineBitwidthOfExpr(const syrec::expression::ptr& expr) const {
+unsigned InorderOperationNodeTraversalHelper::determineBitwidthOfExpr(const syrec::Expression::ptr& expr) const {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         return determineBitwidthOfExpr(exprAsBinaryExpr->lhs);
     }

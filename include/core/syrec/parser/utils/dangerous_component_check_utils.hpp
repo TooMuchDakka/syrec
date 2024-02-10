@@ -11,7 +11,7 @@
 namespace dangerousComponentCheckUtils {
     [[nodiscard]] bool doesNumberContainPotentiallyDangerousComponent(const syrec::Number& number);
     [[nodiscard]] bool doesSignalAccessContainPotentiallyDangerousComponent(const syrec::VariableAccess& signalAccess);
-    [[nodiscard]] bool doesExprContainPotentiallyDangerousComponent(const syrec::expression& expr);
+    [[nodiscard]] bool doesExprContainPotentiallyDangerousComponent(const syrec::Expression& expr);
     [[nodiscard]] bool doesStatementContainPotentiallyDangerousComponent(const syrec::Statement& statement, const parser::SymbolTable& symbolTable);
     [[nodiscard]] bool doesModuleContainPotentiallyDangerousComponent(const syrec::Module& module, const parser::SymbolTable& symbolTable);
     [[nodiscard]] bool doesOptimizedModuleSignatureContainNoParametersOrOnlyReadonlyOnes(const parser::SymbolTable::ModuleCallSignature& moduleCallSignature);

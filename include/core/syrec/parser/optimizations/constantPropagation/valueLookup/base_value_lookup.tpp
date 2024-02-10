@@ -120,7 +120,7 @@ void BaseValueLookup<Vt>::invalidateStoredValueForBitrange(const std::vector<std
         }
 
         auto transformedBitRangeAccess = optimizations::BitRangeAccessRestriction(signalInformation.bitWidth, bitRange);
-        const bool _ = dimensionAccessRestrictions->layerData->tryTrimAlreadyBlockedPartsFromRestriction(std::nullopt, std::make_optional(bitRange), transformedBitRangeAccess);
+        dimensionAccessRestrictions->layerData->tryTrimAlreadyBlockedPartsFromRestriction(std::nullopt, std::make_optional(bitRange), transformedBitRangeAccess);
         if (transformedBitRangeAccess.hasAnyRestrictions()) {
             for (const auto& remainingRestriction: transformedBitRangeAccess.getRestrictions()) {
                 dimensionAccessRestrictions->layerData->blockSubstitutionForBitRange(std::nullopt, remainingRestriction);    

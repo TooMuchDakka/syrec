@@ -5,7 +5,7 @@
 #include "core/syrec/expression.hpp"
 
 namespace optimizations {
-    [[maybe_unused]] bool tryPerformOperationStrengthReduction(syrec::expression::ptr& expr);
+    [[maybe_unused]] bool tryPerformOperationStrengthReduction(syrec::Expression::ptr& expr);
 };
 
 #endif

@@ -2,13 +2,12 @@
 #define SYREC_PARSER_SIGNAL_ACCESS_RESTRICTION_ERROR_FIXTURE_HPP
 #pragma once
 
-#include <googletest/googletest/include/gtest/gtest.h>
 #include "gtest/gtest.h"
-
-#include "core/syrec/program.hpp"
 
 #include "syrec_signal_operand_builder.hpp"
 #include "syrec_signal_operand_builder_utilities.hpp"
+
+#include "core/syrec/program.hpp"
 #include "core/syrec/parser/utils/message_utils.hpp"
 
 #include <cstddef>

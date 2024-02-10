@@ -302,7 +302,7 @@ std::optional<syrec::Variable::ptr> noAdditionalLineSynthesis::ExpressionSubstit
 std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::TransformedSignalAccess> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::transformSignalAccess(const syrec::VariableAccess& signalAccess, const syrec::Variable& symbolTableEntryForReferencedSignal) const {
     std::vector<unsigned int> transformedDimensionAccess    = std::vector(symbolTableEntryForReferencedSignal.dimensions.size(), 0u);
     std::size_t               transformedDimensionAccessIdx                = 0;
-    for (const syrec::expression::ptr& exprDefiningAccessedValueOfDimension : signalAccess.indexes) {
+    for (const syrec::Expression::ptr& exprDefiningAccessedValueOfDimension : signalAccess.indexes) {
         if (const auto& exprAsNumericExpr = std::dynamic_pointer_cast<const syrec::NumericExpression>(exprDefiningAccessedValueOfDimension); exprAsNumericExpr && exprAsNumericExpr->value->isConstant()) {
             transformedDimensionAccess.at(transformedDimensionAccessIdx++) = exprAsNumericExpr->value->evaluate({});
         } else {
@@ -486,7 +486,7 @@ bool noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::advanceIterator
 std::optional<syrec::VariableAccess> noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::generateSignalAccessForNotLoadedEntryFromSymbolTableForGivenBitwidth(const syrec::Variable::ptr& symbolTableEntry, unsigned requiredBitwidth) {
     syrec::VariableAccess generatedSignalAccess;
     generatedSignalAccess.var     = symbolTableEntry;
-    generatedSignalAccess.indexes = std::vector<syrec::expression::ptr>(symbolTableEntry->dimensions.size(), nullptr);
+    generatedSignalAccess.indexes = std::vector<syrec::Expression::ptr>(symbolTableEntry->dimensions.size(), nullptr);
     for (std::size_t i = 0; i < generatedSignalAccess.indexes.size(); ++i) {
         const syrec::Number::ptr            accessedValueOfDimension                   = std::make_shared<syrec::Number>(0);
         const syrec::NumericExpression::ptr containerForExprOfAccessedValueOfDimension = accessedValueOfDimension ? std::make_shared<syrec::NumericExpression>(accessedValueOfDimension, 1) : nullptr;
@@ -546,7 +546,7 @@ std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::Signal
     }
     if (const syrec::VariableAccess::ptr containerForInternalSignalAccess = std::make_shared<syrec::VariableAccess>(); containerForInternalSignalAccess) {
         containerForInternalSignalAccess->var     = symbolTableInformationOfReplacementCandidate;
-        containerForInternalSignalAccess->indexes = std::vector<syrec::expression::ptr>(symbolTableInformationOfReplacementCandidate->dimensions.size(), nullptr);
+        containerForInternalSignalAccess->indexes = std::vector<syrec::Expression::ptr>(symbolTableInformationOfReplacementCandidate->dimensions.size(), nullptr);
 
         const syrec::Number::ptr containerForBitRangeStartValue = std::make_shared<syrec::Number>(0u);
         const syrec::Number::ptr containerForBitRangeEndValue   = containerForBitRangeStartValue ? std::make_shared<syrec::Number>(requiredBitwidthForReplacement - 1) : nullptr;
@@ -557,7 +557,7 @@ std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::Signal
 
         for (std::size_t i = 0; i < containerForInternalSignalAccess->indexes.size(); ++i) {
             const syrec::Number::ptr     containerForInitiallyAccessedValueOfDimension   = std::make_shared<syrec::Number>(0);
-            const syrec::expression::ptr containerForExpressionDefiningAccessOnDimension = containerForInitiallyAccessedValueOfDimension ? std::make_shared<syrec::NumericExpression>(containerForInitiallyAccessedValueOfDimension, BitHelpers::getRequiredBitsToStoreValue(0)) : nullptr;
+            const syrec::Expression::ptr containerForExpressionDefiningAccessOnDimension = containerForInitiallyAccessedValueOfDimension ? std::make_shared<syrec::NumericExpression>(containerForInitiallyAccessedValueOfDimension, BitHelpers::getRequiredBitsToStoreValue(0)) : nullptr;
             if (!containerForExpressionDefiningAccessOnDimension) {
                 return std::nullopt;
             }

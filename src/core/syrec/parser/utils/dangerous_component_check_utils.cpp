@@ -31,7 +31,7 @@ std::optional<unsigned> tryEvaluateNumberAsConstant(const syrec::Number& number,
     return std::nullopt;
 }
 
-std::optional<unsigned> tryEvaluateExpressionToConstant(const syrec::expression& expr, const parser::SymbolTable* symbolTableUsedForEvaluation, bool shouldPerformConstantPropagation, const syrec::Number::loop_variable_mapping& evaluableLoopVariablesIfConstantPropagationIsDisabled, bool* wasOriginalExprSimplified) {
+std::optional<unsigned> tryEvaluateExpressionToConstant(const syrec::Expression& expr, const parser::SymbolTable* symbolTableUsedForEvaluation, bool shouldPerformConstantPropagation, const syrec::Number::loop_variable_mapping& evaluableLoopVariablesIfConstantPropagationIsDisabled, bool* wasOriginalExprSimplified) {
     if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr) {
         return tryEvaluateNumberAsConstant(*exprAsNumericExpr->value, symbolTableUsedForEvaluation, shouldPerformConstantPropagation, evaluableLoopVariablesIfConstantPropagationIsDisabled, wasOriginalExprSimplified);
     }
@@ -80,7 +80,7 @@ bool dangerousComponentCheckUtils::doesSignalAccessContainPotentiallyDangerousCo
     return containsPotentiallyDangerousOperation;
 }
 
-bool dangerousComponentCheckUtils::doesExprContainPotentiallyDangerousComponent(const syrec::expression& expr) {
+bool dangerousComponentCheckUtils::doesExprContainPotentiallyDangerousComponent(const syrec::Expression& expr) {
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expr); exprAsBinaryExpr) {
         return doesExprContainPotentiallyDangerousComponent(*exprAsBinaryExpr->lhs) || doesExprContainPotentiallyDangerousComponent(*exprAsBinaryExpr->rhs);
     }

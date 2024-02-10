@@ -1,5 +1,5 @@
-#include "test_case_creation_utils.hpp"
-#include "test_base_syrec_circuit_comparison_test.hpp"
+#include "../syrecComponentsTestsUtils/test_case_creation_utils.hpp"
+#include "../syrecComponentsTestsUtils/test_base_syrec_circuit_comparison_test.hpp"
 
 #include "gtest/gtest.h"
 

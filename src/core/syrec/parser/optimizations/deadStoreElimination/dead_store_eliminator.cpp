@@ -175,7 +175,7 @@ bool DeadStoreEliminator::doesAssignmentContainPotentiallyUnsafeOperation(const 
     return false;
 }
 
-bool DeadStoreEliminator::doesExpressionContainPotentiallyUnsafeOperation(const syrec::expression::ptr& expr) const {
+bool DeadStoreEliminator::doesExpressionContainPotentiallyUnsafeOperation(const syrec::Expression::ptr& expr) const {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr) {
         auto doesContainPotentiallyUnsafeOperation = doesExpressionContainPotentiallyUnsafeOperation(exprAsBinaryExpr->lhs) || doesExpressionContainPotentiallyUnsafeOperation(exprAsBinaryExpr->rhs);
         // Should we consider a division with unknown divisor as an unsafe operation ?
@@ -252,7 +252,7 @@ std::optional<unsigned int> DeadStoreEliminator::tryEvaluateNumber(const syrec::
     return number.isConstant() ? std::make_optional(number.evaluate({})) : std::nullopt;
 }
 
-std::optional<unsigned> DeadStoreEliminator::tryEvaluateExprToConstant(const syrec::expression& expr) {
+std::optional<unsigned> DeadStoreEliminator::tryEvaluateExprToConstant(const syrec::Expression& expr) {
     if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr) {
         return tryEvaluateNumber(*exprAsNumericExpr->value);
     }
@@ -321,7 +321,7 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
     .has_value();
 }
 
-[[nodiscard]] std::vector<std::optional<unsigned int>> DeadStoreEliminator::transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::expression::ptr>& dimensionAccess) const {
+[[nodiscard]] std::vector<std::optional<unsigned int>> DeadStoreEliminator::transformUserDefinedDimensionAccess(std::size_t numDimensionsOfAccessedSignal, const std::vector<syrec::Expression::ptr>& dimensionAccess) const {
     std::vector<std::optional<unsigned int>> transformedAccessOnDimension;
     std::transform(
             dimensionAccess.cbegin(),
@@ -423,7 +423,7 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
     return deadStoreStatementIndizesInFlowGraph;
 }
 
-void DeadStoreEliminator::markAccessedSignalsAsLiveInExpression(const syrec::expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression) {
+void DeadStoreEliminator::markAccessedSignalsAsLiveInExpression(const syrec::Expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression) {
     /* Numeric expression can be ignored since they either only define constants (accessing the bitwidth of a variable does also define a constant and its value is independent from the changes made during the execution of the program and thus does not update the liveness status of the accessed signal) or use loop variables
     */
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
@@ -562,7 +562,7 @@ void DeadStoreEliminator::decrementReferenceCountOfUsedSignalsInStatement(const 
     }
 }
 
-void DeadStoreEliminator::decrementReferenceCountsOfUsedSignalsInExpression(const syrec::expression::ptr& expr) const {
+void DeadStoreEliminator::decrementReferenceCountsOfUsedSignalsInExpression(const syrec::Expression::ptr& expr) const {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         decrementReferenceCountsOfUsedSignalsInExpression(exprAsBinaryExpr->lhs);
         decrementReferenceCountsOfUsedSignalsInExpression(exprAsBinaryExpr->rhs);
@@ -896,7 +896,7 @@ bool DeadStoreEliminator::doDimensionAccessesOverlap(const std::vector<std::opti
     }).first != assignedToDimensionAccess.cend();
 }
 
-std::vector<syrec::VariableAccess::ptr> DeadStoreEliminator::getAccessedLocalSignalsFromExpression(const syrec::expression::ptr& expr) const {
+std::vector<syrec::VariableAccess::ptr> DeadStoreEliminator::getAccessedLocalSignalsFromExpression(const syrec::Expression::ptr& expr) const {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         auto foundLocalsSignalsFromLhsExpr = getAccessedLocalSignalsFromExpression(exprAsBinaryExpr->lhs);
         const auto& foundLocalsSignalsFromRhsExpr = getAccessedLocalSignalsFromExpression(exprAsBinaryExpr->rhs);
@@ -940,7 +940,7 @@ void DeadStoreEliminator::markPreviouslyDeadStoreAsLiveWithoutUsageInGlobalSideE
     liveStoresWithoutUsageInGlobalSideEffect.at(assignedToSignalParts->var->name).emplace_back(assignedToSignalParts, indexOfAssignmentStatement.relativeStatementIndexPerControlBlock);
 }
 
-void DeadStoreEliminator::markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(const syrec::expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression) {
+void DeadStoreEliminator::markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(const syrec::Expression::ptr& expr, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingExpression) {
     if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
         markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(exprAsBinaryExpr->lhs, indexOfStatementContainingExpression);
         markAccessedLocalSignalsInExpressionAsUsedInNonLocalAssignment(exprAsBinaryExpr->rhs, indexOfStatementContainingExpression);

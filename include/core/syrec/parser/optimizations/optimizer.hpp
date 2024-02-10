@@ -92,7 +92,7 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::Module>       optimizeProgram(const std::vector<std::reference_wrapper<const syrec::Module>>& modules, const std::string_view& defaultMainModuleIdent = "main");
         [[nodiscard]] OptimizationResult<syrec::Statement>    handleStatements(const std::vector<std::reference_wrapper<const syrec::Statement>>& statements);
         [[nodiscard]] OptimizationResult<syrec::Statement>    handleStatement(const syrec::Statement& stmt);
-        [[nodiscard]] OptimizationResult<syrec::expression>   handleExpr(const syrec::expression& expression) const;
+        [[nodiscard]] OptimizationResult<syrec::Expression>   handleExpr(const syrec::Expression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::Number>       handleNumber(const syrec::Number& number) const;
     protected:
         using InternalOwningAssignmentType = std::variant<std::unique_ptr<syrec::AssignStatement>, std::unique_ptr<syrec::UnaryStatement>>;
@@ -140,22 +140,22 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleSwapStmt(const syrec::SwapStatement& swapStatement);
         [[nodiscard]] static OptimizationResult<syrec::Statement>        handleSkipStmt();
 
-        [[nodiscard]] OptimizationResult<syrec::expression>     handleBinaryExpr(const syrec::BinaryExpression& expression) const;
-        [[nodiscard]] OptimizationResult<syrec::expression>     handleShiftExpr(const syrec::ShiftExpression& expression) const;
-        [[nodiscard]] OptimizationResult<syrec::expression>     handleVariableExpr(const syrec::VariableExpression& expression) const;
-        [[nodiscard]] OptimizationResult<syrec::expression>     handleNumericExpr(const syrec::NumericExpression& numericExpr) const;
+        [[nodiscard]] OptimizationResult<syrec::Expression>     handleBinaryExpr(const syrec::BinaryExpression& expression) const;
+        [[nodiscard]] OptimizationResult<syrec::Expression>     handleShiftExpr(const syrec::ShiftExpression& expression) const;
+        [[nodiscard]] OptimizationResult<syrec::Expression>     handleVariableExpr(const syrec::VariableExpression& expression) const;
+        [[nodiscard]] OptimizationResult<syrec::Expression>     handleNumericExpr(const syrec::NumericExpression& numericExpr) const;
 
-        [[nodiscard]] static std::unique_ptr<syrec::expression>                                               trySimplifyExpr(const syrec::expression& expr, const parser::SymbolTable& symbolTable, bool simplifyExprByReassociation, bool performOperationStrengthReduction, std::vector<syrec::VariableAccess::ptr>* optimizedAwaySignalAccesses);
-        [[nodiscard]] static std::unique_ptr<syrec::expression>                                               transformCompileTimeConstantExpressionToNumber(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr);
+        [[nodiscard]] static std::unique_ptr<syrec::Expression>                                               trySimplifyExpr(const syrec::Expression& expr, const parser::SymbolTable& symbolTable, bool simplifyExprByReassociation, bool performOperationStrengthReduction, std::vector<syrec::VariableAccess::ptr>* optimizedAwaySignalAccesses);
+        [[nodiscard]] static std::unique_ptr<syrec::Expression>                                               transformCompileTimeConstantExpressionToNumber(const syrec::Number::CompileTimeConstantExpression& compileTimeConstantExpr);
         [[nodiscard]] static std::optional<syrec_operation::operation>                                        tryMapCompileTimeConstantOperation(syrec::Number::CompileTimeConstantExpression::Operation compileTimeConstantExprOperation);
         [[nodiscard]] static std::optional<syrec::Number::CompileTimeConstantExpression::Operation>           tryMapOperationToCompileTimeConstantOperation(syrec_operation::operation operation);
-        [[nodiscard]] static std::unique_ptr<syrec::expression>                                               tryMapCompileTimeConstantOperandToExpr(const syrec::Number& number);
-        [[nodiscard]] static std::unique_ptr<syrec::Number>                                                   tryMapExprToCompileTimeConstantExpr(const syrec::expression& expr);
+        [[nodiscard]] static std::unique_ptr<syrec::Expression>                                               tryMapCompileTimeConstantOperandToExpr(const syrec::Number& number);
+        [[nodiscard]] static std::unique_ptr<syrec::Number>                                                   tryMapExprToCompileTimeConstantExpr(const syrec::Expression& expr);
         [[nodiscard]] std::optional<std::variant<unsigned int, std::unique_ptr<syrec::Number>>>               trySimplifyNumber(const syrec::Number& number) const;
         
         
         void updateReferenceCountOf(const std::string_view& signalIdent, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
-        void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::expression& expr, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
+        void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Expression& expr, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         void updateReferenceCountsOfSignalIdentsUsedIn(const syrec::Number& number, parser::SymbolTable::ReferenceCountUpdate typeOfUpdate) const;
         
         static void                                           createSymbolTableEntryForVariable(parser::SymbolTable& symbolTable, const syrec::Variable& variable);
@@ -191,7 +191,7 @@ namespace optimizations {
             }
 
             [[nodiscard]] static SignalAccessIndexEvaluationResult<T> createAsUnchangedNonConstantValue(IndexValidityStatus validityStatus, std::unique_ptr<T> originalNonConstantValue) {
-                return SignalAccessIndexEvaluationResult<T>({.validityStatus = validityStatus, .constantValue = std::nullopt, simplifiedNonConstantValue = nullptr, .originalValue = std::move(originalNonConstantValue), .wasToBeEvaluatedIndexSimplified = false});
+                return SignalAccessIndexEvaluationResult<T>({.validityStatus = validityStatus, .constantValue = std::nullopt, .simplifiedNonConstantValue = nullptr, .originalValue = std::move(originalNonConstantValue), .wasToBeEvaluatedIndexSimplified = false});
             }
         };
 
@@ -228,17 +228,17 @@ namespace optimizations {
         }
         
         [[nodiscard]] static std::optional<std::unique_ptr<syrec::Number>> tryConvertSimplifiedIndexValueToUsableSignalAccessIndex(SignalAccessIndexEvaluationResult<syrec::Number>& index);
-        [[nodiscard]] static std::optional<std::unique_ptr<syrec::expression>> tryConvertSimplifiedIndexValueToUsableSignalAccessIndex(SignalAccessIndexEvaluationResult<syrec::expression>& index);
+        [[nodiscard]] static std::optional<std::unique_ptr<syrec::Expression>> tryConvertSimplifiedIndexValueToUsableSignalAccessIndex(SignalAccessIndexEvaluationResult<syrec::Expression>& index);
         
 
         struct DimensionAccessEvaluationResult {
-            const bool                                                              wasTrimmed;
-            std::vector<SignalAccessIndexEvaluationResult<syrec::expression>> valuePerDimension;
-            const bool                                                              wasAnyExprSimplified;
+            const bool                                                        wasTrimmed;
+            std::vector<SignalAccessIndexEvaluationResult<syrec::Expression>> valuePerDimension;
+            const bool                                                        wasAnyExprSimplified;
         };
-        [[nodiscard]] DimensionAccessEvaluationResult    evaluateUserDefinedDimensionAccess(const std::string_view& accessedSignalIdent, const std::vector<std::reference_wrapper<const syrec::expression>>& accessedValuePerDimension) const;
+        [[nodiscard]] DimensionAccessEvaluationResult    evaluateUserDefinedDimensionAccess(const std::string_view& accessedSignalIdent, const std::vector<std::reference_wrapper<const syrec::Expression>>& accessedValuePerDimension) const;
         [[nodiscard]] static std::optional<unsigned int> tryEvaluateNumberAsConstant(const syrec::Number& number, const parser::SymbolTable* symbolTableUsedForEvaluation, bool shouldPerformConstantPropagation, const syrec::Number::loop_variable_mapping& evaluableLoopVariablesIfConstantPropagationIsDisabled,  bool* wasOriginalNumberSimplified);
-        [[nodiscard]] static std::optional<unsigned int> tryEvaluateExpressionToConstant(const syrec::expression& expr, const parser::SymbolTable* symbolTableUsedForEvaluation, bool shouldPerformConstantPropagation, const syrec::Number::loop_variable_mapping& evaluableLoopVariablesIfConstantPropagationIsDisabled, bool* wasOriginalExprSimplified);
+        [[nodiscard]] static std::optional<unsigned int> tryEvaluateExpressionToConstant(const syrec::Expression& expr, const parser::SymbolTable* symbolTableUsedForEvaluation, bool shouldPerformConstantPropagation, const syrec::Number::loop_variable_mapping& evaluableLoopVariablesIfConstantPropagationIsDisabled, bool* wasOriginalExprSimplified);
 
         struct BitRangeEvaluationResult {
             SignalAccessIndexEvaluationResult<syrec::Number> rangeStartEvaluationResult;
@@ -268,7 +268,7 @@ namespace optimizations {
         [[nodiscard]] std::optional<unsigned int>                      tryFetchValueFromEvaluatedSignalAccess(const EvaluatedSignalAccess& accessedSignalParts) const;
         [[nodiscard]] bool                                             isValueLookupBlockedByDataFlowAnalysisRestriction(const syrec::VariableAccess& accessedSignalParts) const;
         [[nodiscard]] SignalAccessUtils::SignalAccessEquivalenceResult areEvaluatedSignalAccessEqualAtCompileTime(const EvaluatedSignalAccess& thisAccessedSignalParts, const EvaluatedSignalAccess& thatAccessedSignalParts) const;
-        [[nodiscard]] bool                                             checkIfOperandsOfBinaryExpressionAreSignalAccessesAndEqual(const syrec::expression& lhsOperand, const syrec::expression& rhsOperand) const;
+        [[nodiscard]] bool                                             checkIfOperandsOfBinaryExpressionAreSignalAccessesAndEqual(const syrec::Expression& lhsOperand, const syrec::Expression& rhsOperand) const;
 
 
         [[nodiscard]] OptimizationResult<syrec::VariableAccess> handleSignalAccess(const syrec::VariableAccess& signalAccess, bool performConstantPropagationForAccessedSignal, std::optional<unsigned int>* fetchedValue) const;
@@ -277,7 +277,7 @@ namespace optimizations {
         struct SignalIdentCountLookup {
             std::map<std::string_view, std::size_t, std::less<void>> lookup;
         };
-        static void                                     determineUsedSignalIdentsIn(const syrec::expression& expr, SignalIdentCountLookup& lookupContainer);
+        static void                                     determineUsedSignalIdentsIn(const syrec::Expression& expr, SignalIdentCountLookup& lookupContainer);
         static void                                     determineUsedSignalIdentsIn(const syrec::Number& number, SignalIdentCountLookup& lookupContainer);
         static void                                     addSignalIdentToLookup(const std::string_view& signalIdent, SignalIdentCountLookup& lookupContainer);
         [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Statement>> transformCollectionOfSharedPointersToReferences(const syrec::Statement::vec& statements);
@@ -342,7 +342,7 @@ namespace optimizations {
             [[nodiscard]] ReferenceCountDifferences               getDifferencesBetweenThisAndOther(const ReferenceCountLookupForStatement& other) const;
             [[nodiscard]] ReferenceCountLookupForStatement&       mergeWith(const ReferenceCountLookupForStatement& other);
             [[nodiscard]] static ReferenceCountLookupForStatement createFromStatement(const syrec::Statement& statement);
-            [[nodiscard]] static ReferenceCountLookupForStatement createFromExpression(const syrec::expression& expression);
+            [[nodiscard]] static ReferenceCountLookupForStatement createFromExpression(const syrec::Expression& expression);
             [[nodiscard]] static ReferenceCountLookupForStatement createFromNumber(const syrec::Number& number);
             [[nodiscard]] static ReferenceCountLookupForStatement createFromSignalAccess(const syrec::VariableAccess& signalAccess);
         };

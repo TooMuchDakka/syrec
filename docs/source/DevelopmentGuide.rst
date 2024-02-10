@@ -75,7 +75,7 @@ Initial Setup
 
     .. code-block:: console
 
-        (venv) $ pip install --upgrade pip, setuptools, wheel
+        (venv) $ pip install --upgrade pip setuptools wheel
 
 7. (Optional, **highly recommended**) Setup `nox <https://nox.thea.codes/en/stable/index.html>`_ to conveniently run many development tasks.
 
@@ -108,7 +108,7 @@ Initial Setup
 Working on the core C++ library
 ###############################
 
-Building the project requires a C++ compiler supporting *C++17*, CMake with a minimum version of *3.14*, and the Boost libraries with a minimum version of *1.71.0*.
+Building the project requires a C++ compiler supporting *C++17*, CMake with a minimum version of *3.19*, and the Boost libraries with a minimum version of *1.71.0*.
 
     .. note::
         We noticed some issues when compiling with Microsoft's *MSCV* compiler toolchain.
@@ -124,14 +124,14 @@ First, CMake needs to be *configured* by calling
 
     .. code-block:: console
 
-        $ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_QECC_TESTS=ON -DBINDINGS=ON
+        $ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SYREC_TESTS=ON -DBINDINGS=ON
 
 This tells CMake to
 
 - search the current directory :code:`.` (passed via :code:`-S`) for a :code:`CMakeLists.txt` file.
 - process it into a directory :code:`build` (passed via :code:`-B`).
 - the flag :code:`-DCMAKE_BUILD_TYPE=Release` tells CMake to configure a *Release* build (as opposed to, e.g., a *Debug* build).
-- the flag :code:`-DBUILD_QECC_TESTS=ON` tells CMake to also build the C++ tests.
+- the flag :code:`-DBUILD_SYREC_TESTS=ON` tells CMake to also build the C++ tests.
 - the flag :code:`-DBINDINGS=ON` tells CMake to also build the Python bindings.
 
 After configuring with CMake, the project can be built by calling

@@ -25,7 +25,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::vector<SharedAssignmentReference> simplify(const std::vector<SharedAssignmentReference>& assignmentsToSimplify, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback);
         
     protected:
-        using AwaitedInversionsByBinaryAssignmentLookupEntry = std::unordered_map<syrec::expression::ptr, syrec_operation::operation>;
+        using AwaitedInversionsByBinaryAssignmentLookupEntry = std::unordered_map<syrec::Expression::ptr, syrec_operation::operation>;
         using AwaitedInversionOfAssignedToSignalPartsByBinaryAssignmentLookup = std::unordered_map<syrec::VariableAccess::ptr, AwaitedInversionsByBinaryAssignmentLookupEntry>;
 
         struct AwaitedInversionsByUnaryAssignmentLookupEntry {
@@ -68,7 +68,7 @@ namespace noAdditionalLineSynthesis {
         void               addWatchForInversionOfAssignment(const syrec::UnaryStatement& assignment);
         void               tryRemoveWatchForInversionOfAssignment(const syrec::AssignStatement& assignment, bool& wasLastExistingWatchRemoved);
         void               tryRemoveWatchForInversionOfAssignment(const syrec::UnaryStatement& assignment);
-        void               updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::expression& expr) const;
+        void               updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::Expression& expr) const;
         void               invalidateSignalValueLookupEntryFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void               handleAllExpectedInversionsOfAssignedToSignalPartsDefined(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void               createSignalValueLookupCacheEntry(const syrec::VariableAccess::ptr& assignedToSignalParts, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback);

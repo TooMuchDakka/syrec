@@ -24,7 +24,7 @@ namespace noAdditionalLineSynthesis {
 
         struct SimplificationScope {
             std::vector<syrec::AssignStatement::ptr>              generatedAssignments;
-            std::vector<syrec::expression::ptr>                   expressionsRequiringFixup;
+            std::vector<syrec::Expression::ptr>                   expressionsRequiringFixup;
         };
 
         using SimplificationScopeReference = std::unique_ptr<SimplificationScope>;
@@ -38,22 +38,22 @@ namespace noAdditionalLineSynthesis {
         //static void mergeSimplificationScopes(const SimplificationScopeReference& parentScope, const SimplificationScopeReference& childScope);
         static void                                 fuseGeneratedExpressionsOf(const SimplificationScopeReference& scope, syrec_operation::operation operation);
         static void                                 copyGeneratedAssignmentsAndExpressionsTo(const SimplificationScopeReference& copiedToScope, const SimplificationScopeReference& copiedFromScope);
-        [[nodiscard]] static syrec::expression::ptr createExpressionFor(const syrec::expression::ptr& lhsOperand, syrec_operation::operation operation, const syrec::expression::ptr& rhsOperand);
-        [[nodiscard]] static bool                   isMinusAndXorOperationOnlyDefinedForLeaveNodesInAST(const syrec::expression::ptr& exprToCheck);
-        [[nodiscard]] static bool                   checkNoConsecutiveNonReversibleOperationsDefinedInExpressionAST(const syrec::expression::ptr& exprToCheck, const std::optional<syrec_operation::operation>& parentNodeOperation);
+        [[nodiscard]] static syrec::Expression::ptr createExpressionFor(const syrec::Expression::ptr& lhsOperand, syrec_operation::operation operation, const syrec::Expression::ptr& rhsOperand);
+        [[nodiscard]] static bool                   isMinusAndXorOperationOnlyDefinedForLeaveNodesInAST(const syrec::Expression::ptr& exprToCheck);
+        [[nodiscard]] static bool                   checkNoConsecutiveNonReversibleOperationsDefinedInExpressionAST(const syrec::Expression::ptr& exprToCheck, const std::optional<syrec_operation::operation>& parentNodeOperation);
         [[nodiscard]] static bool                   isOperationAdditionSubtractionOrXor(syrec_operation::operation operation);
 
         struct SplitAssignmentExprPart {
             syrec_operation::operation mappedToAssignmentOperation;
-            syrec::expression::ptr     assignmentRhsOperand;
+            syrec::Expression::ptr     assignmentRhsOperand;
 
-            explicit SplitAssignmentExprPart(syrec_operation::operation mappedToAssignmentOperation, syrec::expression::ptr assignmentRhsOperand):
+            explicit SplitAssignmentExprPart(syrec_operation::operation mappedToAssignmentOperation, syrec::Expression::ptr assignmentRhsOperand):
                 mappedToAssignmentOperation(mappedToAssignmentOperation), assignmentRhsOperand(std::move(assignmentRhsOperand)) {}
         };
         using SplitAssignmentExprPartReference = std::shared_ptr<SplitAssignmentExprPart>;
 
         [[nodiscard]] static std::vector<SplitAssignmentExprPartReference> splitAssignmentRhs(syrec_operation::operation originalAssignmentOperation, const syrec::BinaryExpression::ptr& assignmentRhsBinaryExpr, bool& isAssignedToSignalZeroPriorToAssignment);
-        [[nodiscard]] static std::vector<SplitAssignmentExprPartReference> splitAssignmentSubexpression(syrec_operation::operation parentBinaryExprOperation, const syrec::expression::ptr& subExpr);
+        [[nodiscard]] static std::vector<SplitAssignmentExprPartReference> splitAssignmentSubexpression(syrec_operation::operation parentBinaryExprOperation, const syrec::Expression::ptr& subExpr);
         [[nodiscard]] static syrec::AssignStatement::vec                   createAssignmentsForSplitAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::vector<SplitAssignmentExprPartReference>& splitUpAssignmentRhsParts);
     };
 }

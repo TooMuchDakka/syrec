@@ -10,9 +10,6 @@
 #include <functional>
 #include <pybind11/stl.h>
 
-#define STRINGIFY(x) #x
-#define MACRO_STRINGIFY(x) STRINGIFY(x)
-
 namespace py = pybind11;
 using namespace pybind11::literals;
 using namespace syrec;
@@ -43,7 +40,9 @@ PYBIND11_MODULE(pysyrec, m) {
                     },
                     "This method returns all annotations for a given gate.")
             .def("quantum_cost", &syrec::Circuit::quantumCost, "Returns the quantum cost of the circuit.")
-            .def("transistor_cost", &syrec::Circuit::transistorCost, "Returns the transistor cost of the circuit.");
+            .def("transistor_cost", &syrec::Circuit::transistorCost, "Returns the transistor cost of the circuit.")
+            .def("to_qasm_str", &syrec::Circuit::toQasm, "Returns the QASM representation of the circuit.")
+            .def("to_qasm_file", &syrec::Circuit::toQasmFile, "filename"_a, "Writes the QASM representation of the circuit to a file.");
 
     py::class_<Properties, std::shared_ptr<Properties>>(m, "properties")
             .def(py::init<>(), "Constructs property map object.")
@@ -59,10 +58,10 @@ PYBIND11_MODULE(pysyrec, m) {
             .def(py::init<>(), "Constructs ReadProgramSettings object.")
             .def_readwrite("default_bitwidth", &ReadProgramSettings::defaultBitwidth);
 
-    py::class_<program>(m, "program")
+    py::class_<Program>(m, "program")
             .def(py::init<>(), "Constructs SyReC program object.")
-            .def("add_module", &program::addModule)
-            .def("read", &program::read, "filename"_a, "settings"_a = ReadProgramSettings{}, "Read a SyReC program from a file.");
+            .def("add_module", &Program::addModule)
+            .def("read", &Program::read, "filename"_a, "settings"_a = ReadProgramSettings{}, "Read a SyReC program from a file.");
 
     py::class_<boost::dynamic_bitset<>>(m, "bitset")
             .def(py::init<>(), "Constructs bitset object of size zero.")
@@ -92,10 +91,4 @@ PYBIND11_MODULE(pysyrec, m) {
     m.def("cost_aware_synthesis", &CostAwareSynthesis::synthesize, "circ"_a, "program"_a, "settings"_a = Properties::ptr(), "statistics"_a = Properties::ptr(), "Cost-aware synthesis of the SyReC program.");
     m.def("line_aware_synthesis", &LineAwareSynthesis::synthesize, "circ"_a, "program"_a, "settings"_a = Properties::ptr(), "statistics"_a = Properties::ptr(), "Line-aware synthesis of the SyReC program.");
     m.def("simple_simulation", &simpleSimulation, "output"_a, "circ"_a, "input"_a, "statistics"_a = Properties::ptr(), "Simulation of the synthesized circuit circ.");
-
-#ifdef VERSION_INFO
-    m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
-#else
-    m.attr("__version__") = "dev";
-#endif
 }
