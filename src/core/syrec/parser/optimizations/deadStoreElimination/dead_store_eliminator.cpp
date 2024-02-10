@@ -1,5 +1,7 @@
 #include "core/syrec/parser/optimizations/deadStoreElimination/statement_iteration_helper.hpp"
 #include "core/syrec/parser/optimizations/deadStoreElimination/dead_store_eliminator.hpp"
+
+#include "core/syrec/parser/operation.hpp"
 #include "core/syrec/parser/utils/loop_range_utils.hpp"
 
 using namespace deadStoreElimination;
@@ -26,14 +28,23 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
         if (const auto& nextStatementAsLoopStatement = std::dynamic_pointer_cast<syrec::ForStatement>(nextStatement->statement); nextStatementAsLoopStatement != nullptr) {
             addInformationAboutLoopWithMoreThanOneStatement(nextStatementAsLoopStatement, nextStatement->relativeIndexInControlFlowGraph.size());
         } else if (const auto& nextStatementAsAssignmentStatement = std::dynamic_pointer_cast<syrec::AssignStatement>(nextStatement->statement); nextStatementAsAssignmentStatement != nullptr) {
-            markAccessedVariablePartsAsLive(nextStatementAsAssignmentStatement->lhs, indexOfCurrentStmtInControlFlowGraph);
-            markAccessedSignalsAsLiveInExpression(nextStatementAsAssignmentStatement->rhs, indexOfCurrentStmtInControlFlowGraph);
-            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsAssignmentStatement) && !isAssignmentDefinedInLoopPerformingMoreThanOneIteration()) {
-                insertPotentiallyDeadAssignmentStatement(nextStatementAsAssignmentStatement->lhs, nextStatement->relativeIndexInControlFlowGraph);   
+            const std::optional<syrec_operation::operation> mappedToAssignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(nextStatementAsAssignmentStatement->op);
+            const std::optional<unsigned int>               assignmentRhsExprAsConstant = tryEvaluateExprToConstant(*nextStatementAsAssignmentStatement->rhs);
+
+            const bool doesAssignmentRhsDefinedIdentityElement = mappedToAssignmentOperation.has_value() && assignmentRhsExprAsConstant.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToAssignmentOperation, *assignmentRhsExprAsConstant);
+            if (!doesAssignmentRhsDefinedIdentityElement) {
+                markAccessedVariablePartsAsLive(nextStatementAsAssignmentStatement->lhs, indexOfCurrentStmtInControlFlowGraph);
+                markAccessedSignalsAsLiveInExpression(nextStatementAsAssignmentStatement->rhs, indexOfCurrentStmtInControlFlowGraph);                
+            }
+            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsAssignmentStatement)) {
+                if (doesAssignmentRhsDefinedIdentityElement || (!isAssignmentDefinedInLoopPerformingMoreThanOneIteration() && !isAssignedToSignalAModifiableParameter(nextStatementAsAssignmentStatement->lhs->var->name))) {
+                    insertPotentiallyDeadAssignmentStatement(nextStatementAsAssignmentStatement->lhs, nextStatement->relativeIndexInControlFlowGraph);       
+                }
             }
         } else if (const auto& nextStatementAsUnaryAssignmentStatement = std::dynamic_pointer_cast<syrec::UnaryStatement>(nextStatement->statement); nextStatementAsUnaryAssignmentStatement != nullptr) {
             markAccessedVariablePartsAsLive(nextStatementAsUnaryAssignmentStatement->var, indexOfCurrentStmtInControlFlowGraph);
-            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsUnaryAssignmentStatement) && !isAssignmentDefinedInLoopPerformingMoreThanOneIteration()) {
+            if (!doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsUnaryAssignmentStatement) && !isAssignmentDefinedInLoopPerformingMoreThanOneIteration()
+                && !isAssignedToSignalAModifiableParameter(nextStatementAsUnaryAssignmentStatement->var->var->name)) {
                 insertPotentiallyDeadAssignmentStatement(nextStatementAsUnaryAssignmentStatement->var, nextStatement->relativeIndexInControlFlowGraph);   
             }
         } else if (const auto& nextStatementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(nextStatement->statement); nextStatementAsIfStatement != nullptr) {
@@ -155,32 +166,30 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
 
 bool DeadStoreEliminator::doesAssignmentContainPotentiallyUnsafeOperation(const syrec::Statement::ptr& stmt) const {
     if (const auto& stmtAsUnaryAssignmentStmt = std::dynamic_pointer_cast<syrec::UnaryStatement>(stmt); stmtAsUnaryAssignmentStmt != nullptr) {
-        return !wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsUnaryAssignmentStmt->var)
-            || isAssignedToSignalAModifiableParameter(stmtAsUnaryAssignmentStmt->var->var->name);
+        return !wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsUnaryAssignmentStmt->var);
     }
     if (const auto& stmtAsAssignmentStmt = std::dynamic_pointer_cast<syrec::AssignStatement>(stmt); stmtAsAssignmentStmt != nullptr) {
         return !wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(stmtAsAssignmentStmt->lhs)
-            || isAssignedToSignalAModifiableParameter(stmtAsAssignmentStmt->lhs->var->name)
             || doesExpressionContainPotentiallyUnsafeOperation(stmtAsAssignmentStmt->rhs);
     }
     return false;
 }
 
 bool DeadStoreEliminator::doesExpressionContainPotentiallyUnsafeOperation(const syrec::expression::ptr& expr) const {
-    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr != nullptr) {
+    if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr) {
         auto doesContainPotentiallyUnsafeOperation = doesExpressionContainPotentiallyUnsafeOperation(exprAsBinaryExpr->lhs) || doesExpressionContainPotentiallyUnsafeOperation(exprAsBinaryExpr->rhs);
         // Should we consider a division with unknown divisor as an unsafe operation ?
         if (!doesContainPotentiallyUnsafeOperation && exprAsBinaryExpr->op == syrec::BinaryExpression::Divide) {
-            if (const auto& rhsOperandAsNumber = std::dynamic_pointer_cast<syrec::NumericExpression>(exprAsBinaryExpr->rhs); rhsOperandAsNumber != nullptr) {
-                doesContainPotentiallyUnsafeOperation = !(tryEvaluateNumber(rhsOperandAsNumber->value).has_value() && tryEvaluateNumber(rhsOperandAsNumber->value) != 0);
+            if (const auto& rhsOperandAsNumber = std::dynamic_pointer_cast<syrec::NumericExpression>(exprAsBinaryExpr->rhs); rhsOperandAsNumber) {
+                doesContainPotentiallyUnsafeOperation = !(tryEvaluateNumber(*rhsOperandAsNumber->value).has_value() && tryEvaluateNumber(*rhsOperandAsNumber->value) != 0);
             }
         }
         return doesContainPotentiallyUnsafeOperation;
     }
-    if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr != nullptr) {
+    if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr) {
         return doesExpressionContainPotentiallyUnsafeOperation(exprAsShiftExpr->lhs);
     }
-    if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableExpr != nullptr) {
+    if (const auto& exprAsVariableExpr = std::dynamic_pointer_cast<syrec::VariableExpression>(expr); exprAsVariableExpr) {
         return !wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(exprAsVariableExpr->var);
     }
     return false;
@@ -208,7 +217,7 @@ bool DeadStoreEliminator::wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndW
         const auto& maximumValidValueOfDimension      = symbolTableEntryForVariable->dimensions.at(i) - 1;
 
         if (const auto& accessedValueOfDimensionAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimension); accessedValueOfDimensionAsNumericExpr != nullptr) {
-            const auto accessedValueOfDimensionEvaluated = tryEvaluateNumber(accessedValueOfDimensionAsNumericExpr->value);
+            const auto accessedValueOfDimensionEvaluated = tryEvaluateNumber(*accessedValueOfDimensionAsNumericExpr->value);
             dimensionAccessOK                            = accessedValueOfDimensionEvaluated.has_value() && *accessedValueOfDimensionEvaluated <= maximumValidValueOfDimension;    
         }
         else {
@@ -219,8 +228,8 @@ bool DeadStoreEliminator::wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndW
     bool bitRangeOK = dimensionAccessOK;
     if (signalAccess->range.has_value() && bitRangeOK) {
         const auto maximumValidBitRangeIndex = symbolTableEntryForVariable->bitwidth - 1;
-        const auto bitRangeStartEvaluated    = tryEvaluateNumber(signalAccess->range->first);
-        const auto bitRangeEndEvaluated      = tryEvaluateNumber(signalAccess->range->second);
+        const auto bitRangeStartEvaluated    = tryEvaluateNumber(*signalAccess->range->first);
+        const auto bitRangeEndEvaluated      = tryEvaluateNumber(*signalAccess->range->second);
 
         bitRangeOK = bitRangeStartEvaluated.has_value() && bitRangeEndEvaluated.has_value() && *bitRangeStartEvaluated <= maximumValidBitRangeIndex && *bitRangeEndEvaluated <= maximumValidBitRangeIndex && *bitRangeStartEvaluated <= *bitRangeEndEvaluated;
     }
@@ -239,9 +248,17 @@ bool DeadStoreEliminator::isAssignedToSignalAModifiableParameter(const std::stri
     return false;
 }
 
-std::optional<unsigned int> DeadStoreEliminator::tryEvaluateNumber(const syrec::Number::ptr& number) const {
-    return number->isConstant() ? std::make_optional(number->evaluate({})) : std::nullopt;
+std::optional<unsigned int> DeadStoreEliminator::tryEvaluateNumber(const syrec::Number& number) {
+    return number.isConstant() ? std::make_optional(number.evaluate({})) : std::nullopt;
 }
+
+std::optional<unsigned> DeadStoreEliminator::tryEvaluateExprToConstant(const syrec::expression& expr) {
+    if (const auto& exprAsNumericExpr = dynamic_cast<const syrec::NumericExpression*>(&expr); exprAsNumericExpr) {
+        return tryEvaluateNumber(*exprAsNumericExpr->value);
+    }
+    return std::nullopt;
+}
+
 
 void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableAccess::ptr& signalAccess, const AssignmentStatementIndexInControlFlowGraph& indexOfStatementContainingSignalAccess) {
     const auto& signalTableEntryForAccessedSignal = symbolTable->getVariable(signalAccess->var->name);
@@ -312,7 +329,7 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
             std::back_inserter(transformedAccessOnDimension),
             [&](const auto& accessedValueOfDimension) -> std::optional<unsigned int> {
                 if (const auto& accessedValueOfDimensionAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(accessedValueOfDimension); accessedValueOfDimensionAsNumericExpr != nullptr) {
-                    return tryEvaluateNumber(accessedValueOfDimensionAsNumericExpr->value);   
+                    return tryEvaluateNumber(*accessedValueOfDimensionAsNumericExpr->value);   
                 }
                 return std::nullopt;
             });
@@ -332,8 +349,8 @@ void DeadStoreEliminator::markAccessedVariablePartsAsLive(const syrec::VariableA
         return std::make_optional<optimizations::BitRangeAccessRestriction::BitRangeAccess>(0, accessedSignalBitwidth - 1);
     }
 
-    auto bitRangeStartEvaluated = tryEvaluateNumber(bitRangeAccess->first);
-    auto bitRangeEndEvaluated   = tryEvaluateNumber(bitRangeAccess->second);
+    auto bitRangeStartEvaluated = tryEvaluateNumber(*bitRangeAccess->first);
+    auto bitRangeEndEvaluated   = tryEvaluateNumber(*bitRangeAccess->second);
     if (!bitRangeStartEvaluated.has_value() || !bitRangeEndEvaluated.has_value()) {
         return std::make_optional(optimizations::BitRangeAccessRestriction::BitRangeAccess(0, accessedSignalBitwidth - 1));
     }
@@ -610,9 +627,9 @@ void DeadStoreEliminator::addInformationAboutLoopWithMoreThanOneStatement(const 
 }
 
 bool DeadStoreEliminator::doesLoopPerformMoreThanOneIteration(const std::shared_ptr<syrec::ForStatement>& loopStmt) const {
-    const auto& startValue = tryEvaluateNumber(loopStmt->range.first);
-    const auto& endValue = tryEvaluateNumber(loopStmt->range.second);
-    const auto& stepSize   = tryEvaluateNumber(loopStmt->step);
+    const auto& startValue = tryEvaluateNumber(*loopStmt->range.first);
+    const auto& endValue = tryEvaluateNumber(*loopStmt->range.second);
+    const auto& stepSize   = tryEvaluateNumber(*loopStmt->step);
 
     if (!startValue.has_value() || !endValue.has_value() || !stepSize.has_value()) {
         return false;

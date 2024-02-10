@@ -148,9 +148,44 @@
       "deadCodeElimON": "0"
     }
   },
-  "TODO_DEAD_STORES_AS_ASSIGNMENT_WITH_IDENTITY_ELEMENT_REMOVED_WHEN_DEAD_CODE_ELIMINATION_IS_DISABLED": {
-    "circuit": "",
-    "expectedCircuit": "",
+  "AdditionWithIdentityElementOfBitOfSignalIsConsideredAsDeadStoreAndRemoved": {
+    "circuit": "module main(out a(4)) a.1 += 0",
+    "expectedCircuit": "module main(out a(4)) skip",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
+  "AdditionWithIdentityElementOfBitRangeOfSignalIsConsideredAsDeadStoreAndRemoved": {
+    "circuit": "module main(out a(4)) a.1:2 += 0",
+    "expectedCircuit": "module main(out a(4)) skip",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
+  "AdditionWithIdentityElementOfValueOdDimensionIsConsideredAsDeadStoreAndRemoved": {
+    "circuit": "module main(out a[2](4)) a[0] += 0",
+    "expectedCircuit": "module main(out a[2](4)) skip",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
+  "SubtractionWithIdentityElementOfBitOfSignalIsConsideredAsDeadStoreAndRemoved": {
+    "circuit": "module main(out a(4)) a.0 -= 0",
+    "expectedCircuit": "module main(out a(4)) skip",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
+  "SubtractionWithIdentityElementOfBitRangeOfSignalIsConsideredAsDeadStoreAndRemoved": {
+    "circuit": "module main(out a(4)) a.2:3 -= 0",
+    "expectedCircuit": "module main(out a(4)) skip",
+    "optimizations": {
+      "deadCodeElimON": "0"
+    }
+  },
+  "SubtractionWithIdentityElementOfValueOdDimensionIsConsideredAsDeadStoreAndRemoved": {
+    "circuit": "module main(out a[2](4)) a[1] += 0",
+    "expectedCircuit": "module main(out a[2](4)) skip",
     "optimizations": {
       "deadCodeElimON": "0"
     }

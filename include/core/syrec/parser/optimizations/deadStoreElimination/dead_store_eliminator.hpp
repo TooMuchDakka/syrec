@@ -30,7 +30,7 @@ namespace deadStoreElimination {
          * IV.  Assignment to undeclared variable <br>
          * then the assignment will not be considered as a dead store. <br>
          *
-         * <em>NOTE: Noop assignments (i.e. x += 0) or similar 'dead' stores are not removed by this optimization.</em>
+         * <em>NOTE: Noop assignments (i.e. x += 0) are also considered as dead stores.</em>
          * \param statementList The list of statements from which dead stores shall be removed
          */
         void removeDeadStoresFrom(syrec::Statement::vec& statementList);
@@ -117,7 +117,8 @@ namespace deadStoreElimination {
         [[nodiscard]] bool                        doesExpressionContainPotentiallyUnsafeOperation(const syrec::expression::ptr& expr) const;
         [[nodiscard]] bool                        wasSignalDeclaredAndAreAllIndizesOfSignalConstantsAndWithinRange(const syrec::VariableAccess::ptr& signalAccess) const;
         [[nodiscard]] bool                        isAssignedToSignalAModifiableParameter(const std::string_view& assignedToSignalIdent) const;
-        [[nodiscard]] std::optional<unsigned int> tryEvaluateNumber(const syrec::Number::ptr& number) const;
+        [[nodiscard]] static std::optional<unsigned int>        tryEvaluateNumber(const syrec::Number& number);
+        [[nodiscard]] static std::optional<unsigned int> tryEvaluateExprToConstant(const syrec::expression& expr);
 
         [[nodiscard]] bool isNextDeadStoreInSameBranch(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores, std::size_t currentNestingLevel) const;
 
