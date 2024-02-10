@@ -392,8 +392,7 @@ protected:
                 .preferAssignmentsGeneratedByChoiceRegardlessOfCost = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost),
                 .optionalNewReplacementSignalIdentsPrefix           = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisNewSignalIdentsPrefix, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix)
             }));
-        }
-        else {
+        } else if (!userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig.has_value() && defaultParserConfig.optionalNoAdditionalLineSynthesisConfig.has_value()) {
             mergedOptions.optionalNoAdditionalLineSynthesisConfig.emplace(*defaultParserConfig.optionalNoAdditionalLineSynthesisConfig);
         }
 
