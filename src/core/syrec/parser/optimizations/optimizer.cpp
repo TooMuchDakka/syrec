@@ -282,7 +282,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         rhsOperand = std::move(simplificationResultOfRhsExpr.tryTakeOwnershipOfOptimizationResult()->front());
     }
     
-    const auto& rhsOperandEvaluatedAsConstant = tryEvaluateExpressionToConstant(*rhsOperand, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
+    const auto& rhsOperandEvaluatedAsConstant = tryEvaluateExpressionToConstant(*rhsOperand, getActiveSymbolTableForEvaluation(), parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
     const auto& mappedToAssignmentOperationFromFlag = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentStmt.op);
     const auto  doesAssignmentNotModifyAssignedToSignalValue = mappedToAssignmentOperationFromFlag.has_value() && rhsOperandEvaluatedAsConstant.has_value() && syrec_operation::isOperandUseAsRhsInOperationIdentityElement(*mappedToAssignmentOperationFromFlag, *rhsOperandEvaluatedAsConstant);
 
@@ -556,7 +556,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     auto                                 canChangesMadeInFalseBranchBeIgnored = false;
     auto                                 canChangesMadeInTrueBranchBeIgnored  = false;
 
-    if (const auto& constantValueOfGuardCondition = tryEvaluateExpressionToConstant(simplifiedGuardExpr ? *simplifiedGuardExpr : *ifStatement.condition, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr); constantValueOfGuardCondition.has_value()) {
+    if (const auto& constantValueOfGuardCondition = tryEvaluateExpressionToConstant(simplifiedGuardExpr ? *simplifiedGuardExpr : *ifStatement.condition, getActiveSymbolTableForEvaluation(), parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr); constantValueOfGuardCondition.has_value()) {
         if (!*constantValueOfGuardCondition) {
             canTrueBranchBeOmitted = parserConfig.deadCodeEliminationEnabled;
             canChangesMadeInTrueBranchBeIgnored = true;
@@ -720,9 +720,9 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 
     if (auto iterationRangeStartSimplificationResult = handleNumber(*forStatement.range.first); iterationRangeStartSimplificationResult.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         iterationRangeStartSimplified = std::move(iterationRangeStartSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
-        constantValueOfIterationRangeStart = tryEvaluateNumberAsConstant(*iterationRangeStartSimplified, symbolTableScopePointerUsableForEvaluation, parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
+        constantValueOfIterationRangeStart = tryEvaluateNumberAsConstant(*iterationRangeStartSimplified, symbolTableScopePointerUsableForEvaluation, parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
     } else {
-        constantValueOfIterationRangeStart = tryEvaluateNumberAsConstant(*forStatement.range.first, symbolTableScopePointerUsableForEvaluation, parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
+        constantValueOfIterationRangeStart = tryEvaluateNumberAsConstant(*forStatement.range.first, symbolTableScopePointerUsableForEvaluation, parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
     }
 
     if (!forStatement.loopVariable.empty()) {
@@ -745,17 +745,17 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     else {
         if (auto iterationRangeEndSimplificationResult = handleNumber(*forStatement.range.second); iterationRangeEndSimplificationResult.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
             iterationRangeEndSimplified      = std::move(iterationRangeEndSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
-            constantValueOfIterationRangeEnd = tryEvaluateNumberAsConstant(*iterationRangeEndSimplified, symbolTableScopePointerUsableForEvaluation, parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
+            constantValueOfIterationRangeEnd = tryEvaluateNumberAsConstant(*iterationRangeEndSimplified, symbolTableScopePointerUsableForEvaluation, parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
         } else {
-            constantValueOfIterationRangeEnd = tryEvaluateNumberAsConstant(*forStatement.range.second, symbolTableScopePointerUsableForEvaluation, parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
+            constantValueOfIterationRangeEnd = tryEvaluateNumberAsConstant(*forStatement.range.second, symbolTableScopePointerUsableForEvaluation, parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
         }
     }
 
     if (auto iterationRangeStepSizeSimplificationResult = handleNumber(*forStatement.step); iterationRangeStepSizeSimplificationResult.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         iterationRangeStepSizeSimplified = std::move(iterationRangeStepSizeSimplificationResult.tryTakeOwnershipOfOptimizationResult()->front());
-        constantValueOfIterationRangeStepsize = tryEvaluateNumberAsConstant(*iterationRangeStepSizeSimplified, symbolTableScopePointerUsableForEvaluation, parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
+        constantValueOfIterationRangeStepsize = tryEvaluateNumberAsConstant(*iterationRangeStepSizeSimplified, symbolTableScopePointerUsableForEvaluation, parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
     } else {
-        constantValueOfIterationRangeStepsize = tryEvaluateNumberAsConstant(*forStatement.step, symbolTableScopePointerUsableForEvaluation, parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
+        constantValueOfIterationRangeStepsize = tryEvaluateNumberAsConstant(*forStatement.step, symbolTableScopePointerUsableForEvaluation, parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
     }
 
     auto                        shouldValueOfLoopVariableBeAvailableInLoopBody = false;
@@ -1121,8 +1121,8 @@ optimizations::Optimizer::OptimizationResult<syrec::Expression> optimizations::O
     }
 
     std::unique_ptr<syrec::Expression> simplifiedBinaryExpr;
-    const auto constantValueOfLhsExpr = tryEvaluateExpressionToConstant(simplifiedLhsExpr ? *simplifiedLhsExpr : *expression.lhs, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
-    const auto constantValueOfRhsExpr = tryEvaluateExpressionToConstant(simplifiedRhsExpr ? *simplifiedRhsExpr : *expression.rhs, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
+    const auto constantValueOfLhsExpr = tryEvaluateExpressionToConstant(simplifiedLhsExpr ? *simplifiedLhsExpr : *expression.lhs, getActiveSymbolTableForEvaluation(), parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
+    const auto constantValueOfRhsExpr = tryEvaluateExpressionToConstant(simplifiedRhsExpr ? *simplifiedRhsExpr : *expression.rhs, getActiveSymbolTableForEvaluation(), parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
     const auto mappedToBinaryOperation = syrec_operation::tryMapBinaryOperationFlagToEnum(expression.op);
 
     if (mappedToBinaryOperation.has_value()) {
@@ -1192,7 +1192,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Expression> optimizations::O
 
 optimizations::Optimizer::OptimizationResult<syrec::Expression> optimizations::Optimizer::handleVariableExpr(const syrec::VariableExpression& expression) const {
     std::optional<unsigned int> fetchedValueOfSignal;
-    if (auto simplificationResultOfUserDefinedSignalAccess = handleSignalAccess(*expression.var, parserConfig.performConstantPropagation, &fetchedValueOfSignal); simplificationResultOfUserDefinedSignalAccess.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
+    if (auto simplificationResultOfUserDefinedSignalAccess = handleSignalAccess(*expression.var, parserConfig.constantPropagationEnabled, &fetchedValueOfSignal); simplificationResultOfUserDefinedSignalAccess.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         if (fetchedValueOfSignal.has_value()) {
             updateReferenceCountOf(expression.var->var->name, parser::SymbolTable::ReferenceCountUpdate::Decrement);
             return OptimizationResult<syrec::Expression>::fromOptimizedContainer(std::make_unique<syrec::NumericExpression>(std::make_unique<syrec::Number>(*fetchedValueOfSignal), expression.bitwidth()));
@@ -1218,8 +1218,8 @@ optimizations::Optimizer::OptimizationResult<syrec::Expression> optimizations::O
 
     if (const auto& mappedToShiftOperation = syrec_operation::tryMapShiftOperationFlagToEnum(expression.op); mappedToShiftOperation.has_value()) {
         std::unique_ptr<syrec::Expression> simplificationResultOfExpr;
-        const auto& constantValueOfToBeShiftedExpr = tryEvaluateExpressionToConstant(simplifiedToBeShiftedExpr ? *simplifiedToBeShiftedExpr : *expression.lhs, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
-        const auto& constantValueOfShiftAmount     = tryEvaluateNumberAsConstant(simplifiedShiftAmount ? *simplifiedShiftAmount : *expression.rhs, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, nullptr);
+        const auto& constantValueOfToBeShiftedExpr = tryEvaluateExpressionToConstant(simplifiedToBeShiftedExpr ? *simplifiedToBeShiftedExpr : *expression.lhs, getActiveSymbolTableForEvaluation(), parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
+        const auto& constantValueOfShiftAmount     = tryEvaluateNumberAsConstant(simplifiedShiftAmount ? *simplifiedShiftAmount : *expression.rhs, getActiveSymbolTableForEvaluation(), parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, nullptr);
 
         if (constantValueOfToBeShiftedExpr.has_value() && syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(*mappedToShiftOperation, *constantValueOfToBeShiftedExpr)) {
             if (!simplifiedShiftAmount) {
@@ -1267,7 +1267,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optim
     }
     if (number.isLoopVariable()) {
         if (const auto& activeSymbolTableScope = getActiveSymbolTableScope(); activeSymbolTableScope.has_value()) {
-            if (const auto& fetchedValueOfLoopVariable = tryFetchValueOfLoopVariable(number.variableName(), **activeSymbolTableScope, parserConfig.performConstantPropagation, evaluableLoopVariableLookup); fetchedValueOfLoopVariable.has_value()) {
+            if (const auto& fetchedValueOfLoopVariable = tryFetchValueOfLoopVariable(number.variableName(), **activeSymbolTableScope, parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup); fetchedValueOfLoopVariable.has_value()) {
                 updateReferenceCountOf(number.variableName(), parser::SymbolTable::ReferenceCountUpdate::Decrement);
                 return OptimizationResult<syrec::Number>::fromOptimizedContainer(std::make_unique<syrec::Number>(*fetchedValueOfLoopVariable));   
             }
@@ -1413,7 +1413,7 @@ void optimizations::Optimizer::updateReferenceCountOf(const std::string_view& si
 }
 
 std::optional<unsigned> optimizations::Optimizer::tryFetchValueForAccessedSignal(const syrec::VariableAccess& accessedSignal) const {
-    if (!parserConfig.performConstantPropagation || isValueLookupBlockedByDataFlowAnalysisRestriction(accessedSignal)) {
+    if (!parserConfig.constantPropagationEnabled || isValueLookupBlockedByDataFlowAnalysisRestriction(accessedSignal)) {
         return std::nullopt;
     }
 
@@ -1452,7 +1452,7 @@ optimizations::Optimizer::DimensionAccessEvaluationResult optimizations::Optimiz
                 owningContainerOfOptimizationResult = std::move(temporaryOwningContainerOfOptimizationResult->front());
                 wasUserDefinedValueForDimensionSimplified = true;
             }
-            if (const auto& constantValueOfAccessedValueOfDimension = tryEvaluateExpressionToConstant(*owningContainerOfOptimizationResult, symbolTableScopeUsableForEvaluation, parserConfig.performConstantPropagation, evaluableLoopVariableLookup, &didUserDefinedValueOfDimensionEvaluateToConstant); constantValueOfAccessedValueOfDimension.has_value()) {
+            if (const auto& constantValueOfAccessedValueOfDimension = tryEvaluateExpressionToConstant(*owningContainerOfOptimizationResult, symbolTableScopeUsableForEvaluation, parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, &didUserDefinedValueOfDimensionEvaluateToConstant); constantValueOfAccessedValueOfDimension.has_value()) {
                 const auto isAccessedValueOfDimensionWithinRange = parser::isValidDimensionAccess(signalData, i, *constantValueOfAccessedValueOfDimension);
                 evaluatedValuePerDimension.emplace_back(SignalAccessIndexEvaluationResult<syrec::Expression>::createFromConstantValue(isAccessedValueOfDimensionWithinRange ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange, wasUserDefinedValueForDimensionSimplified, *constantValueOfAccessedValueOfDimension));
                 wasUserDefinedValueForDimensionSimplified |= didUserDefinedValueOfDimensionEvaluateToConstant;
@@ -1532,8 +1532,8 @@ std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations:
         wasOriginalBitRangeEndSimplified = wasOriginalBitRangeStartSimplified;
     }
 
-    const auto& bitRangeStartEvaluated = tryEvaluateNumberAsConstant(*evaluationResultOfBitRangeStart, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, &wasOriginalBitRangeStartSimplified);
-    const auto& bitRangeEndEvaluated   = tryEvaluateNumberAsConstant(*evaluationResultOfBitRangeEnd, getActiveSymbolTableForEvaluation(), parserConfig.performConstantPropagation, evaluableLoopVariableLookup, &wasOriginalBitRangeEndSimplified);
+    const auto& bitRangeStartEvaluated = tryEvaluateNumberAsConstant(*evaluationResultOfBitRangeStart, getActiveSymbolTableForEvaluation(), parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, &wasOriginalBitRangeStartSimplified);
+    const auto& bitRangeEndEvaluated   = tryEvaluateNumberAsConstant(*evaluationResultOfBitRangeEnd, getActiveSymbolTableForEvaluation(), parserConfig.constantPropagationEnabled, evaluableLoopVariableLookup, &wasOriginalBitRangeEndSimplified);
 
     if (bitRangeStartEvaluated.has_value()) {
         bitRangeStartEvaluationStatus = parser::isValidBitAccess(*signalData, *bitRangeStartEvaluated) ? IndexValidityStatus::Valid : IndexValidityStatus::OutOfRange;
@@ -1903,7 +1903,7 @@ void optimizations::Optimizer::performSwapAndCreateBackupOfOperands(const syrec:
 }
 
 std::optional<unsigned> optimizations::Optimizer::tryFetchValueFromEvaluatedSignalAccess(const EvaluatedSignalAccess& accessedSignalParts) const {
-    if (!parserConfig.performConstantPropagation) {
+    if (!parserConfig.constantPropagationEnabled) {
         return std::nullopt;
     }
 

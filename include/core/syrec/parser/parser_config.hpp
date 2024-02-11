@@ -29,7 +29,7 @@ namespace parser {
         bool                                                 supportBroadcastingAssignmentOperands;
         bool                                                 reassociateExpressionsEnabled;
         bool                                                 deadCodeEliminationEnabled;
-        bool                                                 performConstantPropagation;
+        bool                                                 constantPropagationEnabled;
         bool                                                 operationStrengthReductionEnabled;
         bool                                                 deadStoreEliminationEnabled;
         bool                                                 combineRedundantInstructions;
@@ -44,7 +44,7 @@ namespace parser {
                 const bool                                                 supportBroadcastingAssignmentOperands       = false,
                 const bool                                                 reassociateExpressionEnabled                = false,
                 const bool                                                 isRemovalOfUnusedVariablesAndModulesEnabled = false,
-                const bool                                                 performConstantPropagation                  = false,
+                const bool                                                 constantPropagationEnabled                  = false,
                 const bool                                                 operationStrengthReductionEnabled           = false,
                 const bool                                                 deadStoreEliminationEnabled                 = false,
                 const bool                                                 combineRedundantInstructions                = false,
@@ -57,7 +57,7 @@ namespace parser {
             supportBroadcastingAssignmentOperands(supportBroadcastingAssignmentOperands),
             reassociateExpressionsEnabled(reassociateExpressionEnabled),
             deadCodeEliminationEnabled(isRemovalOfUnusedVariablesAndModulesEnabled),
-            performConstantPropagation(performConstantPropagation),
+            constantPropagationEnabled(constantPropagationEnabled),
             operationStrengthReductionEnabled(operationStrengthReductionEnabled),
             deadStoreEliminationEnabled(deadStoreEliminationEnabled),
             combineRedundantInstructions(combineRedundantInstructions),
@@ -72,7 +72,7 @@ namespace parser {
             supportBroadcastingAssignmentOperands = copy.supportBroadcastingAssignmentOperands;
             reassociateExpressionsEnabled         = copy.reassociateExpressionsEnabled;
             deadCodeEliminationEnabled            = copy.deadCodeEliminationEnabled;
-            performConstantPropagation            = copy.performConstantPropagation;
+            constantPropagationEnabled            = copy.constantPropagationEnabled;
             operationStrengthReductionEnabled     = copy.operationStrengthReductionEnabled;
             deadStoreEliminationEnabled           = copy.deadStoreEliminationEnabled;
             combineRedundantInstructions          = copy.combineRedundantInstructions;

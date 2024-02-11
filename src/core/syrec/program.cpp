@@ -52,7 +52,7 @@ bool Program::parseFileContent(std::string_view programToBeParsed, const ReadPro
                                                            false,
                                                            config.reassociateExpressionEnabled,
                                                            config.deadCodeEliminationEnabled,
-                                                           config.performConstantPropagation,
+                                                           config.constantPropagationEnabled,
                                                            config.operationStrengthReductionEnabled,
                                                            config.deadStoreEliminationEnabled,
                                                            config.combineRedundantInstructions,

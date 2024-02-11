@@ -32,7 +32,7 @@ protected:
     static constexpr auto cJsonKeySupportingBroadcastingExpressionOperands = "exprOperandsBroadcastingON";
     static constexpr auto cJsonKeySupportingBroadCastingAssignmentOperands = "assignmentOperandsBroadcastingON";
     static constexpr auto cJsonKeyDeadCodeEliminationFlag                  = "deadCodeElimON";
-    static constexpr auto cJsonKeyPerformConstantPropagationFlag           = "constantPropON";
+    static constexpr auto cJsonKeyConstantPropagationEnabledFlag           = "constantPropON";
     static constexpr auto cJsonKeyNoAdditionalLineSynthesisFlag            = "noAddLineSynON";
     static constexpr auto cJsonKeyOperationStrengthReductionEnabled        = "opStrengthReductionON";
     static constexpr auto cJsonKeyDeadStoreEliminationEnabled              = "deadStoreElimON";
@@ -261,7 +261,7 @@ protected:
                 case PerformConstantPropagationFlag: {
                     const auto parsedConstantPropagationFlagValue = tryParseStringToNumber(value);
                     ASSERT_TRUE(parsedConstantPropagationFlagValue.has_value()) << "Failed to map " << value << " to a valid constant propagation value";
-                    generatedConfig.performConstantPropagation = *parsedConstantPropagationFlagValue > 0;
+                    generatedConfig.constantPropagationEnabled = *parsedConstantPropagationFlagValue > 0;
                     break;
                 }
                 case OperationStrengthReductionEnabled: {
@@ -369,7 +369,7 @@ protected:
 
         syrec::ReadProgramSettings mergedOptions;
         mergedOptions.deadCodeEliminationEnabled = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::DeadCodeEliminationFlag, loadedOptimizationOptions, defaultParserConfig.deadCodeEliminationEnabled, userDefinedOptimizations.deadCodeEliminationEnabled);
-        mergedOptions.performConstantPropagation = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::PerformConstantPropagationFlag, loadedOptimizationOptions, defaultParserConfig.performConstantPropagation, userDefinedOptimizations.performConstantPropagation);
+        mergedOptions.constantPropagationEnabled = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::PerformConstantPropagationFlag, loadedOptimizationOptions, defaultParserConfig.constantPropagationEnabled, userDefinedOptimizations.constantPropagationEnabled);
         mergedOptions.operationStrengthReductionEnabled   = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::OperationStrengthReductionEnabled, loadedOptimizationOptions, defaultParserConfig.operationStrengthReductionEnabled, userDefinedOptimizations.operationStrengthReductionEnabled);
         mergedOptions.deadStoreEliminationEnabled         = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::DeadStoreEliminationEnabled, loadedOptimizationOptions, defaultParserConfig.deadStoreEliminationEnabled, userDefinedOptimizations.deadStoreEliminationEnabled);
         mergedOptions.combineRedundantInstructions        = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::CombineRedundantInstructionsEnabled, loadedOptimizationOptions, defaultParserConfig.combineRedundantInstructions, userDefinedOptimizations.combineRedundantInstructions);
@@ -426,7 +426,7 @@ protected:
         if (jsonKeyOfOptimizationOption == cJsonKeySupportingBroadcastingExpressionOperands) return std::make_optional(OptimizerOption::SupportingBroadCastingExpressionOperandsFlag);
         if (jsonKeyOfOptimizationOption == cJsonKeySupportingBroadCastingAssignmentOperands) return std::make_optional(OptimizerOption::SupportingBroadCastingAssignmentOperands);
         if (jsonKeyOfOptimizationOption == cJsonKeyDeadCodeEliminationFlag) return std::make_optional(OptimizerOption::DeadCodeEliminationFlag);
-        if (jsonKeyOfOptimizationOption == cJsonKeyPerformConstantPropagationFlag) return std::make_optional(OptimizerOption::PerformConstantPropagationFlag);
+        if (jsonKeyOfOptimizationOption == cJsonKeyConstantPropagationEnabledFlag) return std::make_optional(OptimizerOption::PerformConstantPropagationFlag);
         if (jsonKeyOfOptimizationOption == cJsonKeyOperationStrengthReductionEnabled) return std::make_optional(OptimizerOption::OperationStrengthReductionEnabled);
         if (jsonKeyOfOptimizationOption == cJsonKeyDeadStoreEliminationEnabled) return std::make_optional(OptimizerOption::DeadStoreEliminationEnabled);
         if (jsonKeyOfOptimizationOption == cJsonKeyCombineRedundantInstructionsEnabled) return std::make_optional(OptimizerOption::CombineRedundantInstructionsEnabled);

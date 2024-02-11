@@ -15,7 +15,7 @@ namespace syrec {
                 unsigned                                                 bitwidth                                = 32U,
                 bool                                                     reassociateExpressionEnabled            = false,
                 bool                                                     deadCodeEliminationEnabled              = false,
-                bool                                                     performConstantPropagation              = false,
+                bool                                                     constantPropagationEnabled              = false,
                 bool                                                     operationStrengthReductionEnabled       = false,
                 bool                                                     deadStoreEliminationEnabled             = false,
                 bool                                                     combineRedundantInstructions            = false,
@@ -26,7 +26,7 @@ namespace syrec {
             defaultBitwidth(bitwidth),
             reassociateExpressionEnabled(reassociateExpressionEnabled),
             deadCodeEliminationEnabled(deadCodeEliminationEnabled),
-            performConstantPropagation(performConstantPropagation),
+            constantPropagationEnabled(constantPropagationEnabled),
             operationStrengthReductionEnabled(operationStrengthReductionEnabled),
             deadStoreEliminationEnabled(deadStoreEliminationEnabled),
             combineRedundantInstructions(combineRedundantInstructions),
@@ -38,7 +38,7 @@ namespace syrec {
         unsigned                                                 defaultBitwidth;
         bool                                                     reassociateExpressionEnabled;
         bool                                                     deadCodeEliminationEnabled;
-        bool                                                     performConstantPropagation;
+        bool                                                     constantPropagationEnabled;
         bool                                                     operationStrengthReductionEnabled;
         bool                                                     deadStoreEliminationEnabled;
         bool                                                     combineRedundantInstructions;
@@ -52,7 +52,7 @@ namespace syrec {
             swap(defaultBitwidth, other.defaultBitwidth);
             swap(reassociateExpressionEnabled, other.reassociateExpressionEnabled);
             swap(deadCodeEliminationEnabled, other.deadCodeEliminationEnabled);
-            swap(performConstantPropagation, other.performConstantPropagation);
+            swap(constantPropagationEnabled, other.constantPropagationEnabled);
             swap(operationStrengthReductionEnabled, other.operationStrengthReductionEnabled);
             swap(deadStoreEliminationEnabled, other.deadStoreEliminationEnabled);
             swap(combineRedundantInstructions, other.combineRedundantInstructions),
