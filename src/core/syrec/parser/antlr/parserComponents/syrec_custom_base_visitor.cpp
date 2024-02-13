@@ -29,7 +29,7 @@ bool SyReCCustomBaseVisitor::isSignalAssignableOtherwiseCreateError(const unsign
     return true;
 }
 
-inline messageUtils::Message::Position SyReCCustomBaseVisitor::determineContextStartTokenPositionOrUseDefaultOne(const antlr4::ParserRuleContext* context) {
+messageUtils::Message::Position SyReCCustomBaseVisitor::determineContextStartTokenPositionOrUseDefaultOne(const antlr4::ParserRuleContext* context) {
     return context ? mapAntlrTokenPosition(context->start) : messageUtils::Message::Position(SharedVisitorData::fallbackErrorLinePosition, SharedVisitorData::fallbackErrorColumnPosition);
 }
 
@@ -129,7 +129,7 @@ std::optional<syrec_operation::operation> SyReCCustomBaseVisitor::getDefinedOper
     return definedOperation;
 }
 
-inline messageUtils::Message::Position SyReCCustomBaseVisitor::mapAntlrTokenPosition(const antlr4::Token* token) {
+messageUtils::Message::Position SyReCCustomBaseVisitor::mapAntlrTokenPosition(const antlr4::Token* token) {
     if (!token) {
         return messageUtils::Message::Position(SharedVisitorData::fallbackErrorLinePosition, SharedVisitorData::fallbackErrorColumnPosition);
     }
