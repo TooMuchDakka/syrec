@@ -1,9 +1,8 @@
 #pragma once
 
-#include "core/syrec/expression.hpp"
 #include "core/syrec/grammar.hpp"
 #include "core/syrec/module.hpp"
-#include "parser/parser_config.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/no_additional_line_synthesis_config.hpp"
 #include "parser/optimizations/loop_optimizer.hpp"
 #include "parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp"
 
@@ -11,41 +10,17 @@
 
 namespace syrec {
     struct ReadProgramSettings {
-        explicit ReadProgramSettings(
-                unsigned                                                 bitwidth                                = 32U,
-                bool                                                     reassociateExpressionEnabled            = false,
-                bool                                                     deadCodeEliminationEnabled              = false,
-                bool                                                     constantPropagationEnabled              = false,
-                bool                                                     operationStrengthReductionEnabled       = false,
-                bool                                                     deadStoreEliminationEnabled             = false,
-                bool                                                     combineRedundantInstructions            = false,
-                optimizations::MultiplicationSimplificationMethod        multiplicationSimplificationMethod      = optimizations::MultiplicationSimplificationMethod::None,
-                std::optional<optimizations::LoopOptimizationConfig>     optionalLoopUnrollConfig                = std::nullopt,
-                std::optional<::parser::NoAdditionalLineSynthesisConfig> optionalNoAdditionalLineSynthesisConfig = std::nullopt,
-                std::string                                              expectedMainModuleName                  = "main"):
-            defaultBitwidth(bitwidth),
-            reassociateExpressionEnabled(reassociateExpressionEnabled),
-            deadCodeEliminationEnabled(deadCodeEliminationEnabled),
-            constantPropagationEnabled(constantPropagationEnabled),
-            operationStrengthReductionEnabled(operationStrengthReductionEnabled),
-            deadStoreEliminationEnabled(deadStoreEliminationEnabled),
-            combineRedundantInstructions(combineRedundantInstructions),
-            multiplicationSimplificationMethod(multiplicationSimplificationMethod),
-            optionalLoopUnrollConfig(optionalLoopUnrollConfig),
-            optionalNoAdditionalLineSynthesisConfig(optionalNoAdditionalLineSynthesisConfig),
-            expectedMainModuleName(std::move(expectedMainModuleName)) {}
-
-        unsigned                                                 defaultBitwidth;
-        bool                                                     reassociateExpressionEnabled;
-        bool                                                     deadCodeEliminationEnabled;
-        bool                                                     constantPropagationEnabled;
-        bool                                                     operationStrengthReductionEnabled;
-        bool                                                     deadStoreEliminationEnabled;
-        bool                                                     combineRedundantInstructions;
-        optimizations::MultiplicationSimplificationMethod        multiplicationSimplificationMethod;
-        std::optional<optimizations::LoopOptimizationConfig>     optionalLoopUnrollConfig;
-        std::optional<::parser::NoAdditionalLineSynthesisConfig> optionalNoAdditionalLineSynthesisConfig;
-        std::string                                              expectedMainModuleName;
+        unsigned                                                                  defaultBitwidth = 32U;
+        bool                                                                      reassociateExpressionEnabled;
+        bool                                                                      deadCodeEliminationEnabled;
+        bool                                                                      constantPropagationEnabled;
+        bool                                                                      operationStrengthReductionEnabled;
+        bool                                                                      deadStoreEliminationEnabled;
+        bool                                                                      combineRedundantInstructions;
+        optimizations::MultiplicationSimplificationMethod                         multiplicationSimplificationMethod = optimizations::MultiplicationSimplificationMethod::None;
+        std::optional<optimizations::LoopOptimizationConfig>                      optionalLoopUnrollConfig;
+        std::optional<noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig> optionalNoAdditionalLineSynthesisConfig;
+        std::string                                                               expectedMainModuleName = "main";
 
         ReadProgramSettings& operator=(ReadProgramSettings other) noexcept {
             using std::swap;
@@ -56,7 +31,7 @@ namespace syrec {
             swap(operationStrengthReductionEnabled, other.operationStrengthReductionEnabled);
             swap(deadStoreEliminationEnabled, other.deadStoreEliminationEnabled);
             swap(combineRedundantInstructions, other.combineRedundantInstructions),
-                    swap(multiplicationSimplificationMethod, other.multiplicationSimplificationMethod);
+            swap(multiplicationSimplificationMethod, other.multiplicationSimplificationMethod);
             if (other.optionalLoopUnrollConfig.has_value()) {
                 optionalLoopUnrollConfig.emplace(*other.optionalLoopUnrollConfig);
             } else {

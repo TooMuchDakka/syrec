@@ -189,7 +189,9 @@ protected:
     [[nodiscard]] virtual std::string                getTestDataFilePath() const = 0;
     [[nodiscard]] virtual std::vector<std::string>   getTestDataFilePaths() const { return { getTestDataFilePath()}; }
     [[nodiscard]] virtual syrec::ReadProgramSettings getDefaultParserConfig() const {
-        return syrec::ReadProgramSettings(defaultSignalBitwidth);
+        auto defaultConfig = syrec::ReadProgramSettings();
+        defaultConfig.defaultBitwidth = defaultSignalBitwidth;
+        return defaultConfig;
     }
 
     enum OptimizerOption {
@@ -351,14 +353,12 @@ protected:
         }));
         }
         if (wereNoAdditionalLineSynthesisConfigOperationsDefined) {
-            generatedConfig.optionalNoAdditionalLineSynthesisConfig.emplace(parser::NoAdditionalLineSynthesisConfig({
-                .useGeneratedAssignmentsByDecisionAsTieBreaker = shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker,
-                .preferAssignmentsGeneratedByChoiceRegardlessOfCost = preferAssignmentGeneratedByChoiceRegardlessOfCosts,
-                .expressionNestingPenalty                           = 0,
-                .expressionNestingPenaltyScalingPerNestingLevel     = 0,
-                .optionalNewReplacementSignalIdentsPrefix = newSignalIdentsGeneratedByNoAdditionalLineSynthesisPrefix}));
+            auto config = noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig();
+            config.useGeneratedAssignmentsByDecisionAsTieBreaker      = shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker;
+            config.preferAssignmentsGeneratedByChoiceRegardlessOfCost = preferAssignmentGeneratedByChoiceRegardlessOfCosts;
+            config.optionalNewReplacementSignalIdentsPrefix           = newSignalIdentsGeneratedByNoAdditionalLineSynthesisPrefix;
+            generatedConfig.optionalNoAdditionalLineSynthesisConfig   = config;
         }
-
         parsedProgramSettings.emplace(generatedConfig);
     }
 
@@ -392,13 +392,13 @@ protected:
         if (userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig.has_value() && !defaultParserConfig.optionalNoAdditionalLineSynthesisConfig.has_value()) {
             mergedOptions.optionalNoAdditionalLineSynthesisConfig.emplace(*userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig);
         } else if (userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig.has_value() && defaultParserConfig.optionalNoAdditionalLineSynthesisConfig.has_value()) {
-            mergedOptions.optionalNoAdditionalLineSynthesisConfig.emplace(parser::NoAdditionalLineSynthesisConfig({
-                .useGeneratedAssignmentsByDecisionAsTieBreaker      = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisTieBreakerByAssignmentsOfChoice, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->useGeneratedAssignmentsByDecisionAsTieBreaker, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->useGeneratedAssignmentsByDecisionAsTieBreaker),
-                .preferAssignmentsGeneratedByChoiceRegardlessOfCost = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost),
-                .expressionNestingPenalty = 0,
-                .expressionNestingPenaltyScalingPerNestingLevel = 0,
-                .optionalNewReplacementSignalIdentsPrefix           = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisNewSignalIdentsPrefix, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix)
-            }));
+            noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig mergeOfNoAdditionalLineConfigs;
+            mergeOfNoAdditionalLineConfigs.useGeneratedAssignmentsByDecisionAsTieBreaker = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisTieBreakerByAssignmentsOfChoice, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->useGeneratedAssignmentsByDecisionAsTieBreaker, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->useGeneratedAssignmentsByDecisionAsTieBreaker);
+            mergeOfNoAdditionalLineConfigs.preferAssignmentsGeneratedByChoiceRegardlessOfCost = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost);
+            mergeOfNoAdditionalLineConfigs.expressionNestingPenalty                           = 0;
+            mergeOfNoAdditionalLineConfigs.expressionNestingPenaltyScalingPerNestingLevel     = 0;
+            mergeOfNoAdditionalLineConfigs.optionalNewReplacementSignalIdentsPrefix           = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisNewSignalIdentsPrefix, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix);
+            mergedOptions.optionalNoAdditionalLineSynthesisConfig = mergeOfNoAdditionalLineConfigs;
         } else if (!userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig.has_value() && defaultParserConfig.optionalNoAdditionalLineSynthesisConfig.has_value()) {
             mergedOptions.optionalNoAdditionalLineSynthesisConfig.emplace(*defaultParserConfig.optionalNoAdditionalLineSynthesisConfig);
         }

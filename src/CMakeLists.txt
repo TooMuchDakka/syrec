@@ -169,6 +169,7 @@ add_library(
       ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_substitution_generator.hpp
       ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_to_subassignment_splitter.hpp
       ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/inorder_operation_node_traversal_helper.hpp
+      ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/no_additional_line_synthesis_config.hpp
       ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/main_additional_line_for_assignment_simplifier.hpp
       ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp
       ${PROJECT_SOURCE_DIR}/include/core/syrec/parser/optimizations/noAdditionalLineSynthesis/post_order_expr_traversal_helper.hpp
@@ -194,10 +195,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include
                                                   ${PROJECT_BINARY_DIR}/include)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/src/core/syrec/parser/antlr)
-
-# set required C++ standard and disable compiler specific extensions
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
-set_target_properties(${PROJECT_NAME} PROPERTIES CMAKE_CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
 
 # link to the MQT::qfr DD library
 target_link_libraries(${PROJECT_NAME} PUBLIC MQT::CoreDD)
@@ -230,7 +227,7 @@ set(ANTLR4_WITH_STATIC_CRT OFF)
 include(ExternalAntlr4Cpp)
 include_directories(${ANTLR4_INCLUDE_DIRS})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE antlr4_static)
+target_link_libraries(${PROJECT_NAME} PUBLIC antlr4_static)
 
 # add MQT alias
 add_library(MQT::${PROJECT_NAME} ALIAS ${PROJECT_NAME})

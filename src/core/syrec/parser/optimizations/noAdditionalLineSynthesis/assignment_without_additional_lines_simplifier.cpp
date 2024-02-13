@@ -1690,29 +1690,49 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logDe
     if constexpr (!shouldLogMessageBePrinted()) {
         return;
     }
+#ifndef NDEBUG
     logMessage(fmt::format("Decision @ operation node {:d} choose operand {:s} | Decision repetition flag: {:s} \n", madeDecision->operationNodeId, stringifyChosenOperandForLogMessage(madeDecision->choosenOperand), stringifyRepetitionOfChoice(madeDecision->shouldChoiceBeRepeated)));
+#else
+    return;
+#endif
 }
 
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logConflict(std::size_t operationNodeId, Decision::ChoosenOperand operandCausingConflict, const syrec::VariableAccess& signalAccessCausingConflict, const std::optional<std::size_t>& idOfEarliestDecisionInvolvedInConflict) {
     if constexpr (!shouldLogMessageBePrinted()) {
         return;
     }
+
+#ifndef NDEBUG
     const std::size_t printableIdOfEarliestOperationNodeInvolvedInConflict = idOfEarliestDecisionInvolvedInConflict.value_or(0);
     logMessage(fmt::format("Conflict @ operation node {:d} detected by usage of operand {:s} => signal access {:s} overlaps decision made in operation node {:d}\n", operationNodeId, stringifyChosenOperandForLogMessage(operandCausingConflict), signalAccessCausingConflict.var->name, printableIdOfEarliestOperationNodeInvolvedInConflict));
+#else
+    return;
+#endif
 }
 
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logStartOfProcessingOfOperationNode(std::size_t operationNodeId) {
     if constexpr (!shouldLogMessageBePrinted()) {
         return;
     }
+
+#ifndef NDEBUG
     logMessage(fmt::format("START Processing operation node {:d}\n", operationNodeId));
+#else
+    return;
+#endif
+    
 }
 
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logEndOfProcessingOfOperationNode(std::size_t operationNodeId) {
     if constexpr (!shouldLogMessageBePrinted()) {
         return;
     }
+#ifndef NDEBUG
     logMessage(fmt::format("END Processing operation node {:d}\n", operationNodeId));
+#else
+    return;
+#endif
+    
 }
 
 
@@ -1720,33 +1740,59 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logBa
     if constexpr (!shouldLogMessageBePrinted()) {
         return;
     }
+#ifndef NDEBUG
     logMessage(fmt::format("Backtracking started @ operation node with id {:d} | finished @ operation node with id {:d} as next to be processed\n", operationNodeIdAtStartOfBacktracking, nextOperationNodeAfterBacktrackingFinished));
+#else
+    return;
+#endif
+    
 }
 
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logMarkingOfOperationNodeAsSourceOfConflict(std::size_t operationNodeId) {
     if constexpr (!shouldLogMessageBePrinted()) {
         return;
     }
+#ifndef NDEBUG
     logMessage(fmt::format("Marking operation node {:d} as source of conflict\n", operationNodeId));
+#else
+    return;
+#endif
+
 }
 
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logMessage(const std::string& msg) {
+#ifndef NDEBUG
     fmt::print(stdout, msg);
+#else
+    return;
+#endif
+    
 }
 
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logCreationOfSubstitutionOfOperandOfOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand substitutedOperand, const syrec::VariableAccess& generatedSubstitution) {
+#ifndef NDEBUG
     logMessage(fmt::format("{:s} operand in operation node {:d} was replaced with {:s}\n", stringifyChosenOperandForLogMessage(substitutedOperand), operationNodeId, generatedSubstitution.var->name));
+#else
+    return;
+#endif
 }
 
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logLearnedConflict(std::size_t operationNodeId, Decision::ChoosenOperand learnedConflictingChoiceOfOperand) {
+#ifndef NDEBUG
     logMessage(fmt::format("Remembering conflict @ operation node {:d} due to choice of operand {:s}\n", operationNodeId, stringifyChosenOperandForLogMessage(learnedConflictingChoiceOfOperand)));
+#else
+    return;
+#endif
 }
 
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logCreationOfSubstitutionOfExprOfOperationNode(std::size_t operationNodeId, const std::string& replacementSignalIdent, bool wasExistingEntryUpdated) {
+#ifndef NDEBUG
     if (wasExistingEntryUpdated) {
         logMessage(fmt::format("Updated existing replacement (defined by assignment to replacement signal {:s}) for whole expression of operation node with id {:d}\n", replacementSignalIdent, operationNodeId));
+    } else {
+        logMessage(fmt::format("Created replacement signal {:s} for whole expression of operation node with id {:d}\n", replacementSignalIdent, operationNodeId));
     }
-    else {
-        logMessage(fmt::format("Created replacement signal {:s} for whole expression of operation node with id {:d}\n", replacementSignalIdent, operationNodeId));   
-    }
+#else
+    return;
+#endif
 }

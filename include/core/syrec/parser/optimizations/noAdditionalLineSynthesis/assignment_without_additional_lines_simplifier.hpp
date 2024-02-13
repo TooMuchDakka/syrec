@@ -5,9 +5,9 @@
 #include "assignment_transformer.hpp"
 #include "expression_substitution_generator.hpp"
 #include "expression_to_subassignment_splitter.hpp"
+#include "no_additional_line_synthesis_config.hpp"
 #include "temporary_expressions_container.hpp"
 #include "core/syrec/statement.hpp"
-#include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/expression_traversal_helper.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/temporary_assignments_container.hpp"
 
@@ -57,7 +57,7 @@ namespace noAdditionalLineSynthesis {
         void                                        reloadGenerateableReplacementSignalName();
 
          virtual ~AssignmentWithoutAdditionalLineSimplifier() = default;
-        AssignmentWithoutAdditionalLineSimplifier(const std::optional<parser::NoAdditionalLineSynthesisConfig>& config) {
+        AssignmentWithoutAdditionalLineSimplifier(const std::optional<NoAdditionalLineSynthesisConfig>& config) {
             generatedAssignmentsContainer                     = std::make_shared<TemporaryAssignmentsContainer>();
             temporaryExpressionsContainer                     = std::make_unique<TemporaryExpressionsContainer>();
             expressionTraversalHelper                         = std::make_shared<ExpressionTraversalHelper>();
@@ -106,7 +106,7 @@ namespace noAdditionalLineSynthesis {
         ExpressionSubstitutionGenerator::ptr    substitutionGenerator;
         bool                                    disabledValueLookupToggle;
         AssignmentTransformer::ptr              assignmentTransformer;
-        parser::NoAdditionalLineSynthesisConfig internalConfig;
+        NoAdditionalLineSynthesisConfig internalConfig;
         std::optional<unsigned int>             determinedBitWidthOfAssignmentToSimplify;
         std::unordered_map<std::size_t, syrec::AssignStatement::ptr> wholeExpressionOfOperationNodeReplacementLookup;
         

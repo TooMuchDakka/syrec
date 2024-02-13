@@ -17,8 +17,15 @@ protected:
     }
 
     syrec::ReadProgramSettings getDefaultParserConfig() const override {
-        const std::optional<parser::NoAdditionalLineSynthesisConfig> noAdditionalLineSynthesisConfig = std::make_optional<parser::NoAdditionalLineSynthesisConfig>({.useGeneratedAssignmentsByDecisionAsTieBreaker = true, .preferAssignmentsGeneratedByChoiceRegardlessOfCost = true});
-        return syrec::ReadProgramSettings(defaultSignalBitwidth, false, false, true, true, false, false, optimizations::MultiplicationSimplificationMethod::None, std::nullopt, noAdditionalLineSynthesisConfig);
+        std::optional<noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig> noAdditionalLineConfig = std::make_optional<noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig>();
+        noAdditionalLineConfig->useGeneratedAssignmentsByDecisionAsTieBreaker         = true;
+        noAdditionalLineConfig->preferAssignmentsGeneratedByChoiceRegardlessOfCost    = true;
+
+        auto        configToUse                     = syrec::ReadProgramSettings();
+        configToUse.constantPropagationEnabled      = true;
+        configToUse.operationStrengthReductionEnabled = true;
+        configToUse.optionalNoAdditionalLineSynthesisConfig = noAdditionalLineConfig;
+        return configToUse;
     }
 };
 
