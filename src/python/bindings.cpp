@@ -54,8 +54,23 @@ PYBIND11_MODULE(pysyrec, m) {
             .def("get_string", py::overload_cast<const std::string&>(&Properties::get<std::string>, py::const_))
             .def("get_double", py::overload_cast<const std::string&>(&Properties::get<double>, py::const_));
 
+    py::class_<optimizations::LoopOptimizationConfig>(m, "loop_optimization_config")
+            .def(py::init<std::size_t, std::size_t, std::size_t, bool, bool, bool>(), py::arg("maxNumberOfUnrolledIterationsPerLoop"), py::arg("maxAllowedNestingLevelOfInnerLoops"), py::arg("maxAllowedLoopSizeInNumberOfStatements"), py::arg("isRemainderLoopAllowed"), py::arg("forceUnroll"), py::arg("autoUnrollLoopsWithOneIteration"), "Constructs a LoopOptimizationConfig object.");
+
+    py::class_<noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig>(m, "no_additional_line_synthesis_config")
+            .def(py::init<bool, bool, double, double, const std::optional<std::string>&>(),
+                py::arg("useGeneratedAssignmentsByDecisionAsTieBreaker"), py::arg("preferAssignmentsGeneratedByChoiceRegardlessOfCost"), py::arg("expressionNestingPenalty"), py::arg("expressionNestingPenaltyScalingPerNestingLevel"), py::arg("optionalNewReplacementSignalIdentsPrefix"), "Constructs a NoAdditionalLineSynthesisConfig object.");
+
+     py::enum_<optimizations::MultiplicationSimplificationMethod>(m, "multiplication_simplification_method")
+            .value("binary_simplification", optimizations::MultiplicationSimplificationMethod::BinarySimplification, "Simplify multiplications using the binary simplification method.")
+            .value("binary_simplification_with_factoring", optimizations::MultiplicationSimplificationMethod::BinarySimplificationWithFactoring, "Simplify multiplications using the binary simplification method.")
+            .value("none", optimizations::MultiplicationSimplificationMethod::None, "None.")
+            .export_values();
+
     py::class_<ReadProgramSettings>(m, "read_program_settings")
-            .def(py::init<>(), "Constructs ReadProgramSettings object.")
+            .def(py::init<uint32_t, bool, bool, bool, bool, bool, bool, optimizations::MultiplicationSimplificationMethod, const std::optional<optimizations::LoopOptimizationConfig>&, const std::optional<noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig>&, const std::string&>(),
+                py::arg("defaultBitwidth") = 32U, py::arg("reassociateExpressionEnabled"), py::arg("deadCodeEliminationEnabled"), py::arg("constantPropagationEnabled"), py::arg("operationStrengthReductionEnabled"), py::arg("deadStoreEliminationEnabled"),
+                py::arg("combineRedundantInstructions"), py::arg("multiplicationSimplificationMethod"), py::arg("optionalLoopUnrollConfig"), py::arg("optionalNoAdditionalLineSynthesisConfig"), py::arg("expectedMainModuleName")="main", "Constructs ReadProgramSettings object.")
             .def_readwrite("default_bitwidth", &ReadProgramSettings::defaultBitwidth);
 
     py::class_<Program>(m, "program")
