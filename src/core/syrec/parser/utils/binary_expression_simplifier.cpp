@@ -148,7 +148,7 @@ static BinaryExpressionSimplificationResult trySimplifyOptionallyOnlyTopLevelExp
         /*
          * Since operation strength can change the operation of a binary expression, we need to update the used operation of the binary expression
          */
-        if (tryPerformOperationStrengthReduction(referenceExpression)) {
+        if (operationStrengthReduction::tryPerformOperationStrengthReduction(referenceExpression)) {
             mappedFlagToEnum = syrec_operation::tryMapBinaryOperationFlagToEnum(usedOperation);
             if (!mappedFlagToEnum.has_value()) {
                 return BinaryExpressionSimplificationResult(false, referenceExpression);

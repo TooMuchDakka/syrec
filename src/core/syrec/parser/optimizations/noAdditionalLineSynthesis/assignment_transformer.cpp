@@ -47,6 +47,7 @@ std::vector<AssignmentTransformer::SharedAssignmentReference> AssignmentTransfor
                 if (wasLastAwaitedInversionWatchRemoved) {
                     handleAllExpectedInversionsOfAssignedToSignalPartsDefined(assignmentAsBinaryOne->lhs);
                 }
+                transformAddAssignOperationToXorAssignOperationIfAssignedToSignalValueIsZero(*subAssignmentCasted);   
                 updateEntryInValueLookupCacheByPerformingAssignment(subAssignmentCasted->lhs, *mappedToOperationEnumValueForSubassignmentOperation, *subAssignmentCasted->rhs);
 
                 if (const std::optional<std::shared_ptr<syrec::UnaryStatement>> binaryAssignmentAsUnaryOne = tryReplaceBinaryAssignmentWithUnaryOne(*subAssignmentCasted); binaryAssignmentAsUnaryOne.has_value()) {
@@ -70,7 +71,8 @@ std::vector<AssignmentTransformer::SharedAssignmentReference> AssignmentTransfor
                 createSignalValueLookupCacheEntry(assignmentAsUnaryOne->var, initialSignalValueLookupCallback);
                 addWatchForInversionOfAssignment(*assignmentAsUnaryOne);
             }
-
+            const std::optional<syrec_operation::operation> mappedToAssignmentOperationForUnaryAssignment = syrec_operation::tryMapAssignmentOperationFlagToEnum(assignmentAsUnaryOne->op);
+            updateEntryInValueLookupCacheByPerformingAssignment(assignmentAsUnaryOne->var, mappedToAssignmentOperationForUnaryAssignment);
             generatedAssignments.emplace_back(assignmentAsUnaryOne);
         }
     }
@@ -94,7 +96,7 @@ void AssignmentTransformer::SignalValueLookupCacheEntry::invalidateCurrentValue(
 
 void AssignmentTransformer::SignalValueLookupCacheEntry::markInitialValueAsActive() {
     activeValueEntry = Original;
-    currentValue     = activeValueEntry;
+    currentValue     = valuePriorToAnyAssignment;
 }
 
 void AssignmentTransformer::SignalValueLookupCacheEntry::markValueAsModifiable() {
@@ -226,6 +228,18 @@ void AssignmentTransformer::updateEntryInValueLookupCacheByPerformingAssignment(
     signalValueCacheEntry->updateValueTo(newValueAfterApplicationOfAssignment);
 }
 
+void AssignmentTransformer::updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation) const {
+    if (!getSignalValueCacheEntryFor(assignedToSignalParts)) {
+        return;
+    }
+
+    const SignalValueLookupCacheEntryReference signalValueCacheEntry                = getSignalValueCacheEntryFor(assignedToSignalParts);
+    const std::optional<unsigned int>          currentValueOfAssignedToSignalParts  = signalValueCacheEntry->getValue();
+    const std::optional<unsigned int>          newValueAfterApplicationOfAssignment = assignmentOperation.has_value() ? syrec_operation::apply(*assignmentOperation, currentValueOfAssignedToSignalParts, 1) : std::nullopt;
+    signalValueCacheEntry->updateValueTo(newValueAfterApplicationOfAssignment);
+}
+
+
 void AssignmentTransformer::invalidateSignalValueLookupEntryFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const {
     if (const SignalValueLookupCacheEntryReference signalValueCacheEntry = getSignalValueCacheEntryFor(assignedToSignalParts); signalValueCacheEntry) {
         signalValueCacheEntry->invalidateCurrentValue();
@@ -246,6 +260,18 @@ void AssignmentTransformer::createSignalValueLookupCacheEntry(const syrec::Varia
     std::optional<unsigned int> fetchedInitialValueOfAssignedToSignalParts = initialSignalValueLookupCallback(*assignedToSignalParts);
     SignalValueLookupCacheEntryReference signalValueCacheEntry                      = std::make_shared<SignalValueLookupCacheEntry>(fetchedInitialValueOfAssignedToSignalParts);
     signalValueLookupCache.emplace(std::make_pair(assignedToSignalParts, signalValueCacheEntry));
+}
+
+void AssignmentTransformer::transformAddAssignOperationToXorAssignOperationIfAssignedToSignalValueIsZero(syrec::AssignStatement& assignment) const {
+    const std::optional<unsigned int>               currentValueOfAssignedToSignal = fetchCurrentValueOfAssignedToSignal(assignment.lhs);
+    const std::optional<syrec_operation::operation> mappedToAssignmentOperation    = currentValueOfAssignedToSignal.has_value() ? syrec_operation::tryMapAssignmentOperationFlagToEnum(assignment.op) : std::nullopt;
+    if (!mappedToAssignmentOperation.has_value() || *currentValueOfAssignedToSignal || *mappedToAssignmentOperation != syrec_operation::operation::AddAssign) {
+        return;
+    }
+
+    if (const std::optional<unsigned int> mappedToXorAssignmentOperationFlagValue = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign); mappedToXorAssignmentOperationFlagValue.has_value()) {
+        assignment.op = *mappedToXorAssignmentOperationFlagValue;
+    }
 }
 
 

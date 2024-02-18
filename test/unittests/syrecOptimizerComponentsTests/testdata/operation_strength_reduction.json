@@ -1,0 +1,23 @@
+{
+  "AddAssignOperationReplacedWithXorAssignIfAssignedToSignalValueIsZero": {
+    "circuit": "module main(out a(4), inout b(4)) a += b",
+    "expectedCircuit": "module main(out a(4), inout b(4)) a ^= b"
+  },
+  "AddAssignOperationNotReplacedWithXorAssignIfAssignedToSignalValueIsUnknown": {
+    "circuit": "module main(out a(4), inout b(4)) a ^= b; a += b"
+  },
+  "AddAssignOperationNotReplacedWithXorAssignIfAssignedToSignalIsBlockedByDataflowAnalysis": {
+    "circuit": "module main(out a(4)) for $i = 0 to 5 step 1 do a += 2 rof"
+  },
+  "AddAssignOperationNotReplacedWithXorAssignIfAssignedToSignalValueIsNotZero": {
+    "circuit": "module main(out a(4)) a ^= 5; a += 2"
+  },
+  "AddAssignOperationWithRhsExprBeingConstantWithValueOneReplacedByIncrementAssign": {
+    "circuit": "module main(out a(4)) a += 1",
+    "expectedCircuit": "module main(out a(4)) ++= a"
+  },
+  "MinusAssignOperationWithRhsExprBeingConstantWithValueOneReplacedByDecrementAssign": {
+    "circuit": "module main(out a(4)) a -= 1",
+    "expectedCircuit": "module main(out a(4)) --= a"
+  }
+}

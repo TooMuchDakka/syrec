@@ -69,9 +69,11 @@ namespace noAdditionalLineSynthesis {
         void               tryRemoveWatchForInversionOfAssignment(const syrec::AssignStatement& assignment, bool& wasLastExistingWatchRemoved);
         void               tryRemoveWatchForInversionOfAssignment(const syrec::UnaryStatement& assignment);
         void               updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation, const syrec::Expression& expr) const;
+        void               updateEntryInValueLookupCacheByPerformingAssignment(const syrec::VariableAccess::ptr& assignedToSignalParts, const std::optional<syrec_operation::operation>& assignmentOperation) const;
         void               invalidateSignalValueLookupEntryFor(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void               handleAllExpectedInversionsOfAssignedToSignalPartsDefined(const syrec::VariableAccess::ptr& assignedToSignalParts) const;
         void               createSignalValueLookupCacheEntry(const syrec::VariableAccess::ptr& assignedToSignalParts, const InitialSignalValueLookupCallback& initialSignalValueLookupCallback);
+        void               transformAddAssignOperationToXorAssignOperationIfAssignedToSignalValueIsZero(syrec::AssignStatement& assignment) const;
 
         [[nodiscard]] bool                                                         areMoreInversionsRequiredToReachOriginalSignalValue(const syrec::VariableAccess::ptr& accessedSignalParts) const;
         [[nodiscard]] bool                                                         doesAssignmentMatchWatchForInvertedAssignment(const syrec::AssignStatement& assignment) const;

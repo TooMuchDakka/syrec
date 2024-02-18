@@ -408,11 +408,13 @@ protected:
 
 
     void performParsingAndCompareExpectedAndActualCircuit() {
-        //std::string errorsFromParsedCircuit;
+        std::string errorsFromParsedCircuit;
         syrec::Program::OptimizationResult optimizationResult;
 
         //ASSERT_NO_THROW(errorsFromParsedCircuit = parserPublicInterface.readFromString(circuitToOptimize, config));
         ASSERT_NO_THROW(optimizationResult = parserPublicInterface.readAndOptimizeCircuitFromString(circuitToOptimize, config));
+        errorsFromParsedCircuit = optimizationResult.foundErrors;
+
         if (expectedErrors.empty()) {
             ASSERT_TRUE(errorsFromParsedCircuit.empty()) << "Expected to be able to parse given circuit without errors but errors found were actually: " << errorsFromParsedCircuit;
 
@@ -421,7 +423,6 @@ protected:
             ASSERT_THAT(stringifiedProgram, testing::AnyOfArray(expectedOptimizedCircuits));
         }
         else {
-            errorsFromParsedCircuit = optimizationResult.foundErrors;
             ASSERT_NO_THROW(compareExpectedAndActualErrors(expectedErrors, messageUtils::tryDeserializeStringifiedMessagesFromString(errorsFromParsedCircuit))) << "Missmatch between expected and actual errors";
         }
     }

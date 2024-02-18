@@ -1519,7 +1519,7 @@
     "circuit": "module main(out a(16), inout b(16), in c(16)) a += (((c + 2) ^ b) + b)",
     "expectedCircuit": "module main(out a(16), inout b(16), in c(16)) a ^= b; a += (b ^ (c + 2))"
   },
-  "DISABLED_DISABLED_checkConflictDetectedInRhsSubtreeRevertsEarliestOverlappingDecisionInLhsSubtreeInOperationNodeWithOneLeafNodeAndRhsOperandBeingChoosenAndLeafOperandCreatesExprIfLhsOperandDidCreateAssignmentButOperationIsNotCommutativeAndWithoutAssingmentCounterpart": {
+  "DISABLED_DISABLED_checkConflictDetectedInRhsSubtreeRevertsEarliestOverlappingDecisionInLhsSubtreeInOperationNodeWithOneLeafNodeAndRhsOperandBeingChoosenAndLeafOperandCreatesExprIfLhsOperandDidCreateAssignmentButOperationIsNotCommutativeAndWithoutAssignmentCounterpart": {
 
   },
 
@@ -1936,7 +1936,7 @@
   },
   "simplificationByReplacementReusesTemporarilyBlockedValueOfDimensionOfExistingSignalFromPreviousAssignment": {
     "circuit": "module main(out a[2](2), inout b(2), inout c(2)) a[0] += 3; a[1] += 1; c += (b + (b + 2)); b += (c + (c + 2))",
-    "expectedCircuit": "module main(out a[2](2), inout b(2), inout c(2)) a[0] ^= 3; a[1] ^= 1; a[0] ^= 3; a[0] ^= b; a[0] += 2; a[0] += b; c += a[0]; a[0] -= b; a[0] -= 2; a[0] ^= b; a[0] ^= 3; a[0] ^= 3; a[0] ^= c; a[0] += 2; a[0] += c; b += a[0]; a[0] -= c; a[0] -= 2; a[0] ^= c; a[0] ^= 3",
+    "expectedCircuit": "module main(out a[2](2), inout b(2), inout c(2)) a[0] ^= 3; ++= a[1]; a[0] ^= 3; a[0] ^= b; a[0] += 2; a[0] += b; c += a[0]; a[0] -= b; a[0] -= 2; a[0] ^= b; a[0] ^= 3; a[0] ^= 3; a[0] ^= c; a[0] += 2; a[0] += c; b += a[0]; a[0] -= c; a[0] -= 2; a[0] ^= c; a[0] ^= 3",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl"
@@ -2058,9 +2058,9 @@
       "deadCodeElimON": "1"
     }
   },
-  "simplificationByReplacmentReusingExistingSignalWithValueOfOneReplacesBinaryAssingmentWithUnaryOne": {
+  "simplificationByReplacmentReusingExistingSignalWithValueOfOneReplacesBinaryAssignmentWithUnaryOne": {
     "circuit": "module main(out a(2), inout b(2), inout c(2)) a += 1; c += (b + (b + 2))",
-    "expectedCircuit": "module main(out a(2), inout b(2), inout c(2)) a ^= 1; --= a; a ^= b; a += 2; a += b; c += a; a -= b; a -= 2; a ^= b; ++= a",
+    "expectedCircuit": "module main(out a(2), inout b(2), inout c(2)) ++= a; --= a; a ^= b; a += 2; a += b; c += a; a -= b; a -= 2; a ^= b; ++= a",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl"

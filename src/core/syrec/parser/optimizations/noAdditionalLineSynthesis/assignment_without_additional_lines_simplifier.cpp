@@ -71,7 +71,7 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::Simplifica
 
     // Since we only support binary and numeric expressions, return if the top most assignment rhs expression does not conform to this.
     // TODO: Support shift expressions
-    if (!std::dynamic_pointer_cast<const syrec::BinaryExpression>(assignmentStatement.rhs) && !std::dynamic_pointer_cast<const syrec::NumericExpression>(assignmentStatement.rhs)) {
+    if (std::dynamic_pointer_cast<const syrec::ShiftExpression>(assignmentStatement.rhs)) {
         SimplificationResult result = SimplificationResult::asEmptyResult();
         return std::make_unique<SimplificationResult>(std::move(result)); 
     }
