@@ -747,8 +747,7 @@ std::optional<bool> SyReCCustomBaseVisitor::isSizeOfSignalAcessResult1DSignalOrL
         return std::nullopt;
     }
 
-    if (const auto& sizeOfOperandAfterSignalAccess = std::max((!firstNoExplicitlyAccessedDimensionOfLhsOperand ? numDeclaredDimensionsOfLhsOperand : numDeclaredDimensionsOfLhsOperand - firstNoExplicitlyAccessedDimensionOfLhsOperand), static_cast<std::size_t>(1))
-        ; sizeOfOperandAfterSignalAccess != 1) {
+    if (const std::size_t & sizeOfOperandAfterSignalAccess = std::max((!firstNoExplicitlyAccessedDimensionOfLhsOperand ? numDeclaredDimensionsOfLhsOperand : (numDeclaredDimensionsOfLhsOperand - firstNoExplicitlyAccessedDimensionOfLhsOperand)), static_cast<std::size_t>(1)) != 1) {
         if (errorPosition) {
             createError(*errorPosition, OperandIsNot1DSignal, sizeOfOperandAfterSignalAccess);
         }
@@ -759,8 +758,8 @@ std::optional<bool> SyReCCustomBaseVisitor::isSizeOfSignalAcessResult1DSignalOrL
         if (errorPosition) {
             createError(*errorPosition, OneDimensionalOperandDoesAccessMoreThanOneValueOfDimension, numAccessedValuesOfLastAccessedDimension);
         }
+        return false;
     }
-    
     return true;
 }
 

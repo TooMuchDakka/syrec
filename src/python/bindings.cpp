@@ -54,29 +54,61 @@ PYBIND11_MODULE(pysyrec, m) {
             .def("get_string", py::overload_cast<const std::string&>(&Properties::get<std::string>, py::const_))
             .def("get_double", py::overload_cast<const std::string&>(&Properties::get<double>, py::const_));
 
+    /*
+     * We are following the following naming convention (https://peps.python.org/pep-0008/#function-and-variable-names) for all variables names of the defined classes
+     */
     py::class_<optimizations::LoopOptimizationConfig>(m, "loop_optimization_config")
-            .def(py::init<std::size_t, std::size_t, std::size_t, bool, bool, bool>(), py::arg("maxNumberOfUnrolledIterationsPerLoop"), py::arg("maxAllowedNestingLevelOfInnerLoops"), py::arg("maxAllowedLoopSizeInNumberOfStatements"), py::arg("isRemainderLoopAllowed"), py::arg("forceUnroll"), py::arg("autoUnrollLoopsWithOneIteration"), "Constructs a LoopOptimizationConfig object.");
+            .def(py::init(), "Constructs a loop optimization config object.")
+            .def_readwrite("max_number_of_unrolled_iterations_per_loop", &optimizations::LoopOptimizationConfig::maxNumberOfUnrolledIterationsPerLoop)
+            .def_readwrite("max_allowed_nesting_level_of_inner_loops", &optimizations::LoopOptimizationConfig::maxAllowedNestingLevelOfInnerLoops)
+            .def_readwrite("max_allowed_loop_size_in_number_of_statements", &optimizations::LoopOptimizationConfig::maxAllowedLoopSizeInNumberOfStatements)
+            .def_readwrite("is_remainder_loop_allowed", &optimizations::LoopOptimizationConfig::isRemainderLoopAllowed)
+            .def_readwrite("force_unroll", &optimizations::LoopOptimizationConfig::forceUnroll)
+            .def_readwrite("auto_unroll_loops_with_one_iteration", &optimizations::LoopOptimizationConfig::autoUnrollLoopsWithOneIteration);
 
     py::class_<noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig>(m, "no_additional_line_synthesis_config")
-            .def(py::init<bool, bool, double, double, const std::optional<std::string>&>(),
-                py::arg("useGeneratedAssignmentsByDecisionAsTieBreaker"), py::arg("preferAssignmentsGeneratedByChoiceRegardlessOfCost"), py::arg("expressionNestingPenalty"), py::arg("expressionNestingPenaltyScalingPerNestingLevel"), py::arg("optionalNewReplacementSignalIdentsPrefix"), "Constructs a NoAdditionalLineSynthesisConfig object.");
+            .def(py::init(), "Constructs a additional line synthesis config object.")
+            .def_readwrite("use_generated_assignments_by_decisions_as_tie_breaker", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::useGeneratedAssignmentsByDecisionAsTieBreaker)
+            .def_readwrite("prefer_assignments_generated_by_choice_regardless_of_cost", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::preferAssignmentsGeneratedByChoiceRegardlessOfCost)
+            .def_readwrite("expression_nesting_penalty", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::expressionNestingPenalty)
+            .def_readwrite("expression_nesting_penalty_scaling_per_nesting_level", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::expressionNestingPenaltyScalingPerNestingLevel)
+            .def_readwrite("optional_new_replacement_signal_idents_prefix", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::optionalNewReplacementSignalIdentsPrefix);
 
-     py::enum_<optimizations::MultiplicationSimplificationMethod>(m, "multiplication_simplification_method")
-            .value("binary_simplification", optimizations::MultiplicationSimplificationMethod::BinarySimplification, "Simplify multiplications using the binary simplification method.")
-            .value("binary_simplification_with_factoring", optimizations::MultiplicationSimplificationMethod::BinarySimplificationWithFactoring, "Simplify multiplications using the binary simplification method.")
-            .value("none", optimizations::MultiplicationSimplificationMethod::None, "None.")
+    /*
+     * We are following the official naming conventions (https://docs.python.org/3/howto/enum.html) recommending the following naming schema for enum members (UPPER_CASE).
+     * (see also: https://peps.python.org/pep-0008/#constants)
+     */
+     py::enum_<optimizations::MultiplicationSimplificationMethod>(m, "MultiplicationSimplificationMethod")
+            .value("BINARY_SIMPLIFICATION", optimizations::MultiplicationSimplificationMethod::BinarySimplification, "Simplify multiplications using the binary simplification method.")
+            .value("BINARY_SIMPLIFICATION_WITH_FACTORING", optimizations::MultiplicationSimplificationMethod::BinarySimplificationWithFactoring, "Simplify multiplications using the binary simplification method.")
+            .value("NONE", optimizations::MultiplicationSimplificationMethod::None, "None.")
             .export_values();
 
     py::class_<ReadProgramSettings>(m, "read_program_settings")
-            .def(py::init<uint32_t, bool, bool, bool, bool, bool, bool, optimizations::MultiplicationSimplificationMethod, const std::optional<optimizations::LoopOptimizationConfig>&, const std::optional<noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig>&, const std::string&>(),
-                py::arg("defaultBitwidth") = 32U, py::arg("reassociateExpressionEnabled"), py::arg("deadCodeEliminationEnabled"), py::arg("constantPropagationEnabled"), py::arg("operationStrengthReductionEnabled"), py::arg("deadStoreEliminationEnabled"),
-                py::arg("combineRedundantInstructions"), py::arg("multiplicationSimplificationMethod"), py::arg("optionalLoopUnrollConfig"), py::arg("optionalNoAdditionalLineSynthesisConfig"), py::arg("expectedMainModuleName")="main", "Constructs ReadProgramSettings object.")
-            .def_readwrite("default_bitwidth", &ReadProgramSettings::defaultBitwidth);
+            .def(py::init(), "Constructs a ReadProgramSettings object.")
+            .def_readwrite("default_bitwidth", &ReadProgramSettings::defaultBitwidth)
+            .def_readwrite("reassociate_expression_enabled", &ReadProgramSettings::reassociateExpressionEnabled)
+            .def_readwrite("dead_code_elimination_enabled", &ReadProgramSettings::deadCodeEliminationEnabled)
+            .def_readwrite("constant_propagation_enabled", &ReadProgramSettings::constantPropagationEnabled)
+            .def_readwrite("operation_strength_reduction_enabled", &ReadProgramSettings::operationStrengthReductionEnabled)
+            .def_readwrite("dead_store_elimination_enabled", &ReadProgramSettings::deadStoreEliminationEnabled)
+            .def_readwrite("combine_redundant_instructions", &ReadProgramSettings::combineRedundantInstructions)
+            .def_readwrite("multiplication_simplification_method", &ReadProgramSettings::multiplicationSimplificationMethod)
+            .def_readwrite("optional_loop_optimization_config", &ReadProgramSettings::optionalLoopUnrollConfig)
+            .def_readwrite("optional_no_additional_line_synthesis_config", &ReadProgramSettings::optionalNoAdditionalLineSynthesisConfig)
+            .def_readwrite("expected_main_module_name", &ReadProgramSettings::expectedMainModuleName);
+
+    py::class_<Program::OptimizationResult>(m, "optimization_result")
+            .def(py::init(), "Constructs the optimization result of a SyReC program.")
+            .def_readwrite("found_errors", &Program::OptimizationResult::foundErrors)
+            .def_readwrite("dumped_optimized_circuit", &Program::OptimizationResult::dumpedOptimizedCircuit);
 
     py::class_<Program>(m, "program")
             .def(py::init<>(), "Constructs SyReC program object.")
             .def("add_module", &Program::addModule)
-            .def("read", &Program::read, "filename"_a, "settings"_a = ReadProgramSettings{}, "Read a SyReC program from a file.");
+            .def("read", &Program::read, "filename"_a, "settings"_a = ReadProgramSettings{}, "Read a SyReC program from a file.")
+            .def("read_and_optimize_from_file", &Program::readAndOptimizeCircuit, "circuitFileName"_a, "settings"_a = ReadProgramSettings{}, "Read and optimize a SyReC program from a file.")
+            .def("read_and_optimize_from_string", &Program::readAndOptimizeCircuitFromString, "circuitStringified"_a, "settings"_a = ReadProgramSettings{}, "Read and optimize a SyReC program from a string.");
 
     py::class_<boost::dynamic_bitset<>>(m, "bitset")
             .def(py::init<>(), "Constructs bitset object of size zero.")

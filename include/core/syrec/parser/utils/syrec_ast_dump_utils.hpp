@@ -32,7 +32,18 @@ namespace syrecAstDumpUtils {
     const auto stringifyAndJoinManyComplex = stringifyAndJoinMany<std::shared_ptr<T>>;
 
     class SyrecASTDumper {
-    private:
+    public:
+        SyrecASTDumper() = delete;
+        [[nodiscard]] static SyrecASTDumper createUsingDebugASTDumpConfig() {
+            return SyrecASTDumper(createDefaultDebugASTDumpConfig());
+        }
+
+        [[nodiscard]] static SyrecASTDumper createUsingDefaultASTDumpConfig() {
+            return SyrecASTDumper(createDefaultASTDumpConfig());
+        }
+
+        [[nodiscard]] std::string stringifyModules(const syrec::Module::vec& modules);
+    protected:
         struct ASTDumpConfig {
             const std::string newlineSequence;
             const std::string identationSequence;
@@ -43,24 +54,20 @@ namespace syrecAstDumpUtils {
                 newlineSequence(std::move(newlineSequence)), identationSequence(std::move(identationSequence)), stmtDelimiter(std::move(stmtDelimiter)), parameterDelimiter(std::move(parameterDelimiter)){};
         };
 
-        std::size_t       identationLevel     = 0;
+        std::size_t         identationLevel = 0;
         const ASTDumpConfig dumpConfig;
 
         [[nodiscard]] static ASTDumpConfig createDefaultASTDumpConfig() {
-            return ASTDumpConfig("\n", "\t", ";\n", ", ");       
+            return ASTDumpConfig("\n", "\t", ";\n", ", ");
         }
 
         [[nodiscard]] static ASTDumpConfig createDefaultDebugASTDumpConfig() {
             return ASTDumpConfig(" ", "", "; ", ", ");
         }
 
-    public:
-        explicit SyrecASTDumper(bool useDebugConfig):
-            dumpConfig(useDebugConfig ? createDefaultDebugASTDumpConfig() : createDefaultASTDumpConfig()){}
+        explicit SyrecASTDumper(ASTDumpConfig astDumpConfig):
+            dumpConfig(std::move(astDumpConfig)) {}
 
-        [[nodiscard]] std::string stringifyModules(const syrec::Module::vec& modules);
-
-    protected:
         [[nodiscard]] std::string stringifyModule(const syrec::Module::ptr& moduleToStringify);
         [[nodiscard]] std::string stringifyModuleLocals(const syrec::Variable::vec& moduleLocals);
 

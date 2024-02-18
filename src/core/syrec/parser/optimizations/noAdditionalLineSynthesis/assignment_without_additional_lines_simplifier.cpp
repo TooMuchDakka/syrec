@@ -69,6 +69,13 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::Simplifica
         return std::make_unique<SimplificationResult>(std::move(result)); 
     }
 
+    // Since we only support binary and numeric expressions, return if the top most assignment rhs expression does not conform to this.
+    // TODO: Support shift expressions
+    if (!std::dynamic_pointer_cast<const syrec::BinaryExpression>(assignmentStatement.rhs) && !std::dynamic_pointer_cast<const syrec::NumericExpression>(assignmentStatement.rhs)) {
+        SimplificationResult result = SimplificationResult::asEmptyResult();
+        return std::make_unique<SimplificationResult>(std::move(result)); 
+    }
+
     // TODO: For a binary expression with no nested expressions as operands, should we prefer that a signal access is always the lhs operand
     const std::shared_ptr<syrec::AssignStatement> transformedAssignmentStmt = transformAssignmentPriorToSimplification(assignmentStatement, true);
     if (!transformedAssignmentStmt) {
@@ -1211,10 +1218,10 @@ std::optional<double> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLine
 
 noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResultReference noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineMostViableAlternativeBasedOnCost(SimplificationResultReference& generatedSimplifiedAssignments, const std::shared_ptr<syrec::AssignStatement>& originalAssignmentUnoptimized, const SignalValueLookupCallback& signalValueCallback) const {
     SimplificationResultReference endResult = std::make_unique<SimplificationResult>();
-    if (internalConfig.preferAssignmentsGeneratedByChoiceRegardlessOfCost) {
+    if (!endResult || internalConfig.preferAssignmentsGeneratedByChoiceRegardlessOfCost) {
         return std::move(generatedSimplifiedAssignments);
     }
-
+    
     /*if (!generatedSimplifiedAssignments.empty() && (!doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperationWithNoLeafNodes(*originalAssignmentUnoptimized->rhs) || internalConfig.preferAssignmentsGeneratedByChoiceRegardlessOfCost)) {
         return generatedSimplifiedAssignments;
     }*/

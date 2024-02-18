@@ -19,7 +19,7 @@ namespace optimizations {
     public:
         explicit Optimizer(const parser::ParserConfig& parserConfig, const parser::SymbolTable::ptr& sharedSymbolTableReference):
             parserConfig(parserConfig), activeSymbolTableScope({!sharedSymbolTableReference ? std::make_shared<parser::SymbolTable>() : sharedSymbolTableReference}), loopUnrollerInstance(std::make_unique<optimizations::LoopUnroller>()), activeDataFlowValuePropagationRestrictions(std::make_unique<LoopBodyValuePropagationBlocker>(activeSymbolTableScope)),
-            assignmentWithoutAdditionalLineSynthesisOptimizer(std::make_unique<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier>(parserConfig.noAdditionalLineOptimizationConfig)){}
+            assignmentWithoutAdditionalLineSynthesisOptimizer(parserConfig.noAdditionalLineOptimizationConfig.has_value() ? std::make_unique<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier>(*parserConfig.noAdditionalLineOptimizationConfig) : nullptr) {}
 
         // TODO: Add new result flag FAILED?
         enum OptimizationResultFlag {

@@ -104,7 +104,7 @@ std::any SyReCStatementVisitor::visitAssignStatement(SyReCParser::AssignStatemen
             const auto& rhsOperandSizeCheckErrorPosition = determineContextStartTokenPositionOrUseDefaultOne(context->expression());
             const auto& isRhsOperand1dSignal = isSizeOfSignalAcessResult1DSignalOrLogError(rhsOperandSizeInformation.numDeclaredDimensionOfOperand, rhsOperandSizeInformation.explicitlyAccessedValuesPerDimension.size(), accessedValuePerDimensionOfRhsOperand, &rhsOperandSizeCheckErrorPosition);
 
-            if (isLhsOperand1dSignal && isRhsOperand1dSignal) {
+            if (isLhsOperand1dSignal.value_or(false) && isRhsOperand1dSignal.value_or(false)) {
                 // TODO: Check for bitwidth match
                 const auto assignStmt = std::make_shared<syrec::AssignStatement>(
                         *assignedToSignal,
@@ -440,7 +440,7 @@ std::any SyReCStatementVisitor::visitSwapStatement(SyReCParser::SwapStatementCon
     
     const auto& isLhsOperand1DSignal = isSizeOfSignalAcessResult1DSignalOrLogError(numDeclaredDimensionsOfAccessedSignalOfLhsOperand, firstNotExplicitlyAccessedDimensionIndexOfLhsOperand, accessedValuePerDimensionOfLhsOperand, &lhsOperandPotentialBitwidthEvaluationErrorPosition);
     const auto& isRhsOperand1DSignal = isSizeOfSignalAcessResult1DSignalOrLogError(numDeclaredDimensionsOfAccessedSignalOfRhsOperand, firstNotExplicitlyAccessedDimensionIndexOfRhsOperand, accessedValuePerDimensionOfRhsOperand, &rhsOperandPotentialBitwidthEvaluationErrorPosition);
-    if (isLhsOperand1DSignal && isRhsOperand1DSignal) {
+    if (isLhsOperand1DSignal.value_or(false) && isRhsOperand1DSignal.value_or(false)) {
         addStatementToOpenContainer(std::make_shared<syrec::SwapStatement>(lhsAccessedSignal, rhsAccessedSignal));        
     }
     return 0;

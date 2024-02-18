@@ -57,21 +57,17 @@ namespace noAdditionalLineSynthesis {
         void                                        reloadGenerateableReplacementSignalName();
 
          virtual ~AssignmentWithoutAdditionalLineSimplifier() = default;
-        AssignmentWithoutAdditionalLineSimplifier(const std::optional<NoAdditionalLineSynthesisConfig>& config) {
+        AssignmentWithoutAdditionalLineSimplifier(NoAdditionalLineSynthesisConfig config) {
             generatedAssignmentsContainer                     = std::make_shared<TemporaryAssignmentsContainer>();
             temporaryExpressionsContainer                     = std::make_unique<TemporaryExpressionsContainer>();
             expressionTraversalHelper                         = std::make_shared<ExpressionTraversalHelper>();
             expressionToSubAssignmentSplitterReference        = std::make_unique<ExpressionToSubAssignmentSplitter>();
 
-            if (config.has_value()) {
-                internalConfig = *config;
-                if (config->optionalNewReplacementSignalIdentsPrefix.has_value()) {
-                    substitutionGenerator = std::make_unique<ExpressionSubstitutionGenerator>(config->optionalNewReplacementSignalIdentsPrefix.value());
-                }
-                assignmentTransformer = std::make_unique<AssignmentTransformer>();
-            } else {
-                assignmentTransformer = nullptr;
+            internalConfig = config;
+            if (config.optionalNewReplacementSignalIdentsPrefix.has_value()) {
+                substitutionGenerator = std::make_unique<ExpressionSubstitutionGenerator>(config.optionalNewReplacementSignalIdentsPrefix.value());
             }
+            assignmentTransformer                             = std::make_unique<AssignmentTransformer>();
             learnedConflictsLookup                            = std::make_unique<LearnedConflictsLookup>();
             disabledValueLookupToggle                         = false;
         }

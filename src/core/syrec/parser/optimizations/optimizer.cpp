@@ -105,7 +105,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
     bool wasAnyStatementInModuleBodyOptimized = false;
     if (auto optimizationResultOfModuleStatements = handleStatements(transformCollectionOfSharedPointersToReferences(module.statements)); optimizationResultOfModuleStatements.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         if (optimizationResultOfModuleStatements.getStatusOfResult() == OptimizationResultFlag::WasOptimized) {
-           if (auto resultOfModuleBodyOptimization = optimizationResultOfModuleStatements.tryTakeOwnershipOfOptimizationResult(); resultOfModuleBodyOptimization.has_value()) {
+           if (auto&& resultOfModuleBodyOptimization = optimizationResultOfModuleStatements.tryTakeOwnershipOfOptimizationResult(); resultOfModuleBodyOptimization.has_value()) {
                copyOfModule->statements = createStatementListFrom({}, std::move(*resultOfModuleBodyOptimization));
            }   
         }
@@ -157,13 +157,12 @@ optimizations::Optimizer::OptimizationResult<syrec::Module> optimizations::Optim
      * beforehand while determining the unused parameters.
      */ 
     closeActiveSymbolTableScope();
-
+    
      /*
      * If we can determine that the main module only contains read-only parameters or does not perform assignments to either local signals and modifiable parameters,
      * the former can be removed but since the program must consist of some module, the main module will be stripped of all parameters, local signals as well as any
      * declared statements and its module body will only consist of a signal skip statement (which is required so that the module matches the SyReC grammar).
      */
-
     const auto& globalSymbolTableScope = *getActiveSymbolTableScope();
     
     /*
@@ -337,7 +336,6 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
             * If the value of the rhs expr does not modify the value of the assigned to signal but no dead code elimination is enabled, we can skip the application of the assignment
             */
             if (!doesAssignmentNotModifyAssignedToSignalValue) {
-               
                 if (!skipCheckForSplitOfAssignmentInSubAssignments && assignmentWithoutAdditionalLineSynthesisOptimizer) {
                     std::unique_ptr<syrec::AssignStatement> assignmentStmtToSimplify;
                     if (lhsOperand != assignmentStmt.lhs || rhsOperand != assignmentStmt.rhs) {
@@ -378,6 +376,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
+// TODO: Symbol table entry for module should also contain whether the module modifies any of its modifiable parameters in its body
 // TODO: Should the semantic checks that we assume to be already done in the parser be repeated again, i.e. does a matching module exist, etc.
 // TODO: Since we have optimized the call statement, we also need to optimize the corresponding uncall statement
 // TODO: Calls to readonly module or modules with no parameters can also be optimized away with the dead code elimination

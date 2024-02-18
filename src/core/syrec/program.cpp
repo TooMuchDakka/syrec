@@ -2,6 +2,7 @@
 
 #include "core/syrec/parser/antlr/parserComponents/syrec_parser_interface.hpp"
 #include "core/syrec/parser/optimizations/optimizer.hpp"
+#include "core/syrec/parser/utils/syrec_ast_dump_utils.hpp"
 
 using namespace syrec;
 
@@ -19,6 +20,43 @@ std::string Program::readFromString(const std::string& circuitStringified, const
     std::string foundErrorBuffer;
     parseFileContent(circuitStringified, settings, &foundErrorBuffer);
     return foundErrorBuffer;
+}
+
+Program::OptimizationResult Program::readAndOptimizeCircuit(const std::string& circuitFilename, ReadProgramSettings settings) {
+    std::string foundErrorBuffer;
+    if (const std::optional<std::string>& readFileContent = tryReadFileContent(circuitFilename, &foundErrorBuffer); readFileContent.has_value() && foundErrorBuffer.empty()) {
+        return readAndOptimizeCircuitFromString(*readFileContent, settings);
+    }
+    return OptimizationResult({foundErrorBuffer, std::nullopt});
+}
+
+Program::OptimizationResult Program::readAndOptimizeCircuitFromString(const std::string& circuitStringified, ReadProgramSettings settings) {
+    std::string foundErrorBuffer = readFromString(circuitStringified, settings);
+    if (foundErrorBuffer.empty()) {
+        auto parserConfigToUse                                  = ::parser::ParserConfig();
+        parserConfigToUse.cDefaultSignalWidth                   = settings.defaultBitwidth;
+        parserConfigToUse.combineRedundantInstructions          = settings.combineRedundantInstructions;
+        parserConfigToUse.constantPropagationEnabled            = settings.constantPropagationEnabled;
+        parserConfigToUse.deadCodeEliminationEnabled            = settings.deadCodeEliminationEnabled;
+        parserConfigToUse.deadStoreEliminationEnabled           = settings.deadStoreEliminationEnabled;
+        parserConfigToUse.expectedMainModuleName                = settings.expectedMainModuleName;
+        parserConfigToUse.multiplicationSimplificationMethod    = settings.multiplicationSimplificationMethod;
+        parserConfigToUse.noAdditionalLineOptimizationConfig    = settings.optionalNoAdditionalLineSynthesisConfig;
+        parserConfigToUse.operationStrengthReductionEnabled     = settings.operationStrengthReductionEnabled;
+        parserConfigToUse.optionalLoopUnrollConfig              = settings.optionalLoopUnrollConfig;
+        parserConfigToUse.reassociateExpressionsEnabled         = settings.reassociateExpressionEnabled;
+        parserConfigToUse.supportBroadcastingAssignmentOperands = false;
+        parserConfigToUse.supportBroadcastingExpressionOperands = false;
+
+        if (const std::optional<syrec::Module::vec>& optimizedProgramModules = optimizeProgram(modulesVec, parserConfigToUse, foundErrorBuffer); foundErrorBuffer.empty()) {
+            if (optimizedProgramModules.has_value()) {
+                modulesVec = *optimizedProgramModules;
+            }
+            auto syrecAstDumper = syrecAstDumpUtils::SyrecASTDumper::createUsingDefaultASTDumpConfig();
+            return OptimizationResult({"", syrecAstDumper.stringifyModules(modulesVec)});
+        }
+    }
+    return OptimizationResult({foundErrorBuffer, std::nullopt});
 }
 
 std::optional<std::string> Program::tryReadFileContent(const std::string_view& fileName, std::string* foundFileHandlingErrors) {
@@ -47,54 +85,20 @@ std::optional<std::string> Program::tryReadFileContent(const std::string_view& f
 
 
 bool Program::parseFileContent(std::string_view programToBeParsed, const ReadProgramSettings& config, std::string* foundErrors) {
-    const auto& parserConfigToUse = ::parser::ParserConfig(config.defaultBitwidth,
-                                                           false,
-                                                           false,
-                                                           config.reassociateExpressionEnabled,
-                                                           config.deadCodeEliminationEnabled,
-                                                           config.constantPropagationEnabled,
-                                                           config.operationStrengthReductionEnabled,
-                                                           config.deadStoreEliminationEnabled,
-                                                           config.combineRedundantInstructions,
-                                                           config.multiplicationSimplificationMethod,
-                                                           config.optionalLoopUnrollConfig,
-                                                           config.optionalNoAdditionalLineSynthesisConfig,
-                                                           config.expectedMainModuleName);
+    auto parserConfigToUse = ::parser::ParserConfig();
+    parserConfigToUse.cDefaultSignalWidth = config.defaultBitwidth;
+    parserConfigToUse.supportBroadcastingAssignmentOperands = false;
+    parserConfigToUse.supportBroadcastingExpressionOperands = false;
+    parserConfigToUse.expectedMainModuleName                = config.expectedMainModuleName;
+    
     const auto  parsingResult     = ::parser::SyrecParserInterface::parseProgram(programToBeParsed, parserConfigToUse);
     if (parsingResult.wasParsingSuccessful) {
-        const auto& optimizer                         = std::make_unique<optimizations::Optimizer>(parserConfigToUse, nullptr);
-        const auto& userDefinedMainModuleName   = config.expectedMainModuleName.empty() ? ::parser::ParserConfig::defaultExpectedMainModuleName : config.expectedMainModuleName;
-        auto        optimizationResultOfProgram       = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsingResult.foundModules), userDefinedMainModuleName);
-
-        std::string reasonForFallbackToUnoptimizedResult;
-        if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::IsUnchanged) {
-            this->modulesVec = parsingResult.foundModules;
-        } else if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::WasOptimized) {
-            auto&& optimizedModules = optimizationResultOfProgram.tryTakeOwnershipOfOptimizationResult();
-            // This case should not happen and will default to returning the unoptimized result
-            if (!optimizedModules.has_value()) {
-                reasonForFallbackToUnoptimizedResult = "Expected program to not be completely optimized away, will assume unoptimized result";
-            } else {
-                this->modulesVec.reserve(optimizedModules->size());
-                std::move(optimizedModules->begin(), optimizedModules->end(), std::back_inserter(this->modulesVec));                
-            }
-        // This case should not happen and will default to returning the unoptimized result
-        } else {
-            reasonForFallbackToUnoptimizedResult = "Expected program to not be completely optimized away, will assume unoptimized result";
-        }
-
-        if (!reasonForFallbackToUnoptimizedResult.empty()) {
-            this->modulesVec = parsingResult.foundModules;
-            if (foundErrors) {
-                *foundErrors = reasonForFallbackToUnoptimizedResult;
-            }
-        }
+        modulesVec = parsingResult.foundModules;
         return true;
     }
 
-    const auto& concatinatedFoundErrors = messageUtils::tryStringifyMessages(parsingResult.errors);
-    if (foundErrors && concatinatedFoundErrors.has_value()) {
-        *foundErrors = *concatinatedFoundErrors;
+    if (const std::optional<std::string> concatinatedFoundErrors = foundErrors ? messageUtils::tryStringifyMessages(parsingResult.errors) : std::nullopt; concatinatedFoundErrors.has_value()) {
+        *foundErrors = concatinatedFoundErrors.value();
     }
     return false;
 }
@@ -118,4 +122,27 @@ syrec::Module::vec Program::transformProgramOptimizationResult(std::vector<std::
         resultContainer.at(i) = std::move(optimizedProgram.at(i));
     }
     return resultContainer;
+}
+
+std::optional<syrec::Module::vec> Program::optimizeProgram(const syrec::Module::vec& parsedProgram, const ::parser::ParserConfig& config, std::string& foundErrors) {
+    const auto& optimizer                   = std::make_unique<optimizations::Optimizer>(config, nullptr);
+    const auto& userDefinedMainModuleName   = config.expectedMainModuleName.empty() ? ::parser::ParserConfig::defaultExpectedMainModuleName : config.expectedMainModuleName;
+    auto        optimizationResultOfProgram = optimizer->optimizeProgram(prepareParsingResultForOptimizations(parsedProgram), userDefinedMainModuleName);
+    
+    std::string reasonForFallbackToUnoptimizedResult;
+    if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::IsUnchanged) {
+        return parsedProgram;
+    }
+
+    if (optimizationResultOfProgram.getStatusOfResult() == optimizations::Optimizer::WasOptimized) {
+        if (auto&& optimizedModules = optimizationResultOfProgram.tryTakeOwnershipOfOptimizationResult(); optimizedModules.has_value()) {
+            syrec::Module::vec containerForOptimizedResult;
+            containerForOptimizedResult.reserve(optimizedModules->size());
+            std::move(optimizedModules->begin(), optimizedModules->end(), std::back_inserter(containerForOptimizedResult));
+            return containerForOptimizedResult;
+        }
+    }
+    // This case should not happen and will default to returning the unoptimized result
+    foundErrors = "Expected program to not be completely optimized away, will assume unoptimized result";
+    return std::nullopt;
 }

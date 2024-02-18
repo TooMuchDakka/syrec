@@ -2,9 +2,10 @@
 
 #include "core/syrec/grammar.hpp"
 #include "core/syrec/module.hpp"
+#include "core/syrec/parser/parser_config.hpp"
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/no_additional_line_synthesis_config.hpp"
-#include "parser/optimizations/loop_optimizer.hpp"
-#include "parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp"
+#include "core/syrec/parser/optimizations/loop_optimizer.hpp"
+#include "core/syrec/parser/optimizations/operationSimplification/base_multiplication_simplifier.hpp"
 
 #include <vector>
 
@@ -75,6 +76,12 @@ namespace syrec {
         // TODO: Replace ReadProgramSettings with ParserConfig
         std::string readFromString(const std::string& circuitStringified, ReadProgramSettings settings = ReadProgramSettings{});
 
+        struct OptimizationResult {
+            std::string                foundErrors;
+            std::optional<std::string> dumpedOptimizedCircuit;
+        };
+        [[maybe_unused]] OptimizationResult readAndOptimizeCircuit(const std::string& circuitFilename, ReadProgramSettings settings = ReadProgramSettings{});
+        [[maybe_unused]] OptimizationResult readAndOptimizeCircuitFromString(const std::string& circuitStringified, ReadProgramSettings settings = ReadProgramSettings{});
     private:
         Module::vec modulesVec;
 
@@ -97,6 +104,7 @@ namespace syrec {
         [[maybe_unused]] bool                                                         parseFileContent(std::string_view programToBeParsed, const ReadProgramSettings& config, std::string* foundErrors);
         [[nodiscard]] static std::vector<std::reference_wrapper<const syrec::Module>> prepareParsingResultForOptimizations(const syrec::Module::vec& foundModules);
         [[nodiscard]] static syrec::Module::vec                                       transformProgramOptimizationResult(std::vector<std::unique_ptr<syrec::Module>>&& optimizedProgram);
+        [[nodiscard]] static std::optional<syrec::Module::vec>                        optimizeProgram(const syrec::Module::vec& parsedProgram, const ::parser::ParserConfig& config, std::string& foundErrors);
     };
 
 } // namespace syrec
