@@ -189,7 +189,8 @@ void ExpressionTraversalHelper::handleOperationNodeDuringTraversalQueueInit(cons
         handleOperationNodeDuringTraversalQueueInit(*getOperationNodeById(operationNode->rhsOperand.id));
     }
     operationNodeTraversalQueue.emplace_back(operationNode->id);*/
-    
+
+    // PRE-ORDER TRAVERSAL
     operationNodeTraversalQueue.emplace_back(operationNode->id);
     if (!operationNode->lhsOperand.isLeafNode()) {
         handleOperationNodeDuringTraversalQueueInit(*getOperationNodeById(*operationNode->lhsOperand.operationNodeId));
@@ -283,6 +284,10 @@ ExpressionTraversalHelper::OperationNodeReference ExpressionTraversalHelper::cre
     if (const auto& exprAsShiftExpr = std::dynamic_pointer_cast<syrec::ShiftExpression>(expr); exprAsShiftExpr) {
         mappedToOperation = *syrec_operation::tryMapShiftOperationFlagToEnum(exprAsShiftExpr->op);
         nodeForLhsOperand = createOperandNode(exprAsShiftExpr->lhs, parentIdForNestedExpressions);
+        /*
+         * Since the SyReC grammar does not allow signal accesses to be defined in the shift amount, we also do not split a potentially nested "compile time constant" expression
+         * defined here and thus will only create one operand node for the whole shift amount.
+         */
         nodeForRhsOperand = createOperandNode(createExpressionForNumber(exprAsShiftExpr->rhs, exprAsShiftExpr->lhs->bitwidth()), parentIdForNestedExpressions);
     } else if (const auto& exprAsBinaryExpr = std::dynamic_pointer_cast<syrec::BinaryExpression>(expr); exprAsBinaryExpr) {
         mappedToOperation = *syrec_operation::tryMapBinaryOperationFlagToEnum(exprAsBinaryExpr->op);

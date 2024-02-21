@@ -335,7 +335,7 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
         }
 
         noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SignalValueLookupCallback signalValueLookupCallback = [this](const syrec::VariableAccess& accessedSignalParts) { return tryFetchValueForAccessedSignal(accessedSignalParts); };
-        if (noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResultReference simplificationResult = assignmentWithoutAdditionalLineSynthesisOptimizer->simplify(*assignmentStmtToSimplify, signalValueLookupCallback); simplificationResult) {
+        if (noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::SimplificationResult::OwningReference simplificationResult = assignmentWithoutAdditionalLineSynthesisOptimizer->simplify(*assignmentStmtToSimplify, signalValueLookupCallback); simplificationResult) {
             if (!simplificationResult->generatedAssignments.empty()) {
                 std::vector<std::unique_ptr<syrec::Statement>> remainingSimplifiedAssignments;
                 remainingSimplifiedAssignments.reserve(simplificationResult->requiredValueResetsForReplacementsTargetingExistingSignals.size() + simplificationResult->generatedAssignments.size() + simplificationResult->requiredInversionsOfValuesResetsForReplacementsTargetingExistingSignals.size());
