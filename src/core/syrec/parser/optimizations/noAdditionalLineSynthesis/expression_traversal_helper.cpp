@@ -130,6 +130,15 @@ void ExpressionTraversalHelper::markSignalAsAssignable(const std::string& assign
     identsOfAssignableSignals.emplace(assignableSignalIdent);
 }
 
+std::optional<std::size_t> ExpressionTraversalHelper::getOperationNodeIdOfRightOperand(std::size_t operationNodeId) const {
+    const std::optional<OperationNodeReference> referencedOperationNode = getOperationNodeById(operationNodeId);
+    if (!referencedOperationNode.has_value()) {
+        return std::nullopt;
+    }
+    return referencedOperationNode->get()->rhsOperand.operationNodeId;
+}
+
+
 void ExpressionTraversalHelper::removeOperationNodeAsPotentialBacktrackOperation(std::size_t operationNodeId) {
     if (const auto& fetchedOperationNodeForId = getOperationNodeById(operationNodeId); fetchedOperationNodeForId.has_value()) {
         const auto& foundMatchForOperationNode = std::find_if(

@@ -74,8 +74,11 @@ namespace noAdditionalLineSynthesis {
          */
         using SignalValueLookupCallback = std::function<std::optional<unsigned int>(const syrec::VariableAccess&)>;
         [[nodiscard]] SimplificationResult::OwningReference simplify(const syrec::AssignStatement& assignmentStatement, const SignalValueLookupCallback& signalValueLookupCallback);
-        void                                                defineSymbolTable(const parser::SymbolTable::ptr& activeSymbolTableScope);
-        void                                                reloadGenerateableReplacementSignalName();
+        
+        /**
+         * \brief Perform the required internal resets so that this instance of the simplifier can be used in another module again.
+         */
+        void                                                resetForUsageInNewModule(const parser::SymbolTable::ptr& activeSymbolTableScope);
 
          virtual ~AssignmentWithoutAdditionalLineSimplifier() = default;
         AssignmentWithoutAdditionalLineSimplifier(NoAdditionalLineSynthesisConfig config) {
@@ -112,9 +115,11 @@ namespace noAdditionalLineSynthesis {
             ChoosenOperand             choosenOperand;
             ChoiceRepetition           shouldChoiceBeRepeated;
             syrec::VariableAccess::ptr inheritedOperandDataForChoice;
+
+            bool operator()(const Decision& thisDecision, const Decision& otherDecision) const { return thisDecision.operationNodeId > otherDecision.operationNodeId; };
         };
         using DecisionReference = std::shared_ptr<Decision>;
-        std::vector<DecisionReference>          pastDecisions;
+        std::set<DecisionReference, std::greater<>>          pastDecisions;
         TemporaryAssignmentsContainer::ptr      generatedAssignmentsContainer;
         TemporaryExpressionsContainer::ptr      temporaryExpressionsContainer;
         ExpressionTraversalHelper::ptr          expressionTraversalHelper;
@@ -140,70 +145,153 @@ namespace noAdditionalLineSynthesis {
         LearnedConflictsLookupReference learnedConflictsLookup;
 
         std::optional<std::size_t> operationNodeCausingConflictAndBacktrack;
-        class OperationOperandSimplificationResult {
-        public:
-            using OwningReference = std::unique_ptr<OperationOperandSimplificationResult>;
 
-            [[nodiscard]] std::optional<syrec::VariableAccess::ptr> getAssignedToSignalOfAssignment() const {
-                if (data.has_value() && std::holds_alternative<syrec::VariableAccess::ptr>(*data)) {
-                    return std::get<syrec::VariableAccess::ptr>(*data);
+         /*
+         * Rework of inversion
+         */
+        enum UnknownResultReason {
+            Conflict,
+            Other,
+            NoOperationEnumToFlagValueMapping
+        };
+
+        class OperationNodeSimplificationResult {
+        public:
+            using IdAndAssignmentTuple = std::pair<std::size_t, syrec::VariableAccess::ptr>;
+            using SignalAccessOrExpression = std::variant<IdAndAssignmentTuple, syrec::Expression::ptr>;
+            using OwningReference          = std::unique_ptr<OperationNodeSimplificationResult>;
+
+            OperationNodeSimplificationResult():
+                referencedOperationNode(0), dataDependenciesAsIdsOfDependentAssignments({}), wasManuallyCreated(false) {}
+
+            [[nodiscard]] std::optional<std::size_t> getIdOfGeneratedAssignment() const {
+                if (data.has_value() && std::holds_alternative<IdAndAssignmentTuple>(*data)) {
+                    if (const std::size_t idOfGeneratedAssignment = std::get<IdAndAssignmentTuple>(*data).first; idOfGeneratedAssignment) {
+                        return idOfGeneratedAssignment;
+                    }
                 }
                 return std::nullopt;
             }
 
-            [[nodiscard]] std::optional<syrec::Expression::ptr> getGeneratedExpr() const {
+            [[nodiscard]] std::optional<syrec::VariableAccess::ptr> getResultAsSignalAccess() const {
+                if (data.has_value() && std::holds_alternative<IdAndAssignmentTuple>(*data)) {
+                    return std::get<IdAndAssignmentTuple>(*data).second;
+                }
+                return std::nullopt;
+            }
+
+            [[nodiscard]] std::optional<syrec::Expression::ptr> getResultAsExpr() const {
                 if (data.has_value() && std::holds_alternative<syrec::Expression::ptr>(*data)) {
                     return std::get<syrec::Expression::ptr>(*data);
                 }
                 return std::nullopt;
             }
 
-            [[nodiscard]] std::size_t getNumberOfCreatedAssignments() const {
-                return numGeneratedAssignments;
+            [[nodiscard]] std::vector<std::size_t> getDataDependenciesAsIdsOfDependentAssignments() const {
+                return dataDependenciesAsIdsOfDependentAssignments;
+            }
+
+            [[nodiscard]] bool hasKnownValue() const {
+                return data.has_value();
             }
 
             [[nodiscard]] bool wasResultManuallyCreated() const {
                 return wasManuallyCreated;
             }
 
-            [[nodiscard]] bool isResultUnknown() const {
-                return resultUnknown;
+            [[nodiscard]] std::optional<UnknownResultReason> getReasonForUnknownResult() const {
+                return reasonForUnknownResult;
             }
 
-            void updateData(const std::variant<syrec::VariableAccess::ptr, syrec::Expression::ptr>& updatedData) {
-                data = updatedData;
+            [[nodiscard]] static OperationNodeSimplificationResult createManuallyFromLeafNode(const SignalAccessOrExpression& leafNodeData) {
+                OperationNodeSimplificationResult result;
+                result.data               = leafNodeData;
+                result.wasManuallyCreated = true;
+                return result;
             }
 
-            [[nodiscard]] static OperationOperandSimplificationResult createManuallyFrom(const std::variant<syrec::VariableAccess::ptr, syrec::Expression::ptr>& data) noexcept {
-                return OperationOperandSimplificationResult(0, data, true);
+            [[nodiscard]] static OperationNodeSimplificationResult createFromLeafNode(const SignalAccessOrExpression& leafNodeData) {
+                OperationNodeSimplificationResult result;
+                result.data = leafNodeData;
+                return result;
             }
 
-            [[nodiscard]] static OperationOperandSimplificationResult createAsUnknownResult() noexcept {
-                return OperationOperandSimplificationResult(0, std::nullopt, true);
+            [[nodiscard]] static OperationNodeSimplificationResult createFromNonLeafNode(std::size_t referencedOperationNodeId, const SignalAccessOrExpression& nonLeafNodeData, const std::vector<std::size_t>& dataDependenciesAsIdsOfDependentAssignments) {
+                OperationNodeSimplificationResult result;
+                result.referencedOperationNode                     = referencedOperationNodeId;
+                result.data                                        = nonLeafNodeData;
+                result.dataDependenciesAsIdsOfDependentAssignments = dataDependenciesAsIdsOfDependentAssignments;
+                return result;
             }
 
-            [[nodiscard]] static OperationOperandSimplificationResult createFrom(std::size_t numGeneratedAssignments, std::variant<syrec::VariableAccess::ptr, syrec::Expression::ptr> data) noexcept {
-                return OperationOperandSimplificationResult(numGeneratedAssignments, std::move(data), false);
+            [[nodiscard]] static OperationNodeSimplificationResult createAsUnknownResult(UnknownResultReason reasonForUnknownResult) {
+                OperationNodeSimplificationResult result;
+                result.reasonForUnknownResult = reasonForUnknownResult;
+                return result;
             }
 
-            [[nodiscard]] static OwningReference createOwningReferenceFrom(OperationOperandSimplificationResult&& data) {
-                return std::make_unique<OperationOperandSimplificationResult>(data);
+            [[nodiscard]] static OwningReference createAndOwnNewInstance(OperationNodeSimplificationResult&& dataOfNewInstance) {
+                return std::make_unique<OperationNodeSimplificationResult>(dataOfNewInstance);
             }
 
-            explicit OperationOperandSimplificationResult(std::size_t numGeneratedAssignments, std::optional<std::variant<syrec::VariableAccess::ptr, syrec::Expression::ptr>> data, bool wasManuallyCreated = false) noexcept
-                : numGeneratedAssignments(numGeneratedAssignments), data(std::move(data)), wasManuallyCreated(wasManuallyCreated), resultUnknown(false) {}
-        private:
-            std::size_t                                                                     numGeneratedAssignments;
-            std::optional<std::variant<syrec::VariableAccess::ptr, syrec::Expression::ptr>> data;
-            bool                                                                            wasManuallyCreated;
-            bool                                                                            resultUnknown;
+        protected:
+            std::size_t                             referencedOperationNode;
+            std::optional<SignalAccessOrExpression> data;
+            std::optional<UnknownResultReason>      reasonForUnknownResult;
+            std::vector<std::size_t>                dataDependenciesAsIdsOfDependentAssignments;
+            bool                                    wasManuallyCreated;
         };
-        
 
-        [[nodiscard]] std::optional<OperationOperandSimplificationResult::OwningReference> handleOperationNode(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
-        [[nodiscard]] std::optional<OperationOperandSimplificationResult::OwningReference> handleOperationNodeWithNoLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
-        [[nodiscard]] std::optional<OperationOperandSimplificationResult::OwningReference> handleOperationNodeWithOneLeafNode(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
-        [[nodiscard]] std::optional<OperationOperandSimplificationResult::OwningReference> handleOperationNodeWithOnlyLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
+        struct DecisionResult {
+            std::optional<std::variant<std::shared_ptr<syrec::UnaryStatement>, std::shared_ptr<syrec::AssignStatement>, syrec::Expression::ptr>> data;
+            std::optional<std::size_t>                                                                                                           idOfGeneratedAssignment;
+            std::vector<std::size_t>                                                                                                             dataDependenciesOfGeneratedResult;
+            std::optional<UnknownResultReason>                                                                                                   reasonForUnknownResult;
+
+            [[nodiscard]] static DecisionResult fromGeneratedAssignment(const std::variant<std::shared_ptr<syrec::UnaryStatement>, std::shared_ptr<syrec::AssignStatement>, syrec::Expression::ptr>& data, std::size_t idOfGeneratedAssignment) {
+                DecisionResult dataOfResult;
+                dataOfResult.data                    = data;
+                dataOfResult.idOfGeneratedAssignment = idOfGeneratedAssignment;
+                return dataOfResult;
+            }
+
+            [[nodiscard]] static DecisionResult fromGeneratedExpression(const std::variant<std::shared_ptr<syrec::UnaryStatement>, std::shared_ptr<syrec::AssignStatement>, syrec::Expression::ptr>& data, const std::vector<std::size_t>& dataDependenciesOfExpression) {
+                DecisionResult dataOfResult;
+                dataOfResult.data                              = data;
+                dataOfResult.dataDependenciesOfGeneratedResult = dataDependenciesOfExpression;
+                return dataOfResult;
+            }
+
+            [[nodiscard]] static DecisionResult fromUnknownResult(UnknownResultReason failureReason) {
+                DecisionResult dataOfResult;
+                dataOfResult.reasonForUnknownResult = failureReason;
+                return dataOfResult;
+            }
+
+            [[nodiscard]] std::optional<syrec::VariableAccess::ptr> getAssignedToSignalParts() const {
+                if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(*data)) {
+                    return std::get<std::shared_ptr<syrec::UnaryStatement>>(*data)->var;
+                }
+                else if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(*data)) {
+                    return std::get<std::shared_ptr<syrec::AssignStatement>>(*data)->lhs;
+                }
+                return std::nullopt;
+            }
+
+            [[nodiscard]] std::optional<syrec::Expression::ptr> getGeneratedExpression() const {
+                if (std::holds_alternative<syrec::Expression::ptr>(*data)) {
+                    return std::get<syrec::Expression::ptr>(*data);
+                }
+                return std::nullopt;
+            }
+        };
+        [[nodiscard]] static std::optional<OperationNodeSimplificationResult::OwningReference> tryPerformTransformationOfDecisionResultToOperationNodeSimplificationResultWhenNoConflictWasDetected(std::size_t operationNodeId, const DecisionResult& decisionResult);
+
+
+        [[nodiscard]] std::optional<OperationNodeSimplificationResult::OwningReference>    handleOperationNode(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
+        [[nodiscard]] std::optional<OperationNodeSimplificationResult::OwningReference>    handleOperationNodeWithNoLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
+        [[nodiscard]] std::optional<OperationNodeSimplificationResult::OwningReference>    handleOperationNodeWithOneLeafNode(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
+        [[nodiscard]] std::optional<OperationNodeSimplificationResult::OwningReference>    handleOperationNodeWithOnlyLeafNodes(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback);
 
         // This function should probably be refactored since the usage of a signal access can only determine a conflict and not the choice when trying to create an assignments
         // Only active assignments contribute to the set of potential conflicts.
@@ -215,7 +303,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] bool                             doesAssignmentToSignalLeadToConflict(const syrec::VariableAccess& assignedToSignal) const;
         [[nodiscard]] std::optional<DecisionReference> tryGetDecisionForOperationNode(const std::size_t& operationNodeId) const;
         
-        [[nodiscard]] DecisionReference           makeDecision(const ExpressionTraversalHelper::OperationNodeReference& operationNode, OperationOperandSimplificationResult& simplificationResultOfFirstOperand, OperationOperandSimplificationResult& simplificationResultOfSecondOperand, const SignalValueLookupCallback& callbackForValueLookupOfExistingSymbolTableSignals);
+        //[[nodiscard]] DecisionReference           makeDecision(const ExpressionTraversalHelper::OperationNodeReference& operationNode, OperationOperandSimplificationResult& simplificationResultOfFirstOperand, OperationOperandSimplificationResult& simplificationResultOfSecondOperand, const SignalValueLookupCallback& callbackForValueLookupOfExistingSymbolTableSignals);
         [[nodiscard]] std::optional<std::size_t>  determineOperationNodeIdCausingConflict(const syrec::VariableAccess& choiceOfAssignedToSignalTriggeringSearchForCauseOfConflict) const;
         [[nodiscard]] bool                        isOperationNodeSourceOfConflict(std::size_t operationNodeId) const;
         void                                      markOperationNodeAsSourceOfConflict(std::size_t operationNodeId);
@@ -228,9 +316,9 @@ namespace noAdditionalLineSynthesis {
         void                                                                            clearNotUsableReplacementCandidatesFromAssignmentForGenerator(const std::vector<syrec::VariableAccess::ptr>& replacementCandidateRestrictionsStemmingFromAssignment) const;
         [[nodiscard]] bool                                                              isChoiceOfSignalAccessBlockedByAnyActiveExpression(const syrec::VariableAccess& chosenOperand) const;
         [[nodiscard]] std::optional<syrec::VariableAccess::ptr>                         createReplacementForChosenOperand(const DecisionReference& decisionToReplace, const SignalValueLookupCallback& callbackForValueLookupOfExistingSymbolTableSignals) const;
-        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>                         getAndActivateReplacementForOperationNode(std::size_t referencedOperationNodeId, syrec_operation::operation definedOperationInOperationNode, const OperationOperandSimplificationResult& lhsOperandDataChoicesAfterSimplification, const OperationOperandSimplificationResult& rhsOperandDataChoicesAfterSimplification, bool* wasExistingReplacementForOperationNodeEntryUpdated, const SignalValueLookupCallback& callbackForValueLookupOfExistingSymbolTableSignals);
-        [[nodiscard]] static std::optional<bool>                                        tryUpdateOperandsOfExistingReplacementForWholeBinaryExpressionIfChangedAndReturnWhetherUpdateTookPlace(syrec::BinaryExpression& replacementRhsAsBinaryExpr, const OperationOperandSimplificationResult& potentiallyNewLhsOperandOfBinaryExpr, const OperationOperandSimplificationResult& potentiallyNewRhsOperandOfBinaryExpr);
-        [[nodiscard]] static std::optional<bool>                                        tryUpdateOperandsOfExistingReplacementForWholeBinaryExpressionIfChangedAndReturnWhetherUpdateTookPlace(syrec::ShiftExpression& replacementRhsAsShiftExpr, const OperationOperandSimplificationResult& potentiallyNewLhsOperandOfShiftExpr, const OperationOperandSimplificationResult& potentiallyNewRhsOperandOfShiftExpr);
+        [[nodiscard]] std::optional<std::pair<std::size_t, std::shared_ptr<syrec::AssignStatement>>> getAndActivateReplacementForOperationNode(std::size_t referencedOperationNodeId, syrec_operation::operation definedOperationInOperationNode, const OperationNodeSimplificationResult& lhsOperandDataChoicesAfterSimplification, const OperationNodeSimplificationResult& rhsOperandDataChoicesAfterSimplification, bool* wasExistingReplacementForOperationNodeEntryUpdated, const SignalValueLookupCallback& callbackForValueLookupOfExistingSymbolTableSignals);
+        [[nodiscard]] static std::optional<bool>                                        tryUpdateOperandsOfExistingReplacementForWholeBinaryExpressionIfChangedAndReturnWhetherUpdateTookPlace(syrec::BinaryExpression& replacementRhsAsBinaryExpr, const OperationNodeSimplificationResult& potentiallyNewLhsOperandOfBinaryExpr, const OperationNodeSimplificationResult& potentiallyNewRhsOperandOfBinaryExpr);
+        [[nodiscard]] static std::optional<bool>                                        tryUpdateOperandsOfExistingReplacementForWholeShiftExpressionIfChangedAndReturnWhetherUpdateTookPlace(syrec::ShiftExpression& replacementRhsAsShiftExpr, const OperationNodeSimplificationResult& potentiallyNewLhsOperandOfShiftExpr, const OperationNodeSimplificationResult& potentiallyNewRhsOperandOfShiftExpr);
 
         // This call should be responsible to determine conflicts, during a decision their should not arise any conflicts
         // The check for a conflict should take place in the operations nodes with either one or two leaf nodes by using this call before making any decisions
@@ -252,6 +340,8 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<DecisionReference>                tryGetLastDecision() const;
         [[nodiscard]] std::optional<DecisionReference>                tryGetSecondToLastDecision() const;
         virtual void                                                  resetInternals();
+        void                                                          defineSymbolTable(const parser::SymbolTable::ptr& activeSymbolTableScope);
+        void                                                          reloadGenerateableReplacementSignalName();
         [[nodiscard]] virtual std::unique_ptr<syrec::AssignStatement> transformAssignmentPriorToSimplification(const syrec::AssignStatement& assignmentToSimplify, bool applyHeuristicsForSubassignmentGeneration) const;
         void                                                          transformExpressionPriorToSimplification(syrec::Expression& expr, bool applyHeuristicsForSubassignmentGeneration) const;
         void                                                          rememberConflict(std::size_t operationNodeId, Decision::ChoosenOperand chosenOperandAtOperationNode) const;
@@ -266,7 +356,7 @@ namespace noAdditionalLineSynthesis {
         void                                                          recordDecision(const DecisionReference& decision);
 
         struct OperationNodeProcessingResult {
-            std::optional<OperationOperandSimplificationResult::OwningReference> simplificationResult;
+            std::optional<OperationNodeSimplificationResult::OwningReference>  simplificationResult;
             bool                                                               derivedConflictInOtherNode;
             bool                                                               derivedConflictInThisNode;
 
@@ -281,7 +371,7 @@ namespace noAdditionalLineSynthesis {
                 return {};
             }
 
-            [[nodiscard]] static OperationNodeProcessingResult fromResult(std::optional<OperationOperandSimplificationResult::OwningReference>&& simplificationResult) {
+            [[nodiscard]] static OperationNodeProcessingResult fromResult(std::optional<OperationNodeSimplificationResult::OwningReference>&& simplificationResult) {
                 OperationNodeProcessingResult result;
                 result.simplificationResult = std::move(simplificationResult);
                 return result;
@@ -309,18 +399,15 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<double>                                                           determineCostOfAssignments(const std::vector<AssignmentTransformer::SharedAssignmentReference>& assignmentsToCheck) const;
         [[nodiscard]] std::optional<double>                                                           determineCostOfAssignments(SimplificationResult::OwningCopiesOfAssignment& assignments) const;
         [[nodiscard]] SimplificationResult::OwningReference                                           determineMostViableAlternativeBasedOnCost(SimplificationResult::OwningReference& generatedSimplifiedAssignments, const std::shared_ptr<syrec::AssignStatement>& originalAssignmentUnoptimized, const SignalValueLookupCallback& signalValueCallback) const;
-        [[nodiscard]] std::optional<std::variant<syrec::VariableAccess::ptr, syrec::Expression::ptr>> tryCreateFinalSimplificationResultAfterDecisionWasMade(const DecisionReference& madeDecision, const OperationOperandSimplificationResult& lhsOperandOfOperationNode, syrec_operation::operation definedOperationAtOperationNode, const OperationOperandSimplificationResult& rhsOperandOfOperationNode, const SignalValueLookupCallback& callbackForValueLookupOfExistingSymbolTableSignals);
-
+        
         [[nodiscard]] static std::optional<syrec::Expression::ptr>       fuseExpressions(const syrec::Expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::Expression::ptr& rhsOperand);
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentForOperationNode(const syrec::VariableAccess::ptr& assignmentLhs, syrec_operation::operation op, const syrec::Expression::ptr& assignmentRhs);
-        [[nodiscard]] static syrec::Expression::ptr                      createExpressionFromOperandSimplificationResult(const OperationOperandSimplificationResult& operandSimplificationResult);
         [[nodiscard]] static bool                                        doesExpressionDefineNestedSplitableExpr(const syrec::Expression& expr);
         [[nodiscard]] static bool                                        doesExpressionDefineNumber(const syrec::Expression& expr);
         [[nodiscard]] static bool                                        doesExprDefineSignalAccess(const syrec::Expression& expr);
-        [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentFromOperands(Decision::ChoosenOperand chosenOperandAsAssignedToSignal, const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
-        [[nodiscard]] static std::optional<syrec::Expression::ptr>       tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationOperandSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationOperandSimplificationResult& simplificationResultOfSecondOperand);
-        [[nodiscard]] static std::optional<syrec::Expression::ptr>       tryCreateExpressionFromOperationNodeOperandSimplification(const OperationOperandSimplificationResult& simplificationResultOfOperand);
-        [[nodiscard]] static std::optional<syrec::Number::ptr>           tryCreateNumberFromOperationNodeOperandSimplification(const OperationOperandSimplificationResult& simplificationResultOfOperand);
+        [[nodiscard]] static std::optional<syrec::Expression::ptr>       tryCreateExpressionFromOperationNodeOperandSimplifications(const OperationNodeSimplificationResult& simplificationResultOfFirstOperand, syrec_operation::operation operationNodeOperation, const OperationNodeSimplificationResult& simplificationResultOfSecondOperand);
+        [[nodiscard]] static std::optional<syrec::Expression::ptr>       tryCreateExpressionFromOperationNodeOperandSimplification(const OperationNodeSimplificationResult& simplificationResultOfOperand);
+        [[nodiscard]] static std::optional<syrec::Number::ptr>           tryCreateNumberFromOperationNodeOperandSimplification(const OperationNodeSimplificationResult& simplificationResultOfOperand);
         [[nodiscard]] static bool                                        areAssignedToSignalPartsZero(const syrec::VariableAccess& accessedSignalParts, const SignalValueLookupCallback& signalValueLookupCallback);
         [[nodiscard]] static bool                                        doesExprOnlyDefineReversibleOperationsAndNoBitwiseXorOperationWithNoLeafNodes(const syrec::Expression& expr);
         static void                                                      tryConvertNumericToBinaryExpr(syrec::Expression::ptr& expr);
@@ -336,11 +423,11 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static bool                                    areSignalAccessesSyntacticallyEquivalent(const syrec::VariableAccess& firstSignalAccess, const syrec::VariableAccess& otherSignalAccess, const parser::SymbolTable& symbolTable);
         [[nodiscard]] static std::optional<unsigned int>             determineBitwidthOfSignalAccess(const syrec::VariableAccess& signalAccess);
         [[nodiscard]] static std::optional<unsigned int>             evaluateNumber(const syrec::Number& numberToEvaluate);
-        [[nodiscard]] static bool                                    doesOperandSimplificationResultMatchExpression(const OperationOperandSimplificationResult& operandSimplificationResult, const syrec::Expression::ptr& exprToCheck);
-        [[nodiscard]] static bool                                                          doesOperandSimplificationResultMatchNumber(const OperationOperandSimplificationResult& operandSimplificationResult, const syrec::Number::ptr& numberToCheck);
-        [[nodiscard]] static std::optional<SimplificationResult::OwningCopyOfAssignment> createOwningCopyOfAssignment(const syrec::AssignStatement& assignment);
+        [[nodiscard]] static bool                                                          doesOperandSimplificationResultMatchExpression(const OperationNodeSimplificationResult& operandSimplificationResult, const syrec::Expression::ptr& exprToCheck);
+        [[nodiscard]] static bool                                                          doesOperandSimplificationResultMatchNumber(const OperationNodeSimplificationResult& operandSimplificationResult, const syrec::Number::ptr& numberToCheck);
+        [[nodiscard]] static std::optional<SimplificationResult::OwningCopyOfAssignment>   createOwningCopyOfAssignment(const syrec::AssignStatement& assignment);
         [[nodiscard]] static std::optional<SimplificationResult::OwningCopyOfAssignment>   createOwningCopyOfAssignment(const syrec::UnaryStatement& assignment);
-        [[nodiscard]] static std::optional<SimplificationResult::OwningCopiesOfAssignment> createOwningCopiesOfAssignments(const std::vector<TemporaryAssignmentsContainer::SharedAssignmentReference>& assignments);
+        [[nodiscard]] static std::optional<SimplificationResult::OwningCopiesOfAssignment> createOwningCopiesOfAssignments(const std::vector<TemporaryAssignmentsContainer::AssignmentReferenceVariant>& assignments);
          static void                                                          tryAddCosts(std::optional<double>& currentSumOfCosts, const std::optional<double>& costsToAdd);
         /**
          * \brief Determines the signal parts defined in the given expression which cannot be used as potential replacement candidates
@@ -365,6 +452,11 @@ namespace noAdditionalLineSynthesis {
         static void                         logCreationOfSubstitutionOfOperandOfOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand substitutedOperand, const syrec::VariableAccess& generatedSubstitution);
         static void                         logCreationOfSubstitutionOfExprOfOperationNode(std::size_t operationNodeId, const std::string& replacementSignalIdent, bool wasExistingEntryUpdated);
         static void                         logLearnedConflict(std::size_t operationNodeId, Decision::ChoosenOperand learnedConflictingChoiceOfOperand);
+
+        [[nodiscard]] DecisionResult           makeDecisionFor(std::size_t operationNodeId, const OperationNodeSimplificationResult& lhsOperandSimplificationResult, syrec_operation::operation definedOperationOfOperationNode, const OperationNodeSimplificationResult& rhsOperandSimplificationResult, const std::optional<std::size_t>& idOfLastActiveAssignmentPriorToProcessingOfLhsOperand, const std::optional<std::size_t>& idOfLastActiveAssignmentPriorToProcessingOfRhsOperand, const SignalValueLookupCallback& signalValueLookupCallback);
+        [[nodiscard]] DecisionReference        constructAndRecordDefaultDecision(std::size_t operationNodeId);
+        [[nodiscard]] static DecisionReference constructDefaultDecision(std::size_t operationNodeId);
+        
     };
 }
 

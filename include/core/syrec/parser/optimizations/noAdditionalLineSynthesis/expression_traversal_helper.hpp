@@ -47,6 +47,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] bool                                      canSignalBeUsedOnAssignmentLhs(const std::string& signalIdent) const;
         [[nodiscard]] std::optional<OperationNodeReference>     getOperationNodeById(std::size_t operationNodeId) const;
         void                                                    markSignalAsAssignable(const std::string& assignableSignalIdent);
+        [[nodiscard]] std::optional<std::size_t>                getOperationNodeIdOfRightOperand(std::size_t operationNodeId) const;
 
         /**
          * \brief Update the operand data of a given operation node

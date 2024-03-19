@@ -80,6 +80,7 @@ std::optional<noAdditionalLineSynthesis::ExpressionSubstitutionGenerator::Replac
             }
         }
         if (wasGenerationOfReplacementSuccessful) {
+            updateRestriction(**foundReplacement, RestrictionLifetime::Temporary, RestrictionUpdate::Activation);
             return ReplacementResult({.foundReplacement = *foundReplacement, .requiredResetOfReplacement = requiredResetPriorToUsageOfReplacement, .doesGeneratedReplacementReferenceExistingSignal = true});   
         }
     }
