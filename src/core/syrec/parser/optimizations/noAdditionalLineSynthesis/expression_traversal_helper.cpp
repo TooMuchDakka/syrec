@@ -40,7 +40,7 @@ std::optional<syrec::VariableExpression::ptr> ExpressionTraversalHelper::getOper
 }
 
 std::optional<syrec::Expression::ptr> ExpressionTraversalHelper::getOperandAsExpr(std::size_t operandNodeId) const {
-    if (std::optional<syrec::Expression::ptr> operandData = getDataOfOperand(operandNodeId); operandData.has_value() && std::dynamic_pointer_cast<syrec::VariableExpression>(*operandData) == nullptr) {
+    if (std::optional<syrec::Expression::ptr> operandData = getDataOfOperand(operandNodeId); operandData.has_value() && !std::dynamic_pointer_cast<syrec::VariableExpression>(*operandData)) {
         return operandData;
     }
     return std::nullopt;
@@ -126,6 +126,16 @@ bool ExpressionTraversalHelper::updateOperandData(std::size_t operationNodeId, b
     return true;
 }
 
+bool ExpressionTraversalHelper::updateOperation(std::size_t operationNodeId, syrec_operation::operation newOperation) const {
+    const std::optional<OperationNodeReference> referencedOperationNode = getOperationNodeById(operationNodeId);
+    if (!referencedOperationNode.has_value()) {
+        return false;
+    }
+    referencedOperationNode->get()->operation = newOperation;
+    return true;
+}
+
+
 void ExpressionTraversalHelper::markSignalAsAssignable(const std::string& assignableSignalIdent) {
     identsOfAssignableSignals.emplace(assignableSignalIdent);
 }
@@ -136,6 +146,13 @@ std::optional<std::size_t> ExpressionTraversalHelper::getOperationNodeIdOfRightO
         return std::nullopt;
     }
     return referencedOperationNode->get()->rhsOperand.operationNodeId;
+}
+
+std::optional<std::size_t> ExpressionTraversalHelper::getOperationNodeIdOfFirstEntryInQueue() const {
+    if (operationNodeTraversalQueue.empty()) {
+        return std::nullopt;
+    }
+    return operationNodeTraversalQueue.front();
 }
 
 

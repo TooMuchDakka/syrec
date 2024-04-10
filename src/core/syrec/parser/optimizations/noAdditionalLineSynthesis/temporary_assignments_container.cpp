@@ -14,7 +14,6 @@ std::shared_ptr<syrec::VariableAccess> TemporaryAssignmentsContainer::InternalAs
     return std::get<std::shared_ptr<syrec::UnaryStatement>>(data)->var;
 }
 
-
 std::optional<std::size_t> TemporaryAssignmentsContainer::getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(const syrec::VariableAccess& signalAccess, std::size_t exclusionRangeLowerBoundDefinedWithAssociatedOperationNodeId, std::size_t exclusionRangeUpperBoundDefinedWithAssociatedOperationNodeId, const parser::SymbolTable& symbolTableReference) const {
     const auto& foundMatchingActiveAssignment = std::find_if(
             activeAssignmentsLookupById.cbegin(),
@@ -60,41 +59,6 @@ bool TemporaryAssignmentsContainer::existsActiveAssignmentHavingGivenAssignmentA
     return false;
 }
 
-TemporaryAssignmentsContainer::OrderedAssignmentIdContainer TemporaryAssignmentsContainer::getOverlappingActiveAssignmentsOrderedByLastAppearanceOfSignalAccessedDefinedInExpression(const syrec::Expression& expression, const parser::SymbolTable& symbolTableReference) const {
-    OrderedAssignmentIdContainer resultContainer;
-    for (const std::reference_wrapper<syrec::VariableAccess>& signalAccess : getSignalAccessesOfExpression(expression)) {
-        resultContainer.merge(getOverlappingActiveAssignmentsOrderedByLastAppearanceOfSignalAccess(signalAccess, symbolTableReference));
-    }
-    return resultContainer;
-}
-
-TemporaryAssignmentsContainer::OrderedAssignmentIdContainer TemporaryAssignmentsContainer::getOverlappingActiveAssignmentsOrderedByLastAppearanceOfSignalAccess(const syrec::VariableAccess& signalAccess, const parser::SymbolTable& symbolTableReference) const {
-    OrderedAssignmentIdContainer resultContainer;
-    for (const std::size_t activeAssignmentId : activeAssignmentsLookupById) {
-        const InternalAssignmentContainer::ReadOnlyReference activeAssignmentReference = internalAssignmentContainer.count(activeAssignmentId) ? internalAssignmentContainer.at(activeAssignmentId) : nullptr;
-        if (!activeAssignmentReference || !activeAssignmentReference->isStillActive) {
-            continue;
-        }
-
-        syrec::VariableAccess::ptr assignedToSignalPartsOfActiveAssignment = nullptr;
-        if (const std::optional<std::shared_ptr<syrec::AssignStatement>>& activeAssignmentAsBinaryAssignment = tryGetActiveAssignmentAsBinaryAssignment(activeAssignmentReference->data); activeAssignmentAsBinaryAssignment.has_value()) {
-            assignedToSignalPartsOfActiveAssignment = activeAssignmentAsBinaryAssignment->get()->lhs;
-        } else if (const std::optional<std::shared_ptr<syrec::UnaryStatement>>& activeAssignmentAsUnaryAssignment = tryGetActiveAssignmentAsUnaryAssignment(activeAssignmentReference->data); activeAssignmentAsUnaryAssignment.has_value()) {
-            assignedToSignalPartsOfActiveAssignment = activeAssignmentAsUnaryAssignment->get()->var;
-        } else {
-            continue;
-        }
-
-        const SignalAccessUtils::SignalAccessEquivalenceResult signalAccessEquivalenceResult = SignalAccessUtils::areSignalAccessesEqual(*assignedToSignalPartsOfActiveAssignment, signalAccess,
-            SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping, SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping, symbolTableReference);
-        if (signalAccessEquivalenceResult.isResultCertain && signalAccessEquivalenceResult.equality == SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual) {
-            continue;
-        }
-        resultContainer.emplace(activeAssignmentReference->id);
-    }
-    return resultContainer;
-}
-
 TemporaryAssignmentsContainer::OrderedAssignmentIdContainer TemporaryAssignmentsContainer::getDataDependenciesOfAssignment(std::size_t assignmentId) const {
     if (!internalAssignmentContainer.count(assignmentId)) {
         return {};
@@ -106,210 +70,113 @@ std::optional<std::size_t> TemporaryAssignmentsContainer::getIdOfLastGeneratedAs
     return internalAssignmentContainer.empty() ? std::nullopt : std::make_optional(internalAssignmentContainer.cbegin()->first);
 }
 
-bool TemporaryAssignmentsContainer::invertAssignmentsWithIdInRange(std::size_t idOfAssignmentDefiningLowerBoundOfOpenInterval, const std::optional<std::size_t>& idOfAssignmentDefiningUpperBoundOfOpenInterval) {
-    if (internalAssignmentContainer.empty() || activeAssignmentsLookupById.empty()) {
+bool TemporaryAssignmentsContainer::invertAssignmentAndDataDependencies(std::size_t assignmentId) {
+    const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId);
+    if (!matchingAssignmentForId.has_value() || !isAssignmentActive(assignmentId)) {
         return true;
     }
 
-    const std::size_t                   smallestIdOfInvertibleActiveAssignments = *activeAssignmentsLookupById.rbegin();
-    const std::size_t                   largestIdOfInvertibleActiveAssignments  = *activeAssignmentsLookupById.cbegin();
-    std::pair<std::size_t, std::size_t> closedIntervalOfIdsOfAssignmentsToInvert;
-    if (idOfAssignmentDefiningLowerBoundOfOpenInterval >= largestIdOfInvertibleActiveAssignments) {
-        return true;
-    }
-    if (idOfAssignmentDefiningUpperBoundOfOpenInterval.has_value()) {
-        if (idOfAssignmentDefiningLowerBoundOfOpenInterval > *idOfAssignmentDefiningUpperBoundOfOpenInterval) {
-            return false;
-        }
-        if (*idOfAssignmentDefiningUpperBoundOfOpenInterval > largestIdOfInvertibleActiveAssignments + 1) {
-            closedIntervalOfIdsOfAssignmentsToInvert.second = largestIdOfInvertibleActiveAssignments + 1;
-        } else {
-            closedIntervalOfIdsOfAssignmentsToInvert.second = !*idOfAssignmentDefiningUpperBoundOfOpenInterval ? 0 : (*idOfAssignmentDefiningUpperBoundOfOpenInterval - 1);
-        }
-    }
-    else {
-        closedIntervalOfIdsOfAssignmentsToInvert.second = largestIdOfInvertibleActiveAssignments + 1;
-    }
-
-    if (idOfAssignmentDefiningLowerBoundOfOpenInterval < smallestIdOfInvertibleActiveAssignments - 1) {
-        closedIntervalOfIdsOfAssignmentsToInvert.first = smallestIdOfInvertibleActiveAssignments - 1;
-    }
-    else {
-        closedIntervalOfIdsOfAssignmentsToInvert.first = idOfAssignmentDefiningLowerBoundOfOpenInterval + 1;
-    }
-
-    bool inversionOfAssignmentsOk = true;
-    for (std::size_t assignmentId = closedIntervalOfIdsOfAssignmentsToInvert.second; assignmentId >= closedIntervalOfIdsOfAssignmentsToInvert.first && inversionOfAssignmentsOk; --assignmentId) {
-        if (!activeAssignmentsLookupById.count(assignmentId)) {
+    const OrderedAssignmentIdContainer dataDependenciesOfAssignmentToBeInverted = getDataDependenciesOfAssignment(assignmentId);
+    OrderedAssignmentIdContainer dataDependenciesOfInvertedAssignment;
+    for (const std::size_t dataDependency : dataDependenciesOfAssignmentToBeInverted) {
+        if (isAssignmentActive(dataDependency)) {
+            dataDependenciesOfInvertedAssignment.emplace(dataDependency);
             continue;
         }
 
-        if (!replayNotActiveDataDependenciesOfAssignment(assignmentId, false)) {
+        const std::optional<std::size_t> idOfReplayedDataDependency = replayNotActiveAssignment(dataDependency);
+        if (!idOfReplayedDataDependency.has_value()) {
             return false;
         }
-        
-        const std::optional<InternalAssignmentContainer::Reference>& matchingAssignmentForId = getAssignmentById(assignmentId);
-        if (!matchingAssignmentForId.has_value()) {
-            return false;
-        }
-
-        std::optional<AssignmentReferenceVariant> assignmentData;
-        if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(matchingAssignmentForId.value()->data)) {
-            if (const std::shared_ptr<syrec::Statement> copyOfOriginalAssignment = copyUtils::createCopyOfStmt(*std::get<std::shared_ptr<syrec::AssignStatement>>(matchingAssignmentForId->get()->data)); copyOfOriginalAssignment) {
-                std::shared_ptr<syrec::AssignStatement> castedCopyOfOriginalAssignment = std::dynamic_pointer_cast<syrec::AssignStatement>(copyOfOriginalAssignment);
-                invertAssignment(*castedCopyOfOriginalAssignment);
-                assignmentData                                                         = castedCopyOfOriginalAssignment;
-            }
-        } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(matchingAssignmentForId.value()->data)) {
-            if (const std::shared_ptr<syrec::Statement> copyOfOriginalUnaryAssignment = copyUtils::createCopyOfStmt(*std::get<std::shared_ptr<syrec::UnaryStatement>>(matchingAssignmentForId->get()->data)); copyOfOriginalUnaryAssignment) {
-                std::shared_ptr<syrec::UnaryStatement> castedCopyOfOriginalUnaryAssignment = std::dynamic_pointer_cast<syrec::UnaryStatement>(copyOfOriginalUnaryAssignment);
-                invertAssignment(*castedCopyOfOriginalUnaryAssignment);
-                assignmentData                                                             = castedCopyOfOriginalUnaryAssignment;
-            }
-        }
-
-        const std::size_t                 idOfLastGeneratedAssignment                = getIdOfLastGeneratedAssignment().value_or(0);
-        const std::optional<std::size_t>& idOfGeneratedInversionOfOriginalAssignment = storeActiveAssignment(*assignmentData, std::nullopt, matchingAssignmentForId->get()->dataDependencies, 0, assignmentId);
-        if (!idOfGeneratedInversionOfOriginalAssignment.has_value()) {
-            return false;
-        }
-        markAssignmentAsInactiveInLookup(assignmentId);
-        matchingAssignmentForId->get()->idOfReferencedAssignment = *idOfGeneratedInversionOfOriginalAssignment;
-        inversionOfAssignmentsOk = invertAssignmentsWithIdInRange(idOfLastGeneratedAssignment, *idOfGeneratedInversionOfOriginalAssignment);
+        dataDependenciesOfInvertedAssignment.emplace(*idOfReplayedDataDependency);
     }
-    return inversionOfAssignmentsOk;
+
+    std::optional<AssignmentReferenceVariant> generatedCopyOfAssignment = createCopyOfAssignmentFromInternalContainerEntry(**matchingAssignmentForId);
+    if (!generatedCopyOfAssignment.has_value()) {
+        return false;
+    }
+
+    if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(*generatedCopyOfAssignment)) {
+        const std::shared_ptr<syrec::AssignStatement> generatedCopyAsAssignmentStatement = std::get<std::shared_ptr<syrec::AssignStatement>>(*generatedCopyOfAssignment);
+        invertAssignment(*generatedCopyAsAssignmentStatement);
+    } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(*generatedCopyOfAssignment)){
+        const std::shared_ptr<syrec::UnaryStatement> generatedCopyAsUnaryStatement = std::get<std::shared_ptr<syrec::UnaryStatement>>(*generatedCopyOfAssignment);
+        invertAssignment(*generatedCopyAsUnaryStatement);
+    } else {
+        generatedCopyOfAssignment.reset();
+    }
+
+    const std::optional<std::size_t> idOfInversionAssignment = storeActiveAssignment(*generatedCopyOfAssignment, std::nullopt, dataDependenciesOfInvertedAssignment, 0, assignmentId);
+    if (!idOfInversionAssignment.has_value() 
+        || !std::all_of(dataDependenciesOfInvertedAssignment.cbegin(), dataDependenciesOfInvertedAssignment.cend(), [&](const std::size_t dataDependency) { return invertAssignmentAndDataDependencies(dataDependency); })) {
+        return false;
+    }
+    markAssignmentAsInactiveInLookup(assignmentId);
+    matchingAssignmentForId->get()->idOfReferencedAssignment = *idOfInversionAssignment;
+
+    if (matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited.has_value()) {
+        return invertAssignmentAndDataDependencies(*matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited);
+    }
+    return true;
 }
 
-std::optional<std::size_t> TemporaryAssignmentsContainer::findDataDependencyOfCurrentAndChildAssignmentsFittingCriteria(const std::vector<std::size_t>& assignmentsToCheck, DataDependencySortCriteria sortCriteria) const {
-    OrderedAssignmentIdContainer alreadyCheckedAssignments;
-    std::optional<std::size_t>   foundDataDependencyMatchingCriteria;
+std::optional<std::size_t> TemporaryAssignmentsContainer::replayNotActiveAssignment(std::size_t assignmentId) {
+    const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId);
 
-    for (const std::size_t assignmentId : assignmentsToCheck) {
-        const std::optional<std::size_t> dataDependencyMatchingCriteriaOfAssignment = findDataDependencyOfCurrentAndChildAssignmentsFittingCriteria(assignmentId, sortCriteria, alreadyCheckedAssignments);
-        if (dataDependencyMatchingCriteriaOfAssignment.has_value()) {
-            if (!foundDataDependencyMatchingCriteria.has_value() || doesAssignmentIdFulfillSortCriteria(foundDataDependencyMatchingCriteria.value_or(SIZE_MAX), *dataDependencyMatchingCriteriaOfAssignment, sortCriteria)) {
-                foundDataDependencyMatchingCriteria = dataDependencyMatchingCriteriaOfAssignment;
-            }
-        } else if (foundDataDependencyMatchingCriteria.has_value()) {
-            if (doesAssignmentIdFulfillSortCriteria(*foundDataDependencyMatchingCriteria, assignmentId, sortCriteria)) {
-                foundDataDependencyMatchingCriteria = assignmentId;
-            }
-        } else {
-            foundDataDependencyMatchingCriteria = assignmentId;
-        }
-    }
-    return foundDataDependencyMatchingCriteria;
-}
-
-
-TemporaryAssignmentsContainer::OrderedAssignmentIdContainer TemporaryAssignmentsContainer::determineIdsOfAssignmentFormingCompleteInheritanceChainFromEarliestToLastOverlappingAssignment(const syrec::VariableAccess& signalAccessForWhichOverlapsShouldBeFound, const parser::SymbolTable& symbolTableReference) const {
-    const std::optional<std::size_t> idOfLatestOverlappingAssignmentRelativeToLastCreatedOne   = determineIdOfOverlappingAssignmentBasedOnCreationTime(signalAccessForWhichOverlapsShouldBeFound, AssignmentCreationTimeRelativeToLastCreatedOne::Latest, symbolTableReference);
-    const std::optional<std::size_t> idOfEarliestOverlappingAssignmentRelativeToLastCreatedOne = determineIdOfOverlappingAssignmentBasedOnCreationTime(signalAccessForWhichOverlapsShouldBeFound, AssignmentCreationTimeRelativeToLastCreatedOne::Earliest, symbolTableReference);
-    if (!idOfLatestOverlappingAssignmentRelativeToLastCreatedOne.has_value() || !idOfEarliestOverlappingAssignmentRelativeToLastCreatedOne.has_value()) {
-        return {};
+    if (!matchingAssignmentForId.has_value() || isAssignmentActive(assignmentId)) {
+        return assignmentId;
     }
 
-    OrderedAssignmentIdContainer idsOfAssignmentsFormingInheritanceChainOrderFromEarliestToLatestOverlappingAssignmentRelativeToLastCreatedOne;
-    const auto&                  inheritanceChainUpperBoundIdRestriction = std::next(internalAssignmentContainer.find(*idOfEarliestOverlappingAssignmentRelativeToLastCreatedOne));
-    auto                         internalAssignmentContainerIterator     = internalAssignmentContainer.find(*idOfLatestOverlappingAssignmentRelativeToLastCreatedOne);
-    do {
-        if (internalAssignmentContainerIterator->second->assignmentType == InternalAssignmentContainer::InversionOfSubAssignment) {
+    const OrderedAssignmentIdContainer dataDependenciesOfAssignmentToBeReplayed = getDataDependenciesOfAssignment(assignmentId);
+    OrderedAssignmentIdContainer       dataDependenciesOfReplayedAssignment;
+    for (const std::size_t dataDependency: dataDependenciesOfAssignmentToBeReplayed) {
+        if (isAssignmentActive(dataDependency)) {
+            dataDependenciesOfReplayedAssignment.emplace(dataDependency);
             continue;
         }
-        idsOfAssignmentsFormingInheritanceChainOrderFromEarliestToLatestOverlappingAssignmentRelativeToLastCreatedOne.emplace(internalAssignmentContainerIterator->first);
-    } while (++internalAssignmentContainerIterator != inheritanceChainUpperBoundIdRestriction);
-    return idsOfAssignmentsFormingInheritanceChainOrderFromEarliestToLatestOverlappingAssignmentRelativeToLastCreatedOne;
-}
 
-std::optional<std::size_t> TemporaryAssignmentsContainer::determineIdOfOverlappingAssignmentBasedOnCreationTime(const syrec::VariableAccess& signalAccessForWhichOverlapsShouldBeFound, AssignmentCreationTimeRelativeToLastCreatedOne relativeAssignmentCreationTime, const parser::SymbolTable& symbolTableReference) const {
-    switch (relativeAssignmentCreationTime) {
-        case TemporaryAssignmentsContainer::AssignmentCreationTimeRelativeToLastCreatedOne::Earliest: {
-            const auto& earliestFoundOverlappingAssignment = std::find_if(
-                    internalAssignmentContainer.cbegin(),
-                    internalAssignmentContainer.cend(),
-                    [&signalAccessForWhichOverlapsShouldBeFound, &symbolTableReference](const std::pair<std::size_t, InternalAssignmentContainer::Reference>& internalContainerEntry) {
-                        const syrec::VariableAccess::ptr& assignedToSignalPartsOfLookupEntry = internalContainerEntry.second->getAssignedToSignalParts();
-                        return assignedToSignalPartsOfLookupEntry && doSignalAccessesOverlap(*assignedToSignalPartsOfLookupEntry, signalAccessForWhichOverlapsShouldBeFound, symbolTableReference);
-                    });
-            if (earliestFoundOverlappingAssignment != internalAssignmentContainer.cend()) {
-                return earliestFoundOverlappingAssignment->first;
-            }
+        const std::optional<std::size_t> idOfReplayedDataDependency = replayNotActiveAssignment(dataDependency);
+        if (!idOfReplayedDataDependency.has_value()) {
             return std::nullopt;
         }
-        case TemporaryAssignmentsContainer::AssignmentCreationTimeRelativeToLastCreatedOne::Latest: {
-            const auto& latestFoundOverlappingAssignment = std::find_if(
-                    internalAssignmentContainer.crbegin(),
-                    internalAssignmentContainer.crend(),
-                    [&signalAccessForWhichOverlapsShouldBeFound, &symbolTableReference](const std::pair<std::size_t, InternalAssignmentContainer::Reference>& internalContainerEntry) {
-                        const syrec::VariableAccess::ptr& assignedToSignalPartsOfLookupEntry = internalContainerEntry.second->getAssignedToSignalParts();
-                        return assignedToSignalPartsOfLookupEntry && doSignalAccessesOverlap(*assignedToSignalPartsOfLookupEntry, signalAccessForWhichOverlapsShouldBeFound, symbolTableReference);
-                    });
-            if (latestFoundOverlappingAssignment != internalAssignmentContainer.crend()) {
-                return latestFoundOverlappingAssignment->first;
-            }
+        dataDependenciesOfReplayedAssignment.emplace(*idOfReplayedDataDependency);
+    }
+
+    const std::optional<AssignmentReferenceVariant> generatedCopyOfAssignment = createCopyOfAssignmentFromInternalContainerEntry(**matchingAssignmentForId);
+    if (!generatedCopyOfAssignment.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::optional<std::size_t> idOfReplayedAssignment = storeActiveAssignment(*generatedCopyOfAssignment, std::nullopt, dataDependenciesOfReplayedAssignment, 0, std::nullopt);
+    if (!idOfReplayedAssignment.has_value()
+        || !std::all_of(dataDependenciesOfReplayedAssignment.cbegin(), dataDependenciesOfReplayedAssignment.cend(), [&](const std::size_t dataDependency) { return invertAssignmentAndDataDependencies(dataDependency); })) {
+        return std::nullopt;
+    }
+
+    if (matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited.has_value()) {
+        const std::optional<InternalAssignmentContainer::Reference> matchingReplayedAssignment        = getAssignmentById(*idOfReplayedAssignment);
+        matchingReplayedAssignment->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited = replayNotActiveAssignment(*matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited);
+        if (!matchingReplayedAssignment->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited.has_value()) {
             return std::nullopt;
         }
-        default:
-            return std::nullopt;
     }
+    return idOfReplayedAssignment;
 }
 
-
-
-
-void TemporaryAssignmentsContainer::replayNotActiveDataDependencies(const OrderedAssignmentIdContainer& dataDependencies, std::size_t associatedWithOperationNodeId) {
-    OrderedAssignmentIdContainer notActiveDataDependenciesOrderedByEarliestOccurrenceRelativeToLastActiveOneFirst;
-    for (const std::size_t idOfAssignmentIdentifiedAsDataDependency: dataDependencies) {
-        notActiveDataDependenciesOrderedByEarliestOccurrenceRelativeToLastActiveOneFirst.merge(getDirectAndChildDataDependenciesOfAssignment(idOfAssignmentIdentifiedAsDataDependency, DataDependencyActiveFlag::Inactive));
-    }
-    const std::vector<std::size_t> idsOfToBeReplayedAssignmentsOrderedByLatestOccurrenceRelativeToLastActiveOneFirst = std::vector(notActiveDataDependenciesOrderedByEarliestOccurrenceRelativeToLastActiveOneFirst.rend(), notActiveDataDependenciesOrderedByEarliestOccurrenceRelativeToLastActiveOneFirst.rbegin());
-    // If an assignment is active, its child elements should also be still be active
-    for (const std::size_t idOfToBeReplayedAssignment: idsOfToBeReplayedAssignmentsOrderedByLatestOccurrenceRelativeToLastActiveOneFirst) {
-        if (const std::optional<InternalAssignmentContainer::Reference> toBeReplayedAssignment = getAssignmentById(idOfToBeReplayedAssignment); toBeReplayedAssignment.has_value()) {
-            const std::optional<std::size_t>                            idOfLatestInversionOfToBeReplayedAssignment = getIdOfLastInversionOfAssignment(toBeReplayedAssignment->get()->idOfReferencedAssignment);
-            const std::optional<InternalAssignmentContainer::Reference> latestInversionOfToBeReplayedAssignment     = idOfLatestInversionOfToBeReplayedAssignment.has_value() ? getAssignmentById(*idOfLatestInversionOfToBeReplayedAssignment) : std::nullopt;
-            if (latestInversionOfToBeReplayedAssignment.has_value()) {
-                const AssignmentReferenceVariant   toBeReplayedAssignmentData               = toBeReplayedAssignment->get()->data;
-                const OrderedAssignmentIdContainer dataDependenciesOfToBeReplayedAssignment = toBeReplayedAssignment->get()->dataDependencies;
-                if (const std::optional<std::size_t> idOfReplayedAssignment = storeActiveAssignment(toBeReplayedAssignmentData, toBeReplayedAssignment->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited, dataDependenciesOfToBeReplayedAssignment, associatedWithOperationNodeId, std::nullopt); idOfReplayedAssignment.has_value()) {
-                    latestInversionOfToBeReplayedAssignment->get()->idOfReferencedAssignment = *idOfReplayedAssignment;
-                    latestInversionOfToBeReplayedAssignment->get()->isStillActive           = true;
-                }
-            }
+std::optional<TemporaryAssignmentsContainer::AssignmentReferenceVariant> TemporaryAssignmentsContainer::createCopyOfAssignmentFromInternalContainerEntry(const InternalAssignmentContainer& assignmentToCopy) {
+    if (const std::shared_ptr<syrec::AssignStatement> assignmentToCopyAsAssignStatement = std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(assignmentToCopy.data) ? std::get<std::shared_ptr<syrec::AssignStatement>>(assignmentToCopy.data) : nullptr; assignmentToCopyAsAssignStatement) {
+        if (std::optional<OwningAssignmentReferenceVariant> owningCopyOfAssignStatement = createOwningCopyOfAssignment(*assignmentToCopyAsAssignStatement); owningCopyOfAssignStatement.has_value() && std::holds_alternative<std::unique_ptr<syrec::AssignStatement>>(*owningCopyOfAssignStatement)) {
+            std::shared_ptr<syrec::AssignStatement> finalOwningCopyOfAssignAssignment = std::move(std::get<std::unique_ptr<syrec::AssignStatement>>(*owningCopyOfAssignStatement));
+            return finalOwningCopyOfAssignAssignment;
+        }
+    } else if (const std::shared_ptr<syrec::UnaryStatement> assignmentToCopyAsUnaryStatement = std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(assignmentToCopy.data) ? std::get<std::shared_ptr<syrec::UnaryStatement>>(assignmentToCopy.data) : nullptr; assignmentToCopyAsUnaryStatement) {
+        if (std::optional<OwningAssignmentReferenceVariant> owningCopyOfUnaryStatement = createOwningCopyOfAssignment(*assignmentToCopyAsUnaryStatement); owningCopyOfUnaryStatement.has_value() && std::holds_alternative<std::unique_ptr<syrec::UnaryStatement>>(*owningCopyOfUnaryStatement)) {
+            std::shared_ptr<syrec::UnaryStatement> finalOwningCopyOfUnaryAssignment = std::move(std::get<std::unique_ptr<syrec::UnaryStatement>>(*owningCopyOfUnaryStatement));
+            return finalOwningCopyOfUnaryAssignment;
         }
     }
+    return std::nullopt;
 }
-
-void TemporaryAssignmentsContainer::invertAssignmentAndDataDependencies(std::size_t assignmentId) {
-    const OrderedAssignmentIdContainer idsOfToBeInvertedAssignmentsOrderedByEarliestOccurrenceRelativeToLastActiveOneFirst = getDirectAndChildDataDependenciesOfAssignment(assignmentId, DataDependencyActiveFlag::Active);
-    for (const std::size_t idOfToBeInvertedAssignment: idsOfToBeInvertedAssignmentsOrderedByEarliestOccurrenceRelativeToLastActiveOneFirst) {
-        invertAssignmentAndStoreAndMarkOriginalAsInactive(idOfToBeInvertedAssignment);
-    }
-    invertAssignmentAndStoreAndMarkOriginalAsInactive(assignmentId);
-}
-
-void TemporaryAssignmentsContainer::invertAssignmentsButLeaveDataDependenciesUnchanged(const OrderedAssignmentIdContainer& orderedIdsOfAssignmentToInvert) {
-    for (const std::size_t assignmentId : orderedIdsOfAssignmentToInvert) {
-        invertAssignmentAndStoreAndMarkOriginalAsInactive(assignmentId);
-    }
-}
-
-TemporaryAssignmentsContainer::OrderedAssignmentIdContainer TemporaryAssignmentsContainer::getIdsOfAssignmentsDefiningInheritanceChainToCurrentOne(std::size_t idOfLastAssignmentInheritingAssignedToSignalParts) const {
-    OrderedAssignmentIdContainer orderedInheritanceChainStartingFromMostRecentOne;
-
-    std::size_t currentAssignmentToCheck = idOfLastAssignmentInheritingAssignedToSignalParts;
-    while (currentAssignmentToCheck) {
-        const std::optional<InternalAssignmentContainer::ReadOnlyReference> matchingActiveAssignmentForId = getMatchingActiveSubassignmentById(currentAssignmentToCheck);
-        orderedInheritanceChainStartingFromMostRecentOne.emplace(idOfLastAssignmentInheritingAssignedToSignalParts);
-        if (matchingActiveAssignmentForId.has_value()) {
-            currentAssignmentToCheck = matchingActiveAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited.value_or(0);   
-        } else {
-            currentAssignmentToCheck = 0;
-        }
-    }
-    return orderedInheritanceChainStartingFromMostRecentOne;
-}
-
 
 bool TemporaryAssignmentsContainer::storeInitializationForReplacementOfLeafNode(const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const std::optional<AssignmentReferenceVariant>& optionalRequiredResetOfSubstitutionLhsOperand) {
     const std::shared_ptr<syrec::AssignStatement> castedAssignmentDefiningSubstitution = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentDefiningSubstitution);
@@ -340,21 +207,6 @@ void TemporaryAssignmentsContainer::markCutoffForInvertibleAssignments() {
     cutOffIndicesForInvertibleAssignments.emplace_back(internalAssignmentContainer.size());
 }
 
-/*
- * END OF REWORK
- */
-void TemporaryAssignmentsContainer::invertAllActiveAssignmentsExcludingFirstActiveOne() {
-    if (activeAssignmentsLookupById.empty() || activeAssignmentsLookupById.size() == 1) {
-        return;
-    }
-
-    const OrderedAssignmentIdContainer assignmentsToInvert(std::next(activeAssignmentsLookupById.begin()), activeAssignmentsLookupById.end());
-    for (const auto& activeAssignmentId: assignmentsToInvert) {
-        const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(activeAssignmentId);
-        invertAssignmentAndDataDependencies(activeAssignmentId);
-    }
-}
-
 void TemporaryAssignmentsContainer::popLastCutoffForInvertibleAssignments() {
     if (!cutOffIndicesForInvertibleAssignments.empty()) {
         cutOffIndicesForInvertibleAssignments.pop_back();
@@ -371,14 +223,11 @@ void TemporaryAssignmentsContainer::rollbackLastXAssignments(std::size_t numberO
     for (auto generatedAssignmentLookupEntry = internalAssignmentContainer.begin(); generatedAssignmentLookupEntry != internalAssignmentContainer.end() && numRemovedAssignments < actualNumberOfAssignmentsRemoved;) {
         if (const std::optional<InternalAssignmentContainer::Reference> dataOfInvertedAssignment = getAssignmentById(generatedAssignmentLookupEntry->second->idOfReferencedAssignment); dataOfInvertedAssignment.has_value()) {
             dataOfInvertedAssignment->get()->idOfReferencedAssignment = 0;
-            dataOfInvertedAssignment->get()->isStillActive           = true;
             if (generatedAssignmentLookupEntry->second->assignmentType == InternalAssignmentContainer::AssignmentType::SubAssignmentGeneration) {
-                activeAssignmentsLookupById.emplace(dataOfInvertedAssignment->get()->id);   
+                markAssignmentAsActiveInLookup(dataOfInvertedAssignment->get()->id);
             }
         }
-        if (generatedAssignmentLookupEntry->second->isStillActive) {
-            markAssignmentAsInactiveInLookup(generatedAssignmentLookupEntry->first);
-        }
+        markAssignmentAsInactiveInLookup(generatedAssignmentLookupEntry->first);
         generatedAssignmentLookupEntry = internalAssignmentContainer.erase(generatedAssignmentLookupEntry);
         numRemovedAssignments++;
     }
@@ -421,7 +270,8 @@ std::vector<TemporaryAssignmentsContainer::AssignmentReferenceVariant> Temporary
     combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.insert(combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.end(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.cbegin(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.cend());
     auto insertPositionOfGeneratedAssignments = std::next(combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.begin(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.size());
     for (const auto& generatedAssignmentIterator: internalAssignmentContainer) {
-        combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.emplace(insertPositionOfGeneratedAssignments++, generatedAssignmentIterator.second->data);
+        combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.emplace_back(generatedAssignmentIterator.second->data);
+        //combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.emplace(insertPositionOfGeneratedAssignments++, generatedAssignmentIterator.second->data);
     }
     /*
      * To allow a reuse of the generated replacements, we need to reset our generated assignments defining the substitution of an operand of an operation node. Since the assignments defining the substitutions all use the XOR assignment operation,
@@ -493,122 +343,8 @@ std::size_t TemporaryAssignmentsContainer::getNumberOfAssignments() const {
 
 //// START OF NON-PUBLIC FUNCTIONS
 ///
-
-bool TemporaryAssignmentsContainer::replayNotActiveDataDependenciesOfAssignment(std::size_t assignmentId, bool replayAssignmentItself) {
-    const OrderedAssignmentIdContainer dataDependenciesOfAssignment = getDataDependenciesOfAssignment(assignmentId);
-    for (const std::size_t dataDependency : dataDependenciesOfAssignment) {
-        if (const std::optional<bool> isDataDependencyActive = isAssignmentActive(dataDependency); isDataDependencyActive.has_value()) {
-            if (*isDataDependencyActive) {
-                continue;
-            }
-            if (!replayNotActiveDataDependenciesOfAssignment(dataDependency, true)) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
-
-    if (!replayAssignmentItself) {
-        return true;
-    }
-
-    const std::optional<InternalAssignmentContainer::Reference>& matchingAssignmentForId = getAssignmentById(assignmentId);
-    if (!matchingAssignmentForId.has_value()) {
-        return false;
-    }
-
-    std::optional<AssignmentReferenceVariant> assignmentData;
-    if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(matchingAssignmentForId.value()->data)) {
-        if (const std::shared_ptr<syrec::Statement> copyOfOriginalAssignment = copyUtils::createCopyOfStmt(*std::get<std::shared_ptr<syrec::AssignStatement>>(matchingAssignmentForId->get()->data)); copyOfOriginalAssignment) {
-            std::shared_ptr<syrec::AssignStatement> castedCopyOfOriginalAssignment = std::dynamic_pointer_cast<syrec::AssignStatement>(copyOfOriginalAssignment);
-            assignmentData                                                         = castedCopyOfOriginalAssignment;
-        }
-    } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(matchingAssignmentForId.value()->data)) {
-        if (const std::shared_ptr<syrec::Statement> copyOfOriginalUnaryAssignment = copyUtils::createCopyOfStmt(*std::get<std::shared_ptr<syrec::UnaryStatement>>(matchingAssignmentForId->get()->data)); copyOfOriginalUnaryAssignment) {
-            std::shared_ptr<syrec::UnaryStatement> castedCopyOfOriginalUnaryAssignment = std::dynamic_pointer_cast<syrec::UnaryStatement>(copyOfOriginalUnaryAssignment);
-            assignmentData                                                             = castedCopyOfOriginalUnaryAssignment;
-        }
-    }
-    const std::optional<std::size_t>& idOfGeneratedInversionOfOriginalAssignment = storeActiveAssignment(*assignmentData, std::nullopt, dataDependenciesOfAssignment, 0, std::nullopt);
-    /*
-     *  const std::optional<std::size_t>                            idOfLatestInversionOfToBeReplayedAssignment = getIdOfLastInversionOfAssignment(toBeReplayedAssignment->get()->idOfReferencedAssignment);
-            const std::optional<InternalAssignmentContainer::Reference> latestInversionOfToBeReplayedAssignment     = idOfLatestInversionOfToBeReplayedAssignment.has_value() ? getAssignmentById(*idOfLatestInversionOfToBeReplayedAssignment) : std::nullopt;
-            if (latestInversionOfToBeReplayedAssignment.has_value()) {
-            
-     */
-    return idOfGeneratedInversionOfOriginalAssignment.has_value();
-}
-
-std::optional<bool> TemporaryAssignmentsContainer::isAssignmentActive(std::size_t assignmentId) const {
-    const std::optional<InternalAssignmentContainer::Reference>& matchingAssignmentForId = getAssignmentById(assignmentId);
-    return matchingAssignmentForId.has_value() && matchingAssignmentForId->get()->isStillActive;
-}
-
-std::optional<std::size_t> TemporaryAssignmentsContainer::findDataDependencyOfCurrentAndChildAssignmentsFittingCriteria(std::size_t assignmentId, DataDependencySortCriteria sortCriteria, OrderedAssignmentIdContainer& alreadyCheckedAssignmentIds) const {
-    if (alreadyCheckedAssignmentIds.count(assignmentId)) {
-        return std::nullopt;
-    }
-
-    std::optional<std::size_t> foundDataDependencyMatchingCriteria;
-    for (const std::size_t dataDependency: getDataDependenciesOfAssignment(assignmentId)) {
-        if (alreadyCheckedAssignmentIds.count(dataDependency)) {
-            continue;
-        }
-
-        const std::optional<std::size_t> dataDependencyMatchingCriteriaOfAssignment = findDataDependencyOfCurrentAndChildAssignmentsFittingCriteria(dataDependency, sortCriteria, alreadyCheckedAssignmentIds);
-        if (dataDependencyMatchingCriteriaOfAssignment.has_value()) {
-            if (!foundDataDependencyMatchingCriteria.has_value() || doesAssignmentIdFulfillSortCriteria(foundDataDependencyMatchingCriteria.value_or(SIZE_MAX), *dataDependencyMatchingCriteriaOfAssignment, sortCriteria)) {
-                foundDataDependencyMatchingCriteria = dataDependencyMatchingCriteriaOfAssignment;
-            }
-        } else if (foundDataDependencyMatchingCriteria.has_value()) {
-            if (doesAssignmentIdFulfillSortCriteria(*foundDataDependencyMatchingCriteria, assignmentId, sortCriteria)) {
-                foundDataDependencyMatchingCriteria = assignmentId;
-            }
-        } else {
-            foundDataDependencyMatchingCriteria = assignmentId;
-        }
-        alreadyCheckedAssignmentIds.emplace(dataDependency);
-    }
-    return foundDataDependencyMatchingCriteria;
-}
-
-TemporaryAssignmentsContainer::OrderedAssignmentIdContainer TemporaryAssignmentsContainer::getDirectAndChildDataDependenciesOfAssignment(std::size_t assignmentId, DataDependencyActiveFlag isActiveFilterOnlyReturningMatchingElements) const {
-    OrderedAssignmentIdContainer activeAssignmentContainer;
-
-    if (const std::optional<InternalAssignmentContainer::Reference>& referencedAssignment = getAssignmentById(assignmentId); referencedAssignment.has_value() && isActiveFilterOnlyReturningMatchingElements == referencedAssignment->get()->isStillActive) {
-        std::unordered_set<std::size_t> alreadyProcessedAssignmentLookup;
-        for (const std::size_t dataDependencyOfReferencedAssignment: referencedAssignment->get()->dataDependencies) {
-            const OrderedAssignmentIdContainer childDependenciesOfDataDependency = getDirectAndChildDataDependenciesOfAssignment(dataDependencyOfReferencedAssignment, isActiveFilterOnlyReturningMatchingElements, alreadyProcessedAssignmentLookup);
-            activeAssignmentContainer.merge(getDirectAndChildDataDependenciesOfAssignment(dataDependencyOfReferencedAssignment, isActiveFilterOnlyReturningMatchingElements, alreadyProcessedAssignmentLookup));
-        }
-    }
-    return activeAssignmentContainer;
-}
-
-TemporaryAssignmentsContainer::OrderedAssignmentIdContainer TemporaryAssignmentsContainer::getDirectAndChildDataDependenciesOfAssignment(std::size_t assignmentId, DataDependencyActiveFlag isActiveFilterOnlyReturningMatchingElements, std::unordered_set<std::size_t>& idsOfAlreadyProcessedAssignments) const {
-    if (idsOfAlreadyProcessedAssignments.count(assignmentId)) {
-        return {};
-    }
-
-    if (const std::optional<InternalAssignmentContainer::Reference>& referencedAssignment = getAssignmentById(assignmentId); referencedAssignment.has_value() && referencedAssignment->get()->isStillActive == isActiveFilterOnlyReturningMatchingElements) {
-        idsOfAlreadyProcessedAssignments.emplace(assignmentId);
-        OrderedAssignmentIdContainer resultContainer;
-        resultContainer.emplace(assignmentId);
-
-        for (const std::size_t dataDependencyOfReferencedAssignment: referencedAssignment->get()->dataDependencies) {
-            resultContainer.merge(getDirectAndChildDataDependenciesOfAssignment(dataDependencyOfReferencedAssignment, isActiveFilterOnlyReturningMatchingElements, idsOfAlreadyProcessedAssignments));
-        }
-        return resultContainer;
-    }
-    return {};
-}
-
-std::optional<std::size_t> TemporaryAssignmentsContainer::getIdOfLastInversionOfAssignment(std::size_t assignmentId) const {
-    if (const std::optional<InternalAssignmentContainer::Reference> assignmentData = getAssignmentById(assignmentId); assignmentData.has_value() && !assignmentData->get()->isStillActive) {
-        return getIdOfLastInversionOfAssignment(assignmentData->get()->idOfReferencedAssignment);
-    }
-    return std::nullopt;
+inline bool TemporaryAssignmentsContainer::isAssignmentActive(std::size_t assignmentId) const {
+    return activeAssignmentsLookupById.count(assignmentId);
 }
 
 std::optional<std::size_t> TemporaryAssignmentsContainer::storeActiveAssignment(const AssignmentReferenceVariant& assignmentData, const std::optional<std::size_t>& idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited, const OrderedAssignmentIdContainer& dataDependencies, std::size_t associatedWithOperationNodeId, const std::optional<std::size_t>& optionalIdOfInvertedAssignment) {
@@ -624,44 +360,21 @@ std::optional<std::size_t> TemporaryAssignmentsContainer::storeActiveAssignment(
         ? InternalAssignmentContainer::asInversionOfSubAssignment(chosenAssignmentId, *optionalIdOfInvertedAssignment, assignmentData, dataDependencies)
         : InternalAssignmentContainer::asSubAssignment(chosenAssignmentId, associatedWithOperationNodeId, idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited, assignmentData, dataDependencies)); createdAssignment) {
         internalAssignmentContainer.emplace(chosenAssignmentId, createdAssignment);
-        if (createdAssignment->assignmentType == InternalAssignmentContainer::AssignmentType::SubAssignmentGeneration) {
+        /*if (createdAssignment->assignmentType == InternalAssignmentContainer::AssignmentType::SubAssignmentGeneration) {
             activeAssignmentsLookupById.emplace(chosenAssignmentId);       
-        }
+        }*/
+        activeAssignmentsLookupById.emplace(chosenAssignmentId);       
         return chosenAssignmentId;
     }
     return std::nullopt;
 }
 
-
-void TemporaryAssignmentsContainer::invertAssignmentAndStoreAndMarkOriginalAsInactive(std::size_t idOfToBeInvertedAssignment) {
-    const std::optional<InternalAssignmentContainer::Reference>& matchingAssignmentForId = getAssignmentById(idOfToBeInvertedAssignment);
-    if (!matchingAssignmentForId.has_value()) {
-        return;
-    }
-
-    std::optional<AssignmentReferenceVariant> invertedAssignmentData;
-    if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(matchingAssignmentForId.value()->data)) {
-        if (const std::shared_ptr<syrec::Statement> copyOfOriginalAssignment = copyUtils::createCopyOfStmt(*std::get<std::shared_ptr<syrec::AssignStatement>>(matchingAssignmentForId->get()->data)); copyOfOriginalAssignment) {
-            std::shared_ptr<syrec::AssignStatement> castedCopyOfOriginalAssignment = std::dynamic_pointer_cast<syrec::AssignStatement>(copyOfOriginalAssignment);
-            invertAssignment(*castedCopyOfOriginalAssignment);
-            invertedAssignmentData = castedCopyOfOriginalAssignment;
-        } 
-    } else if (std::holds_alternative<std::shared_ptr<syrec::UnaryStatement>>(matchingAssignmentForId.value()->data)) {
-        if (const std::shared_ptr<syrec::Statement> copyOfOriginalUnaryAssignment = copyUtils::createCopyOfStmt(*std::get<std::shared_ptr<syrec::UnaryStatement>>(matchingAssignmentForId->get()->data)); copyOfOriginalUnaryAssignment) {
-            std::shared_ptr<syrec::UnaryStatement> castedCopyOfOriginalUnaryAssignment = std::dynamic_pointer_cast<syrec::UnaryStatement>(copyOfOriginalUnaryAssignment);
-            invertAssignment(*castedCopyOfOriginalUnaryAssignment);
-            invertedAssignmentData = castedCopyOfOriginalUnaryAssignment;
-        }
-    }
-    
-    if (const std::optional<std::size_t>& idOfGeneratedInversionOfOriginalAssignment = storeActiveAssignment(*invertedAssignmentData, std::nullopt, matchingAssignmentForId->get()->dataDependencies, 0, idOfToBeInvertedAssignment); idOfGeneratedInversionOfOriginalAssignment.has_value()) {
-        markAssignmentAsInactiveInLookup(idOfToBeInvertedAssignment);
-        matchingAssignmentForId->get()->isStillActive           = false;
-        matchingAssignmentForId->get()->idOfReferencedAssignment = *idOfGeneratedInversionOfOriginalAssignment;
-    }
+inline void TemporaryAssignmentsContainer::markAssignmentAsActiveInLookup(std::size_t assigmentId) {
+    activeAssignmentsLookupById.emplace(assigmentId);
 }
 
-void TemporaryAssignmentsContainer::markAssignmentAsInactiveInLookup(std::size_t assignmentId) {
+
+inline void TemporaryAssignmentsContainer::markAssignmentAsInactiveInLookup(std::size_t assignmentId) {
     activeAssignmentsLookupById.erase(assignmentId);
 }
 
@@ -678,11 +391,11 @@ std::optional<TemporaryAssignmentsContainer::InternalAssignmentContainer::Refere
 }
 
 std::optional<TemporaryAssignmentsContainer::InternalAssignmentContainer::ReadOnlyReference> TemporaryAssignmentsContainer::getMatchingActiveSubassignmentById(std::size_t assignmentId) const {
-    if (!activeAssignmentsLookupById.count(assignmentId)) {
+    if (!isAssignmentActive(assignmentId)) {
         return std::nullopt;
     }
 
-    if (const std::optional<TemporaryAssignmentsContainer::InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId); matchingAssignmentForId.has_value() && matchingAssignmentForId->get()->isStillActive
+    if (const std::optional<TemporaryAssignmentsContainer::InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId); matchingAssignmentForId.has_value()
         && matchingAssignmentForId->get()->assignmentType == InternalAssignmentContainer::SubAssignmentGeneration) {
         return *matchingAssignmentForId;
     }
@@ -789,15 +502,4 @@ bool TemporaryAssignmentsContainer::doSignalAccessesOverlap(const syrec::Variabl
         return true;
     }
     return false;
-}
-
-bool TemporaryAssignmentsContainer::doesAssignmentIdFulfillSortCriteria(std::size_t referenceAssignmentId, std::size_t newAssignmentId, DataDependencySortCriteria sortCriteria) {
-    switch (sortCriteria) {
-        case TemporaryAssignmentsContainer::DataDependencySortCriteria::Smallest:
-            return newAssignmentId < referenceAssignmentId;
-        case TemporaryAssignmentsContainer::DataDependencySortCriteria::Largest:
-            return newAssignmentId > referenceAssignmentId;
-        default:
-            return false;
-    }
 }

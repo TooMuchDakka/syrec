@@ -1,4 +1,11 @@
 #include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
+#include "core/syrec/parser/optimizations/noAdditionalLineSynthesis/assignment_without_additional_lines_simplifier.hpp"
 #include "core/syrec/parser/utils/copy_utils.hpp"
 #include "core/syrec/parser/utils/signal_access_utils.hpp"
 
@@ -77,6 +84,11 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::Simplifica
         return SimplificationResult::createOwningReferenceOf(SimplificationResult::asEmptyResult());
     }
 
+    topmostAssignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(transformedAssignmentStmt->op);
+    if (!topmostAssignmentOperation.has_value()) {
+        return SimplificationResult::createOwningReferenceOf(SimplificationResult::asEmptyResult());
+    }
+
     expressionTraversalHelper->buildTraversalQueue(transformedAssignmentStmt->rhs, *symbolTableReference);
     disableValueLookup();
     const std::vector<syrec::VariableAccess::ptr> replacementCandidateRestrictionsStemmingFromAssignment = defineNotUsableReplacementCandidatesFromAssignmentForGenerator(*transformedAssignmentStmt);
@@ -115,11 +127,17 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::Simplifica
             }
         } else {
             generatedAssignmentRhsExpr = *generatedExprForTopmostOperationRhsExpr;
+            const std::vector<std::size_t>& dataDependenciesInheritedForTopmostAssignment = simplificationResultOfTopmostOperationNode->get()->getDataDependenciesAsIdsOfDependentAssignments();
+            dataDependenciesOfTopmostAssignmentStatement.insert(dataDependenciesInheritedForTopmostAssignment.cbegin(), dataDependenciesInheritedForTopmostAssignment.cend());
         }
 
-        if (const std::shared_ptr<syrec::AssignStatement> generatedAssignment = std::make_shared<syrec::AssignStatement>(generatedAssignmentAssignedToSignal,transformedAssignmentStmt->op,generatedAssignmentRhsExpr); generatedAssignment){
+        unsigned int mappedToAssignmentOperationFlagValue = transformedAssignmentStmt->op;
+        if (topmostAssignmentOperation.has_value()) {
+            mappedToAssignmentOperationFlagValue = syrec_operation::tryMapAssignmentOperationEnumToFlag(*topmostAssignmentOperation).value_or(transformedAssignmentStmt->op);
+        }
+        if (const std::shared_ptr<syrec::AssignStatement> generatedAssignment = std::make_shared<syrec::AssignStatement>(generatedAssignmentAssignedToSignal, mappedToAssignmentOperationFlagValue, generatedAssignmentRhsExpr); generatedAssignment) {
             const std::optional<std::size_t> idOfTopmostAssignment = generatedAssignmentsContainer->storeActiveAssignment(generatedAssignment, std::nullopt, dataDependenciesOfTopmostAssignmentStatement, 0, std::nullopt);
-            if (!idOfTopmostAssignment.has_value() || !generatedAssignmentsContainer->invertAssignmentsWithIdInRange(0, idOfTopmostAssignment.value())) {
+            if (!idOfTopmostAssignment.has_value() || !std::all_of(dataDependenciesOfTopmostAssignmentStatement.cbegin(), dataDependenciesOfTopmostAssignmentStatement.cend(), [&](const std::size_t dataDependency) { return generatedAssignmentsContainer->invertAssignmentAndDataDependencies(dataDependency); })) {
                 return SimplificationResult::createOwningReferenceOf(SimplificationResult::asEmptyResult());
             }
         }
@@ -273,82 +291,60 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
     expressionTraversalHelper->markOperationNodeAsPotentialBacktrackOption(operationNode->id);
     generatedAssignmentsContainer->markCutoffForInvertibleAssignments();
 
-    const bool                                          wasLhsOperandLeafNode        = operationNode->getLeafNodeOperandId().value() == operationNode->lhsOperand.id;
-    const std::optional<syrec::VariableExpression::ptr> dataOfLeafNodeAsVariableExpr = expressionTraversalHelper->getOperandAsVariableExpr(wasLhsOperandLeafNode ? operationNode->lhsOperand.id : operationNode->rhsOperand.id);
+    const bool                                          wasLhsOperandLeafNode                               = operationNode->getLeafNodeOperandId().value() == operationNode->lhsOperand.id;
+    const std::optional<syrec::VariableExpression::ptr> dataOfLeafNodeAsVariableExpr                        = expressionTraversalHelper->getOperandAsVariableExpr(wasLhsOperandLeafNode ? operationNode->lhsOperand.id : operationNode->rhsOperand.id);
     const std::size_t                                   idOfLastActiveAssignmentPriorToProcessingOfLeafNode = generatedAssignmentsContainer->getIdOfLastGeneratedAssignment().value_or(0);
+    std::shared_ptr<syrec::VariableExpression>          castedLeafNodeAsVariableExpr                        = dataOfLeafNodeAsVariableExpr.has_value() ? std::dynamic_pointer_cast<syrec::VariableExpression>(*dataOfLeafNodeAsVariableExpr) : nullptr;
 
-    if (const std::shared_ptr<syrec::VariableExpression> castedExprDefiningDataOfLeafNode = dataOfLeafNodeAsVariableExpr.has_value() && wasLhsOperandLeafNode ? std::dynamic_pointer_cast<syrec::VariableExpression>(*dataOfLeafNodeAsVariableExpr) : nullptr; castedExprDefiningDataOfLeafNode) {
-        const std::size_t searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId = operationNode->id;
-        const std::size_t searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId = operationNode->rhsOperand.operationNodeId.value_or(SIZE_MAX) - 1;
-        if (const std::optional<std::size_t>& idOfAssignmentOverlappingWithGivenSignalAccess = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(*castedExprDefiningDataOfLeafNode->var, searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId, searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId, *symbolTableReference); idOfAssignmentOverlappingWithGivenSignalAccess.has_value()
-            && !generatedAssignmentsContainer->existsActiveAssignmentHavingGivenAssignmentAsDataDependency(*idOfAssignmentOverlappingWithGivenSignalAccess)) {
-            handleConflict(operationNode->id, Decision::ChoosenOperand::Left, *castedExprDefiningDataOfLeafNode->var);
-            return std::nullopt;
-        }   
-    }
-
-    std::optional<OperationNodeSimplificationResult::OwningReference> simplificationResultOfOperationNodeOperand;
-    bool continueProcessingOfNonLeafNode = true;
-    while (continueProcessingOfNonLeafNode) {
-       OperationNodeProcessingResult resultOfNonLeafNode = processNextOperationNode(signalValueLookupCallback);
-        if (resultOfNonLeafNode.isResultUnknown()) {
-           generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
-            return OperationNodeSimplificationResult::createAndOwnNewInstance(OperationNodeSimplificationResult::createAsUnknownResult(UnknownResultReason::Other));      
-        }
-        if (resultOfNonLeafNode.derivedConflictInOtherNode) {
-           generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
-           return std::nullopt;
-        }
-        simplificationResultOfOperationNodeOperand = std::move(resultOfNonLeafNode.simplificationResult);
-        /*
-        * We need to perform our conflict check twice, once prior to the processing of the subexpression define in one of the operands of this operation and also
-        * after we have processed said subexpression, to determine whether the value of the leaf node was not changed in any of the sub-assignments generated during the processing
-        * of said subexpression
-        */
-        if (dataOfLeafNodeAsVariableExpr.has_value()) {
-            const auto& accessedSignalPartsOfLeafNode = std::dynamic_pointer_cast<syrec::VariableExpression>(*dataOfLeafNodeAsVariableExpr);
-            if (wereAccessedSignalPartsModifiedByActiveAssignment(*accessedSignalPartsOfLeafNode->var)) {
-                handleConflict(operationNode->id, wasLhsOperandLeafNode ? Decision::ChoosenOperand::Left : Decision::ChoosenOperand::Right, *accessedSignalPartsOfLeafNode->var);
-                const bool isCurrentOperationNodeSourceOfConflict = isOperationNodeSourceOfConflict(operationNode->id);
-                
-                generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(!isCurrentOperationNodeSourceOfConflict);
-                backtrack(operationNode->id, isCurrentOperationNodeSourceOfConflict);
-                if (isCurrentOperationNodeSourceOfConflict) {
-                    markSourceOfConflictReached();
-                    simplificationResultOfOperationNodeOperand.reset();
-                } else {
-                    return std::nullopt;
-                }
+    // A conflict detected via the usage of the lhs operand can only stem from an operation node with an id lower than the one of the current operation node
+    if (castedLeafNodeAsVariableExpr && wasLhsOperandLeafNode) {
+        constexpr std::size_t lowerBoundForExcludedSearchSpaceOfActiveAssignmentIds = 0;
+        constexpr std::size_t upperBoundForExcludedSearchSpaceOfActiveAssignmentIds = SIZE_MAX;
+        if (const std::optional<std::size_t> idOfActiveAssignmentOverlappingLeafNode = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(*castedLeafNodeAsVariableExpr->var, lowerBoundForExcludedSearchSpaceOfActiveAssignmentIds, upperBoundForExcludedSearchSpaceOfActiveAssignmentIds, *symbolTableReference); idOfActiveAssignmentOverlappingLeafNode.has_value()) {
+            /*
+             * Performing a dry-run of the replacement generation process to determine whether a replacement could be generated is not sufficient since during the processing of the non-leaf node the potential replacement candidates could be
+             * exhausted and thus no replacement generated in the decision making function for this operation node thus validating the promise that was made here that a replacement could be generated.
+             * If no replacement can be generated we have derived a conflict. We moved this conflict check that is again done in the decision making process to not start processing of the non-leaf node if we can derive a conflict from the leaf node
+             * with the condition that the leaf node is the lhs operand.
+             */
+            if (const std::optional<syrec::VariableAccess::ptr> generatedReplacementForLeafNode = createReplacementForLeafNodeOperand(operationNode->id, Decision::ChoosenOperand::Left, castedLeafNodeAsVariableExpr, signalValueLookupCallback); !generatedReplacementForLeafNode.has_value()) {
+                handleConflict(operationNode->id, Decision::ChoosenOperand::Left, *castedLeafNodeAsVariableExpr->var);
+                return std::nullopt;      
             }
         }
-        continueProcessingOfNonLeafNode = !simplificationResultOfOperationNodeOperand.has_value();
     }
-    
-    DecisionResult                                                                                decisionResult;
+
     std::variant<OperationNodeSimplificationResult::IdAndAssignmentTuple, syrec::Expression::ptr> simplificationResultDataOfLeafNode;
-    if (dataOfLeafNodeAsVariableExpr.has_value()) {
-        simplificationResultDataOfLeafNode = std::make_pair(0, std::dynamic_pointer_cast<syrec::VariableExpression>(*dataOfLeafNodeAsVariableExpr)->var);
+    if (castedLeafNodeAsVariableExpr) {
+        simplificationResultDataOfLeafNode = std::make_pair(0, castedLeafNodeAsVariableExpr->var);
     } else {
         simplificationResultDataOfLeafNode = *expressionTraversalHelper->getOperandAsExpr(wasLhsOperandLeafNode ? operationNode->lhsOperand.id : operationNode->rhsOperand.id);
     }
     OperationNodeSimplificationResult simplificationResultOfLeafNode = OperationNodeSimplificationResult::createManuallyFromLeafNode(simplificationResultDataOfLeafNode);
+    std::optional<OperationNodeSimplificationResult::OwningReference> simplificationResultOfOperationNodeOperand;
 
-    // TODO: Semantic check for prior to assingment generation
-    if (simplificationResultOfOperationNodeOperand.has_value()) {
-        const syrec::Expression::ptr temporaryExpressionToConsiderForDecision = simplificationResultOfOperationNodeOperand->get()->getResultAsExpr().value_or(nullptr);
-        considerExpressionInFutureDecisions(temporaryExpressionToConsiderForDecision);
-        if (wasLhsOperandLeafNode) {
-            decisionResult = makeDecisionFor(operationNode->id, simplificationResultOfLeafNode, operationNode->operation, **simplificationResultOfOperationNodeOperand, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, signalValueLookupCallback);
-        } else {
-            decisionResult = makeDecisionFor(operationNode->id, **simplificationResultOfOperationNodeOperand, operationNode->operation, simplificationResultOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, signalValueLookupCallback);
-        }
-        revokeConsiderationOfExpressionForFutureDecisions(temporaryExpressionToConsiderForDecision);
-    } else {
-        const std::size_t operandIdOfNonLeafNode   = wasLhsOperandLeafNode ? operationNode->rhsOperand.id : operationNode->lhsOperand.id;
-        simplificationResultOfOperationNodeOperand = OperationNodeSimplificationResult::createAndOwnNewInstance(OperationNodeSimplificationResult::createFromNonLeafNode(operationNode->id, *expressionTraversalHelper->getOperandAsExpr(operandIdOfNonLeafNode), {}));
+    OperationNodeProcessingResult resultOfNonLeafNode = processNextOperationNode(signalValueLookupCallback);
+    if (resultOfNonLeafNode.isResultUnknown()) {
+        generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
+        return OperationNodeSimplificationResult::createAndOwnNewInstance(OperationNodeSimplificationResult::createAsUnknownResult(UnknownResultReason::Other));
     }
+    if (resultOfNonLeafNode.derivedConflictInOtherNode) {
+        generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
+        return std::nullopt;
+    }
+    simplificationResultOfOperationNodeOperand = std::move(resultOfNonLeafNode.simplificationResult);
+    const syrec::Expression::ptr expressionFromNonLeafNodeToBeConsideredWhenTryingToCreateAssignment = simplificationResultOfOperationNodeOperand->get()->getResultAsExpr().value_or(nullptr);
+    considerExpressionInFutureDecisions(expressionFromNonLeafNodeToBeConsideredWhenTryingToCreateAssignment);
 
-     if (decisionResult.reasonForUnknownResult.has_value()) {
+    DecisionResult decisionResult;
+    if (wasLhsOperandLeafNode) {
+        decisionResult = makeDecisionFor(operationNode->id, simplificationResultOfLeafNode, operationNode->operation, **simplificationResultOfOperationNodeOperand, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, signalValueLookupCallback);
+    } else {
+        decisionResult = makeDecisionFor(operationNode->id, **simplificationResultOfOperationNodeOperand, operationNode->operation, simplificationResultOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, signalValueLookupCallback);
+    }
+    revokeConsiderationOfExpressionForFutureDecisions(expressionFromNonLeafNodeToBeConsideredWhenTryingToCreateAssignment);
+
+    if (decisionResult.reasonForUnknownResult.has_value()) {
         generatedAssignmentsContainer->rollbackAssignmentsMadeSinceLastCutoffAndOptionallyPopCutoff(true);
     } else {
         expressionTraversalHelper->removeOperationNodeAsPotentialBacktrackOperation(operationNode->id);
@@ -394,7 +390,7 @@ inline bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier
     return generatedAssignmentsContainer->existsOverlappingAssignmentFor(assignedToSignal, *symbolTableReference);
 }
 
-std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionReference> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::tryGetDecisionForOperationNode(const std::size_t& operationNodeId) const {
+std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionReference> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::tryGetDecisionForOperationNode(std::size_t operationNodeId) const {
     const auto& matchingDecisionForOperationNode = std::find_if(
             pastDecisions.cbegin(),
             pastDecisions.cend(),
@@ -405,6 +401,14 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
         return *matchingDecisionForOperationNode;
     }
     return std::nullopt;
+}
+
+
+std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionReference> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::tryGetOrConstructDefaultDecisionForOperationNode(std::size_t operationNodeId) {
+    if (const std::optional<DecisionReference> existingReferenceToDecision = tryGetDecisionForOperationNode(operationNodeId); existingReferenceToDecision.has_value()) {
+        return existingReferenceToDecision;
+    }
+    return constructAndRecordDefaultDecision(operationNodeId);
 }
 
 // TODO: When replacing an operand with a replacement, should we also clear any existing learned conflicts for that operand in the operation node ?
@@ -532,53 +536,6 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
 //    return madeDecision;
 //}
 
-std::optional<std::size_t> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineOperationNodeIdCausingConflict(const syrec::VariableAccess& choiceOfAssignedToSignalTriggeringSearchForCauseOfConflict) const {
-    for (auto decisionIterator = pastDecisions.rbegin(); decisionIterator != pastDecisions.rend(); ++decisionIterator) {
-        const DecisionReference& decision = *decisionIterator;
-        if (decision->choosenOperand == Decision::ChoosenOperand::None || decision->inheritedOperandDataForChoice) {
-            continue;
-        }
-
-        const auto& referenceOperationNode = expressionTraversalHelper->getOperationNodeById(decision->operationNodeId);
-        if (!referenceOperationNode.has_value()) {
-            continue;
-        }
-
-        /*syrec::VariableExpression::ptr selectedOperandData;
-        if (decision->inheritedOperandDataForChoice) {
-            selectedOperandData = std::make_shared<syrec::VariableExpression>(decision->inheritedOperandDataForChoice);
-        } else {
-            selectedOperandData = decision->choosenOperand == Decision::ChoosenOperand::Left ? expressionTraversalHelper->getOperandAsVariableExpr(referenceOperationNode->get()->lhsOperand.id).value_or(nullptr) : expressionTraversalHelper->getOperandAsVariableExpr(referenceOperationNode->get()->rhsOperand.id).value_or(nullptr);
-        }*/
-
-        syrec::VariableExpression::ptr selectedOperandData = decision->choosenOperand == Decision::ChoosenOperand::Left
-            ? expressionTraversalHelper->getOperandAsVariableExpr(referenceOperationNode->get()->lhsOperand.id).value_or(nullptr)
-            : expressionTraversalHelper->getOperandAsVariableExpr(referenceOperationNode->get()->rhsOperand.id).value_or(nullptr);
-
-        if (!selectedOperandData) {
-            return std::nullopt;
-        }
-
-        // TODO: if the made choice was inherited from an assignment, the call getOperandAsVariableExpr will not return anything (pastDecision needs to have additional field [inheritedOperand])
-        if (const auto& operandAsSignalAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(selectedOperandData); operandAsSignalAccess) {
-            const auto& accessedSignalIdentOfDecision = operandAsSignalAccess->var->var->name;
-
-            if (accessedSignalIdentOfDecision == choiceOfAssignedToSignalTriggeringSearchForCauseOfConflict.var->name) {
-                const auto& equalityResult = SignalAccessUtils::areSignalAccessesEqual(
-                        *operandAsSignalAccess->var, choiceOfAssignedToSignalTriggeringSearchForCauseOfConflict,
-                        SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping,
-                        SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping,
-                        *symbolTableReference);
-
-                if (equalityResult.equality != SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual) {
-                    return decision->operationNodeId;
-                }
-            }
-        }
-    }
-    return std::nullopt;
-}
-
 bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::isOperationNodeSourceOfConflict(std::size_t operationNodeId) const {
     return operationNodeCausingConflictAndBacktrack.has_value() && *operationNodeCausingConflictAndBacktrack == operationNodeId;
 }
@@ -598,24 +555,25 @@ bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::wereA
 
 std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionReference> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineEarliestDecisionsOverlappingAccessedSignalPartsOmittingAlreadyRecordedOnes(const syrec::VariableAccess& accessedSignalParts) const {
     DecisionReference earliestDecisionOverlappingAccessedSignalParts;
+    /*
+     * Since we are looking for the earliest decision (i.e. earliest in the processing order and thus with smaller the operation node is the earlier the decision [when excluding decision where the operand data was inherited from another decision]),
+     * a simply traversal of the sorted decision container (sorted ascending by the operation node id) is sufficient.
+     */
     for (const DecisionReference& decision : pastDecisions) {
         if (decision->choosenOperand == Decision::ChoosenOperand::None || decision->inheritedOperandDataForChoice) {
             continue;
         }
 
-        const auto& referenceOperationNode = expressionTraversalHelper->getOperationNodeById(decision->operationNodeId);
+        const std::optional<ExpressionTraversalHelper::OperationNodeReference>& referenceOperationNode = expressionTraversalHelper->getOperationNodeById(decision->operationNodeId);
         if (!referenceOperationNode.has_value()) {
             continue;
         }
 
-        const syrec::VariableExpression::ptr selectedOperandData = decision->choosenOperand == Decision::ChoosenOperand::Left
-            ? expressionTraversalHelper->getOperandAsVariableExpr(referenceOperationNode->get()->lhsOperand.id).value_or(nullptr)
-            : expressionTraversalHelper->getOperandAsVariableExpr(referenceOperationNode->get()->rhsOperand.id).value_or(nullptr);
-
-        if (selectedOperandData) {
+        const std::size_t                    signalAccessOperandId = decision->choosenOperand == Decision::ChoosenOperand::Left ? referenceOperationNode->get()->lhsOperand.id : referenceOperationNode->get()->rhsOperand.id;
+        if (const syrec::VariableExpression::ptr expressionHoldingSignalAccessOperandData = expressionTraversalHelper->getOperandAsVariableExpr(signalAccessOperandId).value_or(nullptr); expressionHoldingSignalAccessOperandData) {
             const LearnedConflictsLookupKey key = LearnedConflictsLookupKey(decision->operationNodeId, decision->choosenOperand);
-            if (const auto& operandAsSignalAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(selectedOperandData); operandAsSignalAccess && !learnedConflictsLookup->count(key)) {
-                const auto& equalityResult = SignalAccessUtils::areSignalAccessesEqual(
+            if (const auto& operandAsSignalAccess = std::dynamic_pointer_cast<syrec::VariableExpression>(expressionHoldingSignalAccessOperandData); operandAsSignalAccess && !learnedConflictsLookup->count(key)) {
+                const SignalAccessUtils::SignalAccessEquivalenceResult& equalityResult = SignalAccessUtils::areSignalAccessesEqual(
                         *operandAsSignalAccess->var, accessedSignalParts,
                         SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping,
                         SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping,
@@ -623,6 +581,7 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
                 if (!(equalityResult.isResultCertain && equalityResult.equality == SignalAccessUtils::SignalAccessEquivalenceResult::NotEqual)) {
                     if (!earliestDecisionOverlappingAccessedSignalParts || decision.get()->operationNodeId <= earliestDecisionOverlappingAccessedSignalParts->operationNodeId) {
                         earliestDecisionOverlappingAccessedSignalParts = decision;
+                        break;
                     }
                 }
             }
@@ -638,49 +597,59 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
  */
 void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::handleConflict(std::size_t associatedOperationNodeIdOfAccessedSignalPartsOperand, Decision::ChoosenOperand chosenOperandLeadingToDetectionOfConflict, const syrec::VariableAccess& accessedSignalPartsUsedInCheckForConflict) {
     constexpr std::size_t                  earliestPossibleOperationNodeId               = 0;
-    const std::size_t                      idOfEarliestOperationNodeIdInvolvedInConflict = determineOperationNodeIdCausingConflict(accessedSignalPartsUsedInCheckForConflict).value_or(earliestPossibleOperationNodeId);
     const std::optional<DecisionReference> earliestDecisionInvolvedInConflict            = determineEarliestDecisionsOverlappingAccessedSignalPartsOmittingAlreadyRecordedOnes(accessedSignalPartsUsedInCheckForConflict);
-    
+    std::size_t                            idOfEarliestOperationNodeIdInvolvedInConflict = earliestPossibleOperationNodeId;
+
     if (earliestDecisionInvolvedInConflict.has_value()) {
+        idOfEarliestOperationNodeIdInvolvedInConflict = earliestDecisionInvolvedInConflict->get()->operationNodeId;
         rememberConflict(earliestDecisionInvolvedInConflict->get()->operationNodeId, earliestDecisionInvolvedInConflict->get()->choosenOperand);
     }
 
     logConflict(associatedOperationNodeIdOfAccessedSignalPartsOperand, chosenOperandLeadingToDetectionOfConflict, accessedSignalPartsUsedInCheckForConflict, idOfEarliestOperationNodeIdInvolvedInConflict);
 
     std::unordered_set<std::size_t> hotPathFromSourceOfConflictToLocationWhereConflictWasDetected                                 = {};
-    const std::size_t idOfEarliestSharedParentOperationNodeBetweenSourceOfConflictAndDetectionOfOriginOperationNode = determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(idOfEarliestOperationNodeIdInvolvedInConflict, associatedOperationNodeIdOfAccessedSignalPartsOperand, &hotPathFromSourceOfConflictToLocationWhereConflictWasDetected);
+    const std::size_t idOfEarliestSharedParentOperationNodeBetweenSourceOfConflictAndDetectionOfOriginOperationNode = determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(idOfEarliestOperationNodeIdInvolvedInConflict, associatedOperationNodeIdOfAccessedSignalPartsOperand, hotPathFromSourceOfConflictToLocationWhereConflictWasDetected);
     markOperationNodeAsSourceOfConflict(idOfEarliestSharedParentOperationNodeBetweenSourceOfConflictAndDetectionOfOriginOperationNode);
-    forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(idOfEarliestSharedParentOperationNodeBetweenSourceOfConflictAndDetectionOfOriginOperationNode, &hotPathFromSourceOfConflictToLocationWhereConflictWasDetected);
+    forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(associatedOperationNodeIdOfAccessedSignalPartsOperand, hotPathFromSourceOfConflictToLocationWhereConflictWasDetected);
 }
 
-std::size_t noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(std::size_t operationNodeIdOfEarliestSourceOfConflict, std::size_t operationNodeIdWhereConflictWasDetected, std::unordered_set<std::size_t>* hotPathContainerFromSourceToSharedOrigin) const {
-    /*std::optional<ExpressionTraversalHelper::OperationNodeReference> operationNodeOfInterest;
-    if (const std::optional<ExpressionTraversalHelper::OperationNodeReference> dataOfOperationNodeWhereConflictWasDetected = expressionTraversalHelper->getOperationNodeById(operationNodeIdWhereConflictWasDetected); dataOfOperationNodeWhereConflictWasDetected.has_value() && dataOfOperationNodeWhereConflictWasDetected->get()->parentNodeId.has_value()) {
-        operationNodeOfInterest = expressionTraversalHelper->getOperationNodeById(*dataOfOperationNodeWhereConflictWasDetected->get()->parentNodeId);
-    }*/
-
-    std::optional<ExpressionTraversalHelper::OperationNodeReference> operationNodeOfInterest = expressionTraversalHelper->getOperationNodeById(operationNodeIdOfEarliestSourceOfConflict);
+/*
+* Try to find the first shared operation node by the operation node containing the conflict as well as the operation node for which the conflict was detected. Furthermore, the parent of the found shared parent operation node is returned.
+*/
+std::size_t noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(std::size_t operationNodeIdOfEarliestSourceOfConflict, std::size_t operationNodeIdWhereConflictCheckWasInitiated, std::unordered_set<std::size_t>& hotPathContainerFromSourceToSharedOrigin) const {
+    constexpr std::size_t defaultSearchResultOperationNodeId = 0;
+    if (!operationNodeIdOfEarliestSourceOfConflict) {
+        return defaultSearchResultOperationNodeId;
+    }
+    std::optional<ExpressionTraversalHelper::OperationNodeReference> operationNodeOfInterest = expressionTraversalHelper->getOperationNodeById(operationNodeIdWhereConflictCheckWasInitiated);
+    std::size_t                                                      currParentNodeId        = defaultSearchResultOperationNodeId;
 
     /*
-     * Try to find the first shared operation node by the operation node containing the conflict as well as the operation node for which the conflict was detected. Furthermore, the parent of the found shared parent operation node is returned.
+     * Starting from the operation node where the conflict check was initiated, we traverse the operation node structure in reverse order until we reach the first operation node with an id smaller than the one in which
+     * the source of the conflict was.
      */
-    constexpr std::size_t defaultSearchResultOperationNodeId = 0;
-    // If the operation node of interest is already the topmost operation node, we can skip the search for the shared operation node since we already found it.
     while (operationNodeOfInterest.has_value() && operationNodeOfInterest->get()->id) {
-        if (hotPathContainerFromSourceToSharedOrigin) {
-            hotPathContainerFromSourceToSharedOrigin->emplace(operationNodeOfInterest->get()->id);
+        currParentNodeId = operationNodeOfInterest->get()->id;
+        if (currParentNodeId < operationNodeIdOfEarliestSourceOfConflict) {
+            operationNodeOfInterest.reset();
         }
+        else {
+            // Since any generated operation node id is >= 1 we can assume that the lookup for an operation node with id 0 does not return any matching result
+            operationNodeOfInterest = expressionTraversalHelper->getOperationNodeById(operationNodeOfInterest->get()->parentNodeId.value_or(defaultSearchResultOperationNodeId));
+        }
+    }
 
-        /*
-         * We have found the operation node that is the source of the conflict (called original source), but we need to mark its parent node, if such a node exists, as the "source" of the conflict to trigger
-         * a reprocessing of the original source. 
-         */
-        if (operationNodeOfInterest->get()->id < operationNodeIdOfEarliestSourceOfConflict) {
-            // TODO: Why should we always return the parent of the found node and not the node instead ?
-            return operationNodeOfInterest->get()->id;
-            //return operationNodeOfInterest->get()->parentNodeId.value_or(defaultSearchResultOperationNodeId);
+    /*
+     * We can now determine the hot path by traversing the operation node structure in reverse starting from the operation node where the source of the conflict was located back to the found shared parent node.
+     */
+    std::size_t currOperationNodeIdForTraversalFromSourceOfConflictToSharedParent = operationNodeIdOfEarliestSourceOfConflict;
+    operationNodeOfInterest                                                       = expressionTraversalHelper->getOperationNodeById(operationNodeIdOfEarliestSourceOfConflict);
+    while (operationNodeOfInterest.has_value() && operationNodeOfInterest->get()->id) {
+        currOperationNodeIdForTraversalFromSourceOfConflictToSharedParent = operationNodeOfInterest->get()->id;
+        if (currOperationNodeIdForTraversalFromSourceOfConflictToSharedParent == currParentNodeId) {
+            return currParentNodeId;
         }
-        // Since any generated operation node id is >= 1 we can assume that the lookup for an operation node with id 0 does not return any matching result
+        hotPathContainerFromSourceToSharedOrigin.emplace(currOperationNodeIdForTraversalFromSourceOfConflictToSharedParent);    
         operationNodeOfInterest = expressionTraversalHelper->getOperationNodeById(operationNodeOfInterest->get()->parentNodeId.value_or(defaultSearchResultOperationNodeId));
     }
     return defaultSearchResultOperationNodeId;
@@ -689,18 +658,32 @@ std::size_t noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier
 /*
  * TODO: Think this through more thorougly with the help of the test case conflictInOperationNodeWithOneLeafNodeWhereLeafIsRhsOperandNotResolvableByOtherChoiceInLhsOperandThatGeneratedAssignmentCreatesExprInstead
  */
-void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(std::size_t parentOperationNodeId, const std::unordered_set<std::size_t>* idOfOperationNodesOnHotPath) const {
-    /*
-     * We are assuming here that no decision are removed during the processing of the whole assignment statement (only the chosen operand should change). Additionally, we assume that the operation node ids
-     * are ordered ascending and thus the a parent operation node should have a smaller id than any of its child nodes. Since child nodes are processed before their parent, the former
-     * are also found at smaller indices in the container than their parent nodes. Thus we perform a reverse search to find the parents first.
-     */
-    const auto& firstPastDecisionToReuse = std::find_if(pastDecisions.crbegin(), pastDecisions.crend(), [&parentOperationNodeId](const DecisionReference& pastDecision) { return pastDecision->operationNodeId > parentOperationNodeId; });
-    for (auto pastDecisionToReuseIterator = firstPastDecisionToReuse; pastDecisionToReuseIterator != pastDecisions.crend(); ++pastDecisionToReuseIterator) {
-        if (pastDecisionToReuseIterator->get()->shouldChoiceBeRepeated != Decision::ChoiceRepetition::Always) {
-            pastDecisionToReuseIterator->get()->shouldChoiceBeRepeated = (!idOfOperationNodesOnHotPath || !idOfOperationNodesOnHotPath->count(pastDecisionToReuseIterator->get()->operationNodeId)) ? Decision::ChoiceRepetition::UntilReset : Decision::ChoiceRepetition::None;    
+void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(std::size_t idOfOperationNodeWhereConflictWasDetected, const std::unordered_set<std::size_t>& idOfOperationNodesOnHotPath) const {
+    std::size_t upperBoundOfSearchSpace = SIZE_MAX;
+    if (idOfOperationNodeWhereConflictWasDetected) {
+        std::optional<ExpressionTraversalHelper::OperationNodeReference> traversalNodeToFindRightmostNode = expressionTraversalHelper->getOperationNodeById(idOfOperationNodeWhereConflictWasDetected);
+        while (traversalNodeToFindRightmostNode.has_value()) {
+            if (traversalNodeToFindRightmostNode->get()->rhsOperand.isLeafNode()) {
+                upperBoundOfSearchSpace = traversalNodeToFindRightmostNode->get()->id;
+                traversalNodeToFindRightmostNode.reset();
+            } else {
+                traversalNodeToFindRightmostNode = expressionTraversalHelper->getOperationNodeById(*traversalNodeToFindRightmostNode->get()->rhsOperand.operationNodeId);
+            }
+        }   
+    }
+
+    const auto& lastPastDecisionToReuse = upperBoundOfSearchSpace != SIZE_MAX
+        ? std::find_if(pastDecisions.crbegin(), pastDecisions.crend(), [upperBoundOfSearchSpace](const DecisionReference& pastDecision) { return pastDecision->operationNodeId == upperBoundOfSearchSpace; })
+        : pastDecisions.crbegin();
+    const std::size_t numDecisionsToReuse = pastDecisions.size() - std::distance(pastDecisions.crbegin(), lastPastDecisionToReuse);
+
+    auto pastDecisionToReuseIterator = pastDecisions.begin();
+    for (std::size_t i = 0; i < numDecisionsToReuse; ++i) {
+        if (pastDecisionToReuseIterator->get()->shouldChoiceBeRepeated != Decision::ChoiceRepetition::Always && !idOfOperationNodesOnHotPath.count(pastDecisionToReuseIterator->get()->operationNodeId)
+            && pastDecisionToReuseIterator->get()->choosenOperand != Decision::ChoosenOperand::None) {
+            pastDecisionToReuseIterator->get()->shouldChoiceBeRepeated = Decision::ChoiceRepetition::UntilReset;
         }
-        
+        ++pastDecisionToReuseIterator;
     }
 }
 
@@ -775,6 +758,39 @@ std::optional<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::AssignmentW
     }
     return std::nullopt;
 }
+
+std::optional<syrec::VariableAccess::ptr> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::createReplacementForLeafNodeOperand(std::size_t operationNodeId, Decision::ChoosenOperand chosenOperandToBeReplaced, const syrec::Expression::ptr& leafNodeDataToReplace, const SignalValueLookupCallback& callbackForValueLookupOfExistingSymbolTableSignals) const {
+    if (!substitutionGenerator || !determinedBitWidthOfAssignmentToSimplify.has_value() || !expressionTraversalHelper->getOperationNodeById(operationNodeId).has_value() || chosenOperandToBeReplaced == Decision::ChoosenOperand::None || !leafNodeDataToReplace) {
+        return std::nullopt;
+    }
+
+    if (const auto& leafNodeDataExprAsNumericOne = std::dynamic_pointer_cast<syrec::NumericExpression>(leafNodeDataToReplace); leafNodeDataExprAsNumericOne) {
+        if (leafNodeDataExprAsNumericOne->value->isCompileTimeConstantExpression()) {
+            return std::nullopt;
+        }
+    }
+    else if(!std::dynamic_pointer_cast<syrec::VariableExpression>(leafNodeDataToReplace)) {
+        return std::nullopt;
+    }
+
+    const std::optional<unsigned int>                                       mappedToFlagValueForAssignmentEnumValue = syrec_operation::tryMapAssignmentOperationEnumToFlag(syrec_operation::operation::XorAssign);
+    const std::optional<ExpressionSubstitutionGenerator::ReplacementResult> generatedReplacement = mappedToFlagValueForAssignmentEnumValue.has_value() ? substitutionGenerator->generateReplacementFor(*determinedBitWidthOfAssignmentToSimplify, callbackForValueLookupOfExistingSymbolTableSignals) : std::nullopt;
+    if (!generatedReplacement.has_value()) {
+        return std::nullopt;
+    }
+
+    // TODO: We could probably change the return value to indicate that the replacement of the operand data in the expression traversal helper failed and since this could leave said object in an undefined state (or invalid any previous data)
+    // stop further processing of the assignment
+    if (const std::shared_ptr<syrec::AssignStatement>& generatedAssignmentDefiningOperandReplacement = std::make_shared<syrec::AssignStatement>(generatedReplacement->foundReplacement, *mappedToFlagValueForAssignmentEnumValue, leafNodeDataToReplace); generatedAssignmentDefiningOperandReplacement){
+        if (generatedAssignmentsContainer->storeInitializationForReplacementOfLeafNode(generatedAssignmentDefiningOperandReplacement, generatedReplacement->requiredResetOfReplacement)
+            && expressionTraversalHelper->updateOperandData(operationNodeId, chosenOperandToBeReplaced == Decision::ChoosenOperand::Left, leafNodeDataToReplace)) {
+            logCreationOfSubstitutionOfOperandOfOperationNode(operationNodeId, chosenOperandToBeReplaced, *generatedReplacement->foundReplacement);
+            return generatedReplacement->foundReplacement;
+        }
+    }
+    return std::nullopt;
+}
+
 
 std::optional<std::pair<std::size_t, std::shared_ptr<syrec::AssignStatement>>> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::getAndActivateReplacementForOperationNode(std::size_t referencedOperationNodeId, syrec_operation::operation definedOperationInOperationNode, const OperationNodeSimplificationResult& lhsOperandDataChoicesAfterSimplification, const OperationNodeSimplificationResult& rhsOperandDataChoicesAfterSimplification, bool* wasExistingReplacementForOperationNodeEntryUpdated, const SignalValueLookupCallback& callbackForValueLookupOfExistingSymbolTableSignals) {
     if (!determinedBitWidthOfAssignmentToSimplify.has_value() || !substitutionGenerator || !expressionTraversalHelper->getOperationNodeById(referencedOperationNodeId).has_value()) {
@@ -954,6 +970,7 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::reset
     }
     determinedBitWidthOfAssignmentToSimplify.reset();
     wholeExpressionOfOperationNodeReplacementLookup.clear();
+    topmostAssignmentOperation.reset();
     enabledValueLookup();
 }
 
@@ -1770,192 +1787,245 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logCr
 #endif
 }
 
+
+
+
+// TODO: If the synthesis would support boxing, the replacement generated in this function could use smaller bitwidth than the one derived from the assigned to signal of the original assignment lhs operand
+// TODO: Check whether replacement of whole expressions is implemented
+// TODO: Inversion of data dependency overlapping with active assignment problem STILL REQUIRES IMPLEMENTATION
+// TODO: Correct handling of transformation of two subsequent subtraction operations still requires checks whether correctly implementation and probabily does not work with the current backtracking implementation/replacement generation
+// TODO: Implement conflicts being allowed at intermediate nodes by remembering which operand was chosen and from which operation node it was inherited (we should probably store the pointer of the chosen operand instead of the enum value)
 noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionResult noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::makeDecisionFor(std::size_t operationNodeId, const OperationNodeSimplificationResult& lhsOperandSimplificationResult, syrec_operation::operation definedOperationOfOperationNode, const OperationNodeSimplificationResult& rhsOperandSimplificationResult, const std::optional<std::size_t>& idOfLastActiveAssignmentPriorToProcessingOfLhsOperand, const std::optional<std::size_t>& idOfLastActiveAssignmentPriorToProcessingOfRhsOperand, const SignalValueLookupCallback& signalValueLookupCallback) {
-    const std::optional<syrec::Expression::ptr>&     lhsOperandAsExpr         = lhsOperandSimplificationResult.getResultAsExpr();
-    const std::optional<syrec::VariableAccess::ptr>& lhsOperandAsSignalAccess = lhsOperandSimplificationResult.getResultAsSignalAccess();
+    const std::optional<syrec::Expression::ptr>& lhsOperandAsExpr         = lhsOperandSimplificationResult.getResultAsExpr();
+    std::optional<syrec::VariableAccess::ptr>    lhsOperandAsSignalAccess = lhsOperandSimplificationResult.getResultAsSignalAccess();
 
-    const std::optional<syrec::Expression::ptr>&     rhsOperandAsExpr         = rhsOperandSimplificationResult.getResultAsExpr();
-    const std::optional<syrec::VariableAccess::ptr>& rhsOperandAsSignalAccess = rhsOperandSimplificationResult.getResultAsSignalAccess();
+    const std::optional<syrec::Expression::ptr>& rhsOperandAsExpr         = rhsOperandSimplificationResult.getResultAsExpr();
+    std::optional<syrec::VariableAccess::ptr>    rhsOperandAsSignalAccess = rhsOperandSimplificationResult.getResultAsSignalAccess();
 
-    const std::optional<syrec_operation::operation> definedOperationAsAssignmentOperation                      = syrec_operation::getMatchingAssignmentOperationForOperation(definedOperationOfOperationNode);
-    const std::optional<unsigned int>               mappedToDefinedOperationAsAssignmentOperationFlagValue     = definedOperationAsAssignmentOperation.has_value() ? syrec_operation::tryMapAssignmentOperationEnumToFlag(*definedOperationAsAssignmentOperation) : std::nullopt;
-    
-    Decision::ChoosenOperand chosenOperand                              = Decision::ChoosenOperand::None;
-    Decision::ChoosenOperand preferredOperandDueToInheritance            = Decision::ChoosenOperand::None;
-    DecisionReference        previousDecisionForReferencedOperationNode = tryGetDecisionForOperationNode(operationNodeId).value_or(nullptr);
+    DecisionReference                                                      previousDecisionForReferencedOperationNode = tryGetOrConstructDefaultDecisionForOperationNode(operationNodeId).value_or(nullptr);
     if (!previousDecisionForReferencedOperationNode) {
-        previousDecisionForReferencedOperationNode = constructAndRecordDefaultDecision(operationNodeId);
-        if (!previousDecisionForReferencedOperationNode) {
-            return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
-        }
+        return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
     }
 
-    const bool canAssignmentBeGeneratedBasedOnOperation = definedOperationAsAssignmentOperation.has_value() && mappedToDefinedOperationAsAssignmentOperationFlagValue.has_value();
-    const bool isAssignmentOperationCommutative         = mappedToDefinedOperationAsAssignmentOperationFlagValue.has_value() ? syrec_operation::isCommutative(definedOperationOfOperationNode) : false;
-
-    std::optional<std::size_t> idOfLatestActiveAssignmentOverlappingLhsOperand;
-    std::optional<std::size_t> idOfLatestActiveAssignmentOverlappingRhsOperand;
+    const bool               isChosenOperandPreselected = previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated == Decision::ChoiceRepetition::UntilReset;
+    Decision::ChoosenOperand chosenOperand = previousDecisionForReferencedOperationNode->choosenOperand;
     if (previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated != Decision::ChoiceRepetition::Always) {
-        previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated = Decision::ChoiceRepetition::None;
-        previousDecisionForReferencedOperationNode->choosenOperand         = Decision::ChoosenOperand::None;
-
-        /*
-         * If both operands define signal accesses either due to the operand being a signal access or by being created from an assignment, with the lhs operand being manually created (i.e. the original operand already being a
-         * signal access) and the rhs operand being created from an assignment, we prefer to reuse the assigned to signal parts of the latter if a choice between both operands is possible. Otherwise, the preferred operand is the
-         * lhs one.
-         */
-        if (lhsOperandAsSignalAccess.has_value() && lhsOperandSimplificationResult.wasResultManuallyCreated() && rhsOperandAsSignalAccess.has_value() && !rhsOperandSimplificationResult.wasResultManuallyCreated() 
-            && isAssignmentOperationCommutative && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **lhsOperandAsSignalAccess, **rhsOperandAsSignalAccess, *symbolTableReference)) {
-            preferredOperandDueToInheritance = Decision::ChoosenOperand::Right;
+        if (previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated == Decision::ChoiceRepetition::None) {
+            chosenOperand = Decision::ChoosenOperand::None;
+            previousDecisionForReferencedOperationNode->choosenOperand = chosenOperand;
+        }
+        else {
+            previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated = Decision::ChoiceRepetition::None;    
         }
     }
+    previousDecisionForReferencedOperationNode->inheritedOperandDataForChoice = nullptr;
 
-    const std::optional<std::size_t> operationNodeOfRhsOperandOfThisOperationNode = expressionTraversalHelper->getOperationNodeIdOfRightOperand(operationNodeId);
-    if (lhsOperandAsSignalAccess.has_value() && previousDecisionForReferencedOperationNode->choosenOperand != Decision::ChoosenOperand::Left) {
-        const std::size_t                  searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId = operationNodeId;
-        const std::size_t                  searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId = operationNodeOfRhsOperandOfThisOperationNode.value_or(SIZE_MAX) - 1;
-        constexpr Decision::ChoosenOperand potentialOperandChoice                                                                 = Decision::ChoosenOperand::Left;
-        /*
-         * If can find an active assignment that overlaps with the given accessed signal parts of the operand we need to check whether found assignment is a data dependency of another active
-         * assignment because then we can safely invert the found assignment without the inversion affecting other currently active ones (Since our check for an overlapping assignment will return the latest [i.e. earliest relative to the last added active assignment] our subsequent check for it being a data dependency will ignore
-         * prior active assignments that propagated the assigned to signal parts to the found one). Otherwise, if the assignment was no data dependency of another active assignment, we found a conflict.
-         */
-        if (idOfLatestActiveAssignmentOverlappingLhsOperand = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(**lhsOperandAsSignalAccess, searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId, searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId, *symbolTableReference); idOfLatestActiveAssignmentOverlappingLhsOperand.has_value()
-            && !generatedAssignmentsContainer->existsActiveAssignmentHavingGivenAssignmentAsDataDependency(*idOfLatestActiveAssignmentOverlappingLhsOperand)) {
-            if (const std::optional<syrec::VariableAccess::ptr>& generatedSubstitutionForLhsOperand = lhsOperandSimplificationResult.wasResultManuallyCreated() ? createReplacementForChosenOperand(previousDecisionForReferencedOperationNode, signalValueLookupCallback) : std::nullopt; generatedSubstitutionForLhsOperand.has_value()) {
-                logCreationOfSubstitutionOfOperandOfOperationNode(operationNodeId, potentialOperandChoice, **generatedSubstitutionForLhsOperand);
-                previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated = Decision::ChoiceRepetition::Always;
-                previousDecisionForReferencedOperationNode->choosenOperand         = potentialOperandChoice;
-            } else {
-                handleConflict(operationNodeId, potentialOperandChoice, **lhsOperandAsSignalAccess);
-                return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);
+    const std::optional<ExpressionTraversalHelper::OperationNodeReference> operationNodeReferenceForId                                      = expressionTraversalHelper->getOperationNodeById(operationNodeId);
+    bool                                                                   detectedConflictByExistenceOfOverlappingAssignmentWithLhsOperand = false;
+    bool                                                                   detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand = false;
+
+    // We use the next to flags to prevent the creation of a replacement for an already existing replacement of a leaf-node operand in the current operation node
+    bool wasOriginalLhsOperandModified = false;
+    bool wasOriginalRhsOperandModified = false;
+    if (lhsOperandAsSignalAccess.has_value() && lhsOperandSimplificationResult.wasResultManuallyCreated()) {
+        constexpr std::size_t lowerBoundOfActiveAssignmentSearchSpaceBasedOnOperationNodeId = 0;
+        const std::size_t     upperBoundOfActiveAssignmentSearchSpaceBasedOnOperationNodeId = operationNodeId;
+        detectedConflictByExistenceOfOverlappingAssignmentWithLhsOperand = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(**lhsOperandAsSignalAccess, lowerBoundOfActiveAssignmentSearchSpaceBasedOnOperationNodeId, upperBoundOfActiveAssignmentSearchSpaceBasedOnOperationNodeId, *symbolTableReference).has_value();
+
+        if (detectedConflictByExistenceOfOverlappingAssignmentWithLhsOperand) {
+            if (const syrec::Expression::ptr containerExprForSignalAccessLeaf = std::make_shared<syrec::VariableExpression>(*lhsOperandAsSignalAccess); containerExprForSignalAccessLeaf) {
+                if (const std::optional<syrec::VariableAccess::ptr> generatedReplacementForLhsOperand = createReplacementForLeafNodeOperand(operationNodeId, Decision::ChoosenOperand::Left, containerExprForSignalAccessLeaf, signalValueLookupCallback); generatedReplacementForLhsOperand.has_value()) {
+                    lhsOperandAsSignalAccess                                         = generatedReplacementForLhsOperand;
+                    detectedConflictByExistenceOfOverlappingAssignmentWithLhsOperand = false;
+                    wasOriginalLhsOperandModified                                    = true;
+                }   
             }
         }
-        else if (preferredOperandDueToInheritance == Decision::ChoosenOperand::None && canAssignmentBeGeneratedBasedOnOperation &&
-            (((rhsOperandAsSignalAccess.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, potentialOperandChoice, **lhsOperandAsSignalAccess, **rhsOperandAsSignalAccess, *symbolTableReference)) 
-                || (rhsOperandAsExpr.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, potentialOperandChoice, **lhsOperandAsSignalAccess, **rhsOperandAsExpr, *symbolTableReference))))) {
-            chosenOperand = potentialOperandChoice;
-        }
     }
+    if (rhsOperandAsSignalAccess.has_value() && rhsOperandSimplificationResult.wasResultManuallyCreated()) {
+        constexpr std::size_t lowerBoundOfActiveAssignmentSearchSpaceBasedOnOperationNodeId = 0;
+        const std::size_t     upperBoundOfActiveAssignmentSearchSpaceBasedOnOperationNodeId = operationNodeId;
+        detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand                    = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(**rhsOperandAsSignalAccess, lowerBoundOfActiveAssignmentSearchSpaceBasedOnOperationNodeId, upperBoundOfActiveAssignmentSearchSpaceBasedOnOperationNodeId, *symbolTableReference).has_value();
 
-    if (rhsOperandAsSignalAccess.has_value() && previousDecisionForReferencedOperationNode->choosenOperand != Decision::ChoosenOperand::Right) {
-        const std::size_t                  searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId = operationNodeOfRhsOperandOfThisOperationNode.value_or(SIZE_MAX);
-        constexpr std::size_t              searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId = SIZE_MAX;
-        constexpr Decision::ChoosenOperand potentialOperandChoice                                                                 = Decision::ChoosenOperand::Right;
-
-        /*
-         * If can find an active assignment that overlaps with the given accessed signal parts of the operand we need to check whether found assignment is a data dependency of another active
-         * assignment because then we can safely invert the found assignment without the inversion affecting other currently active ones (Since our check for an overlapping assignment will return the latest [i.e. earliest relative to the last added active assignment] our subsequent check for it being a data dependency will ignore
-         * prior active assignments that propagated the assigned to signal parts to the found one). Otherwise, if the assignment was no data dependency of another active assignment, we found a conflict.
-         */
-        if (idOfLatestActiveAssignmentOverlappingRhsOperand = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(**rhsOperandAsSignalAccess, searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId, searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId, *symbolTableReference); idOfLatestActiveAssignmentOverlappingRhsOperand.has_value() && !generatedAssignmentsContainer->existsActiveAssignmentHavingGivenAssignmentAsDataDependency(*idOfLatestActiveAssignmentOverlappingRhsOperand)) {
-            if (const std::optional<syrec::VariableAccess::ptr>& generatedSubstitutionForRhsOperand = rhsOperandSimplificationResult.wasResultManuallyCreated() ? createReplacementForChosenOperand(previousDecisionForReferencedOperationNode, signalValueLookupCallback) : std::nullopt; generatedSubstitutionForRhsOperand.has_value()) {
-                logCreationOfSubstitutionOfOperandOfOperationNode(operationNodeId, potentialOperandChoice, **generatedSubstitutionForRhsOperand);
-                if (chosenOperand == Decision::ChoosenOperand::None) {
-                    previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated = Decision::ChoiceRepetition::Always;
-                    previousDecisionForReferencedOperationNode->choosenOperand         = potentialOperandChoice;   
+        if (detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand) {
+            if (const syrec::Expression::ptr containerExprForSignalAccessLeaf = std::make_shared<syrec::VariableExpression>(*rhsOperandAsSignalAccess); containerExprForSignalAccessLeaf) {
+                if (const std::optional<syrec::VariableAccess::ptr> generatedReplacementForRhsOperand = createReplacementForLeafNodeOperand(operationNodeId, Decision::ChoosenOperand::Right, containerExprForSignalAccessLeaf, signalValueLookupCallback); generatedReplacementForRhsOperand.has_value()) {
+                    rhsOperandAsSignalAccess                                         = generatedReplacementForRhsOperand;
+                    detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand = false;
+                    wasOriginalRhsOperandModified                                    = true;
                 }
             }
-            else {
-                handleConflict(operationNodeId, potentialOperandChoice, **rhsOperandAsSignalAccess);
-                return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);   
+        }
+    }
+
+    // TODO: Handling of repetition of choice NONE when generation of replacements is disabled
+    const std::optional<syrec_operation::operation> matchingAssignmentCounterpartForDefinedOperation = syrec_operation::getMatchingAssignmentOperationForOperation(definedOperationOfOperationNode);
+    if (!isChosenOperandPreselected && chosenOperand == Decision::ChoosenOperand::None && matchingAssignmentCounterpartForDefinedOperation.has_value() && !(detectedConflictByExistenceOfOverlappingAssignmentWithLhsOperand || detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand)) {
+        if (lhsOperandAsSignalAccess.has_value() && ((rhsOperandAsSignalAccess.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess, **rhsOperandAsSignalAccess, *symbolTableReference)) 
+            || (rhsOperandAsExpr.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess, **rhsOperandAsExpr, *symbolTableReference)))) {
+            chosenOperand = Decision::ChoosenOperand::Left;
+        }
+        if (rhsOperandAsSignalAccess.has_value() && ((lhsOperandAsSignalAccess.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsSignalAccess, *symbolTableReference)) 
+            || (lhsOperandAsExpr.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsExpr, *symbolTableReference)))) {
+            constexpr Decision::ChoosenOperand potentialOperandChoiceForAlternative = Decision::ChoosenOperand::Right;
+
+            /*
+             * Due to our preference the reuse existing assignment, we will switch the chosen operand that is currently set to be the lhs operand to the right one, if the signal access of the former was not inherited from an assignment
+             * while the rhs operand was. This can of course only be done if the operation defined for the current operation node is also commutative.
+             */
+            if (syrec_operation::isCommutative(definedOperationOfOperationNode)) {
+                if (chosenOperand == Decision::ChoosenOperand::Left) {
+                    if (lhsOperandSimplificationResult.wasResultManuallyCreated() && !rhsOperandSimplificationResult.wasResultManuallyCreated()) {
+                        chosenOperand = potentialOperandChoiceForAlternative;
+                    }
+                }
+                else {
+                    chosenOperand = potentialOperandChoiceForAlternative;
+                }
+            } else if (chosenOperand == Decision::ChoosenOperand::None && definedOperationOfOperationNode == syrec_operation::operation::Subtraction) {
+                /*
+                    * If no operand was chosen at this point we can try and perform the following two transformations:
+                    * I.   (a - (b - c)) => (a + (c - b))
+                    * II.  (a + (b - c)) => (a - (c - b))
+                    *
+                    * If any of the two transformations can be applied, we also have to update the operation of the parent node.
+                    */
+                if (const std::optional<std::size_t> idOfParentOperationNode = operationNodeReferenceForId->get()->parentNodeId; idOfParentOperationNode.has_value()) {
+                    if (const std::optional<ExpressionTraversalHelper::OperationNodeReference> parentNodeOfOperationNode = expressionTraversalHelper->getOperationNodeById(*idOfParentOperationNode); parentNodeOfOperationNode.has_value() && parentNodeOfOperationNode->get()->rhsOperand.id == operationNodeId) {
+                        // TODO: Switch operands in expression traversal helper ? (no should not be necessary)
+                        // TODO: Should we really update the operand in the parent node in the expression traversal helper? Could we also store this change locally?
+                        if ((parentNodeOfOperationNode->get()->operation == syrec_operation::operation::Subtraction && expressionTraversalHelper->updateOperation(parentNodeOfOperationNode->get()->id, syrec_operation::operation::Addition)) || (parentNodeOfOperationNode->get()->operation == syrec_operation::operation::Addition && expressionTraversalHelper->updateOperation(parentNodeOfOperationNode->get()->id, syrec_operation::operation::Subtraction))) {
+                            chosenOperand = potentialOperandChoiceForAlternative;
+                        }
+                    } 
+                } else if (topmostAssignmentOperation.has_value() && operationNodeId == expressionTraversalHelper->getOperationNodeIdOfFirstEntryInQueue().value_or(0)) {
+                    /*
+                            * Both of the previously mentioned transformation can also be applied in the topmost operation node but now depend on the defined assignment operation instead of the operation of the parent operation node.
+                            * I.   a -= (b - c) => a += (c - b)
+                            * II.  a += (b - c) => a -= (c - b)
+                            */
+                    if (*topmostAssignmentOperation == syrec_operation::operation::MinusAssign) {
+                        chosenOperand              = potentialOperandChoiceForAlternative;
+                        topmostAssignmentOperation = syrec_operation::operation::AddAssign;
+                    } else if (*topmostAssignmentOperation == syrec_operation::operation::AddAssign) {
+                        chosenOperand              = potentialOperandChoiceForAlternative;
+                        topmostAssignmentOperation = syrec_operation::operation::MinusAssign;
+                    }
+                }
             }
         }
-        else if (chosenOperand == Decision::ChoosenOperand::None && isAssignmentOperationCommutative && ((lhsOperandAsSignalAccess.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, potentialOperandChoice, **rhsOperandAsSignalAccess, **lhsOperandAsSignalAccess, *symbolTableReference)) || (lhsOperandAsExpr.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, potentialOperandChoice, **rhsOperandAsSignalAccess, **lhsOperandAsExpr, *symbolTableReference)))) {
-            chosenOperand = potentialOperandChoice;
+    }
+
+    if (!isChosenOperandPreselected && chosenOperand == Decision::ChoosenOperand::None && matchingAssignmentCounterpartForDefinedOperation.has_value() && determinedBitWidthOfAssignmentToSimplify.has_value()) {
+        constexpr Decision::ChoosenOperand operandSelectableByFirstAlternative = Decision::ChoosenOperand::Left;
+        // Signal access operands can only be replaced in operation nodes with only leaf nodes
+        if (lhsOperandAsSignalAccess.has_value() && lhsOperandSimplificationResult.wasResultManuallyCreated() && !wasOriginalLhsOperandModified) {
+            if (const syrec::Expression::ptr containerExprForSignalAccessLeaf = std::make_shared<syrec::VariableExpression>(*lhsOperandAsSignalAccess); containerExprForSignalAccessLeaf) {
+                if (const std::optional<syrec::VariableAccess::ptr> generatedReplacementForLhsOperand = createReplacementForLeafNodeOperand(operationNodeId, operandSelectableByFirstAlternative, containerExprForSignalAccessLeaf, signalValueLookupCallback); generatedReplacementForLhsOperand.has_value()) {
+                    lhsOperandAsSignalAccess                                         = generatedReplacementForLhsOperand;
+                    chosenOperand                                                    = operandSelectableByFirstAlternative;
+                    detectedConflictByExistenceOfOverlappingAssignmentWithLhsOperand = false;
+                }
+            }
+        } else if (lhsOperandAsExpr.has_value()) {
+            /*
+             * Any expression created here should have a bitwidth equal to the one assigned to signal parts, thus we can omit any checks or premature optimizations for the bitwidth of the to be generated replacement.
+             * Furthermore, we should only generated replacements for non-compile time numeric expressions since any other type of expression should have already been replaced with their replacement during the processing of said expression
+             */
+            if (const std::shared_ptr<syrec::NumericExpression> lhsOperandAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(*lhsOperandAsExpr); lhsOperandAsNumericExpr && !lhsOperandAsNumericExpr->value->isCompileTimeConstantExpression()) {
+                if (const std::optional<syrec::VariableAccess::ptr> generatedReplacementForLhsOperand = createReplacementForLeafNodeOperand(operationNodeId, operandSelectableByFirstAlternative, lhsOperandAsNumericExpr, signalValueLookupCallback); generatedReplacementForLhsOperand.has_value()) {
+                    lhsOperandAsSignalAccess = generatedReplacementForLhsOperand;
+                    chosenOperand            = operandSelectableByFirstAlternative;
+                }
+            }
         }
+        
+        if (chosenOperand == Decision::ChoosenOperand::None && syrec_operation::isCommutative(definedOperationOfOperationNode) && !wasOriginalRhsOperandModified) {
+            constexpr Decision::ChoosenOperand operandSelectableBySecondAlternative = Decision::ChoosenOperand::Right;
+            // Signal access operands can only be replaced in operation nodes with only leaf nodes
+            if (rhsOperandAsSignalAccess.has_value() && rhsOperandSimplificationResult.wasResultManuallyCreated()) {
+                if (const syrec::Expression::ptr containerExprForSignalAccessLeaf = std::make_shared<syrec::VariableExpression>(*rhsOperandAsSignalAccess); containerExprForSignalAccessLeaf) {
+                    if (const std::optional<syrec::VariableAccess::ptr> generatedReplacementForRhsOperand = createReplacementForLeafNodeOperand(operationNodeId, operandSelectableBySecondAlternative, containerExprForSignalAccessLeaf, signalValueLookupCallback); generatedReplacementForRhsOperand.has_value()) {
+                        rhsOperandAsSignalAccess                                         = generatedReplacementForRhsOperand;
+                        chosenOperand                                                    = operandSelectableBySecondAlternative;
+                        detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand = false;
+                    }
+                }
+            } else if (rhsOperandAsExpr.has_value()) {
+                /*
+             * Any expression created here should have a bitwidth equal to the one assigned to signal parts, thus we can omit any checks or premature optimizations for the bitwidth of the to be generated replacement.
+             * Furthermore, we should only generated replacements for non-compile time numeric expressions since any other type of expression should have already been replaced with their replacement during the processing of said expression
+             */
+                if (const std::shared_ptr<syrec::NumericExpression> rhsOperandAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(*rhsOperandAsExpr); rhsOperandAsNumericExpr && !rhsOperandAsNumericExpr->value->isCompileTimeConstantExpression()) {
+                    if (const std::optional<syrec::VariableAccess::ptr> generatedReplacementForRhsOperand = createReplacementForLeafNodeOperand(operationNodeId, operandSelectableBySecondAlternative, rhsOperandAsNumericExpr, signalValueLookupCallback); generatedReplacementForRhsOperand.has_value()) {
+                        lhsOperandAsSignalAccess = generatedReplacementForRhsOperand;
+                        chosenOperand            = operandSelectableBySecondAlternative;
+                    }
+                }
+            }
+        }
+    }
+
+    if (detectedConflictByExistenceOfOverlappingAssignmentWithLhsOperand) {
+        handleConflict(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess);
+        return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);
+    }
+    if (detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand) {
+        handleConflict(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess);
+        return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);
     }
 
     const std::vector<std::size_t> dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand = (lhsOperandAsSignalAccess.has_value() && !lhsOperandSimplificationResult.wasResultManuallyCreated()) ? std::vector(1, lhsOperandSimplificationResult.getIdOfGeneratedAssignment().value()) : lhsOperandSimplificationResult.getDataDependenciesAsIdsOfDependentAssignments();
     const std::vector<std::size_t> dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand = (rhsOperandAsSignalAccess.has_value() && !rhsOperandSimplificationResult.wasResultManuallyCreated()) ? std::vector(1, rhsOperandSimplificationResult.getIdOfGeneratedAssignment().value()) : rhsOperandSimplificationResult.getDataDependenciesAsIdsOfDependentAssignments();
-    if (chosenOperand != Decision::ChoosenOperand::None && mappedToDefinedOperationAsAssignmentOperationFlagValue.has_value()) {
-        // GENERATE ASSIGNMENT
-        // INVERSIONS OF DATA DEPENDENCIES, ETC.
-        syrec::VariableAccess::ptr                                  generatedAssignmentLhs;
-        syrec::Expression::ptr                                      generatedAssignmentRhs;
+    if (chosenOperand != Decision::ChoosenOperand::None) {
+        syrec::VariableAccess::ptr assignedToSignalParts;
+        syrec::Expression::ptr     assignmentRhsExpr;
         TemporaryAssignmentsContainer::OrderedAssignmentIdContainer dataDependenciesOfGeneratedAssignmentRhs;
+        std::optional<std::size_t>                                  idOfAssignmentFromWhichAssignedToSignalPartsAreInheritedFrom;
 
         if (chosenOperand == Decision::ChoosenOperand::Left) {
-            generatedAssignmentLhs                   = *lhsOperandAsSignalAccess;
-            if (rhsOperandAsExpr.has_value()) {
-                generatedAssignmentRhs = *rhsOperandAsExpr;
-                dataDependenciesOfGeneratedAssignmentRhs.insert(dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cend());
+            assignedToSignalParts = *lhsOperandAsSignalAccess;
+            idOfAssignmentFromWhichAssignedToSignalPartsAreInheritedFrom = lhsOperandSimplificationResult.getIdOfGeneratedAssignment();
+            assignmentRhsExpr     = rhsOperandAsExpr.value_or(nullptr);
+            if (!assignmentRhsExpr) {
+                assignmentRhsExpr = std::make_shared<syrec::VariableExpression>(*rhsOperandAsSignalAccess);
             }
-            else {
-                generatedAssignmentRhs = std::make_shared<syrec::VariableExpression>(*rhsOperandAsSignalAccess);
-                if (const std::optional<std::size_t> idOfAssociatedAssignmentForRhsOperand = rhsOperandSimplificationResult.getIdOfGeneratedAssignment(); idOfAssociatedAssignmentForRhsOperand.has_value()) {
-                    dataDependenciesOfGeneratedAssignmentRhs.emplace(*idOfAssociatedAssignmentForRhsOperand);
-                }
-            }
+            dataDependenciesOfGeneratedAssignmentRhs.insert(dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cend());
         } else {
-            generatedAssignmentLhs                   = *rhsOperandAsSignalAccess;
-            if (lhsOperandAsExpr.has_value()) {
-                generatedAssignmentRhs = *lhsOperandAsExpr;
-                dataDependenciesOfGeneratedAssignmentRhs.insert(dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cend());
-            } else {
-                generatedAssignmentRhs = std::make_shared<syrec::VariableExpression>(*lhsOperandAsSignalAccess);
-                if (const std::optional<std::size_t> idOfAssociatedAssignmentForLhsOperand = lhsOperandSimplificationResult.getIdOfGeneratedAssignment(); idOfAssociatedAssignmentForLhsOperand.has_value()) {
-                    dataDependenciesOfGeneratedAssignmentRhs.emplace(*idOfAssociatedAssignmentForLhsOperand);
+            assignedToSignalParts = *rhsOperandAsSignalAccess;
+            idOfAssignmentFromWhichAssignedToSignalPartsAreInheritedFrom = rhsOperandSimplificationResult.getIdOfGeneratedAssignment();
+            assignmentRhsExpr     = lhsOperandAsExpr.value_or(nullptr);
+            if (!assignmentRhsExpr) {
+                assignmentRhsExpr = std::make_shared<syrec::VariableExpression>(*lhsOperandAsSignalAccess);
+            }
+            dataDependenciesOfGeneratedAssignmentRhs.insert(dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cend());
+        }
+
+        if (assignmentRhsExpr) {
+            if (const std::shared_ptr<syrec::AssignStatement> generatedAssignment = std::make_shared<syrec::AssignStatement>(assignedToSignalParts, *syrec_operation::tryMapAssignmentOperationEnumToFlag(*matchingAssignmentCounterpartForDefinedOperation), assignmentRhsExpr); generatedAssignment) {
+                if (const std::optional<std::size_t>& idOfGeneratedAssignment = generatedAssignmentsContainer->storeActiveAssignment(generatedAssignment, idOfAssignmentFromWhichAssignedToSignalPartsAreInheritedFrom, dataDependenciesOfGeneratedAssignmentRhs, operationNodeId, std::nullopt); idOfGeneratedAssignment.has_value()) {
+                    if (!std::all_of(dataDependenciesOfGeneratedAssignmentRhs.cbegin(), dataDependenciesOfGeneratedAssignmentRhs.cend(), [&](const std::size_t dataDependency) { return generatedAssignmentsContainer->invertAssignmentAndDataDependencies(dataDependency); })) {
+                        return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
+                    }
+                    previousDecisionForReferencedOperationNode->choosenOperand = chosenOperand;
+
+                    /*
+                     * Since we try to learn conflicts at operation nodes where either or both operands are leaf nodes (learning a conflict at an operation node with no leaf nodes could prevent the usage of a
+                     * now valid operand propagated from node N1 matching a previous conflict found in N2 using the same operand), decisions where an operand was inherited (i.e. the original operand was an expression
+                     * was now transformed to an assignment), will not be considered as a source of a conflict to allow traversal to the child node causing the initial choice that will be propagated to said decision.
+                     */
+                    if (chosenOperand == Decision::ChoosenOperand::Left && !lhsOperandSimplificationResult.wasResultManuallyCreated()) {
+                        previousDecisionForReferencedOperationNode->inheritedOperandDataForChoice = *lhsOperandAsSignalAccess;
+                    } else if (chosenOperand == Decision::ChoosenOperand::Right && !rhsOperandSimplificationResult.wasResultManuallyCreated()) {
+                        previousDecisionForReferencedOperationNode->inheritedOperandDataForChoice = *rhsOperandAsSignalAccess;
+                    }
+                    logDecision(previousDecisionForReferencedOperationNode);
+                    return DecisionResult::fromGeneratedAssignment(generatedAssignment, *idOfGeneratedAssignment);
                 }
             }
         }
-
-        const std::shared_ptr<syrec::AssignStatement> generatedAssignment = generatedAssignmentRhs ? std::make_shared<syrec::AssignStatement>(generatedAssignmentLhs, *mappedToDefinedOperationAsAssignmentOperationFlagValue, generatedAssignmentRhs) : nullptr;
-        if (!generatedAssignment) {
-            return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
-        }
-        logDecision(previousDecisionForReferencedOperationNode);
-
-        std::size_t                idOfFirstAssignmentToInvert;
-        std::optional<std::size_t> idOfLastAssignmentToInvert;
-        if (chosenOperand == Decision::ChoosenOperand::Left) {
-            if (!idOfLastActiveAssignmentPriorToProcessingOfRhsOperand.has_value() || !*idOfLastActiveAssignmentPriorToProcessingOfRhsOperand) {
-                idOfFirstAssignmentToInvert = SIZE_MAX;
-            }
-            else {
-                idOfFirstAssignmentToInvert = *idOfLastActiveAssignmentPriorToProcessingOfRhsOperand;    
-            }
-            idOfLastAssignmentToInvert  = std::nullopt;
-        }
-        else {
-            if (!idOfLastActiveAssignmentPriorToProcessingOfLhsOperand.has_value() || !*idOfLastActiveAssignmentPriorToProcessingOfLhsOperand) {
-                idOfFirstAssignmentToInvert = idOfLastActiveAssignmentPriorToProcessingOfRhsOperand.value_or(SIZE_MAX);
-                idOfLastAssignmentToInvert  = idOfFirstAssignmentToInvert;
-            }
-            else {
-                idOfFirstAssignmentToInvert = *idOfLastActiveAssignmentPriorToProcessingOfLhsOperand;
-                idOfLastAssignmentToInvert  = idOfLastActiveAssignmentPriorToProcessingOfRhsOperand.has_value() ? idOfLastActiveAssignmentPriorToProcessingOfRhsOperand.value() : 0;   
-            }
-        }
-        
-        const TemporaryAssignmentsContainer::OrderedAssignmentIdContainer containerForDataDependenciesOfGeneratedAssignmentRhs(dataDependenciesOfGeneratedAssignmentRhs.begin(), dataDependenciesOfGeneratedAssignmentRhs.end());
-        const std::optional<std::size_t>                                  idOfAssignmentFromWhichAssignedToPartsWereInherited = chosenOperand == Decision::ChoosenOperand::Left ? lhsOperandSimplificationResult.getIdOfGeneratedAssignment() : rhsOperandSimplificationResult.getIdOfGeneratedAssignment();
-        if (const std::optional<std::size_t>& idOfGeneratedAssignment = generatedAssignmentsContainer->storeActiveAssignment(generatedAssignment, idOfAssignmentFromWhichAssignedToPartsWereInherited, containerForDataDependenciesOfGeneratedAssignmentRhs, operationNodeId, std::nullopt); idOfGeneratedAssignment.has_value()) {
-            // Since we are adding the generated assignment prior to the inversion of its data dependencies, we also need to update our upper bound of our open interval when the lhs operand was chosen as assigned to signal of the assignment
-            if (chosenOperand == Decision::ChoosenOperand::Left) {
-                idOfLastAssignmentToInvert = *idOfGeneratedAssignment;
-            }
-            if (!generatedAssignmentsContainer->invertAssignmentsWithIdInRange(idOfFirstAssignmentToInvert, idOfLastAssignmentToInvert)) {
-                return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
-            }
-            previousDecisionForReferencedOperationNode->choosenOperand = chosenOperand;   
-
-            /*
-             * Since we try to learn conflicts at operation nodes where either or both operands are leaf nodes (learning a conflict at an operation node with no leaf nodes could prevent the usage of a
-             * now valid operand propagated from node N1 matching a previous conflict found in N2 using the same operand), decisions where an operand was inherited (i.e. the original operand was an expression
-             * was now transformed to an assignment), will not be considered as a source of a conflict to allow traversal to the child node causing the initial choice that will be propagated to said decision.
-             */
-            if (chosenOperand == Decision::ChoosenOperand::Left && lhsOperandAsExpr.has_value()) {
-                previousDecisionForReferencedOperationNode->inheritedOperandDataForChoice = *lhsOperandAsSignalAccess;
-            } else if (chosenOperand == Decision::ChoosenOperand::Right && rhsOperandAsExpr.has_value()) {
-                previousDecisionForReferencedOperationNode->inheritedOperandDataForChoice = *rhsOperandAsSignalAccess;
-            }
-            return DecisionResult::fromGeneratedAssignment(generatedAssignment, *idOfGeneratedAssignment);
-        }
-        return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
     }
-
-    // FUSE EXPRESSIONS
+   // FUSE EXPRESSIONS
     const syrec::Expression::ptr generatedExprLhsExpr = lhsOperandAsExpr.has_value() ? *lhsOperandAsExpr : std::make_shared<syrec::VariableExpression>(*lhsOperandAsSignalAccess);
     const syrec::Expression::ptr generatedExprRhsExpr = rhsOperandAsExpr.has_value() ? *rhsOperandAsExpr : std::make_shared<syrec::VariableExpression>(*rhsOperandAsSignalAccess);
     if (generatedExprLhsExpr && generatedExprRhsExpr) {
@@ -1972,20 +2042,8 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
         if (operationNodeId) {
             bool wasExistingReplacementUpdated = false;
             if (const std::optional<std::pair<std::size_t, std::shared_ptr<syrec::AssignStatement>>>& idAndDataOfGeneratedReplacementForWholeExpr = getAndActivateReplacementForOperationNode(operationNodeId, definedOperationOfOperationNode, lhsOperandSimplificationResult, rhsOperandSimplificationResult, &wasExistingReplacementUpdated, signalValueLookupCallback); idAndDataOfGeneratedReplacementForWholeExpr.has_value()) {
-                const std::optional<std::size_t> lowerBoundOfClosedIntervalOfAssignmentIdsToInvert = generatedAssignmentsContainer->findDataDependencyOfCurrentAndChildAssignmentsFittingCriteria(fusedDataDependencies, TemporaryAssignmentsContainer::DataDependencySortCriteria::Smallest);
-                std::optional<std::size_t> upperBoundOfClosedIntervalOfAssignmentIdsToInvert = generatedAssignmentsContainer->findDataDependencyOfCurrentAndChildAssignmentsFittingCriteria(fusedDataDependencies, TemporaryAssignmentsContainer::DataDependencySortCriteria::Largest);
-
-                if (lowerBoundOfClosedIntervalOfAssignmentIdsToInvert.has_value() && upperBoundOfClosedIntervalOfAssignmentIdsToInvert.has_value()) {
-                    if (*upperBoundOfClosedIntervalOfAssignmentIdsToInvert == SIZE_MAX) {
-                        upperBoundOfClosedIntervalOfAssignmentIdsToInvert = std::nullopt;
-                    }
-                    else {
-                        upperBoundOfClosedIntervalOfAssignmentIdsToInvert = *upperBoundOfClosedIntervalOfAssignmentIdsToInvert + 1;
-                    }
-
-                    if (!generatedAssignmentsContainer->invertAssignmentsWithIdInRange(*lowerBoundOfClosedIntervalOfAssignmentIdsToInvert - 1, upperBoundOfClosedIntervalOfAssignmentIdsToInvert)) {
-                        return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
-                    }
+                if (!std::all_of(fusedDataDependencies.cbegin(), fusedDataDependencies.cend(), [&](const std::size_t dataDependencyOfFusedExpression) { return generatedAssignmentsContainer->invertAssignmentAndDataDependencies(dataDependencyOfFusedExpression); })) {
+                    return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
                 }
 
                 const std::shared_ptr<syrec::VariableAccess>& assignedToSignalParts = idAndDataOfGeneratedReplacementForWholeExpr.value().second->lhs;
@@ -1997,7 +2055,7 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
                 expressionTraversalHelper->markSignalAsAssignable(assignedToSignalParts->var->name);
                 logCreationOfSubstitutionOfExprOfOperationNode(operationNodeId, assignedToSignalParts->var->name, wasExistingReplacementUpdated);
                 return DecisionResult::fromGeneratedAssignment(idAndDataOfGeneratedReplacementForWholeExpr.value().second, idAndDataOfGeneratedReplacementForWholeExpr.value().first);
-            }    
+            }
         }
 
         if (const std::optional<syrec::Expression::ptr> fusedExpression = fuseExpressions(generatedExprLhsExpr, definedOperationOfOperationNode, generatedExprRhsExpr); fusedExpression) {
@@ -2008,16 +2066,337 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
     return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
 }
 
-noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionReference noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::constructAndRecordDefaultDecision(std::size_t operationNodeId) {
+
+//
+//noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionResult noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::makeDecisionFor(std::size_t operationNodeId, const OperationNodeSimplificationResult& lhsOperandSimplificationResult, syrec_operation::operation definedOperationOfOperationNode, const OperationNodeSimplificationResult& rhsOperandSimplificationResult, const std::optional<std::size_t>& idOfLastActiveAssignmentPriorToProcessingOfLhsOperand, const std::optional<std::size_t>& idOfLastActiveAssignmentPriorToProcessingOfRhsOperand, const SignalValueLookupCallback& signalValueLookupCallback) {
+//    const std::optional<syrec::Expression::ptr>&     lhsOperandAsExpr         = lhsOperandSimplificationResult.getResultAsExpr();
+//    std::optional<syrec::VariableAccess::ptr> lhsOperandAsSignalAccess = lhsOperandSimplificationResult.getResultAsSignalAccess();
+//
+//    const std::optional<syrec::Expression::ptr>&     rhsOperandAsExpr         = rhsOperandSimplificationResult.getResultAsExpr();
+//    std::optional<syrec::VariableAccess::ptr> rhsOperandAsSignalAccess = rhsOperandSimplificationResult.getResultAsSignalAccess();
+//
+//    const std::optional<syrec_operation::operation> definedOperationAsAssignmentOperation                      = syrec_operation::getMatchingAssignmentOperationForOperation(definedOperationOfOperationNode);
+//    const std::optional<unsigned int>               mappedToDefinedOperationAsAssignmentOperationFlagValue     = definedOperationAsAssignmentOperation.has_value() ? syrec_operation::tryMapAssignmentOperationEnumToFlag(*definedOperationAsAssignmentOperation) : std::nullopt;
+//    
+//    Decision::ChoosenOperand chosenOperand                              = Decision::ChoosenOperand::None;
+//    Decision::ChoosenOperand preferredOperandDueToInheritance            = Decision::ChoosenOperand::None;
+//    DecisionReference        previousDecisionForReferencedOperationNode = tryGetDecisionForOperationNode(operationNodeId).value_or(nullptr);
+//    if (!previousDecisionForReferencedOperationNode) {
+//        previousDecisionForReferencedOperationNode = constructAndRecordDefaultDecision(operationNodeId);
+//        if (!previousDecisionForReferencedOperationNode) {
+//            return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
+//        }
+//    }
+//
+//    const bool canAssignmentBeGeneratedBasedOnOperation = definedOperationAsAssignmentOperation.has_value() && mappedToDefinedOperationAsAssignmentOperationFlagValue.has_value();
+//    const bool isAssignmentOperationCommutative         = mappedToDefinedOperationAsAssignmentOperationFlagValue.has_value() ? syrec_operation::isCommutative(definedOperationOfOperationNode) : false;
+//
+//    std::optional<std::size_t> idOfLatestActiveAssignmentOverlappingLhsOperand;
+//    std::optional<std::size_t> idOfLatestActiveAssignmentOverlappingRhsOperand;
+//    if (previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated != Decision::ChoiceRepetition::Always) {
+//        previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated = Decision::ChoiceRepetition::None;
+//        previousDecisionForReferencedOperationNode->choosenOperand         = Decision::ChoosenOperand::None;
+//
+//        /*
+//         * If both operands define signal accesses either due to the operand being a signal access or by being created from an assignment, with the lhs operand being manually created (i.e. the original operand already being a
+//         * signal access) and the rhs operand being created from an assignment, we prefer to reuse the assigned to signal parts of the latter if a choice between both operands is possible. Otherwise, the preferred operand is the
+//         * lhs one.
+//         */
+//        if (lhsOperandAsSignalAccess.has_value() && lhsOperandSimplificationResult.wasResultManuallyCreated() && rhsOperandAsSignalAccess.has_value() && !rhsOperandSimplificationResult.wasResultManuallyCreated() 
+//            && isAssignmentOperationCommutative && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **lhsOperandAsSignalAccess, **rhsOperandAsSignalAccess, *symbolTableReference)) {
+//            preferredOperandDueToInheritance = Decision::ChoosenOperand::Right;
+//        }
+//    }
+//    const std::optional<ExpressionTraversalHelper::OperationNodeReference> operationNodeForWhichDecisionIsMade = expressionTraversalHelper->getOperationNodeById(operationNodeId);
+//    if (!operationNodeForWhichDecisionIsMade.has_value()) {
+//        return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
+//    }
+//    const bool doesOperationNodeOnlyHaveLeafNodes = operationNodeForWhichDecisionIsMade->get()->areBothOperandsLeafNodes();
+//
+//    std::optional<syrec::VariableAccess::ptr> generatedSubstitutionForLhsOperand;
+//    std::optional<syrec::VariableAccess::ptr> generatedSubstitutionForRhsOperand;
+//    
+//    /*
+//     * TODO: We could perform a transformation when the current expression is (OP_1 - (OP_2 - OP_3)) when processing (OP_2 - OP_3) to (OP_1 - (OP_3 - OP_2)) if this leads to the generation of an assignment
+//     */
+//    const std::optional<std::size_t> operationNodeOfRhsOperandOfThisOperationNode = expressionTraversalHelper->getOperationNodeIdOfRightOperand(operationNodeId);
+//    if (lhsOperandAsSignalAccess.has_value() && previousDecisionForReferencedOperationNode->choosenOperand != Decision::ChoosenOperand::Left) {
+//        const std::size_t                  searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId = doesOperationNodeOnlyHaveLeafNodes ? 0 : operationNodeId;
+//        const std::size_t                  searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId = operationNodeOfRhsOperandOfThisOperationNode.value_or(SIZE_MAX) - 1;
+//        constexpr Decision::ChoosenOperand potentialOperandChoice                                                                 = Decision::ChoosenOperand::Left;
+//
+//        const bool detectedConflictForLhsOperand = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(**lhsOperandAsSignalAccess, searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId, searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId, *symbolTableReference).has_value();
+//        if (detectedConflictForLhsOperand) {
+//            if (lhsOperandSimplificationResult.wasResultManuallyCreated()) {
+//                lhsOperandAsSignalAccess = createReplacementForChosenOperand(previousDecisionForReferencedOperationNode, signalValueLookupCallback);
+//            }
+//            if (!lhsOperandAsSignalAccess.has_value()) {
+//                handleConflict(operationNodeId, potentialOperandChoice, **lhsOperandAsSignalAccess);
+//                return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);
+//            }
+//            logCreationOfSubstitutionOfOperandOfOperationNode(operationNodeId, potentialOperandChoice, **generatedSubstitutionForLhsOperand);
+//        }
+//
+//        //if (!detectedConflictForLhsOperand && canAssignmentBeGeneratedBasedOnOperation 
+//        //    && ((rhsOperandAsSignalAccess.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, potentialOperandChoice, **lhsOperandAsSignalAccess, **rhsOperandAsSignalAccess, *symbolTableReference)) 
+//        //        || (rhsOperandAsExpr.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, potentialOperandChoice, **lhsOperandAsSignalAccess, **rhsOperandAsExpr, *symbolTableReference)))) {
+//        //    chosenOperand = potentialOperandChoice;
+//        //}
+//    }
+//
+//    /*
+//     * Extend replacement generation to overlaps with existing expression or not assignable signal 
+//     */
+//    if (rhsOperandAsSignalAccess.has_value()) {
+//        const std::size_t                  searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId = operationNodeOfRhsOperandOfThisOperationNode.value_or(SIZE_MAX);
+//        constexpr std::size_t              searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId = SIZE_MAX;
+//        constexpr Decision::ChoosenOperand potentialOperandChoice                                                                 = Decision::ChoosenOperand::Right;
+//
+//        const bool detectedConflictForRhsOperand = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(**rhsOperandAsSignalAccess, searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId, searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId, *symbolTableReference).has_value();
+//        if (detectedConflictForRhsOperand) {
+//            if (rhsOperandSimplificationResult.wasResultManuallyCreated()) {
+//                rhsOperandAsSignalAccess = createReplacementForChosenOperand(previousDecisionForReferencedOperationNode, signalValueLookupCallback);
+//            }
+//            if (!rhsOperandAsSignalAccess.has_value()) {
+//                handleConflict(operationNodeId, potentialOperandChoice, **rhsOperandAsSignalAccess);
+//                return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);   
+//            }
+//            logCreationOfSubstitutionOfOperandOfOperationNode(operationNodeId, potentialOperandChoice, **generatedSubstitutionForRhsOperand);
+//        }
+//    }
+//
+//    /*
+//     * TODO: Also allow constants to be replaced ?
+//     */
+//    if (canAssignmentBeGeneratedBasedOnOperation) {
+//        const bool canLhsOperandBeChosen = lhsOperandAsSignalAccess.has_value()
+//            && ((rhsOperandAsSignalAccess.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess, **rhsOperandAsSignalAccess, *symbolTableReference)) 
+//                || (rhsOperandAsExpr.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess, **rhsOperandAsExpr, *symbolTableReference)));
+//
+//        const bool canRhsOperandBeChosenWhenIgnoringCommutativityOfAssignmentOperation = rhsOperandAsSignalAccess.has_value()
+//            && ((lhsOperandAsSignalAccess.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsSignalAccess, *symbolTableReference)) 
+//            || (lhsOperandAsExpr.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsExpr, *symbolTableReference)));
+//
+//        // TODO: Apply transformations
+//        if (!canLhsOperandBeChosen && !canRhsOperandBeChosenWhenIgnoringCommutativityOfAssignmentOperation) {
+//            
+//        } else {
+//            chosenOperand = Decision::ChoosenOperand::Left;
+//            if (canRhsOperandBeChosenWhenIgnoringCommutativityOfAssignmentOperation && isAssignmentOperationCommutative && lhsOperandAsSignalAccess.has_value() ? lhsOperandSimplificationResult.wasResultManuallyCreated() : true) {
+//                chosenOperand = Decision::ChoosenOperand::Right;
+//            }
+//        }
+//
+//        if (rhsOperandAsSignalAccess.has_value() && isAssignmentOperationCommutative
+//            && ((lhsOperandAsSignalAccess.has_value() && lhsOperandSimplificationResult.wasResultManuallyCreated() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsSignalAccess, *symbolTableReference))
+//                || (lhsOperandAsExpr.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsExpr, *symbolTableReference)))) {
+//            chosenOperand = Decision::ChoosenOperand::Right;
+//        }
+//
+//
+//    }
+//
+//    if (lhsOperandAsSignalAccess.has_value() && canAssignmentBeGeneratedBasedOnOperation)
+//
+//
+//    if (rhsOperandAsSignalAccess.has_value() && previousDecisionForReferencedOperationNode->choosenOperand != Decision::ChoosenOperand::Right) {
+//        const std::size_t                  searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId = operationNodeOfRhsOperandOfThisOperationNode.value_or(SIZE_MAX);
+//        constexpr std::size_t              searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId = SIZE_MAX;
+//        constexpr Decision::ChoosenOperand potentialOperandChoice                                                                 = Decision::ChoosenOperand::Right;
+//
+//        /*
+//         * If can find an active assignment that overlaps with the given accessed signal parts of the operand we need to check whether found assignment is a data dependency of another active
+//         * assignment because then we can safely invert the found assignment without the inversion affecting other currently active ones (Since our check for an overlapping assignment will return the latest [i.e. earliest relative to the last added active assignment] our subsequent check for it being a data dependency will ignore
+//         * prior active assignments that propagated the assigned to signal parts to the found one). Otherwise, if the assignment was no data dependency of another active assignment, we found a conflict.
+//         */
+//        if (idOfLatestActiveAssignmentOverlappingRhsOperand = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(**rhsOperandAsSignalAccess, searchForActiveAssignmentExclusionRangeForLowerBoundDefinedByAssociatedOperationNodeId, searchForActiveAssignmentExclusionRangeForUpperBoundDefinedByAssociatedOperationNodeId, *symbolTableReference); idOfLatestActiveAssignmentOverlappingRhsOperand.has_value() && !generatedAssignmentsContainer->existsActiveAssignmentHavingGivenAssignmentAsDataDependency(*idOfLatestActiveAssignmentOverlappingRhsOperand)) {
+//            if (const std::optional<syrec::VariableAccess::ptr>& generatedSubstitutionForRhsOperand = rhsOperandSimplificationResult.wasResultManuallyCreated() ? createReplacementForChosenOperand(previousDecisionForReferencedOperationNode, signalValueLookupCallback) : std::nullopt; generatedSubstitutionForRhsOperand.has_value()) {
+//                logCreationOfSubstitutionOfOperandOfOperationNode(operationNodeId, potentialOperandChoice, **generatedSubstitutionForRhsOperand);
+//                if (chosenOperand == Decision::ChoosenOperand::None) {
+//                    previousDecisionForReferencedOperationNode->shouldChoiceBeRepeated = Decision::ChoiceRepetition::Always;
+//                    previousDecisionForReferencedOperationNode->choosenOperand         = potentialOperandChoice;   
+//                }
+//            }
+//            else {
+//                handleConflict(operationNodeId, potentialOperandChoice, **rhsOperandAsSignalAccess);
+//                return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);   
+//            }
+//        }
+//        else if (chosenOperand == Decision::ChoosenOperand::None && ((lhsOperandAsSignalAccess.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, potentialOperandChoice, **rhsOperandAsSignalAccess, **lhsOperandAsSignalAccess, *symbolTableReference)) || (lhsOperandAsExpr.has_value() && canAlternativeByChosenInOperationNode(operationNodeId, potentialOperandChoice, **rhsOperandAsSignalAccess, **lhsOperandAsExpr, *symbolTableReference)))) {
+//            if (isAssignmentOperationCommutative) {
+//                chosenOperand = potentialOperandChoice;
+//            } else if (definedOperationOfOperationNode == syrec_operation::operation::Subtraction || definedOperationAsAssignmentOperation == syrec_operation::operation::Addition) {
+//                /*
+//                 * If no operand was chosen at this point we can try and perform the following two transformations:
+//                 * I.   (a - (b - c)) => (a + (c - b))
+//                 * II.  (a + (b - c)) => (a - (c - b))
+//                 *
+//                 * If any of the two transformations can be applied, we also have to update the operation of the parent node.
+//                 */
+//                if (const std::optional<ExpressionTraversalHelper::OperationNodeReference> operationNodeForWhichDecisionIsMade = expressionTraversalHelper->getOperationNodeById(operationNodeId); operationNodeForWhichDecisionIsMade.has_value()) {
+//                    if (operationNodeForWhichDecisionIsMade->get()->parentNodeId.has_value()) {
+//                        const std::optional<ExpressionTraversalHelper::OperationNodeReference> parentNodeOfOperationNode = expressionTraversalHelper->getOperationNodeById(*operationNodeForWhichDecisionIsMade->get()->parentNodeId);
+//                        if (parentNodeOfOperationNode.has_value() && parentNodeOfOperationNode->get()->rhsOperand.id == operationNodeId) {
+//                            if ((parentNodeOfOperationNode->get()->operation == syrec_operation::operation::Subtraction && expressionTraversalHelper->updateOperation(parentNodeOfOperationNode->get()->id, syrec_operation::operation::Addition))
+//                                || (parentNodeOfOperationNode->get()->operation == syrec_operation::operation::Addition && expressionTraversalHelper->updateOperation(parentNodeOfOperationNode->get()->id, syrec_operation::operation::Subtraction))) {
+//                                chosenOperand = potentialOperandChoice;    
+//                            }
+//                        }
+//                    } else if (topmostAssignmentOperation.has_value() && operationNodeId == expressionTraversalHelper->getOperationNodeIdOfFirstEntryInQueue().value_or(0) ){
+//                        /*
+//                         * Both of the previously mentioned transformation can also be applied in the topmost operation node but now depend on the defined assignment operation instead of the operation of the parent operation node.
+//                         * I.   a -= (b - c) => a += (c - b)
+//                         * II.  a += (b - c) => a -= (c - b)
+//                         */
+//                        if (*topmostAssignmentOperation == syrec_operation::operation::MinusAssign) {
+//                            chosenOperand              = potentialOperandChoice;
+//                            topmostAssignmentOperation = syrec_operation::operation::AddAssign;
+//                        } else if (*topmostAssignmentOperation == syrec_operation::operation::AddAssign) {
+//                            chosenOperand              = potentialOperandChoice;
+//                            topmostAssignmentOperation = syrec_operation::operation::MinusAssign;
+//                        }
+//                    }   
+//                }
+//            }
+//        }
+//    }
+//
+//    const std::vector<std::size_t> dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand = (lhsOperandAsSignalAccess.has_value() && !lhsOperandSimplificationResult.wasResultManuallyCreated()) ? std::vector(1, lhsOperandSimplificationResult.getIdOfGeneratedAssignment().value()) : lhsOperandSimplificationResult.getDataDependenciesAsIdsOfDependentAssignments();
+//    const std::vector<std::size_t> dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand = (rhsOperandAsSignalAccess.has_value() && !rhsOperandSimplificationResult.wasResultManuallyCreated()) ? std::vector(1, rhsOperandSimplificationResult.getIdOfGeneratedAssignment().value()) : rhsOperandSimplificationResult.getDataDependenciesAsIdsOfDependentAssignments();
+//    if (chosenOperand != Decision::ChoosenOperand::None && mappedToDefinedOperationAsAssignmentOperationFlagValue.has_value()) {
+//        // GENERATE ASSIGNMENT
+//        // INVERSIONS OF DATA DEPENDENCIES, ETC.
+//        syrec::VariableAccess::ptr                                  generatedAssignmentLhs;
+//        syrec::Expression::ptr                                      generatedAssignmentRhs;
+//        TemporaryAssignmentsContainer::OrderedAssignmentIdContainer dataDependenciesOfGeneratedAssignmentRhs;
+//
+//        if (chosenOperand == Decision::ChoosenOperand::Left) {
+//            generatedAssignmentLhs                   = *lhsOperandAsSignalAccess;
+//            if (rhsOperandAsExpr.has_value()) {
+//                generatedAssignmentRhs = *rhsOperandAsExpr;
+//                dataDependenciesOfGeneratedAssignmentRhs.insert(dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cend());
+//            }
+//            else {
+//                generatedAssignmentRhs = std::make_shared<syrec::VariableExpression>(*rhsOperandAsSignalAccess);
+//                if (const std::optional<std::size_t> idOfAssociatedAssignmentForRhsOperand = rhsOperandSimplificationResult.getIdOfGeneratedAssignment(); idOfAssociatedAssignmentForRhsOperand.has_value()) {
+//                    dataDependenciesOfGeneratedAssignmentRhs.emplace(*idOfAssociatedAssignmentForRhsOperand);
+//                }
+//            }
+//        } else {
+//            generatedAssignmentLhs                   = *rhsOperandAsSignalAccess;
+//            if (lhsOperandAsExpr.has_value()) {
+//                generatedAssignmentRhs = *lhsOperandAsExpr;
+//                dataDependenciesOfGeneratedAssignmentRhs.insert(dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cend());
+//            } else {
+//                generatedAssignmentRhs = std::make_shared<syrec::VariableExpression>(*lhsOperandAsSignalAccess);
+//                if (const std::optional<std::size_t> idOfAssociatedAssignmentForLhsOperand = lhsOperandSimplificationResult.getIdOfGeneratedAssignment(); idOfAssociatedAssignmentForLhsOperand.has_value()) {
+//                    dataDependenciesOfGeneratedAssignmentRhs.emplace(*idOfAssociatedAssignmentForLhsOperand);
+//                }
+//            }
+//        }
+//
+//        const std::shared_ptr<syrec::AssignStatement> generatedAssignment = generatedAssignmentRhs ? std::make_shared<syrec::AssignStatement>(generatedAssignmentLhs, *mappedToDefinedOperationAsAssignmentOperationFlagValue, generatedAssignmentRhs) : nullptr;
+//        if (!generatedAssignment) {
+//            return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
+//        }
+//        logDecision(previousDecisionForReferencedOperationNode);
+//
+//        std::size_t                idOfFirstAssignmentToInvert;
+//        std::optional<std::size_t> idOfLastAssignmentToInvert;
+//        if (chosenOperand == Decision::ChoosenOperand::Left) {
+//            if (!idOfLastActiveAssignmentPriorToProcessingOfRhsOperand.has_value() || !*idOfLastActiveAssignmentPriorToProcessingOfRhsOperand) {
+//                idOfFirstAssignmentToInvert = SIZE_MAX;
+//            }
+//            else {
+//                idOfFirstAssignmentToInvert = *idOfLastActiveAssignmentPriorToProcessingOfRhsOperand;    
+//            }
+//            idOfLastAssignmentToInvert  = std::nullopt;
+//        }
+//        else {
+//            if (!idOfLastActiveAssignmentPriorToProcessingOfLhsOperand.has_value() || !*idOfLastActiveAssignmentPriorToProcessingOfLhsOperand) {
+//                idOfFirstAssignmentToInvert = idOfLastActiveAssignmentPriorToProcessingOfRhsOperand.value_or(SIZE_MAX);
+//                idOfLastAssignmentToInvert  = idOfFirstAssignmentToInvert;
+//            }
+//            else {
+//                idOfFirstAssignmentToInvert = *idOfLastActiveAssignmentPriorToProcessingOfLhsOperand;
+//                idOfLastAssignmentToInvert  = idOfLastActiveAssignmentPriorToProcessingOfRhsOperand.has_value() ? idOfLastActiveAssignmentPriorToProcessingOfRhsOperand.value() : 0;   
+//            }
+//        }
+//        
+//        const TemporaryAssignmentsContainer::OrderedAssignmentIdContainer containerForDataDependenciesOfGeneratedAssignmentRhs(dataDependenciesOfGeneratedAssignmentRhs.begin(), dataDependenciesOfGeneratedAssignmentRhs.end());
+//        const std::optional<std::size_t>                                  idOfAssignmentFromWhichAssignedToPartsWereInherited = chosenOperand == Decision::ChoosenOperand::Left ? lhsOperandSimplificationResult.getIdOfGeneratedAssignment() : rhsOperandSimplificationResult.getIdOfGeneratedAssignment();
+//        if (const std::optional<std::size_t>& idOfGeneratedAssignment = generatedAssignmentsContainer->storeActiveAssignment(generatedAssignment, idOfAssignmentFromWhichAssignedToPartsWereInherited, containerForDataDependenciesOfGeneratedAssignmentRhs, operationNodeId, std::nullopt); idOfGeneratedAssignment.has_value()) {
+//            if (!std::all_of(dataDependenciesOfGeneratedAssignmentRhs.cbegin(), dataDependenciesOfGeneratedAssignmentRhs.cend(), [&](const std::size_t dataDependency){ return generatedAssignmentsContainer->invertAssignmentAndDataDependencies(dataDependency);})) {
+//                return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
+//            }
+//            previousDecisionForReferencedOperationNode->choosenOperand = chosenOperand;   
+//
+//            /*
+//             * Since we try to learn conflicts at operation nodes where either or both operands are leaf nodes (learning a conflict at an operation node with no leaf nodes could prevent the usage of a
+//             * now valid operand propagated from node N1 matching a previous conflict found in N2 using the same operand), decisions where an operand was inherited (i.e. the original operand was an expression
+//             * was now transformed to an assignment), will not be considered as a source of a conflict to allow traversal to the child node causing the initial choice that will be propagated to said decision.
+//             */
+//            if (chosenOperand == Decision::ChoosenOperand::Left && lhsOperandAsExpr.has_value()) {
+//                previousDecisionForReferencedOperationNode->inheritedOperandDataForChoice = *lhsOperandAsSignalAccess;
+//            } else if (chosenOperand == Decision::ChoosenOperand::Right && rhsOperandAsExpr.has_value()) {
+//                previousDecisionForReferencedOperationNode->inheritedOperandDataForChoice = *rhsOperandAsSignalAccess;
+//            }
+//            return DecisionResult::fromGeneratedAssignment(generatedAssignment, *idOfGeneratedAssignment);
+//        }
+//        return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
+//    }
+//
+//    // FUSE EXPRESSIONS
+//    const syrec::Expression::ptr generatedExprLhsExpr = lhsOperandAsExpr.has_value() ? *lhsOperandAsExpr : std::make_shared<syrec::VariableExpression>(*lhsOperandAsSignalAccess);
+//    const syrec::Expression::ptr generatedExprRhsExpr = rhsOperandAsExpr.has_value() ? *rhsOperandAsExpr : std::make_shared<syrec::VariableExpression>(*rhsOperandAsSignalAccess);
+//    if (generatedExprLhsExpr && generatedExprRhsExpr) {
+//        std::vector<std::size_t> fusedDataDependencies;
+//        fusedDataDependencies.reserve(dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.size() + dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.size());
+//        // TODO: What if this allocation fails?
+//        fusedDataDependencies.insert(fusedDataDependencies.end(), dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cend());
+//        fusedDataDependencies.insert(fusedDataDependencies.end(), dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cend());
+//
+//        /*
+//         * Replacing the topmost expression via a replacement does not lead to any improvement and would only introduce unnecessary additional signals.
+//         * Furthermore, we assume that the topmost operation node has an id with value 0.
+//         */
+//        if (operationNodeId) {
+//            bool wasExistingReplacementUpdated = false;
+//            if (const std::optional<std::pair<std::size_t, std::shared_ptr<syrec::AssignStatement>>>& idAndDataOfGeneratedReplacementForWholeExpr = getAndActivateReplacementForOperationNode(operationNodeId, definedOperationOfOperationNode, lhsOperandSimplificationResult, rhsOperandSimplificationResult, &wasExistingReplacementUpdated, signalValueLookupCallback); idAndDataOfGeneratedReplacementForWholeExpr.has_value()) {
+//                if (!std::all_of(fusedDataDependencies.cbegin(), fusedDataDependencies.cend(), [&](const std::size_t dataDependencyOfFusedExpression) { return generatedAssignmentsContainer->invertAssignmentAndDataDependencies(dataDependencyOfFusedExpression); })) {
+//                    return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
+//                }
+//                
+//                const std::shared_ptr<syrec::VariableAccess>& assignedToSignalParts = idAndDataOfGeneratedReplacementForWholeExpr.value().second->lhs;
+//                /*
+//                * Since we use the expression traversal helper to determine whether a signal ident refers to an assignable signal in our implementation of a decision, and due to the fact that said
+//                * lookup is initially built during the generation of the traversal data from the initial assignment right-hand side expression, we need to manually add the generated replacement signal
+//                * as an assignable signal.
+//                */
+//                expressionTraversalHelper->markSignalAsAssignable(assignedToSignalParts->var->name);
+//                logCreationOfSubstitutionOfExprOfOperationNode(operationNodeId, assignedToSignalParts->var->name, wasExistingReplacementUpdated);
+//                return DecisionResult::fromGeneratedAssignment(idAndDataOfGeneratedReplacementForWholeExpr.value().second, idAndDataOfGeneratedReplacementForWholeExpr.value().first);
+//            }    
+//        }
+//
+//        if (const std::optional<syrec::Expression::ptr> fusedExpression = fuseExpressions(generatedExprLhsExpr, definedOperationOfOperationNode, generatedExprRhsExpr); fusedExpression) {
+//            logDecision(previousDecisionForReferencedOperationNode);
+//            return DecisionResult::fromGeneratedExpression(*fusedExpression, fusedDataDependencies);
+//        }
+//    }
+//    return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
+//}
+
+std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionReference> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::constructAndRecordDefaultDecision(std::size_t operationNodeId) {
     if (DecisionReference generatedDefaultDecision = constructDefaultDecision(operationNodeId); generatedDefaultDecision) {
         pastDecisions.emplace(generatedDefaultDecision);
         return generatedDefaultDecision;
     }
-    return nullptr;
+    return std::nullopt;
 }
 
 noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionReference noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::constructDefaultDecision(std::size_t operationNodeId) {
-    return std::make_shared<Decision>(Decision({operationNodeId, 0, Decision::ChoosenOperand::None, Decision::ChoiceRepetition::UntilReset, nullptr}));
+    return std::make_shared<Decision>(Decision({operationNodeId, 0, Decision::ChoosenOperand::None, Decision::ChoiceRepetition::None, nullptr}));
 }
 
 std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::OperationNodeSimplificationResult::OwningReference> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::tryPerformTransformationOfDecisionResultToOperationNodeSimplificationResultWhenNoConflictWasDetected(std::size_t operationNodeId, const DecisionResult& decisionResult) {

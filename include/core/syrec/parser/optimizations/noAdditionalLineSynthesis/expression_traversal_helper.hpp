@@ -48,6 +48,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<OperationNodeReference>     getOperationNodeById(std::size_t operationNodeId) const;
         void                                                    markSignalAsAssignable(const std::string& assignableSignalIdent);
         [[nodiscard]] std::optional<std::size_t>                getOperationNodeIdOfRightOperand(std::size_t operationNodeId) const;
+        [[nodiscard]] std::optional<std::size_t>                getOperationNodeIdOfFirstEntryInQueue() const;
 
         /**
          * \brief Update the operand data of a given operation node
@@ -57,6 +58,7 @@ namespace noAdditionalLineSynthesis {
          * \return Whether the update was successful
          */
         [[nodiscard]] bool                                      updateOperandData(std::size_t operationNodeId, bool updateLhsOperandData, const syrec::Expression::ptr& newOperandData);
+        [[maybe_unused]] bool                                   updateOperation(std::size_t operationNodeId, syrec_operation::operation newOperation) const;
         void                                                    markOperationNodeAsPotentialBacktrackOption(std::size_t operationNodeId);
         void                                                    removeOperationNodeAsPotentialBacktrackOperation(std::size_t operationNodeId);
         void                                                    backtrackToNode(std::size_t operationNodeId);
