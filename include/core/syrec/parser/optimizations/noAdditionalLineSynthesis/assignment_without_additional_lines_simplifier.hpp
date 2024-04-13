@@ -221,13 +221,7 @@ namespace noAdditionalLineSynthesis {
                 result.wasManuallyCreated = true;
                 return result;
             }
-
-            /*[[nodiscard]] static OperationNodeSimplificationResult createFromLeafNode(const SignalAccessOrExpression& leafNodeData) {
-                OperationNodeSimplificationResult result;
-                result.data = leafNodeData;
-                return result;
-            }*/
-
+            
             [[nodiscard]] static OperationNodeSimplificationResult createFromNonLeafNode(std::size_t referencedOperationNodeId, const SignalAccessOrExpression& nonLeafNodeData, const std::vector<std::size_t>& dataDependenciesAsIdsOfDependentAssignments) {
                 OperationNodeSimplificationResult result;
                 result.referencedOperationNode                     = referencedOperationNodeId;

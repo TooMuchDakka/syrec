@@ -53,7 +53,6 @@
 
 
 
-
 // TODO: We should probably also validate that the optimized circuit that is created after a successful parse is also correct
 // TODO: Correct update of reference counts for simplification of assignments with no additional lines
 
@@ -796,6 +795,9 @@ std::optional<std::pair<std::size_t, std::shared_ptr<syrec::AssignStatement>>> n
     if (!determinedBitWidthOfAssignmentToSimplify.has_value() || !substitutionGenerator || !expressionTraversalHelper->getOperationNodeById(referencedOperationNodeId).has_value()) {
         return std::nullopt;
     }
+    
+    const std::vector<std::size_t> dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand = (lhsOperandDataChoicesAfterSimplification.getResultAsSignalAccess().has_value() && !lhsOperandDataChoicesAfterSimplification.wasResultManuallyCreated()) ? std::vector(1, lhsOperandDataChoicesAfterSimplification.getIdOfGeneratedAssignment().value()) : lhsOperandDataChoicesAfterSimplification.getDataDependenciesAsIdsOfDependentAssignments();
+    const std::vector<std::size_t> dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand = (rhsOperandDataChoicesAfterSimplification.getResultAsSignalAccess().has_value() && !rhsOperandDataChoicesAfterSimplification.wasResultManuallyCreated()) ? std::vector(1, rhsOperandDataChoicesAfterSimplification.getIdOfGeneratedAssignment().value()) : rhsOperandDataChoicesAfterSimplification.getDataDependenciesAsIdsOfDependentAssignments();
     if (wholeExpressionOfOperationNodeReplacementLookup.count(referencedOperationNodeId)) {
         /*
          * If the operands of the already existing assignment did not change, simply reuse said assignment again. Otherwise, update the operands. The operation of the rhs expression of the assignments should not change thus the type of the expression should also not change.
@@ -821,12 +823,10 @@ std::optional<std::pair<std::size_t, std::shared_ptr<syrec::AssignStatement>>> n
         if (wasExistingReplacementForOperationNodeEntryUpdated) {
             *wasExistingReplacementForOperationNodeEntryUpdated = *didOperandsOfExistingAssignmentChange;
         }
-
-        const std::vector<std::size_t>& lhsOperandDataDependencies = lhsOperandDataChoicesAfterSimplification.getDataDependenciesAsIdsOfDependentAssignments();
-        const std::vector<std::size_t>& rhsOperandDataDependencies = rhsOperandDataChoicesAfterSimplification.getDataDependenciesAsIdsOfDependentAssignments();
+        
         TemporaryAssignmentsContainer::OrderedAssignmentIdContainer fusedDataDependencies;
-        fusedDataDependencies.insert(lhsOperandDataDependencies.cbegin(), lhsOperandDataDependencies.cend());
-        fusedDataDependencies.insert(rhsOperandDataDependencies.cbegin(), rhsOperandDataDependencies.cend());
+        fusedDataDependencies.insert(dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cend());
+        fusedDataDependencies.insert(dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cend());
 
         if (const std::optional<std::size_t>& idOfGeneratedAssignment = generatedAssignmentsContainer->storeActiveAssignment(existingReplacementForOperationNode, std::nullopt, fusedDataDependencies, referencedOperationNodeId, std::nullopt); idOfGeneratedAssignment.has_value()) {
             return std::make_pair(*idOfGeneratedAssignment, existingReplacementForOperationNode);    
@@ -851,11 +851,9 @@ std::optional<std::pair<std::size_t, std::shared_ptr<syrec::AssignStatement>>> n
          * Since the operands of the generated assignment, fusing the generated replacement with the expression defining the substitution, rhs expression could potentially change, we need to store said assignment as an active assignment.
          * The optional reset of the replacement can be executed prior to any active assignment and will be stored accordingly in the generated assignment container.
          */
-        const std::vector<std::size_t>&                             lhsOperandDataDependencies = lhsOperandDataChoicesAfterSimplification.getDataDependenciesAsIdsOfDependentAssignments();
-        const std::vector<std::size_t>&                             rhsOperandDataDependencies = rhsOperandDataChoicesAfterSimplification.getDataDependenciesAsIdsOfDependentAssignments();
         TemporaryAssignmentsContainer::OrderedAssignmentIdContainer fusedDataDependencies;
-        fusedDataDependencies.insert(lhsOperandDataDependencies.cbegin(), lhsOperandDataDependencies.cend());
-        fusedDataDependencies.insert(rhsOperandDataDependencies.cbegin(), rhsOperandDataDependencies.cend());
+        fusedDataDependencies.insert(dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cend());
+        fusedDataDependencies.insert(dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cend());
 
         if (const std::optional<std::size_t>& idOfGeneratedAssignment = generatedAssignmentsContainer->storeReplacementAsActiveAssignment(referencedOperationNodeId, assignmentFusingReplacementAndExpression, fusedDataDependencies, generatedReplacement->requiredResetOfReplacement); idOfGeneratedAssignment.has_value()) {
             return std::make_pair(*idOfGeneratedAssignment, assignmentFusingReplacementAndExpression);    
@@ -1958,7 +1956,7 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
              */
                 if (const std::shared_ptr<syrec::NumericExpression> rhsOperandAsNumericExpr = std::dynamic_pointer_cast<syrec::NumericExpression>(*rhsOperandAsExpr); rhsOperandAsNumericExpr && !rhsOperandAsNumericExpr->value->isCompileTimeConstantExpression()) {
                     if (const std::optional<syrec::VariableAccess::ptr> generatedReplacementForRhsOperand = createReplacementForLeafNodeOperand(operationNodeId, operandSelectableBySecondAlternative, rhsOperandAsNumericExpr, signalValueLookupCallback); generatedReplacementForRhsOperand.has_value()) {
-                        lhsOperandAsSignalAccess = generatedReplacementForRhsOperand;
+                        rhsOperandAsSignalAccess = generatedReplacementForRhsOperand;
                         chosenOperand            = operandSelectableBySecondAlternative;
                     }
                 }

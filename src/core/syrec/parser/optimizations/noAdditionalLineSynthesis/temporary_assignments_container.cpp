@@ -191,16 +191,18 @@ bool TemporaryAssignmentsContainer::storeInitializationForReplacementOfLeafNode(
     return true;
 }
 
-bool TemporaryAssignmentsContainer::storeReplacementAsActiveAssignment(std::size_t associatedOperationNodeId, const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const OrderedAssignmentIdContainer& dataDependenciesOfSubstitutionRhs, const std::optional<AssignmentReferenceVariant>& optionalRequiredPriorResetOfSignalUsedOnSubstitutionLhs) {
+std::optional<std::size_t> TemporaryAssignmentsContainer::storeReplacementAsActiveAssignment(std::size_t associatedOperationNodeId, const syrec::AssignStatement::ptr& assignmentDefiningSubstitution, const OrderedAssignmentIdContainer& dataDependenciesOfSubstitutionRhs, const std::optional<AssignmentReferenceVariant>& optionalRequiredPriorResetOfSignalUsedOnSubstitutionLhs) {
     const std::shared_ptr<syrec::AssignStatement> castedAssignmentDefiningSubstitution = std::dynamic_pointer_cast<syrec::AssignStatement>(assignmentDefiningSubstitution);
-    if (!castedAssignmentDefiningSubstitution || !storeActiveAssignment(castedAssignmentDefiningSubstitution, std::nullopt, dataDependenciesOfSubstitutionRhs, associatedOperationNodeId, std::nullopt).has_value()) {
-        return false;
+    if (!castedAssignmentDefiningSubstitution) {
+        return std::nullopt;
     }
-    
-    if (optionalRequiredPriorResetOfSignalUsedOnSubstitutionLhs.has_value()) {
-        initializationAssignmentsForGeneratedSubstitutions.emplace_back(*optionalRequiredPriorResetOfSignalUsedOnSubstitutionLhs);
+    if (const std::optional<std::size_t>& idOfGeneratedAssignment = storeActiveAssignment(castedAssignmentDefiningSubstitution, std::nullopt, dataDependenciesOfSubstitutionRhs, associatedOperationNodeId, std::nullopt); idOfGeneratedAssignment.has_value()) {
+        if (optionalRequiredPriorResetOfSignalUsedOnSubstitutionLhs.has_value()) {
+            initializationAssignmentsForGeneratedSubstitutions.emplace_back(*optionalRequiredPriorResetOfSignalUsedOnSubstitutionLhs);
+        }
+        return idOfGeneratedAssignment;
     }
-    return true;
+    return std::nullopt;
 }
 
 void TemporaryAssignmentsContainer::markCutoffForInvertibleAssignments() {
@@ -269,9 +271,13 @@ std::vector<TemporaryAssignmentsContainer::AssignmentReferenceVariant> Temporary
 
     combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.insert(combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.end(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.cbegin(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.cend());
     auto insertPositionOfGeneratedAssignments = std::next(combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.begin(), generatedAssignmentsDefiningPermanentSubstitutionsOfOperandsOfOperationNode.size());
-    for (const auto& generatedAssignmentIterator: internalAssignmentContainer) {
-        combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.emplace_back(generatedAssignmentIterator.second->data);
-        //combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.emplace(insertPositionOfGeneratedAssignments++, generatedAssignmentIterator.second->data);
+
+    /*
+     * Due to the fact that the internal assignment container is sorted by the associated operation node id ascending which means more recently generated assignments are found at smaller indices of the container.
+     * Since we need to return the generated assignment in the order in which they were created we need to iterate our assignment container in reverse
+     */
+    for (auto generatedSubAssignmentsIterator = internalAssignmentContainer.crbegin(); generatedSubAssignmentsIterator != internalAssignmentContainer.crend(); ++generatedSubAssignmentsIterator) {
+        combinationOfGeneratedAssignmentsAndSubstitutionsOfOperationNodeOperandData.emplace_back(generatedSubAssignmentsIterator->second->data);
     }
     /*
      * To allow a reuse of the generated replacements, we need to reset our generated assignments defining the substitution of an operand of an operation node. Since the assignments defining the substitutions all use the XOR assignment operation,
