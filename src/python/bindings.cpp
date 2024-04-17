@@ -73,6 +73,7 @@ PYBIND11_MODULE(pysyrec, m) {
             .def_readwrite("expression_nesting_penalty", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::expressionNestingPenalty)
             .def_readwrite("expression_nesting_penalty_scaling_per_nesting_level", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::expressionNestingPenaltyScalingPerNestingLevel)
             .def_readwrite("optional_new_replacement_signal_idents_prefix", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::optionalNewReplacementSignalIdentsPrefix);
+            .def_readwrite("transformation_of_subtraction_and_addition_cascade_for_subassignment_generation_enabled", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled);
 
     /*
      * We are following the official naming conventions (https://docs.python.org/3/howto/enum.html) recommending the following naming schema for enum members (UPPER_CASE).

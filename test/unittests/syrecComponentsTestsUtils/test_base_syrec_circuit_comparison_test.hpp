@@ -47,6 +47,7 @@ protected:
     static constexpr auto cJsonKeyNoAdditionalLineSynthesisGeneratedAssignmentsByDecisionTiebreakerFlag = "noAddLineSynGenByChoiceTiebreakerON";
     static constexpr auto cJsonKeyNoAdditionalLineSynthesisPreferGeneratedAssignmentsByChoiceRegardlessOfChoiceFlag = "noAddLineSynAlwaysUseGenByChoiceAssignmentsON";
     static constexpr auto cJsonKeyNoAdditionalLineSynthesisNewSignalIdentsPrefix                                    = "noAddLineSynNewSignalPrefix";
+    static constexpr auto cJsonKeyNoAdditionalLineSynthesisTransformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled = "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled";
 
     static constexpr auto cJsonKeyMultiplicationSimplificationViaBinaryMethod = "binaryMethod";
     static constexpr auto cJsonKeyMultiplicationSimplificationViaBinaryFactoringMethod = "binaryFactoringMethod";
@@ -212,6 +213,7 @@ protected:
         NoAdditionalLineSynthesisTieBreakerByAssignmentsOfChoice,
         NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts,
         NoAdditionalLineSynthesisNewSignalIdentsPrefix,
+        NoAdditionalLineSyntehsisTransformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled
     };
     [[nodiscard]] std::map<OptimizerOption, std::string> loadDefinedOptimizationOptions(const nlohmann::json& testCaseDataJsonObject) const {
         std::map<OptimizerOption, std::string> userDefinedOptions;
@@ -241,6 +243,7 @@ protected:
         bool                       wereNoAdditionalLineSynthesisConfigOperationsDefined = false;
         bool                       shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker = false;
         bool                       preferAssignmentGeneratedByChoiceRegardlessOfCosts   = false;
+        bool                       transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled;
         std::optional<std::string> newSignalIdentsGeneratedByNoAdditionalLineSynthesisPrefix;
 
         for (const auto& [key, value] : loadedOptimizationOptions) {
@@ -345,6 +348,13 @@ protected:
                     newSignalIdentsGeneratedByNoAdditionalLineSynthesisPrefix = value;
                     break;
                 }
+                case NoAdditionalLineSyntehsisTransformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled: {
+                    wereNoAdditionalLineSynthesisConfigOperationsDefined = true;
+                    const auto parsedTransformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabledFlag = tryParseStringToNumber(value);
+                    ASSERT_TRUE(parsedTransformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabledFlag.has_value()) << "Failed to map given value for flag enabling transformation of certain combinations of subtraction and additions to allow generation of more sub-assignments, provided value was " << value;
+                    transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled = *parsedTransformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabledFlag != 0;
+                    break;
+                }
             }
         }
 
@@ -353,11 +363,12 @@ protected:
         }));
         }
         if (wereNoAdditionalLineSynthesisConfigOperationsDefined) {
-            auto config = noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig();
-            config.useGeneratedAssignmentsByDecisionAsTieBreaker      = shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker;
-            config.preferAssignmentsGeneratedByChoiceRegardlessOfCost = preferAssignmentGeneratedByChoiceRegardlessOfCosts;
-            config.optionalNewReplacementSignalIdentsPrefix           = newSignalIdentsGeneratedByNoAdditionalLineSynthesisPrefix;
-            generatedConfig.optionalNoAdditionalLineSynthesisConfig   = config;
+            auto config                                                                          = noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig();
+            config.useGeneratedAssignmentsByDecisionAsTieBreaker                                 = shouldAssignmentsGeneratedByChoiceBeUsedAsTiebreaker;
+            config.preferAssignmentsGeneratedByChoiceRegardlessOfCost                            = preferAssignmentGeneratedByChoiceRegardlessOfCosts;
+            config.optionalNewReplacementSignalIdentsPrefix                                      = newSignalIdentsGeneratedByNoAdditionalLineSynthesisPrefix;
+            config.transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled = transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled;
+            generatedConfig.optionalNoAdditionalLineSynthesisConfig                              = config;
         }
         parsedProgramSettings.emplace(generatedConfig);
     }
@@ -398,6 +409,7 @@ protected:
             mergeOfNoAdditionalLineConfigs.expressionNestingPenalty                           = 0;
             mergeOfNoAdditionalLineConfigs.expressionNestingPenaltyScalingPerNestingLevel     = 0;
             mergeOfNoAdditionalLineConfigs.optionalNewReplacementSignalIdentsPrefix           = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSynthesisNewSignalIdentsPrefix, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->optionalNewReplacementSignalIdentsPrefix);
+            mergeOfNoAdditionalLineConfigs.transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled = chooseValueForOptionWhereUserSuppliedOptionHasHighestPriority(OptimizerOption::NoAdditionalLineSyntehsisTransformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled, loadedOptimizationOptions, defaultParserConfig.optionalNoAdditionalLineSynthesisConfig->transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled, userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig->transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled);
             mergedOptions.optionalNoAdditionalLineSynthesisConfig = mergeOfNoAdditionalLineConfigs;
         } else if (!userDefinedOptimizations.optionalNoAdditionalLineSynthesisConfig.has_value() && defaultParserConfig.optionalNoAdditionalLineSynthesisConfig.has_value()) {
             mergedOptions.optionalNoAdditionalLineSynthesisConfig.emplace(*defaultParserConfig.optionalNoAdditionalLineSynthesisConfig);
@@ -445,6 +457,7 @@ protected:
         if (jsonKeyOfOptimizationOption == cJsonKeyNoAdditionalLineSynthesisGeneratedAssignmentsByDecisionTiebreakerFlag) return std::make_optional(OptimizerOption::NoAdditionalLineSynthesisTieBreakerByAssignmentsOfChoice);
         if (jsonKeyOfOptimizationOption == cJsonKeyNoAdditionalLineSynthesisPreferGeneratedAssignmentsByChoiceRegardlessOfChoiceFlag) return std::make_optional(OptimizerOption::NoAdditionalLineSynthesisPreferAssignmentGeneratedByChoiceRegardlessOfCosts);
         if (jsonKeyOfOptimizationOption == cJsonKeyNoAdditionalLineSynthesisNewSignalIdentsPrefix) return std::make_optional(OptimizerOption::NoAdditionalLineSynthesisNewSignalIdentsPrefix);
+        if (jsonKeyOfOptimizationOption == cJsonKeyNoAdditionalLineSynthesisTransformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled) return std::make_optional(OptimizerOption::NoAdditionalLineSyntehsisTransformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled);
         return std::nullopt;
     }
 

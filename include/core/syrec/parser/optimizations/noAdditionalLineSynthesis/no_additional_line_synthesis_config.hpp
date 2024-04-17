@@ -15,6 +15,10 @@ namespace noAdditionalLineSynthesis {
         double                     expressionNestingPenalty                       = 75;
         double                     expressionNestingPenaltyScalingPerNestingLevel = 3.5;
         std::optional<std::string> optionalNewReplacementSignalIdentsPrefix;
+        /**
+         * \brief Allow certain transformations of two subsequent subtraction, subtraction and addition (or vice versa) to take place if such transformations would allow for generated of further sub-assignments, which  can lead to a lower amount of required additional lines.
+         */
+        bool                       transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled = false;
     };
 }
 #endif

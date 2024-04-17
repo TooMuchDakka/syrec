@@ -121,15 +121,15 @@
     }
   },
   "decisionAtOperationNodeWithOnlyLeafNodesCreatesExpressionIfLhsOperandIsNotAssignableSignalAndRhsOperandIsAssignableSignalAndOperationHasAssignmentCounterpartButIsNotCommutative": {
-    "circuit": "module main(inout a(4), in b(4), inout c(4)) a += (b - c)",
-    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) a += b; a -= c",
+    "circuit": "module main(inout a(4), in b(4), inout c(4)) a ^= (b - c)",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) a ^= b; a -= c",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
   "decisionAtOperationNodeWithOnlyLeafNodesCreatesExpressionIfLhsOperandIsNumberAndRhsOperandIsAssignableSignalAndOperationHasAssignmentCounterpartButIsNotCommutative": {
-    "circuit": "module main(inout a(4), inout b(4)) a += (2 - b)",
-    "expectedCircuit": "module main(inout a(4), inout b(4)) a += 2; a -= b",
+    "circuit": "module main(inout a(4), inout b(4)) a ^= (2 - b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4)) a ^= 2; a -= b",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
@@ -317,8 +317,8 @@
   },
 
   "decisionAtOperationNodeWithOneLeafNodeAndRhsOperandBeingLeafGeneratesExpressionIfLhsOperandGeneratedExpressionAndRhsOperandIsAssignableSignalAndOperationHasAssignmentCounterpartButIsNotCommutative": {
-    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((b * 2) - c)",
-    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b * 2); a -= c",
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a ^= ((b * 2) - c)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) a ^= (b * 2); a -= c",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
@@ -573,7 +573,7 @@
     }
   },
 
-  
+
 
 
   "replayingDataDependenciesInOperationNodeWithOneLeafNodeWithOperationWithAssignmentCounterpartAndLhsOperandAssignableLeafNodeAndRhsOperandBeingExpressionWithoutDependencies": {
@@ -627,7 +627,7 @@
   },
   "replayingDataDependenciesInOperationNodeWithOneLeafNodeWithOperationWithoutAssignmentCounterpartAndLhsOperandBeingAssignableSignalAndRhsBeingExpressionWithADataDependency": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (b * ((d + (c + 2)) >> 2))",
-    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) c += 2; c += d; a += (b * (d >> 2)); c -= d; c -= 2",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) c += 2; c += d; a += (b * (c >> 2)); c -= d; c -= 2",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
@@ -950,28 +950,28 @@
 
 
 
-  "conflictDuringInversionInOperationNodeWithOneLeafNodeAndNotCommutativeOperationWithAssignmentCounterpartAndLhsOperandBeingAssignableSignal":{
+  "conflictDuringInversionInOperationNodeWithOneLeafNodeAndNotCommutativeOperationWithAssignmentCounterpartAndLhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += ((b - (c - 2)) + (d + (c - 2)))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4))  b -= c; b += 2; c -= 2; c += d; b += c; c -= d; c += 2; a += b; c -= 2; c += d; b -= c; c -= d; c += 2; b += c; b -= 2",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "conflictDuringInversionInOperationNodeWithOneLeafNodeAndCommutativeOperationWithAssignmentCounterpartAndLhsOperandBeingAssignableSignal":{
+  "conflictDuringInversionInOperationNodeWithOneLeafNodeAndCommutativeOperationWithAssignmentCounterpartAndLhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += ((b + (c - 2)) + (d + (c - 2)))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) b += c; b -= 2; c -= 2; c += d; b += c; c -= d; c += 2; a += b; c -= 2; c += d; b += c; c -= d; c += 2; b -= c; b += 2",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "conflictDuringInversionInOperationNodeWithTwoLeafNodeNotCommutativeOperationWithAssignmentCounterpartAndLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignal":{
+  "conflictDuringInversionInOperationNodeWithTwoLeafNodeNotCommutativeOperationWithAssignmentCounterpartAndLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4), in e(4)) a += (((b + 2) * (d - (e - c))) + (c + 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4), in e(4)) b += 2; d -= e; d += c; a += (b * d); a += c; a += 2; d -= c; d += e; b -= 2; a -= 2; a -= c",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "conflictDuringInversionInOperationNodeWithTwoLeafNodeCommutativeOperationWithAssignmentCounterpartAndLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignal":{
+  "conflictDuringInversionInOperationNodeWithTwoLeafNodeCommutativeOperationWithAssignmentCounterpartAndLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4), in e(4)) a += (((b + 2) * (d - (e + c))) + (c + 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4), in e(4)) b += 2; d -= e; d += c; a += (b * d); a += c; a += 2; d -= c; d += e; b -= 2",
     "optimizations": {
@@ -1086,34 +1086,34 @@
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "conflictAtOperationNodeWithOneLeafNodeCommutativeAssignmentOperationWithLhsOperandBeingExpressionAndRhsOperandBeingSourceOfConflict":{
+  "conflictAtOperationNodeWithOneLeafNodeCommutativeAssignmentOperationWithLhsOperandBeingExpressionAndRhsOperandBeingSourceOfConflict": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((c * (b + 2)) + b)",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) a += (c * (b + 2)); a += b",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "conflictAtOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndWithLhsOperandBeingSourceOfConflictAndRhsOperandBeingExpression":{
+  "conflictAtOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndWithLhsOperandBeingSourceOfConflictAndRhsOperandBeingExpression": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b * (c * (b + 2)))",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "conflictAtOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndWithLhsOperandBeingSourceOfConflictAndRhsOperandBeingAssignment":{
+  "conflictAtOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndWithLhsOperandBeingSourceOfConflictAndRhsOperandBeingAssignment": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b * (c + (b + 2)))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) c += b; c += 2; a += (b * c); c -= 2; c -= 2",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "conflictAtOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndWithLhsOperandBeingAssignmentAndRhsOperandBeingSourceOfConflict":{
+  "conflictAtOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndWithLhsOperandBeingAssignmentAndRhsOperandBeingSourceOfConflict": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((c + (b + 2)) * b)",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) c += b; c += 2; a += (c * b); c -= 2; c -= b",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "conflictAtOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndWithLhsOperandBeingExpressionAndRhsOperandBeingSourceOfConflict":{
+  "conflictAtOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndWithLhsOperandBeingExpressionAndRhsOperandBeingSourceOfConflict": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((c / (b + 2)) * b)",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
@@ -1202,8 +1202,8 @@
     }
   },
 
-  
-  "creationOfReplacementInOperationWithTwoLeafNodesAndCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingNumber":{
+
+  "creationOfReplacementInOperationWithTwoLeafNodesAndCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingNumber": {
     "circuit": "module main(inout a(4), inout b(4)) a += (b + (b + 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4)) wire __rpl1(4) __rpl1 ^= b; __rpl1 += 2; __rpl1 += b; a += __rpl1; __rpl1 -= b; __rpl1 -= 2; __rpl1 ^= b",
     "optimizations": {
@@ -1211,7 +1211,7 @@
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
-  "creationOfReplacementInOperationWithTwoLeafNodesAndCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingNotAssignableSignal":{
+  "creationOfReplacementInOperationWithTwoLeafNodesAndCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingNotAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), in c(4)) a += (b + (b + c))",
     "expectedCircuit": "module main(inout a(4), inout b(4), in c(4)) wire __rpl1(4) __rpl1 ^= b; __rpl1 += c; __rpl1 += b; a += __rpl1; __rpl1 -= b; __rpl1 -= c; __rpl1 ^= b",
     "optimizations": {
@@ -1219,7 +1219,7 @@
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
-  "creationOfReplacementInOperationWithTwoLeafNodesAndCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingAssignableSignal":{
+  "creationOfReplacementInOperationWithTwoLeafNodesAndCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (c + (b + (b + c)))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; __rpl1 += c; __rpl1 += b; __rpl1 += c; a += __rpl1; __rpl1 -= c; __rpl1 -= b; __rpl1 ^= b",
     "optimizations": {
@@ -1227,7 +1227,7 @@
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
-  "creationOfNoReplacementInOperationWithTwoLeafNodesAndCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingAssignableSignalAndReplacementGenerationDisabled":{
+  "creationOfNoReplacementInOperationWithTwoLeafNodesAndCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingAssignableSignalAndReplacementGenerationDisabled": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b + (b + c))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) c += b; c += b; a += c; c -= b; c -= b",
     "optimizations": {
@@ -1235,7 +1235,7 @@
     }
   },
 
-  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingNumber":{
+  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingNumber": {
     "circuit": "module main(inout a(4), inout b(4)) a += (b + (b - 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4)) wire __rpl1(4) __rpl1 ^= b; __rpl1 -= 2; __rpl1 += b; a += __rpl1; __rpl1 -= b; __rpl1 += 2; __rpl1 ^= b",
     "optimizations": {
@@ -1243,7 +1243,7 @@
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
-  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingNotAssignableSignal":{
+  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingNotAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), in c(4)) a += (b + (b - c))",
     "expectedCircuit": "module main(inout a(4), inout b(4)) wire __rpl1(4) __rpl1 ^= b; __rpl1 -= c; __rpl1 += b; a += __rpl1; __rpl1 -= b; __rpl1 += c; __rpl1 ^= b",
     "optimizations": {
@@ -1251,14 +1251,14 @@
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
-  "creationOfNoReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingAssignableSignalAndReplacementGenerationDisabled":{
+  "creationOfNoReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingAssignableSignalAndReplacementGenerationDisabled": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b + (b - c))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; __rpl1 -= c; __rpl1 += b; a += __rpl1; __rpl1 -= b; __rpl1 += c; __rpl1 ^= b",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingPreviousSourceOfConflict":{
+  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingSourceOfConflictAndRhsOperandBeingPreviousSourceOfConflict": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (c + (b + (b + c)))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; __rpl1 += c; __rpl1 += b; __rpl1 += c; a += __rpl1; __rpl1 -= c; __rpl1 -= b; __rpl1 -= c; __rpl1 ^= b",
     "optimizations": {
@@ -1266,7 +1266,7 @@
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
-  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingNumberAndRhsOperandBeingBeingSourceOfConflict":{
+  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingNumberAndRhsOperandBeingBeingSourceOfConflict": {
     "circuit": "module main(inout a(4), inout c(4)) a += (c - (2 - c))",
     "expectedCircuit": "module main(inout a(4), inout c(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= c; __rpl2 ^= c; __rpl1 -= 2; __rpl2 -= __rpl1; __rpl1 += 2; a += __rpl2; __rpl1 -= 2; __rpl2 += __rpl1; __rpl1 += 2; __rpl1 ^= c; __rpl2 ^= c",
     "optimizations": {
@@ -1274,24 +1274,24 @@
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
-  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingNotAssignableSignalAndRhsOperandBeingBeingSourceOfConflict":{
+  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingNotAssignableSignalAndRhsOperandBeingBeingSourceOfConflict": {
     "circuit": "module main(inout a(4), in b(4), inout c(4)) a += (c - (b - c))",
-    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= c; __rp2 ^= c; __rpl1 -= b; __rpl2 -= __rpl1; __rpl1 += b; a += __rpl2; __rpl1 -= b; __rpl2 += __rpl1; __rpl1 += b; __rpl2 ^= c; __rpl1 ^= c",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= c; __rpl2 ^= c; __rpl1 -= b; __rpl2 -= __rpl1; __rpl1 += b; a += __rpl2; __rpl1 -= b; __rpl2 += __rpl1; __rpl1 += b; __rpl2 ^= c; __rpl1 ^= c",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
   },
-  "creationOfNoReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingAssignableSignalAndRhsOperandBeingSourceOfConflictAndReplacemetGenerationDisabled":{
+  "creationOfNoReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingAssignableSignalAndRhsOperandBeingSourceOfConflictAndReplacemetGenerationDisabled": {
     "circuit": "module main(inout a(4), in b(4), inout c(4)) a += (c - (b - c))",
     "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) a += c; a -= b; a += c",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
     }
   },
-  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingAssignableSignalAndRhsOperandBeingSourceOfConflict":{
+  "creationOfReplacementInOperationWithTwoLeafNodesAndNotCommutativeAssignmentOperationAndLhsOperandBeingAssignableSignalAndRhsOperandBeingSourceOfConflict": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (c - (b - c))",
-    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= c; __rp2 ^= c; __rpl1 -= b; __rpl2 -= __rpl1; __rpl1 += b; a += __rpl2; __rpl1 -= b; __rpl2 += __rpl1; __rpl1 += b; __rpl2 ^= c; __rpl1 ^= c",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4), __rpl2(4) __rpl1 ^= c; __rpl2 ^= c; __rpl1 -= b; __rpl2 -= __rpl1; __rpl1 += b; a += __rpl2; __rpl1 -= b; __rpl2 += __rpl1; __rpl1 += b; __rpl2 ^= c; __rpl1 ^= c",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl"
@@ -1583,11 +1583,126 @@
     }
   },
 
+
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithAssignmentCounterpartAndLhsOperandBeingLeafNodeCausingConflictDetectionBeingReplacedAndRhsGeneratedAssignmentReusesRhsOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b + ((b + 2) + c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; b += 2; b += c; b += __rpl1; a += b; b -= __rpl1; b -= c; b -= 2; __rpl1 ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithNotCommutativeAssignmentCounterpartAndLhsOperandBeingLeafNodeCausingConflictDetectionBeingReplacedAndRhsGeneratedAssignmentChoosesLhsOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a ^= (b - ((b + 2) + c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; b += 2; b += c; __rpl1 -= b; b -= c; b -= 2; a ^= __rpl1; b += 2; b += c; __rpl1 += b; b -= c; b -= 2; __rpl1 ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndLhsOperandBeingLeafNodeCausingConflictDetectionBeingReplacedAndRhsGeneratedAssignmentChoosesNoOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b * ((b + 2) + c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; b += 2; b += c; a += (__rpl1 * b); b -= c; b -= 2; __rpl1 ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithAssignmentCounterpartAndLhsOperandBeingLeafNodeCausingConflictDetectionBeingReplacedAndRhsGeneratedExpressionChoosesLhsOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b + ((b + 2) * c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; b += 2; __rpl1 += (b * c); b -= 2; a += __rpl1; b += 2; __rpl1 -= (b * c); b -= 2; __rpl1 ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithNotCommutativeAssignmentCounterpartAndLhsOperandBeingLeafNodeCausingConflictDetectionBeingReplacedAndRhsGeneratedExpressionChoosesLhsOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b - ((b + 2) * c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) b += 2; __rpl1 -= (b * c); b -= 2; b -= __rpl1; b += 2; __rpl1 += (b * c); b -= 2; a += b; b += 2; __rpl1 += (b * c); b -= 2; b -= __rpl1; b += 2; __rpl1 -= (b * c); b -= 2;",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithoutAssignmentCounterpartAndLhsOperandBeingLeafNodeCausingConflictDetectionBeingReplacedAndRhsGeneratedExpressionChoosesNoOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (b * ((b + 2) * c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) b += 2; __rpl1 ^= (b * c); b -= 2; a += (b * __rpl1); b += 2; __rpl1 ^= (b * c); b -= 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+
+
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithAssignmentCounterpartAndLhsOperandGeneratedAssignmentAndRhsBeingLeafNodeCausingConflictDetectionBeingReplacedReusesLhsOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (((b + 2) + c) + b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; b += 2; b += c; b += __rpl1; a += b; b -= __rpl1; b -= c; b -= 2; __rpl1 ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithNotCommutativeAssignmentCounterpartAndLhsOperandGeneratedAssignmentAndRhsBeingLeafNodeCausingConflictDetectionBeingReplacedReusesLhsOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (((b + 2) + c) - b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; b += 2; b += c; b -= __rpl1; a += b; b += __rpl1; b -= c; b -= 2; __rpl1 ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithNoAssignmentCounterpartAndLhsOperandGeneratedAssignmentAndRhsBeingLeafNodeCausingConflictDetectionBeingReplacedChoosesNoOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (((b + 2) + c) * b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; b += 2; b += c; a += (b * __rpl1); b -= c; b -= 2; __rpl1 ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithAssignmentCounterpartAndLhsOperandGeneratedExpressionAndRhsBeingLeafNodeCausingConflictDetectionBeingReplacedReusesRhsOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (((b + 2) * c) + b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; b += 2; __rpl1 ^= (b * c); b -= 2; a += __rpl1; b += 2; __rpl1 ^= (b * c); b -= 2; __rpl1 ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithNotCommutativeAssignmentCounterpartAndLhsOperandGeneratedExpressionAndRhsBeingLeafNodeCausingConflictDetectionBeingReplacedChoosesNoOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a ^= (((b + 2) * c) / b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) b += 2; __rpl1 ^= (b * c); b -= 2; a ^= (__rpl1 / b); b += 2; __rpl1 ^= (b * c); b -= 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+  "creationOfReplacementInOperationNodeWithOneLeafNodeAndOperationWithNoAssignmentCounterpartAndLhsOperandGeneratedExpressionAndRhsBeingLeafNodeCausingConflictDetectionBeingReplacedChoosesNoOperand": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (((b + 2) * c) / b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) wire __rpl1(4) __rpl1 ^= b; b += 2; a += ((b * c) / __rpl1); b -= 2; __rpl1 ^= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineSynNewSignalPrefix": "__rpl"
+    }
+  },
+
+  "conflictDuringReplayDetectedInOperationNodeInSamePath": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) c ^= (a + ((a + 2) - b))",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+    }
+  },
+  "conflictDuringReplayDetectedInOperationNodeInOtherPath": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) d += (((b - (a + 2)) * (c + 2)) + (a + 2))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) b -= a; b -= 2; c += 2; a += 2; d += (b * c); d += a; d -= 2; c -= 2; b += 2; b += a",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+    }
+  },
+
   "doubleSubtractionTransformationInOperationNodeWithOneLeafNode": {
     "circuit": "",
     "expectedCircuit": "",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
 
@@ -1595,28 +1710,32 @@
     "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += (b - (c - d))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) d -= c; d += b; a += d; d -= b; d += c",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBeingAssignableSignalAndNestedRhsOperandBeingNotAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (b - (c - d))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) c -= d; b -= c; c += d; a += c; c -= d; b += c; c -= d",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBeingAssignableSignalAndNestedRhsOperandBeingBlockedByPreviousConflict": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += (b - (c - ((d + 2) - d)))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) c -= d; c -= 2; c -= d; b -= c; c += d; c += 2; c += d; a += b; c -= d; c -= 2; c -= d; b += c; c += d; c += 2; c += d",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBlockedByPreviousConflictAndNestedRhsOperandBeingBlockedByPreviousConflict": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (((b - 2) - b) - ((c + 2) + c))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) a += b; a -= 2; a -= b; a -= c; a -= 2; a -= c",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
 
@@ -1624,98 +1743,112 @@
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((b - 2) - (c - 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b -= 2; c -= 2; b -= c; c += 2; a += b; c -= 2; b += c; c -= 2; b += 2",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingExpressionAndRhsOperandBeingAssignment": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((b * 2) - (c - 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) c -= 2; a += ((b * 2) - c); c += 2",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingAssignmentAndRhsOperandBeingExpression": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((b - 2) - (c * 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b -= 2; b -= (c * 2); a += b; b += (c * 2); b += 2",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingExpressiondRhsOperandBeingExpression": {
     "circuit": "module main(inout a(4), in b(4), in c(4)) a += ((b - 2) - (c - 2))",
     "expectedCircuit": "module main(inout a(4), in b(4), in c(4)) a += b; a -= 2; a -= c; a += 2",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
 
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionBeingNumber": {
     "circuit": "module main(inout a(4)) a -= 2",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingNotAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), in c(4)) a -= (b - c)",
     "expectedCircuit": "module main(inout a(4), inout b(4), in c(4)) a -= b; a += c",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingNotAssignableSignal": {
     "circuit": "module main(inout a(4), in b(4), in c(4)) a -= (b - c)",
     "expectedCircuit": "module main(inout a(4), in b(4), in c(4)) a -= b; a += c",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), in b(4), inout c(4)) a -= (b - c)",
     "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) c -= b; a += b; c += b",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a -= (b - c)",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b -= c; a -= b; b += c",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingAssignableSignalWithOperandBeingNotSubtraction": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a -= (b + c)",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b += c; a -= b; b -= c",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignalWithOperandBeingNotSubtraction": {
     "circuit": "module main(inout a(4), in b(4), inout c(4)) a -= (b + c)",
     "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) c += b; a -= c; c -= b",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingNotAssignableSignalWithOperandBeingNotSubtraction": {
     "circuit": "module main(inout a(4), in b(4), in c(4)) a -= (b + c)",
     "expectedCircuit": "module main(inout a(4), in b(4), in c(4)) a -= b; a -= c",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingNotAssignableSignalWithOperandBeingNotSubtraction": {
     "circuit": "module main(inout a(4), inout b(4), in c(4)) a -= (b + c)",
     "expectedCircuit": "module main(inout a(4), inout b(4), in c(4)) b += c; a -= b; b -= c",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
   "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionAndNestedExpressionHavingNoLeafNodes": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a -= ((b - 2) - (c - 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b -= 2; c -= 2; b -= c; c += 2; a -= b; c -= 2; b += c; c += 2; b += 2",
     "optimizations": {
-      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   }
 }

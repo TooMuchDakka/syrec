@@ -2216,7 +2216,7 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
                     } else {
                         chosenOperand = potentialOperandChoiceForAlternative;
                     }
-                } else if (chosenOperand == Decision::ChoosenOperand::None && definedOperationOfOperationNode == syrec_operation::operation::Subtraction) {
+                } else if (chosenOperand == Decision::ChoosenOperand::None && definedOperationOfOperationNode == syrec_operation::operation::Subtraction && internalConfig.transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled) {
                     /*
                     * If no operand was chosen at this point we can try and perform the following two transformations:
                     * I.   (a - (b - c)) => (a + (c - b))
