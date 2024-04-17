@@ -347,6 +347,95 @@ std::size_t TemporaryAssignmentsContainer::getNumberOfAssignments() const {
     return internalAssignmentContainer.size();
 }
 
+std::optional<syrec::VariableAccess::ptr> TemporaryAssignmentsContainer::getAssignedToSignalPartsOfAssignmentById(std::size_t assignmentId) const {
+    if (const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId); matchingAssignmentForId.has_value()) {
+        return matchingAssignmentForId->get()->getAssignedToSignalParts();
+    }
+    return std::nullopt;
+}
+
+std::optional<std::size_t> TemporaryAssignmentsContainer::getAssociatedOperationNodeIdForAssignmentById(std::size_t assignmentId) const {
+    if (const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId); matchingAssignmentForId.has_value()) {
+        return matchingAssignmentForId->get()->associatedWithOperationNodeId;
+    }
+    return std::nullopt;
+}
+
+std::vector<syrec::VariableAccess::ptr> TemporaryAssignmentsContainer::getSignalAccessesDefinedInAssignmentRhsExcludingDataDependencies(std::size_t assignmentId) const {
+    if (const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId); matchingAssignmentForId.has_value()) {
+        if (std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(matchingAssignmentForId->get()->data)) {
+            const auto& assignmentAsNonUnaryOne = std::get<std::shared_ptr<syrec::AssignStatement>>(matchingAssignmentForId->get()->data);
+
+            const std::vector<syrec::VariableAccess::ptr>  determinedSignalAccessesOfAssignmentRhsExpr = getSignalAccessesOfExpression(*assignmentAsNonUnaryOne->rhs);
+            std::unordered_set<syrec::VariableAccess::ptr> signalAccessesOfAssignmentRhsExpr(determinedSignalAccessesOfAssignmentRhsExpr.begin(), determinedSignalAccessesOfAssignmentRhsExpr.end());
+
+            for (const std::size_t dataDependency : matchingAssignmentForId->get()->dataDependencies) {
+                const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForDataDependency = getAssignmentById(dataDependency);
+                const syrec::VariableAccess::ptr assignedToSignalPartsOfDataDependency = matchingAssignmentForDataDependency->get()->getAssignedToSignalParts();
+                signalAccessesOfAssignmentRhsExpr.erase(assignedToSignalPartsOfDataDependency);
+            }
+
+            if (!signalAccessesOfAssignmentRhsExpr.empty()) {
+                std::vector<syrec::VariableAccess::ptr> resultContainer(signalAccessesOfAssignmentRhsExpr.size());
+                std::copy(signalAccessesOfAssignmentRhsExpr.begin(), signalAccessesOfAssignmentRhsExpr.end(), resultContainer.begin());
+                return resultContainer;
+            }
+        }
+    }
+    return {};
+}
+
+std::optional<std::size_t> TemporaryAssignmentsContainer::getIdOfOperationNodeWhereOriginOfInheritanceChainIsLocated(std::size_t assignmentId) const {
+    if (const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId); matchingAssignmentForId.has_value()) {
+        if (matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited.has_value()) {
+            return getIdOfOperationNodeWhereOriginOfInheritanceChainIsLocated(*matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited);
+        }
+        return matchingAssignmentForId->get()->associatedWithOperationNodeId;
+    }
+    return std::nullopt;
+}
+
+std::size_t TemporaryAssignmentsContainer::determineLengthOfInheritanceChainLengthOfAssignment(std::size_t assignmentId) const {
+    if (const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId); matchingAssignmentForId.has_value()) {
+        if (matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited.has_value()) {
+            return determineLengthOfInheritanceChainLengthOfAssignment(*matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited) + 1;    
+        }
+        return 1;
+    }
+    return 0;
+}
+
+
+std::optional<TemporaryAssignmentsContainer::IsAssignmentLiveAndTypeInformation> TemporaryAssignmentsContainer::isAssignmentLiveAndInversionOfOtherAssignment(std::size_t assignmentId) const {
+    if (const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId); matchingAssignmentForId.has_value()) {
+        IsAssignmentLiveAndTypeInformation information{};
+        information.isLive = activeAssignmentsLookupById.count(assignmentId);
+        information.isInversionOfOtherAssignment = matchingAssignmentForId->get()->assignmentType == InternalAssignmentContainer::AssignmentType::InversionOfSubAssignment;
+        return information;
+    }
+    return std::nullopt;
+}
+
+
+TemporaryAssignmentsContainer::OrderedBasicActiveAssignmentDataLookup TemporaryAssignmentsContainer::getActiveAssignments(std::size_t inclusiveLowerBoundOfExclusionRangeForActiveAssignments, std::size_t inclusiveUpperBoundOfExclusionRangeForActiveAssignments) const {
+    OrderedBasicActiveAssignmentDataLookup basicActiveAssignmentDataLookup;
+    for (const std::size_t activeAssignmentId : activeAssignmentsLookupById) {
+        const std::optional<InternalAssignmentContainer::Reference> activeAssignmentData = getAssignmentById(activeAssignmentId);
+        if (!activeAssignmentData.has_value() || (activeAssignmentData->get()->associatedWithOperationNodeId >= inclusiveLowerBoundOfExclusionRangeForActiveAssignments && activeAssignmentData->get()->associatedWithOperationNodeId <= inclusiveUpperBoundOfExclusionRangeForActiveAssignments)
+            || activeAssignmentData->get()->assignmentType == InternalAssignmentContainer::AssignmentType::InversionOfSubAssignment) {
+            continue;
+        }
+        BasicActiveAssignmentData data;
+        data.associatedOperationNodeId = activeAssignmentData->get()->associatedWithOperationNodeId.value_or(0);
+        data.assignedToSignalParts     = activeAssignmentData->get()->getAssignedToSignalParts();
+        data.dataDependencies          = activeAssignmentData->get()->dataDependencies;
+
+        basicActiveAssignmentDataLookup.emplace(activeAssignmentData->get()->id, data);
+    }
+    return basicActiveAssignmentDataLookup;
+}
+
+
 //// START OF NON-PUBLIC FUNCTIONS
 ///
 inline bool TemporaryAssignmentsContainer::isAssignmentActive(std::size_t assignmentId) const {
@@ -467,15 +556,15 @@ std::optional<std::vector<TemporaryAssignmentsContainer::OwningAssignmentReferen
     return containerForCopies;
 }
 
-std::vector<std::reference_wrapper<syrec::VariableAccess>> TemporaryAssignmentsContainer::getSignalAccessesOfExpression(const syrec::Expression& expression) {
+std::vector<syrec::VariableAccess::ptr> TemporaryAssignmentsContainer::getSignalAccessesOfExpression(const syrec::Expression& expression) {
     std::vector<std::reference_wrapper<syrec::VariableAccess>> foundSignalAccessContainer;
 
     if (const auto& expressionAsVariableExpr = dynamic_cast<const syrec::VariableExpression*>(&expression); expressionAsVariableExpr) {
-        return {*expressionAsVariableExpr->var};
+        return {expressionAsVariableExpr->var};
     }
     if (const auto& exprAsBinaryExpr = dynamic_cast<const syrec::BinaryExpression*>(&expression); exprAsBinaryExpr) {
-        std::vector<std::reference_wrapper<syrec::VariableAccess>>       foundSignalAccessOfLhsExpr = getSignalAccessesOfExpression(*exprAsBinaryExpr->lhs);
-        const std::vector<std::reference_wrapper<syrec::VariableAccess>> foundSignalAccessOfRhsExpr = getSignalAccessesOfExpression(*exprAsBinaryExpr->rhs);
+        std::vector<syrec::VariableAccess::ptr>       foundSignalAccessOfLhsExpr = getSignalAccessesOfExpression(*exprAsBinaryExpr->lhs);
+        const std::vector<syrec::VariableAccess::ptr> foundSignalAccessOfRhsExpr = getSignalAccessesOfExpression(*exprAsBinaryExpr->rhs);
         foundSignalAccessOfLhsExpr.insert(foundSignalAccessOfLhsExpr.end(), foundSignalAccessOfRhsExpr.begin(), foundSignalAccessOfRhsExpr.end());
         return foundSignalAccessOfLhsExpr;
     }

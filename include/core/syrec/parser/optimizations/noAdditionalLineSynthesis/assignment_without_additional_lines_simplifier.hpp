@@ -215,6 +215,10 @@ namespace noAdditionalLineSynthesis {
                 return reasonForUnknownResult;
             }
 
+            [[nodiscard]] std::size_t getReferencedOperationNodeId() const {
+                return referencedOperationNode;
+            }
+
             [[nodiscard]] static OperationNodeSimplificationResult createManuallyFromLeafNode(const SignalAccessOrExpression& leafNodeData) {
                 OperationNodeSimplificationResult result;
                 result.data               = leafNodeData;
@@ -397,8 +401,8 @@ namespace noAdditionalLineSynthesis {
             }
         };
         [[nodiscard]] OperationNodeProcessingResult                                                   processNextOperationNode(const SignalValueLookupCallback& signalValueLookupCallback);
-        [[nodiscard]] bool                                                                            canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::Expression& alternativeToCheckAsExpr, const parser::SymbolTable& symbolTable) const;
-        [[nodiscard]] bool                                                                            canAlternativeByChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::VariableAccess& alternativeToCheckAsSignalAccess, const parser::SymbolTable& symbolTable) const;
+        [[nodiscard]] bool                                                                            canAlternativeBeChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::Expression& alternativeToCheckAsExpr, const parser::SymbolTable& symbolTable) const;
+        [[nodiscard]] bool                                                                            canAlternativeBeChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::VariableAccess& alternativeToCheckAsSignalAccess, const parser::SymbolTable& symbolTable) const;
         [[nodiscard]] bool                                                                            isAccessedSignalAssignable(const std::string_view& accessedSignalIdent) const;
         [[nodiscard]] std::optional<double>                                                           determineCostOfExpr(const syrec::Expression& expr, std::size_t currentNestingLevel) const;
         [[nodiscard]] std::optional<double>                                                           determineCostOfAssignment(const syrec::AssignStatement& assignment) const;
@@ -406,7 +410,47 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<double>                                                           determineCostOfAssignments(const std::vector<AssignmentTransformer::SharedAssignmentReference>& assignmentsToCheck) const;
         [[nodiscard]] std::optional<double>                                                           determineCostOfAssignments(SimplificationResult::OwningCopiesOfAssignment& assignments) const;
         [[nodiscard]] SimplificationResult::OwningReference                                           determineMostViableAlternativeBasedOnCost(SimplificationResult::OwningReference& generatedSimplifiedAssignments, const std::shared_ptr<syrec::AssignStatement>& originalAssignmentUnoptimized, const SignalValueLookupCallback& signalValueCallback) const;
+
+        enum class OverlapSearchResult {
+            NoneFound = 0,
+            AssignedToSignalPartsOverlapped = 1,
+            NoneDataDependencyOverlapped = 2
+
+        };
         
+        constexpr friend OverlapSearchResult& operator|=(OverlapSearchResult& lhs, OverlapSearchResult rhs) {
+            lhs = static_cast<OverlapSearchResult>(static_cast<std::underlying_type_t<OverlapSearchResult>>(lhs) | static_cast<std::underlying_type_t<OverlapSearchResult>>(rhs));
+            return lhs;
+        }
+
+        [[nodiscard]] constexpr friend bool operator&(const OverlapSearchResult lhs, const OverlapSearchResult rhs) {
+            return lhs == rhs;
+        }
+
+        struct OverlappingSignalAccessDuringReplayOrInversionResult {
+            OverlapSearchResult                       overlapSearchResult;
+            std::optional<std::size_t>                idOfOperationNodeWhereOverlapOfAssignedToSignalPartsWasFound;
+            std::optional<std::size_t>                idOfOperationNodeWhereOverlapOfNoneDataDependencyWasFound;
+            std::optional<std::size_t>                optionalOperationNodeIdOfOriginOfInheritanceChainOfOverlappingActiveAssignment;
+            std::optional<syrec::VariableAccess::ptr> optionalNoneDataDependencySignalAccessWhereOverlapWasFound;
+            std::optional<std::size_t>                idOfLastAssignmentInInheritanceChainWithOverlappingSignalParts;
+
+            [[nodiscard]] static OverlappingSignalAccessDuringReplayOrInversionResult asNoOverlapFound() {
+                return {};
+            }
+        };
+        
+        [[nodiscard]] std::optional<OverlappingSignalAccessDuringReplayOrInversionResult> areAssignedToSignalPartsAccessedDuringReplayOrInversionOfDataDependencies(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenOperandForAssignedToSignalParts, const syrec::VariableAccess& assignedToSignalParts, const TemporaryAssignmentsContainer::OrderedAssignmentIdContainer& dataDependenciesOfAssignmentRhs) const;
+        [[nodiscard]] std::optional<OverlappingSignalAccessDuringReplayOrInversionResult> areAssignedToSignalPartsAccessedDuringReplayOrInversionOfAssignmentOrItsDataDependencies(const syrec::VariableAccess& signalPartsForWhichOverlapShallBeFound, std::size_t assignmentId) const;
+
+        [[nodiscard]] std::optional<OverlappingSignalAccessDuringReplayOrInversionResult> areAssignedToSignalPartsOfAnyActiveAssignmentAccessedDuringReplayOrInversionOfDataDependencies(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenOperandForAssignedToSignalParts, const TemporaryAssignmentsContainer::OrderedAssignmentIdContainer& dataDependenciesOfAssignmentRhs) const;
+        [[nodiscard]] std::optional<OverlappingSignalAccessDuringReplayOrInversionResult> areAssignedToSignalPartsOfAnyActiveAssignmentAccessedDuringReplayOrInversionOfDataDependencies(std::size_t assignmentId, const TemporaryAssignmentsContainer::OrderedBasicActiveAssignmentDataLookup& activeAssignmentsLookup) const;
+        [[nodiscard]] std::optional<std::size_t>                                          getIdOfOverlappingActiveAssignmentForSignalPartsOfToBeReplayedAssignment(const syrec::VariableAccess& assignedToSignalPartsWhichShouldNotOverlapActiveAssignment, const TemporaryAssignmentsContainer::OrderedBasicActiveAssignmentDataLookup& activeAssignmentsLookup) const;
+        [[nodiscard]] bool                                                                determineWhetherConflictShouldBeTriggeredInCurrentOperationNodeOrOverlappingDataDependencyBasedOnInheritanceChainLength(std::size_t idOfAssignmentFromWhichAssignedToSignalPartsInCurrentOperationNodeWhereInherited, std::size_t idOfLastAssignmentInInheritanceChainOverlappingAssignedToSignalParts) const;
+        
+        void handleConflictCausesByReplayOrInversion(std::size_t idOfOperationNodeWhereConflictCheckWasInitiated, const OverlappingSignalAccessDuringReplayOrInversionResult& conflictResult);
+        void handleConflictCausedByOverlapOfInactiveDataDependencyWithInheritedChosenOperand(std::size_t idOfOperationNodeWhereDecisionWasMade, Decision::ChoosenOperand chosenOperationAtOperationNode, std::size_t idOfInheritedAssignmentInOperationNode, std::size_t idOfAssignmentWhereOverlappingSignalAccessInAssignedToSignalPartsWasDefined, bool wasOverlapDetectedInNoneDataDependency);
+
         [[nodiscard]] static std::optional<syrec::Expression::ptr>       fuseExpressions(const syrec::Expression::ptr& lhsOperand, syrec_operation::operation op, const syrec::Expression::ptr& rhsOperand);
         [[nodiscard]] static std::optional<syrec::AssignStatement::ptr>  tryCreateAssignmentForOperationNode(const syrec::VariableAccess::ptr& assignmentLhs, syrec_operation::operation op, const syrec::Expression::ptr& assignmentRhs);
         [[nodiscard]] static bool                                        doesExpressionDefineNestedSplitableExpr(const syrec::Expression& expr);
@@ -459,6 +503,9 @@ namespace noAdditionalLineSynthesis {
         static void                         logCreationOfSubstitutionOfOperandOfOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand substitutedOperand, const syrec::VariableAccess& generatedSubstitution);
         static void                         logCreationOfSubstitutionOfExprOfOperationNode(std::size_t operationNodeId, const std::string& replacementSignalIdent, bool wasExistingEntryUpdated);
         static void                         logLearnedConflict(std::size_t operationNodeId, Decision::ChoosenOperand learnedConflictingChoiceOfOperand);
+        static void                         logReplayOfAssignmentConflictDueToOverlapWithNoneDataDependency(std::size_t operationNodeIdWhereConflictCheckWasInitiated, std::size_t operationNodeWhereConflictDuringReplayWasDetected, const syrec::VariableAccess::ptr& noneDataDependencyWithOverlappingAssignment, std::size_t idOfOperationNodeBeingOriginOfInheritanceChainForActiveAssignment, Decision::ChoosenOperand chosenOperandAtOperationNodeOfOverlappingActiveAssignment);
+        static void                         logReplayOfAssignmentConflictDueToOverlapWithDataDependency(std::size_t operationNodeIdWhereConflictCheckWasInitiated, std::size_t operationNodeWhereConflictDuringReplayWasDetected, Decision::ChoosenOperand chosenOperandAtDataDependencyWhereOverlapWasDetectedDuringReplay, std::size_t idOfOperationNodeBeingOriginOfInheritanceChainForActiveAssignment, Decision::ChoosenOperand chosenOperandAtOperationNodeOfOverlappingActiveAssignment);
+        static void                         logReplayOfAssignmentConflictDueToOverlapWithDataDependencyAndConflictOriginChoiceBasedOnInheritanceChainLength(std::size_t operationNodeId, Decision::ChoosenOperand chosenOperand, std::size_t lengthOfInheritanceChainAtCurrentOperationNode, std::size_t idOfOperationNodeWhereOverlappingSignalPartsWereFound, std::size_t lengthOfInheritanceChainAtOperationNodeWhereOverlappingSignalPartsWereFound);
 
         [[nodiscard]] DecisionResult                   makeDecisionFor(std::size_t operationNodeId, const OperationNodeSimplificationResult& lhsOperandSimplificationResult, syrec_operation::operation definedOperationOfOperationNode, const OperationNodeSimplificationResult& rhsOperandSimplificationResult, const std::optional<std::size_t>& idOfLastActiveAssignmentPriorToProcessingOfLhsOperand, const std::optional<std::size_t>& idOfLastActiveAssignmentPriorToProcessingOfRhsOperand, const SignalValueLookupCallback& signalValueLookupCallback);
         [[nodiscard]] std::optional<DecisionReference> constructAndRecordDefaultDecision(std::size_t operationNodeId);

@@ -29,6 +29,29 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<std::vector<OwningAssignmentReferenceVariant>> getInvertedAssignmentsUndoingValueResetsOfGeneratedSubstitutions() const;
         [[nodiscard]] bool                                                         existsOverlappingAssignmentFor(const syrec::VariableAccess& assignedToSignal, const parser::SymbolTable& symbolTable) const;
         [[nodiscard]] std::size_t                                                  getNumberOfAssignments() const;
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr>                    getAssignedToSignalPartsOfAssignmentById(std::size_t assignmentId) const;
+        [[nodiscard]] std::optional<std::size_t>                                   getAssociatedOperationNodeIdForAssignmentById(std::size_t assignmentId) const;
+        [[nodiscard]] std::vector<syrec::VariableAccess::ptr>                      getSignalAccessesDefinedInAssignmentRhsExcludingDataDependencies(std::size_t assignmentId) const;
+        [[nodiscard]] std::optional<std::size_t>                                   getIdOfOperationNodeWhereOriginOfInheritanceChainIsLocated(std::size_t assignmentId) const;
+        [[nodiscard]] std::size_t                                                  determineLengthOfInheritanceChainLengthOfAssignment(std::size_t assignmentId) const;
+
+        struct IsAssignmentLiveAndTypeInformation {
+            bool isLive;
+            bool isInversionOfOtherAssignment;
+        };
+        [[nodiscard]] std::optional<IsAssignmentLiveAndTypeInformation> isAssignmentLiveAndInversionOfOtherAssignment(std::size_t assignmentId) const;
+
+        struct BasicActiveAssignmentData {
+            std::size_t                  associatedOperationNodeId = 0;
+            syrec::VariableAccess::ptr   assignedToSignalParts;
+            OrderedAssignmentIdContainer dataDependencies;
+
+            [[nodiscard]] bool operator()(const BasicActiveAssignmentData& thisReference, const BasicActiveAssignmentData& thatReference) const {
+                return thisReference.associatedOperationNodeId > thatReference.associatedOperationNodeId;
+            }
+        };
+        using OrderedBasicActiveAssignmentDataLookup = std::map<std::size_t, BasicActiveAssignmentData>;
+        [[nodiscard]] OrderedBasicActiveAssignmentDataLookup getActiveAssignments(std::size_t inclusiveLowerBoundOfExclusionRangeForActiveAssignments, std::size_t inclusiveUpperBoundOfExclusionRangeForActiveAssignments) const;
 
         void markCutoffForInvertibleAssignments();
         void popLastCutoffForInvertibleAssignments();
@@ -97,7 +120,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static std::optional<OwningAssignmentReferenceVariant>              createOwningCopyOfAssignment(const syrec::AssignStatement& assignment);
         [[nodiscard]] static std::optional<OwningAssignmentReferenceVariant>              createOwningCopyOfAssignment(const syrec::UnaryStatement& assignment);
         [[nodiscard]] static std::optional<std::vector<OwningAssignmentReferenceVariant>> createOwningCopiesOfAssignments(const std::vector<AssignmentReferenceVariant>& assignments);
-        [[nodiscard]] static std::vector<std::reference_wrapper<syrec::VariableAccess>>   getSignalAccessesOfExpression(const syrec::Expression& expression);
+        [[nodiscard]] static std::vector<syrec::VariableAccess::ptr>                      getSignalAccessesOfExpression(const syrec::Expression& expression);
         [[nodiscard]] static std::optional<std::shared_ptr<syrec::AssignStatement>>       tryGetActiveAssignmentAsBinaryAssignment(const AssignmentReferenceVariant& assignmentData);
         [[nodiscard]] static std::optional<std::shared_ptr<syrec::UnaryStatement>>        tryGetActiveAssignmentAsUnaryAssignment(const AssignmentReferenceVariant& assignmentData);
         [[nodiscard]] static bool                                                         doSignalAccessesOverlap(const syrec::VariableAccess& first, const syrec::VariableAccess& second, const parser::SymbolTable& symbolTableReference);
