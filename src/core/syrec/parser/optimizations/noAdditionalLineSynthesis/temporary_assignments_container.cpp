@@ -14,13 +14,13 @@ std::shared_ptr<syrec::VariableAccess> TemporaryAssignmentsContainer::InternalAs
     return std::get<std::shared_ptr<syrec::UnaryStatement>>(data)->var;
 }
 
-std::optional<std::size_t> TemporaryAssignmentsContainer::getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(const syrec::VariableAccess& signalAccess, std::size_t exclusionRangeLowerBoundDefinedWithAssociatedOperationNodeId, std::size_t exclusionRangeUpperBoundDefinedWithAssociatedOperationNodeId, const parser::SymbolTable& symbolTableReference) const {
+std::optional<std::size_t> TemporaryAssignmentsContainer::getOverlappingActiveAssignmentForSignalAccess(const syrec::VariableAccess& signalAccess, const std::vector<SearchSpaceIntervalBounds>& searchSpacesToConsiderBasedOnOperationNodeIds, const parser::SymbolTable& symbolTableReference) const {
     const auto& foundMatchingActiveAssignment = std::find_if(
             activeAssignmentsLookupById.cbegin(),
             activeAssignmentsLookupById.cend(),
             [&](std::size_t activeAssignmentIdFromLookup) {
                 const std::optional<InternalAssignmentContainer::ReadOnlyReference> activeAssignmentMatchingId = getMatchingActiveSubassignmentById(activeAssignmentIdFromLookup);
-                if (!activeAssignmentMatchingId.has_value() || (activeAssignmentMatchingId->get()->associatedWithOperationNodeId.has_value() && activeAssignmentMatchingId->get()->associatedWithOperationNodeId >= exclusionRangeLowerBoundDefinedWithAssociatedOperationNodeId && activeAssignmentMatchingId->get()->associatedWithOperationNodeId <= exclusionRangeUpperBoundDefinedWithAssociatedOperationNodeId)) {
+                if (!activeAssignmentMatchingId.has_value() || !activeAssignmentMatchingId->get()->associatedWithOperationNodeId.has_value() || !isIdIncludedInSearchSpaceInterval(*activeAssignmentMatchingId->get()->associatedWithOperationNodeId, searchSpacesToConsiderBasedOnOperationNodeIds)) {
                     return false;
                 }
 
@@ -597,4 +597,8 @@ bool TemporaryAssignmentsContainer::doSignalAccessesOverlap(const syrec::Variabl
         return true;
     }
     return false;
+}
+
+bool TemporaryAssignmentsContainer::isIdIncludedInSearchSpaceInterval(std::size_t operationNodeId, const std::vector<SearchSpaceIntervalBounds>& searchSpacesToInclude) {
+    return std::any_of(searchSpacesToInclude.cbegin(), searchSpacesToInclude.cend(), [operationNodeId](const SearchSpaceIntervalBounds& searchSpace) { return operationNodeId >= searchSpace.lowerBoundInclusive && operationNodeId >= searchSpace.upperBoundInclusive; });
 }

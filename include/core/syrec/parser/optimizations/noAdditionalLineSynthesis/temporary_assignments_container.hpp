@@ -16,7 +16,15 @@ namespace noAdditionalLineSynthesis {
         using OwningAssignmentReferenceVariant = std::variant<std::unique_ptr<syrec::AssignStatement>, std::unique_ptr<syrec::UnaryStatement>>;
         using OrderedAssignmentIdContainer     = std::set<std::size_t, std::greater<>>;
 
-        [[nodiscard]] std::optional<std::size_t>                                   getOverlappingActiveAssignmentForSignalAccessWithIdNotInRange(const syrec::VariableAccess& signalAccess, std::size_t exclusionRangeLowerBoundDefinedWithAssociatedOperationNodeId, std::size_t exclusionRangeUpperBoundDefinedWithAssociatedOperationNodeId, const parser::SymbolTable& symbolTableReference) const;
+        struct SearchSpaceIntervalBounds {
+            std::size_t lowerBoundInclusive;
+            std::size_t upperBoundInclusive;
+
+            SearchSpaceIntervalBounds(std::size_t lowerBoundInclusive, std::size_t upperBoundInclusive)
+                : lowerBoundInclusive(lowerBoundInclusive), upperBoundInclusive(upperBoundInclusive) {}
+        };
+
+        [[nodiscard]] std::optional<std::size_t>                                   getOverlappingActiveAssignmentForSignalAccess(const syrec::VariableAccess& signalAccess, const std::vector<SearchSpaceIntervalBounds>& searchSpacesToConsiderBasedOnOperationNodeIds, const parser::SymbolTable& symbolTableReference) const;
         [[nodiscard]] bool                                                         existsActiveAssignmentHavingGivenAssignmentAsDataDependency(std::size_t assignmentIdWhichShallBeUsedAsADataDependency) const;
         [[nodiscard]] OrderedAssignmentIdContainer                                 getDataDependenciesOfAssignment(std::size_t assignmentId) const;
         [[nodiscard]] std::optional<std::size_t>                                   getIdOfLastGeneratedAssignment() const;
@@ -124,6 +132,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] static std::optional<std::shared_ptr<syrec::AssignStatement>>       tryGetActiveAssignmentAsBinaryAssignment(const AssignmentReferenceVariant& assignmentData);
         [[nodiscard]] static std::optional<std::shared_ptr<syrec::UnaryStatement>>        tryGetActiveAssignmentAsUnaryAssignment(const AssignmentReferenceVariant& assignmentData);
         [[nodiscard]] static bool                                                         doSignalAccessesOverlap(const syrec::VariableAccess& first, const syrec::VariableAccess& second, const parser::SymbolTable& symbolTableReference);
+        [[nodiscard]] static bool                                                         isIdIncludedInSearchSpaceInterval(std::size_t operationNodeId, const std::vector<SearchSpaceIntervalBounds>& searchSpacesToInclude);
     };
 } // namespace noAdditionalLineSynthesis
 
