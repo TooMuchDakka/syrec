@@ -417,14 +417,26 @@ std::optional<TemporaryAssignmentsContainer::IsAssignmentLiveAndTypeInformation>
 }
 
 
-TemporaryAssignmentsContainer::OrderedBasicActiveAssignmentDataLookup TemporaryAssignmentsContainer::getActiveAssignments(std::size_t inclusiveLowerBoundOfExclusionRangeForActiveAssignments, std::size_t inclusiveUpperBoundOfExclusionRangeForActiveAssignments) const {
+TemporaryAssignmentsContainer::OrderedBasicActiveAssignmentDataLookup TemporaryAssignmentsContainer::getActiveAssignments(const std::vector<TemporaryAssignmentsContainer::SearchSpaceIntervalBounds>& searchSpacesToConsider) const {
     OrderedBasicActiveAssignmentDataLookup basicActiveAssignmentDataLookup;
+    if (searchSpacesToConsider.empty()) {
+        return basicActiveAssignmentDataLookup;
+    }
+
     for (const std::size_t activeAssignmentId : activeAssignmentsLookupById) {
         const std::optional<InternalAssignmentContainer::Reference> activeAssignmentData = getAssignmentById(activeAssignmentId);
-        if (!activeAssignmentData.has_value() || (activeAssignmentData->get()->associatedWithOperationNodeId >= inclusiveLowerBoundOfExclusionRangeForActiveAssignments && activeAssignmentData->get()->associatedWithOperationNodeId <= inclusiveUpperBoundOfExclusionRangeForActiveAssignments)
-            || activeAssignmentData->get()->assignmentType == InternalAssignmentContainer::AssignmentType::InversionOfSubAssignment) {
+        
+        if (!activeAssignmentData.has_value() || activeAssignmentData->get()->assignmentType == InternalAssignmentContainer::AssignmentType::InversionOfSubAssignment || !activeAssignmentData->get()->associatedWithOperationNodeId.has_value()){
+            continue;   
+        }
+
+        const std::size_t associatedWithOperationNodeId = *activeAssignmentData->get()->associatedWithOperationNodeId;
+        if (!std::any_of(searchSpacesToConsider.cbegin(), searchSpacesToConsider.cend(), [associatedWithOperationNodeId](const SearchSpaceIntervalBounds& searchSpaceToConsider) {
+                return associatedWithOperationNodeId >= searchSpaceToConsider.lowerBoundInclusive && associatedWithOperationNodeId <= searchSpaceToConsider.upperBoundInclusive; 
+        })) {
             continue;
         }
+        
         BasicActiveAssignmentData data;
         data.associatedOperationNodeId = activeAssignmentData->get()->associatedWithOperationNodeId.value_or(0);
         data.assignedToSignalParts     = activeAssignmentData->get()->getAssignedToSignalParts();
@@ -600,5 +612,5 @@ bool TemporaryAssignmentsContainer::doSignalAccessesOverlap(const syrec::Variabl
 }
 
 bool TemporaryAssignmentsContainer::isIdIncludedInSearchSpaceInterval(std::size_t operationNodeId, const std::vector<SearchSpaceIntervalBounds>& searchSpacesToInclude) {
-    return std::any_of(searchSpacesToInclude.cbegin(), searchSpacesToInclude.cend(), [operationNodeId](const SearchSpaceIntervalBounds& searchSpace) { return operationNodeId >= searchSpace.lowerBoundInclusive && operationNodeId >= searchSpace.upperBoundInclusive; });
+    return std::any_of(searchSpacesToInclude.cbegin(), searchSpacesToInclude.cend(), [operationNodeId](const SearchSpaceIntervalBounds& searchSpace) { return operationNodeId >= searchSpace.lowerBoundInclusive && operationNodeId <= searchSpace.upperBoundInclusive; });
 }

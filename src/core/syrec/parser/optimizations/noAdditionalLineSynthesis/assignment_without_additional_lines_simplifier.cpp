@@ -1050,18 +1050,20 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::OperationN
 }
 
 
-bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::canAlternativeBeChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::VariableAccess& alternativeToCheckAsSignalAccess, const parser::SymbolTable& symbolTable) const {
+bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::canAlternativeBeChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::VariableAccess& alternativeToCheckAsSignalAccess, const parser::SymbolTable& symbolTable, bool shouldCheckForOverlapWithReplayOfDataDependencyOfActiveAssignmentBeIgnored) const {
     return expressionTraversalHelper->canSignalBeUsedOnAssignmentLhs(signalAccess.var->name)
         && !didPreviousDecisionMatchingChoiceCauseConflict(LearnedConflictsLookupKey(operationNodeId, toBeChosenAlternative))
         && !doSignalAccessesOverlap(alternativeToCheckAsSignalAccess, signalAccess, symbolTable)
-        && !isChoiceOfSignalAccessBlockedByAnyActiveExpression(signalAccess);
+        && !isChoiceOfSignalAccessBlockedByAnyActiveExpression(signalAccess)
+        && (shouldCheckForOverlapWithReplayOfDataDependencyOfActiveAssignmentBeIgnored ? !existsActiveAssignmentWhereReplayOfAnyOfItsDataDependenciesAccessesSameSignalPartsAsChosenOperand(signalAccess, operationNodeId, toBeChosenAlternative) : true);
 }
 
-bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::canAlternativeBeChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::Expression& alternativeToCheckAsExpr, const parser::SymbolTable& symbolTable) const {
+bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::canAlternativeBeChosenInOperationNode(std::size_t operationNodeId, Decision::ChoosenOperand toBeChosenAlternative, const syrec::VariableAccess& signalAccess, const syrec::Expression& alternativeToCheckAsExpr, const parser::SymbolTable& symbolTable, bool shouldCheckForOverlapWithReplayOfDataDependencyOfActiveAssignmentBeIgnored) const {
     return expressionTraversalHelper->canSignalBeUsedOnAssignmentLhs(signalAccess.var->name)
         && !didPreviousDecisionMatchingChoiceCauseConflict(LearnedConflictsLookupKey(operationNodeId, toBeChosenAlternative))
         && !doesExprContainOverlappingAccessOnGivenSignalAccess(alternativeToCheckAsExpr, signalAccess, symbolTable)
-        && !isChoiceOfSignalAccessBlockedByAnyActiveExpression(signalAccess);
+        && !isChoiceOfSignalAccessBlockedByAnyActiveExpression(signalAccess)
+        && (shouldCheckForOverlapWithReplayOfDataDependencyOfActiveAssignmentBeIgnored ? !existsActiveAssignmentWhereReplayOfAnyOfItsDataDependenciesAccessesSameSignalPartsAsChosenOperand(signalAccess, operationNodeId, toBeChosenAlternative) : true);
 }
 
 bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::isAccessedSignalAssignable(const std::string_view& accessedSignalIdent) const {
@@ -1279,7 +1281,14 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
         return OverlappingSignalAccessDuringReplayOrInversionResult::asNoOverlapFound();
     }
 
-    const TemporaryAssignmentsContainer::OrderedBasicActiveAssignmentDataLookup& activeAssignmentsLookup = generatedAssignmentsContainer->getActiveAssignments(0, operationNodeId);
+    std::vector<TemporaryAssignmentsContainer::SearchSpaceIntervalBounds>        searchSpacesToConsider(1, TemporaryAssignmentsContainer::SearchSpaceIntervalBounds(0, operationNodeId));
+    if (toBeChosenOperandForAssignedToSignalParts == Decision::ChoosenOperand::Left) {
+        const std::size_t     additionalSearchSpaceLowerBound = expressionTraversalHelper->getOperationNodeIdOfRightOperand(operationNodeId).value_or(SIZE_MAX);
+        constexpr std::size_t additionalSearchSpaceUpperBound = SIZE_MAX;
+        searchSpacesToConsider.emplace_back(additionalSearchSpaceLowerBound, additionalSearchSpaceUpperBound);
+    }
+
+    const TemporaryAssignmentsContainer::OrderedBasicActiveAssignmentDataLookup& activeAssignmentsLookup = generatedAssignmentsContainer->getActiveAssignments(searchSpacesToConsider);
      for (const std::size_t assignmentIdOfDataDependency: dataDependenciesOfAssignmentRhs) {
         if (std::optional<OverlappingSignalAccessDuringReplayOrInversionResult> searchForOverlapInDataDependencyResult = areAssignedToSignalPartsOfAnyActiveAssignmentAccessedDuringReplayOrInversionOfDataDependencies(assignmentIdOfDataDependency, activeAssignmentsLookup); searchForOverlapInDataDependencyResult.has_value()) {
             if (searchForOverlapInDataDependencyResult->overlapSearchResult != OverlapSearchResult::NoneFound) {
@@ -1365,6 +1374,38 @@ std::optional<std::size_t> noAdditionalLineSynthesis::AssignmentWithoutAdditiona
 bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineWhetherConflictShouldBeTriggeredInCurrentOperationNodeOrOverlappingDataDependencyBasedOnInheritanceChainLength(std::size_t idOfAssignmentFromWhichAssignedToSignalPartsInCurrentOperationNodeWhereInherited, std::size_t idOfLastAssignmentInInheritanceChainOverlappingAssignedToSignalParts) const {
     return generatedAssignmentsContainer->determineLengthOfInheritanceChainLengthOfAssignment(idOfAssignmentFromWhichAssignedToSignalPartsInCurrentOperationNodeWhereInherited) < generatedAssignmentsContainer->determineLengthOfInheritanceChainLengthOfAssignment(idOfLastAssignmentInInheritanceChainOverlappingAssignedToSignalParts);
 }
+
+// TODO: This check should not be made if the chosen operand was inherited since said check should have already be done in the child node? or could any conflicting active assignment have been created in the meantime?
+/*
+ * TODO:
+ * The current usage of the result of this function is to determine whether an assignment for the given operand can be generated due to an overlap with an inactive data dependency of an active assignment.
+ * Since we know that the data dependency already created an assignment, we could either not chose the current operand to generate an assignment or trigger the conflict at the inactive data dependency.
+ * The current heuristic uses the former.
+ */
+bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::existsActiveAssignmentWhereReplayOfAnyOfItsDataDependenciesAccessesSameSignalPartsAsChosenOperand(const syrec::VariableAccess& assignedToSignalPartsForWhichNoOverlappingActiveAssignmentShouldExist, std::size_t operationNodeWhereSearchIsTriggered, Decision::ChoosenOperand chosenOperandAtOperationNode) const {
+    std::vector<TemporaryAssignmentsContainer::SearchSpaceIntervalBounds> searchSpacesToConsider(1, TemporaryAssignmentsContainer::SearchSpaceIntervalBounds(0, operationNodeWhereSearchIsTriggered));
+    if (chosenOperandAtOperationNode == Decision::ChoosenOperand::Left) {
+        const std::size_t     additionalSearchSpaceLowerBound = expressionTraversalHelper->getOperationNodeIdOfRightOperand(operationNodeWhereSearchIsTriggered).value_or(SIZE_MAX);
+        constexpr std::size_t additionalSearchSpaceUpperBound = SIZE_MAX;
+        searchSpacesToConsider.emplace_back(additionalSearchSpaceLowerBound, additionalSearchSpaceUpperBound);
+    }
+
+    const TemporaryAssignmentsContainer::OrderedBasicActiveAssignmentDataLookup activeAssignmentsToConsider = generatedAssignmentsContainer->getActiveAssignments(searchSpacesToConsider);
+    for (const std::pair<const std::size_t, TemporaryAssignmentsContainer::BasicActiveAssignmentData>& activeAssignmentIdAndData : activeAssignmentsToConsider) {
+        for (const std::size_t dataDependencyOfActiveAssignment : activeAssignmentIdAndData.second.dataDependencies) {
+            if (activeAssignmentsToConsider.count(dataDependencyOfActiveAssignment)) {
+                continue;
+            }
+
+            if (const std::optional<syrec::VariableAccess::ptr>& assignedToSignalParts = generatedAssignmentsContainer->getAssignedToSignalPartsOfAssignmentById(dataDependencyOfActiveAssignment); assignedToSignalParts.has_value()
+                && doSignalAccessesOverlap(**assignedToSignalParts, assignedToSignalPartsForWhichNoOverlappingActiveAssignmentShouldExist, *symbolTableReference)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 
 /*
  * Is this check only relevant for operation nodes with one leaf node where the leaf node is now chosen.
@@ -2004,7 +2045,10 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
         }
     }
     if (rhsOperandAsSignalAccess.has_value() && rhsOperandSimplificationResult.wasResultManuallyCreated()) {
-        const std::vector<TemporaryAssignmentsContainer::SearchSpaceIntervalBounds> searchSpacesToConsiderToActiveAssignment(1, TemporaryAssignmentsContainer::SearchSpaceIntervalBounds(0, operationNodeId));
+        std::vector<TemporaryAssignmentsContainer::SearchSpaceIntervalBounds> searchSpacesToConsiderToActiveAssignment(1, TemporaryAssignmentsContainer::SearchSpaceIntervalBounds(0, operationNodeId));
+        if (!operationNodeId) {
+            searchSpacesToConsiderToActiveAssignment.emplace_back(TemporaryAssignmentsContainer::SearchSpaceIntervalBounds(0, operationNodeReferenceForId->get()->rhsOperand.operationNodeId.value_or(SIZE_MAX)));
+        }
         detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand = generatedAssignmentsContainer->getOverlappingActiveAssignmentForSignalAccess(**rhsOperandAsSignalAccess, searchSpacesToConsiderToActiveAssignment, *symbolTableReference).has_value();
 
         if (detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand) {
@@ -2024,8 +2068,10 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
     // Note: This conditional (the function canAlternativeByChosenInOperationNode) also handles the case that the two operands are leaf nodes and could potentially overlap and also handles the cases that the potentially chosen operand is not defined again in the other operands expression
     const std::optional<syrec_operation::operation> matchingAssignmentCounterpartForDefinedOperation = syrec_operation::getMatchingAssignmentOperationForOperation(definedOperationOfOperationNode);
     if (!isChosenOperandPreselected && chosenOperand == Decision::ChoosenOperand::None && matchingAssignmentCounterpartForDefinedOperation.has_value() && !(detectedConflictByExistenceOfOverlappingAssignmentWithLhsOperand || detectedConflictByExistenceOfOverlappingAssignmentWithRhsOperand)) {
-        if (lhsOperandAsSignalAccess.has_value() && ((rhsOperandAsSignalAccess.has_value() && canAlternativeBeChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess, **rhsOperandAsSignalAccess, *symbolTableReference)) 
-            || (rhsOperandAsExpr.has_value() && canAlternativeBeChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess, **rhsOperandAsExpr, *symbolTableReference)))) {
+        const bool shouldCheckForOverlapOfLhsOperandWithReplayOfDataDependencyOfActiveAssignmentBeIgnored = lhsOperandSimplificationResult.wasResultManuallyCreated();
+        const bool shouldCheckForOverlapOfRhsOperandWithReplayOfDataDependencyOfActiveAssignmentBeIgnored = rhsOperandSimplificationResult.wasResultManuallyCreated();
+        if (lhsOperandAsSignalAccess.has_value() && ((rhsOperandAsSignalAccess.has_value() && canAlternativeBeChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess, **rhsOperandAsSignalAccess, *symbolTableReference, shouldCheckForOverlapOfLhsOperandWithReplayOfDataDependencyOfActiveAssignmentBeIgnored)) 
+            || (rhsOperandAsExpr.has_value() && canAlternativeBeChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess, **rhsOperandAsExpr, *symbolTableReference, shouldCheckForOverlapOfLhsOperandWithReplayOfDataDependencyOfActiveAssignmentBeIgnored)))) {
             
             chosenOperand = Decision::ChoosenOperand::Left;
             const TemporaryAssignmentsContainer::OrderedAssignmentIdContainer transformedRhsExprDataDependenciesContainer(dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cend());
@@ -2043,8 +2089,8 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
                 return DecisionResult::fromUnknownResult(UnknownResultReason::Other);
             }
         }
-        if (rhsOperandAsSignalAccess.has_value() && ((lhsOperandAsSignalAccess.has_value() && canAlternativeBeChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsSignalAccess, *symbolTableReference)) 
-            || (lhsOperandAsExpr.has_value() && canAlternativeBeChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsExpr, *symbolTableReference)))) {
+        if (rhsOperandAsSignalAccess.has_value() && ((lhsOperandAsSignalAccess.has_value() && canAlternativeBeChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsSignalAccess, *symbolTableReference, shouldCheckForOverlapOfRhsOperandWithReplayOfDataDependencyOfActiveAssignmentBeIgnored)) 
+            || (lhsOperandAsExpr.has_value() && canAlternativeBeChosenInOperationNode(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, **lhsOperandAsExpr, *symbolTableReference, shouldCheckForOverlapOfRhsOperandWithReplayOfDataDependencyOfActiveAssignmentBeIgnored)))) {
             constexpr Decision::ChoosenOperand potentialOperandChoiceForAlternative = Decision::ChoosenOperand::Right;
             /*
              * It could happen that with our choice of the operand that shall be used as the assigned to signal parts in the assignment created at the current operation node (and was inherited from one of its child nodes) that said signal parts are also used in one of the data dependencies and would again be accessed during the

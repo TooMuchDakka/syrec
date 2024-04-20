@@ -59,7 +59,7 @@ namespace noAdditionalLineSynthesis {
             }
         };
         using OrderedBasicActiveAssignmentDataLookup = std::map<std::size_t, BasicActiveAssignmentData>;
-        [[nodiscard]] OrderedBasicActiveAssignmentDataLookup getActiveAssignments(std::size_t inclusiveLowerBoundOfExclusionRangeForActiveAssignments, std::size_t inclusiveUpperBoundOfExclusionRangeForActiveAssignments) const;
+        [[nodiscard]] OrderedBasicActiveAssignmentDataLookup getActiveAssignments(const std::vector<SearchSpaceIntervalBounds>& searchSpacesToConsider) const;
 
         void markCutoffForInvertibleAssignments();
         void popLastCutoffForInvertibleAssignments();
