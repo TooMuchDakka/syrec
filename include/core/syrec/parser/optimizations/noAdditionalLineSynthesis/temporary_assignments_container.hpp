@@ -14,6 +14,9 @@ namespace noAdditionalLineSynthesis {
         using ptr                              = std::shared_ptr<TemporaryAssignmentsContainer>;
         using AssignmentReferenceVariant       = std::variant<std::shared_ptr<syrec::AssignStatement>, std::shared_ptr<syrec::UnaryStatement>>;
         using OwningAssignmentReferenceVariant = std::variant<std::unique_ptr<syrec::AssignStatement>, std::unique_ptr<syrec::UnaryStatement>>;
+        /**
+         * \brief Container storing a set of assignment ids sorted in descending order.
+         */
         using OrderedAssignmentIdContainer     = std::set<std::size_t, std::greater<>>;
 
         struct SearchSpaceIntervalBounds {
@@ -121,6 +124,7 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<InternalAssignmentContainer::ReadOnlyReference>       getMatchingActiveSubassignmentById(std::size_t assignmentId) const;
         [[nodiscard]] bool                                                                isAssignmentActive(std::size_t assignmentId) const;
         [[nodiscard]] std::optional<std::size_t>                                          replayNotActiveAssignment(std::size_t assignmentId);
+        [[nodiscard]] std::vector<std::size_t>                                            getDataDependenciesOfAssignmentOrderedByAssociatedOperationNodeId(std::size_t assignmentId) const;
 
         static void                                                                       invertAssignment(syrec::AssignStatement& assignment);
         static void                                                                       invertAssignment(syrec::UnaryStatement& assignment);

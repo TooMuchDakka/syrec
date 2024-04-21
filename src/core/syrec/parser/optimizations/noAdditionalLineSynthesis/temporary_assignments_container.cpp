@@ -75,10 +75,14 @@ bool TemporaryAssignmentsContainer::invertAssignmentAndDataDependencies(std::siz
     if (!matchingAssignmentForId.has_value() || !isAssignmentActive(assignmentId)) {
         return true;
     }
-
-    const OrderedAssignmentIdContainer dataDependenciesOfAssignmentToBeInverted = getDataDependenciesOfAssignment(assignmentId);
+    
+    /*
+     * Since we want to invert the assignments in same order that they were defined when the given assignment was created, we need to reverse the sort order of our container holding the data dependencies of the current assignment
+     * because the entries in said container are sorted according to the assignment id in ascending order.
+     */
+    const std::vector<std::size_t> dataDependenciesOfAssignmentToBeInvertedOrderedByAssociatedOperationNodeIdInAscendingOrder = getDataDependenciesOfAssignmentOrderedByAssociatedOperationNodeId(assignmentId);
     OrderedAssignmentIdContainer dataDependenciesOfInvertedAssignment;
-    for (const std::size_t dataDependency : dataDependenciesOfAssignmentToBeInverted) {
+    for (const std::size_t dataDependency: dataDependenciesOfAssignmentToBeInvertedOrderedByAssociatedOperationNodeIdInAscendingOrder) {
         if (isAssignmentActive(dataDependency)) {
             dataDependenciesOfInvertedAssignment.emplace(dataDependency);
             continue;
@@ -122,14 +126,32 @@ bool TemporaryAssignmentsContainer::invertAssignmentAndDataDependencies(std::siz
 
 std::optional<std::size_t> TemporaryAssignmentsContainer::replayNotActiveAssignment(std::size_t assignmentId) {
     const std::optional<InternalAssignmentContainer::Reference> matchingAssignmentForId = getAssignmentById(assignmentId);
-
     if (!matchingAssignmentForId.has_value() || isAssignmentActive(assignmentId)) {
         return assignmentId;
     }
 
-    const OrderedAssignmentIdContainer dataDependenciesOfAssignmentToBeReplayed = getDataDependenciesOfAssignment(assignmentId);
-    OrderedAssignmentIdContainer       dataDependenciesOfReplayedAssignment;
-    for (const std::size_t dataDependency: dataDependenciesOfAssignmentToBeReplayed) {
+    /*
+     * To replay the original inheritance chain of the given assignment, we need to start the replay at the first element of the inheritance chain, thus at the assignment from which the current assignment inherited
+     * its assigned to signal parts from, if such a successor exists for the given assignment.
+     */
+    std::optional<std::size_t> idOfReplayedAssignmentFromWhichAssignedToSignalPartsWhereInherited;
+    if (matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited.has_value()) {
+        const std::size_t                                           idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited = *matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited;
+        const std::optional<InternalAssignmentContainer::Reference> matchingReplayedAssignment                                 = getAssignmentById(idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited);
+        idOfReplayedAssignmentFromWhichAssignedToSignalPartsWhereInherited = replayNotActiveAssignment(*matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited);
+        if (!idOfReplayedAssignmentFromWhichAssignedToSignalPartsWhereInherited.has_value()) {
+            return std::nullopt;
+        }
+    }
+
+    const std::vector<std::size_t> dataDependenciesOfAssignmentToBeReplayedOrderedByAssociatedOperationNodeIdInAscendingOrder = getDataDependenciesOfAssignmentOrderedByAssociatedOperationNodeId(assignmentId);
+    OrderedAssignmentIdContainer   dataDependenciesOfReplayedAssignment;
+
+    /*
+     * Since we want to replay the assignments in same order that they were defined when the given assignment was created, we need to reverse the sort order of our container holding the data dependencies of the current assignment
+     * because the entries in said container are sorted according to the assignment id in ascending order.
+     */
+    for (const std::size_t dataDependency: dataDependenciesOfAssignmentToBeReplayedOrderedByAssociatedOperationNodeIdInAscendingOrder) {
         if (isAssignmentActive(dataDependency)) {
             dataDependenciesOfReplayedAssignment.emplace(dataDependency);
             continue;
@@ -147,21 +169,47 @@ std::optional<std::size_t> TemporaryAssignmentsContainer::replayNotActiveAssignm
         return std::nullopt;
     }
 
-    const std::optional<std::size_t> idOfReplayedAssignment = storeActiveAssignment(*generatedCopyOfAssignment, std::nullopt, dataDependenciesOfReplayedAssignment, 0, std::nullopt);
+    const std::optional<std::size_t> idOfReplayedAssignment = storeActiveAssignment(*generatedCopyOfAssignment, idOfReplayedAssignmentFromWhichAssignedToSignalPartsWhereInherited, dataDependenciesOfReplayedAssignment, 0, std::nullopt);
     if (!idOfReplayedAssignment.has_value()
         || !std::all_of(dataDependenciesOfReplayedAssignment.cbegin(), dataDependenciesOfReplayedAssignment.cend(), [&](const std::size_t dataDependency) { return invertAssignmentAndDataDependencies(dataDependency); })) {
         return std::nullopt;
     }
-
-    if (matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited.has_value()) {
-        const std::optional<InternalAssignmentContainer::Reference> matchingReplayedAssignment        = getAssignmentById(*idOfReplayedAssignment);
-        matchingReplayedAssignment->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited = replayNotActiveAssignment(*matchingAssignmentForId->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited);
-        if (!matchingReplayedAssignment->get()->idOfAssignmentFromWhichAssignedToSignalPartsWhereInherited.has_value()) {
-            return std::nullopt;
-        }
-    }
     return idOfReplayedAssignment;
 }
+
+std::vector<std::size_t> TemporaryAssignmentsContainer::getDataDependenciesOfAssignmentOrderedByAssociatedOperationNodeId(std::size_t assignmentId) const {
+    const OrderedAssignmentIdContainer dataDependenciesOfAssignment = getDataDependenciesOfAssignment(assignmentId);
+    if (dataDependenciesOfAssignment.empty()) {
+        return {};
+    }
+
+    std::vector<std::pair<std::size_t, std::size_t>> containerOfAssignmentIdAndAssociatedOperationNodeId;
+    containerOfAssignmentIdAndAssociatedOperationNodeId.reserve(dataDependenciesOfAssignment.size());
+
+    std::transform(dataDependenciesOfAssignment.cbegin(), dataDependenciesOfAssignment.cend(), std::back_inserter(containerOfAssignmentIdAndAssociatedOperationNodeId), [&](const std::size_t dataDependencyId) {
+        return std::make_pair(dataDependencyId, *getAssociatedOperationNodeIdForAssignmentById(dataDependencyId));
+    });
+
+    // Sort container according to associated operation node id (i.e. a lower operation node id corresponds to a lower index in the sorted container)
+    std::sort(
+    containerOfAssignmentIdAndAssociatedOperationNodeId.begin(),
+    containerOfAssignmentIdAndAssociatedOperationNodeId.end(),
+    [](const std::pair<std::size_t, std::size_t>& firstTuple, const std::pair<std::size_t, std::size_t>& secondTuple) {
+        return firstTuple.second < secondTuple.second;
+    });
+
+    std::vector<std::size_t> containerForAssignmentIdsSortedAccordingToAssociatedOperationNodeId;
+    containerForAssignmentIdsSortedAccordingToAssociatedOperationNodeId.reserve(containerOfAssignmentIdAndAssociatedOperationNodeId.size());
+    std::transform(
+    containerOfAssignmentIdAndAssociatedOperationNodeId.cbegin(),
+    containerOfAssignmentIdAndAssociatedOperationNodeId.cend(),
+    std::back_inserter(containerForAssignmentIdsSortedAccordingToAssociatedOperationNodeId),
+    [](const std::pair<std::size_t, std::size_t>& assignmentIdAndAssociatedOperationNodeIdPair) {
+        return assignmentIdAndAssociatedOperationNodeIdPair.first;
+    });
+    return containerForAssignmentIdsSortedAccordingToAssociatedOperationNodeId;
+}
+
 
 std::optional<TemporaryAssignmentsContainer::AssignmentReferenceVariant> TemporaryAssignmentsContainer::createCopyOfAssignmentFromInternalContainerEntry(const InternalAssignmentContainer& assignmentToCopy) {
     if (const std::shared_ptr<syrec::AssignStatement> assignmentToCopyAsAssignStatement = std::holds_alternative<std::shared_ptr<syrec::AssignStatement>>(assignmentToCopy.data) ? std::get<std::shared_ptr<syrec::AssignStatement>>(assignmentToCopy.data) : nullptr; assignmentToCopyAsAssignStatement) {
