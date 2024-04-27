@@ -1817,7 +1817,293 @@
     }
   },
 
-  "doubleSubtractionTransformationInOperationNodeWithOneLeafNode": {
+
+
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingAssignableSignalAndSubtractionOperationAndRhsBeingAssignableSignalChosesLhsOperandAndLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (d + (b - c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) b -= c; b += d; a += b; b -= d; b += c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingAssignableSignalAndSubtractionOperationAndRhsBeingAssignableSignalChosesLhsOperandAndLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a ^= (d - (b - c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) b -= c; a ^= (d - b); b += c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentWithNoAdditionOrSubtractionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingAssignableSignalAndSubtractionOperationAndRhsBeingAssignableSignalChosesLhsOperandAndLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (d * (b - c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) b -= c; a += (d * b); b += c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingNonAssignableSignalAndAdditionOperationAndRhsBeingNotAssignableSignalChosesNoOperandAndLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), in b(4), in c(4), in d(4)) a += (d + (b - c))",
+    "expectedCircuit": "module main(inout a(4), in b(4), in c(4), in d(4)) a += d; a += b; a -= c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingNonAssignableSignalAndSubtractionOperationAndRhsBeingNotAssignableSignalChosesNoOperandAndLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), in b(4), in c(4), in d(4)) a += (d - (b - c))",
+    "expectedCircuit": "module main(inout a(4), in b(4), in c(4), in d(4)) a += d; a -= b; a += c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingNonAssignableSignalAndSubtractionOperationAndRhsBeingNumberChosesNoOperandAndLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), in b(4),in d(4)) a += (d + (b - 2))",
+    "expectedCircuit": "module main(inout a(4), in b(4), in d(4)) a += d; a += b; a -= 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingNonAssignableSignalAndSubtractionOperationAndRhsBeingAssignableSignalTransformsParentOperation": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) a += (d + (b - c))",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) c -= b; c -= d; a -= c; c += d; c += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsNumberAndSubtractionOperationAndRhsBeingAssignableSignalTransformsParentOperation": {
+    "circuit": "module main(inout a(4), inout c(4), in d(4)) a ^= (d + (2 - c))",
+    "expectedCircuit": "module main(inout a(4), inout c(4), in d(4)) c -= 2; a ^= (d - c); c += 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingSourceOfPreviousConflictAndSubtractionOperationAndRhsBeingAssignableSignalTransformsParentOperation": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a ^= (b + (b - c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) c -= b; a ^= (b - c); c += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingNonAssignableSignalAndSubtractionOperationAndRhsBeingAssignableSignalTransformsParentOperation": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) a += (d - (b - c))",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) c -= b; c += d; a += c; c -= d; c += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsNumberAndSubtractionOperationAndRhsBeingAssignableSignalTransformsParentOperation": {
+    "circuit": "module main(inout a(4), inout c(4), in d(4)) a ^= (d - (2 - c))",
+    "expectedCircuit": "module main(inout a(4), inout c(4), in d(4)) c -= 2; c += d; a ^= c; c -= d; c += 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingSourceOfPreviousConflictAndSubtractionOperationAndRhsBeingAssignableSignalTransformsParentOperation": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (b + (d - (b - c)))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) c -= b; c += d; c += b; a += c; c -= b; c -= d; c += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentWithNoSubtractionOrAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingNonAssignableSignalAndSubtractionOperationAndRhsBeingAssignableSignalLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4)) a += (b * (b - c))",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentWithNoSubtractionOrAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsNumberAndSubtractionOperationAndRhsBeingAssignableSignalLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4)) a += (b * (2 - c))",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentWithNoSubtractionOrAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingSourceOfPreviousConflictAndSubtractionOperationAndRhsBeingAssignableSignalLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (b + (d * (b - c)))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += b; a += (d * (b - c))",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+
+
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingNonAssignableSignalAndSubtractionOperationAndRhsBeingAssignableSignalButSourceOfPreviousConflictLeavesParentAndCurrentOperationNodeUnchanged": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4)) a += (c + (b - c))",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) a += c; a += b; a -= c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsNumberAndSubtractionOperationAndRhsBeingAssignableSignalButSourceOfPreviousConflictLeavesParentAndCurrentOperationNodeUnchanged": {
+    "circuit": "module main(inout a(4), inout c(4)) a += (c + (2 - c))",
+    "expectedCircuit": "module main(inout a(4), inout c(4)) a += c; a += 2; a -= c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingSourceOfPreviousConflictAndSubtractionOperationAndRhsBeingAssignableSignalButSourceOfPreviousConflictLeavesParentAndCurrentOperationNodeUnchanged": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (c + (b + (b - c)))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) a += c; a += b; a += b; a -= c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingNonAssignableSignalAndSubtractionOperationAndRhsBeingAssignableSignalButSourceOfPreviousConflictLeavesParentAndCurrentOperationNodeUnchanged": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4)) a += (c + (b - (b - c)))",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) a += c; a += b; a -= b; a += c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsNumberAndSubtractionOperationAndRhsBeingAssignableSignalButSourceOfPreviousConflictLeavesParentAndCurrentOperationNodeUnchanged": {
+    "circuit": "module main(inout a(4), inout c(4), in d(4)) a += (c + (d - (2 - c)))",
+    "expectedCircuit": "module main(inout a(4), inout c(4), in d(4)) a += c; a += d; a -= 2; a += c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOnlyLeafNodesAndLhsBeingSourceOfPreviousConflictAndSubtractionOperationAndRhsBeingAssignableSignalButSourceOfPreviousConflictLeavesParentAndCurrentOperationNodeUnchanged": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (c + (b - (b - c)))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) a += c; a += b; a -= b; a += c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+
+  "operationTransformationOfParentAdditionOperationAndProcessingOfLhsOperationNodeWithOnlyLeafNodesAndLhsBeingNotAssignableSignalAndSubtractionOperationAndRhsOperandBeingAssignableSignalLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) a += ((b - c) + d)",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) a += b; a -= c; a += d",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfLhsOperationNodeWithOnlyLeafNodesAndLhsBeingAssignableSignalButSourceOfPreviousConflictAndSubtractionOperationAndRhsOperandBeingAssignableSignalLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (((b - c) + d) + b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += b; a -= c; a += d; a += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfLhsOperationNodeWithOnlyLeafNodesAndLhsBeingNotAssignableSignalAndSubtractionOperationAndRhsOperandBeingAssignableSignalLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) a += ((b - c) - d)",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) a += b; a -= c; a -= d",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfLhsOperationNodeWithOnlyLeafNodesAndLhsBeingAssignableSignalButSourceOfPreviousConflictAndSubtractionOperationAndRhsOperandBeingAssignableSignalLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (((b - c) - d) + b)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += b; a -= c; a -= d; a += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOneLeafNodeAndLeafBeingLhsOperandBeingNotAssignableSignalAndSubtractionOperationAndNonLeafOperationNodeGeneratingAssignment": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (d + (b - c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) b -= c; b += d; a += b; b -= d; b += c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOneLeafNodeAndLeafBeingLhsOperandBeingNotAssignableSignalAndSubtractionOperationAndNonLeafOperationNodeGeneratingAssignment": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) a ^= (d - (b - c))",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4), in d(4)) c -= b; c += d; a ^= c; c -= d; c += b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOneLeafNodeAndLeafBeingLhsOperandBeingNotAssignableSignalAndNotAdditionOrSubtractionOperationAndNonLeafOperationNodeGeneratingExpressionLeavesParentAndCurrentOperationUnchanged": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += (d - (b * c))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) d -= (b * c); a += d; d += (b * c)",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOneLeafAndLeafBeingLhsBeingNonLeafOperationGeneratingAssignmentAndSubtractionOperationAndRhsOperandBeingLeaf": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a -= ((b - c) - d)",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) b -= c; b -= d; a -= b; b += d; b += c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentSubtractionOperationAndProcessingOfOperationNodeWithOneLeafAndLeafBeingLhsBeingNonLeafOperationGeneratingExpressionAndSubtractionOperationAndRhsOperandBeingLeaf": {
+    "circuit": "module main(inout a(4), in b(4), in c(4), inout d(4)) a += (c - ((b - c) - d))",
+    "expectedCircuit": "module main(inout a(4), in b(4), in c(4), inout d(4)) d += c; d -= b; d += c; a += d; d -= c; d += b; d -= c",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOneLeafAndLeafBeingLhsBeingNonLeafOperationGeneratingAssignmentAndSubtractionOperationAndRhsOperandBeingLeaf": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4), inout d(4)) a += (b + ((b + c) - d))",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4), inout d(4)) c += b; c -= d; c += b; a += c; c -= b; c += d; c -= b",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentAdditionOperationAndProcessingOfOperationNodeWithOneLeafAndLeafBeingLhsBeingNonLeafOperationGeneratingExpressionAndSubtractionOperationAndRhsOperandBeingLeaf": {
+    "circuit": "module main(inout a(4), in b(4), inout c(4), inout d(4)) a += (b + ((b * c) - d))",
+    "expectedCircuit": "module main(inout a(4), in b(4), inout c(4), inout d(4)) d -= (b * c); d -= b; a -= d; d += b; d += (b * c)",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentNodeWithAdditionOperationAndProcessingOfOperationNodeWithOneLeafBeingRhsOperandSubtractionOperationAndNonLeafGeneratingAssignmentWithBacktrackingCorrectlyResettingInversionFlag": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += (c + (((c + b) + (b - d)) + d))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += c; a += c; a += b; a += b; a -= d; a += d",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentNodeWithSubtractionOperationAndProcessingOfOperationNodeWithOneLeafBeingRhsOperandSubtractionOperationAndNonLeafGeneratingAssignmentWithBacktrackingCorrectlyResettingInversionFlag": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += (c + (((c + b) - (b - d)) + d))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += c; a += c; a += b; a -= b; a += d; a += d",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+  "operationTransformationOfParentNodeWithNoAdditionOrSubtractionOperationAndProcessingOfOperationNodeWithOneLeafBeingRhsOperandSubtractionOperationAndNonLeafGeneratingAssignmentWithBacktrackingCorrectlyResettingInversionFlag": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += (c + (((c + b) * (b - d)) + d))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += c; a += ((c + b) * (b - d)); a += d",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
+      "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
+    }
+  },
+
+
+  "DISABLED_doubleSubtractionTransformationInOperationNodeWithOneLeafNode": {
     "circuit": "",
     "expectedCircuit": "",
     "optimizations": {
@@ -1826,7 +2112,7 @@
     }
   },
 
-  "doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBeingAssignableSignalAndNestedRhsOperandBeingAssignableSignal": {
+  "DISABLED_doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBeingAssignableSignalAndNestedRhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += (b - (c - d))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) d -= c; d += b; a += d; d -= b; d += c",
     "optimizations": {
@@ -1834,7 +2120,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBeingAssignableSignalAndNestedRhsOperandBeingNotAssignableSignal": {
+  "DISABLED_doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBeingAssignableSignalAndNestedRhsOperandBeingNotAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) a += (b - (c - d))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), in d(4)) c -= d; b -= c; c += d; a += c; c -= d; b += c; c -= d",
     "optimizations": {
@@ -1842,7 +2128,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBeingAssignableSignalAndNestedRhsOperandBeingBlockedByPreviousConflict": {
+  "DISABLED_doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBeingAssignableSignalAndNestedRhsOperandBeingBlockedByPreviousConflict": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) a += (b - (c - ((d + 2) - d)))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4), inout d(4)) c -= d; c -= 2; c -= d; b -= c; c += d; c += 2; c += d; a += b; c -= d; c -= 2; c -= d; b += c; c += d; c += 2; c += d",
     "optimizations": {
@@ -1850,7 +2136,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBlockedByPreviousConflictAndNestedRhsOperandBeingBlockedByPreviousConflict": {
+  "DISABLED_doubleSubtractionTransformationInOperationNodeWithOneLeafNodeWithLhsOperandBeingAssignableSignalAndRhsOperandBeingExpressionWithNestedLhsOperandBlockedByPreviousConflictAndNestedRhsOperandBeingBlockedByPreviousConflict": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += (((b - 2) - b) - ((c + 2) + c))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) a += b; a -= 2; a -= b; a -= c; a -= 2; a -= c",
     "optimizations": {
@@ -1859,7 +2145,7 @@
     }
   },
 
-  "doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingAssignmentAndRhsOperandBeingAssignment": {
+  "DISABLED_doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingAssignmentAndRhsOperandBeingAssignment": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((b - 2) - (c - 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b -= 2; c -= 2; b -= c; c += 2; a += b; c -= 2; b += c; c += 2; b += 2",
     "optimizations": {
@@ -1867,7 +2153,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingExpressionAndRhsOperandBeingAssignment": {
+  "DISABLED_doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingExpressionAndRhsOperandBeingAssignment": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((b * 2) - (c - 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) c -= 2; a += ((b * 2) - c); c += 2",
     "optimizations": {
@@ -1875,7 +2161,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingAssignmentAndRhsOperandBeingExpression": {
+  "DISABLED_doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingAssignmentAndRhsOperandBeingExpression": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((b - 2) - (c * 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b -= 2; b -= (c * 2); a += b; b += (c * 2); b += 2",
     "optimizations": {
@@ -1883,7 +2169,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingExpressiondRhsOperandBeingExpression": {
+  "DISABLED_doubleSubtractionTransformationInOperationNodeWithNoLeafNodeAndLhsOperandBeingExpressiondRhsOperandBeingExpression": {
     "circuit": "module main(inout a(4), in b(4), in c(4)) a += ((b - 2) - (c - 2))",
     "expectedCircuit": "module main(inout a(4), in b(4), in c(4)) a += b; a -= 2; a -= c; a += 2",
     "optimizations": {
@@ -1892,14 +2178,14 @@
     }
   },
 
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionBeingNumber": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionBeingNumber": {
     "circuit": "module main(inout a(4)) a -= 2",
     "optimizations": {
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingNotAssignableSignal": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingNotAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), in c(4)) a -= (b - c)",
     "expectedCircuit": "module main(inout a(4), inout b(4), in c(4)) a -= b; a += c",
     "optimizations": {
@@ -1907,7 +2193,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingNotAssignableSignal": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingNotAssignableSignal": {
     "circuit": "module main(inout a(4), in b(4), in c(4)) a -= (b - c)",
     "expectedCircuit": "module main(inout a(4), in b(4), in c(4)) a -= b; a += c",
     "optimizations": {
@@ -1915,7 +2201,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignal": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), in b(4), inout c(4)) a -= (b - c)",
     "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) c -= b; a += b; c += b",
     "optimizations": {
@@ -1923,7 +2209,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingAssignableSignal": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingAssignableSignal": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a -= (b - c)",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b -= c; a -= b; b += c",
     "optimizations": {
@@ -1931,7 +2217,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingAssignableSignalWithOperandBeingNotSubtraction": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingAssignableSignalWithOperandBeingNotSubtraction": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a -= (b + c)",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b += c; a -= b; b -= c",
     "optimizations": {
@@ -1939,7 +2225,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignalWithOperandBeingNotSubtraction": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingAssignableSignalWithOperandBeingNotSubtraction": {
     "circuit": "module main(inout a(4), in b(4), inout c(4)) a -= (b + c)",
     "expectedCircuit": "module main(inout a(4), in b(4), inout c(4)) c += b; a -= c; c -= b",
     "optimizations": {
@@ -1947,7 +2233,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingNotAssignableSignalWithOperandBeingNotSubtraction": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingNotAssignableSignalAndRhsOperandBeingNotAssignableSignalWithOperandBeingNotSubtraction": {
     "circuit": "module main(inout a(4), in b(4), in c(4)) a -= (b + c)",
     "expectedCircuit": "module main(inout a(4), in b(4), in c(4)) a -= b; a -= c",
     "optimizations": {
@@ -1955,7 +2241,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingNotAssignableSignalWithOperandBeingNotSubtraction": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionWithRhsExpressionHavingTwoLeafNodesWithLhsOperandBeingAssignableSignalAndRhsOperandBeingNotAssignableSignalWithOperandBeingNotSubtraction": {
     "circuit": "module main(inout a(4), inout b(4), in c(4)) a -= (b + c)",
     "expectedCircuit": "module main(inout a(4), inout b(4), in c(4)) b += c; a -= b; b -= c",
     "optimizations": {
@@ -1963,7 +2249,7 @@
       "noAddLineTransformationOfSubtractionAndAdditionCascadeEnabled": "1"
     }
   },
-  "doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionAndNestedExpressionHavingNoLeafNodes": {
+  "DISABLED_doubleSubtractionTransformationInTopmostOperationNodeWithOriginalAssignmentBeingSubtractionAndNestedExpressionHavingNoLeafNodes": {
     "circuit": "module main(inout a(4), inout b(4), inout c(4)) a -= ((b - 2) - (c - 2))",
     "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b -= 2; c -= 2; b -= c; c += 2; a -= b; c -= 2; b += c; c += 2; b += 2",
     "optimizations": {

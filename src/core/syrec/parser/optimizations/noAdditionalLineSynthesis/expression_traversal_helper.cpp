@@ -31,6 +31,18 @@ bool ExpressionTraversalHelper::OperationNode::areBothOperandsLeafNodes() const 
     return lhsOperand.isLeafNode() && rhsOperand.isLeafNode();
 }
 
+std::optional<syrec_operation::operation> ExpressionTraversalHelper::OperationNode::getOperationConsideringWhetherMarkedAsInverted() const {
+    return isOneTimeOperationInversionFlagEnabled ? syrec_operation::invert(operation) : operation;
+}
+
+void ExpressionTraversalHelper::OperationNode::enabledIsOneTimeOperationInversionFlag() {
+    isOneTimeOperationInversionFlagEnabled = true;
+}
+
+void ExpressionTraversalHelper::OperationNode::disableIsOneTimeOperationInversionFlag() {
+    isOneTimeOperationInversionFlagEnabled = false;
+}
+
 
 std::optional<syrec::VariableExpression::ptr> ExpressionTraversalHelper::getOperandAsVariableExpr(std::size_t operandNodeId) const {
     if (std::optional<syrec::Expression::ptr> operandData = getDataOfOperand(operandNodeId); operandData.has_value() && std::dynamic_pointer_cast<syrec::VariableExpression>(*operandData)) {
@@ -321,7 +333,7 @@ ExpressionTraversalHelper::OperationNodeReference ExpressionTraversalHelper::cre
         nodeForRhsOperand = createOperandNode(exprAsBinaryExpr->rhs, parentIdForNestedExpressions);
     }
 
-    const auto  operationNode          = OperationNode({generatedIdForCurrentNode, parentOperationNodeId, mappedToOperation, nodeForLhsOperand, nodeForRhsOperand});
+    const auto  operationNode          = OperationNode({generatedIdForCurrentNode, parentOperationNodeId, mappedToOperation, nodeForLhsOperand, nodeForRhsOperand, false});
     const auto& operationNodeReference = std::make_shared<OperationNode>(operationNode);
     return operationNodeReference;
 }

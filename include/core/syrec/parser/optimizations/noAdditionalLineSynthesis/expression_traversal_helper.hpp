@@ -29,11 +29,15 @@ namespace noAdditionalLineSynthesis {
             syrec_operation::operation operation;
             OperandNode                lhsOperand;
             OperandNode                rhsOperand;
+            bool                       isOneTimeOperationInversionFlagEnabled;
 
             [[nodiscard]] std::optional<std::size_t>                         getLeafNodeOperandId() const;
             [[nodiscard]] std::optional<std::pair<std::size_t, std::size_t>> getLeafNodeOperandIds() const;
             [[nodiscard]] bool                                               hasAnyLeafOperandNodes() const;
             [[nodiscard]] bool                                               areBothOperandsLeafNodes() const;
+            [[nodiscard]] std::optional<syrec_operation::operation>          getOperationConsideringWhetherMarkedAsInverted() const;
+            void                                                             enabledIsOneTimeOperationInversionFlag();
+            void                                                             disableIsOneTimeOperationInversionFlag();
         };
         using OperationNodeReference = std::shared_ptr<OperationNode>;
 

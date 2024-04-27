@@ -339,7 +339,7 @@ namespace noAdditionalLineSynthesis {
         void                                                                                                               handleConflict(std::size_t associatedOperationNodeIdOfAccessedSignalPartsOperand, Decision::ChoosenOperand chosenOperandLeadingToDetectionOfConflict, const syrec::VariableAccess& accessedSignalPartsUsedInCheckForConflict);
         
         [[nodiscard]] std::size_t determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(std::size_t operationNodeIdOfEarliestSourceOfConflict, std::size_t operationNodeIdWhereConflictCheckWasInitiated, std::unordered_set<std::size_t>& hotPathContainerFromSourceToSharedOrigin) const;
-        void                      forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(std::size_t idOfOperationNodeWhereConflictWasDetected, const std::unordered_set<std::size_t>& idOfOperationNodesOnHotPath) const;
+        void                      forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(std::size_t idOfOperationNodeWhereConflictWasDetected, const std::unordered_set<std::size_t>& idOfOperationNodesOnHotPath, std::size_t idOfSharedParentOperationNode) const;
 
         /**
          * \brief Determine whether another choice for a previously made decision could be made. This calls excludes the last made decision under the assumption that this call is made after a conflict was derived at the current operation node

@@ -203,6 +203,7 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::reset
 // START OF NON-PUBLIC FUNCTION IMPLEMENTATIONS
 std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::OperationNodeSimplificationResult::OwningReference> noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::handleOperationNode(const ExpressionTraversalHelper::OperationNodeReference& operationNode, const SignalValueLookupCallback& signalValueLookupCallback) {
     logStartOfProcessingOfOperationNode(operationNode->id);
+    operationNode->disableIsOneTimeOperationInversionFlag();
     std::optional<OperationNodeSimplificationResult::OwningReference> simplificationResult;
     if (!operationNode->hasAnyLeafOperandNodes()) {
         simplificationResult = handleOperationNodeWithNoLeafNodes(operationNode, signalValueLookupCallback);
@@ -273,7 +274,11 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
         }
     }
 
-    const DecisionResult decisionResult = makeDecisionFor(operationNode->id, **owningLhsOperandSimplificationResult, operationNode->operation, **owningRhsOperandSimplificationResult, idOfLastActiveAssignmentPriorToProcessingOfLhsOperand, idOfLastActiveAssignmentPriorToProcessingOfRhsOperand, signalValueLookupCallback);
+    const std::optional<syrec_operation::operation> definedOperationOfOperationNodeConsideringConsideringInversionFlag = operationNode->getOperationConsideringWhetherMarkedAsInverted();
+    if (!definedOperationOfOperationNodeConsideringConsideringInversionFlag)
+        return OperationNodeSimplificationResult::createAndOwnNewInstance(OperationNodeSimplificationResult::createAsUnknownResult(UnknownResultReason::Other));
+
+    const DecisionResult decisionResult = makeDecisionFor(operationNode->id, **owningLhsOperandSimplificationResult, *definedOperationOfOperationNodeConsideringConsideringInversionFlag, **owningRhsOperandSimplificationResult, idOfLastActiveAssignmentPriorToProcessingOfLhsOperand, idOfLastActiveAssignmentPriorToProcessingOfRhsOperand, signalValueLookupCallback);
     revokeConsiderationOfExpressionForFutureDecisions(expressionToConsiderForDecisionInSecondNode);
 
     if (decisionResult.reasonForUnknownResult.has_value()) {
@@ -334,11 +339,15 @@ std::optional<noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifi
     const syrec::Expression::ptr expressionFromNonLeafNodeToBeConsideredWhenTryingToCreateAssignment = simplificationResultOfOperationNodeOperand->get()->getResultAsExpr().value_or(nullptr);
     considerExpressionInFutureDecisions(expressionFromNonLeafNodeToBeConsideredWhenTryingToCreateAssignment);
 
+    const std::optional<syrec_operation::operation> definedOperationOfOperationNodeConsideringConsideringInversionFlag = operationNode->getOperationConsideringWhetherMarkedAsInverted();
+    if (!definedOperationOfOperationNodeConsideringConsideringInversionFlag)
+        return OperationNodeSimplificationResult::createAndOwnNewInstance(OperationNodeSimplificationResult::createAsUnknownResult(UnknownResultReason::Other));
+
     DecisionResult decisionResult;
     if (wasLhsOperandLeafNode) {
-        decisionResult = makeDecisionFor(operationNode->id, simplificationResultOfLeafNode, operationNode->operation, **simplificationResultOfOperationNodeOperand, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, signalValueLookupCallback);
+        decisionResult = makeDecisionFor(operationNode->id, simplificationResultOfLeafNode, *definedOperationOfOperationNodeConsideringConsideringInversionFlag, **simplificationResultOfOperationNodeOperand, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, signalValueLookupCallback);
     } else {
-        decisionResult = makeDecisionFor(operationNode->id, **simplificationResultOfOperationNodeOperand, operationNode->operation, simplificationResultOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, signalValueLookupCallback);
+        decisionResult = makeDecisionFor(operationNode->id, **simplificationResultOfOperationNodeOperand, *definedOperationOfOperationNodeConsideringConsideringInversionFlag, simplificationResultOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, idOfLastActiveAssignmentPriorToProcessingOfLeafNode, signalValueLookupCallback);
     }
     revokeConsiderationOfExpressionForFutureDecisions(expressionFromNonLeafNodeToBeConsideredWhenTryingToCreateAssignment);
 
@@ -478,12 +487,16 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::handl
         rememberConflict(earliestDecisionInvolvedInConflict->get()->operationNodeId, earliestDecisionInvolvedInConflict->get()->choosenOperand);
     }
 
+    if (!associatedOperationNodeIdOfAccessedSignalPartsOperand) {
+        int x = 0;
+    }
+
     logConflict(associatedOperationNodeIdOfAccessedSignalPartsOperand, chosenOperandLeadingToDetectionOfConflict, accessedSignalPartsUsedInCheckForConflict, idOfEarliestOperationNodeIdInvolvedInConflict);
 
     std::unordered_set<std::size_t> hotPathFromSourceOfConflictToLocationWhereConflictWasDetected                                 = {};
     const std::size_t idOfEarliestSharedParentOperationNodeBetweenSourceOfConflictAndDetectionOfOriginOperationNode = determineEarliestSharedParentOperationNodeIdBetweenCurrentAndConflictOperationNodeId(idOfEarliestOperationNodeIdInvolvedInConflict, associatedOperationNodeIdOfAccessedSignalPartsOperand, hotPathFromSourceOfConflictToLocationWhereConflictWasDetected);
     markOperationNodeAsSourceOfConflict(idOfEarliestSharedParentOperationNodeBetweenSourceOfConflictAndDetectionOfOriginOperationNode);
-    forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(associatedOperationNodeIdOfAccessedSignalPartsOperand, hotPathFromSourceOfConflictToLocationWhereConflictWasDetected);
+    forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(associatedOperationNodeIdOfAccessedSignalPartsOperand, hotPathFromSourceOfConflictToLocationWhereConflictWasDetected, idOfEarliestSharedParentOperationNodeBetweenSourceOfConflictAndDetectionOfOriginOperationNode);
 }
 
 /*
@@ -531,7 +544,7 @@ std::size_t noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier
 /*
  * TODO: Think this through more thorougly with the help of the test case conflictInOperationNodeWithOneLeafNodeWhereLeafIsRhsOperandNotResolvableByOtherChoiceInLhsOperandThatGeneratedAssignmentCreatesExprInstead
  */
-void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(std::size_t idOfOperationNodeWhereConflictWasDetected, const std::unordered_set<std::size_t>& idOfOperationNodesOnHotPath) const {
+void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::forceReuseOfPreviousDecisionsOnceAtAllDecisionsForChildrenOfNodeButExcludeHotpath(std::size_t idOfOperationNodeWhereConflictWasDetected, const std::unordered_set<std::size_t>& idOfOperationNodesOnHotPath, std::size_t idOfSharedParentOperationNode) const {
     std::size_t upperBoundOfSearchSpace = SIZE_MAX;
     if (idOfOperationNodeWhereConflictWasDetected) {
         std::optional<ExpressionTraversalHelper::OperationNodeReference> traversalNodeToFindRightmostNode = expressionTraversalHelper->getOperationNodeById(idOfOperationNodeWhereConflictWasDetected);
@@ -544,11 +557,15 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::force
             }
         }   
     }
+    const auto& firstPastDecisionToReuse = idOfSharedParentOperationNode
+        ? std::find_if(pastDecisions.crbegin(), pastDecisions.crend(), [idOfSharedParentOperationNode](const DecisionReference& pastDecision) { return pastDecision->operationNodeId == idOfSharedParentOperationNode; })
+        : pastDecisions.crend();
 
     const auto& lastPastDecisionToReuse = upperBoundOfSearchSpace != SIZE_MAX
         ? std::find_if(pastDecisions.crbegin(), pastDecisions.crend(), [upperBoundOfSearchSpace](const DecisionReference& pastDecision) { return pastDecision->operationNodeId == upperBoundOfSearchSpace; })
         : pastDecisions.crbegin();
-    const std::size_t numDecisionsToReuse = pastDecisions.size() - std::distance(pastDecisions.crbegin(), lastPastDecisionToReuse);
+
+    const std::size_t numDecisionsToReuse = pastDecisions.size() - std::distance(firstPastDecisionToReuse, lastPastDecisionToReuse);
 
     auto pastDecisionToReuseIterator = pastDecisions.begin();
     for (std::size_t i = 0; i < numDecisionsToReuse; ++i) {
@@ -1993,6 +2010,7 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logCr
 // TODO IMPORTANT - Sub assignment generation at topmost assignment node should not happen if the sub-assignments with the assigned to signal parts of the topmost assignment can be created
 // TODO FURTHER - Replacement generation tests with generation of multiple assignments
 
+
 // TODO: If the synthesis would support boxing, the replacement generated in this function could use smaller bitwidth than the one derived from the assigned to signal of the original assignment lhs operand
 // TODO: Check whether replacement of whole expressions is implemented
 // TODO: Inversion of data dependency overlapping with active assignment problem STILL REQUIRES IMPLEMENTATION
@@ -2150,10 +2168,13 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
                     * If any of the two transformations can be applied, we also have to update the operation of the parent node.
                     */
                     if (const std::optional<std::size_t> idOfParentOperationNode = operationNodeReferenceForId->get()->parentNodeId; idOfParentOperationNode.has_value()) {
-                        if (const std::optional<ExpressionTraversalHelper::OperationNodeReference> parentNodeOfOperationNode = expressionTraversalHelper->getOperationNodeById(*idOfParentOperationNode); parentNodeOfOperationNode.has_value() && parentNodeOfOperationNode->get()->rhsOperand.id == operationNodeId) {
-                            // TODO: Switch operands in expression traversal helper ? (no should not be necessary)
-                            // TODO: Should we really update the operand in the parent node in the expression traversal helper? Could we also store this change locally?
-                            if ((parentNodeOfOperationNode->get()->operation == syrec_operation::operation::Subtraction && expressionTraversalHelper->updateOperation(parentNodeOfOperationNode->get()->id, syrec_operation::operation::Addition)) || (parentNodeOfOperationNode->get()->operation == syrec_operation::operation::Addition && expressionTraversalHelper->updateOperation(parentNodeOfOperationNode->get()->id, syrec_operation::operation::Subtraction))) {
+                        if (const std::optional<ExpressionTraversalHelper::OperationNodeReference> parentNodeOfOperationNode = expressionTraversalHelper->getOperationNodeById(*idOfParentOperationNode); parentNodeOfOperationNode.has_value() && parentNodeOfOperationNode->get()->rhsOperand.operationNodeId.value_or(0) == operationNodeId) {
+                            /*
+                             * We opt to not modify the operand data, order or defined operation at the operation node since the switch of the operation is only relevant in the decision making process.
+                             */
+                            if (const std::optional<syrec_operation::operation> definedOperationAtParentOperationNodeConsideringInversionFlag = parentNodeOfOperationNode->get()->getOperationConsideringWhetherMarkedAsInverted(); definedOperationAtParentOperationNodeConsideringInversionFlag.has_value()
+                                && (*definedOperationAtParentOperationNodeConsideringInversionFlag == syrec_operation::operation::Subtraction || *definedOperationAtParentOperationNodeConsideringInversionFlag == syrec_operation::operation::Addition)) {
+                                parentNodeOfOperationNode->get()->enabledIsOneTimeOperationInversionFlag();
                                 chosenOperand = potentialOperandChoiceForAlternative;
                             }
                         }
