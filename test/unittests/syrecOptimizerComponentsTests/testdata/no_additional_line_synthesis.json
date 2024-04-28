@@ -2415,5 +2415,48 @@
       "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1",
       "noAddLineSynNewSignalPrefix": "__rpl"
     }
+  },
+
+  "checkAssignmentAssignedToSignalPartsPrecedenceOverTopmostOperationNodeWithAddAssignOperationAndTopmostOperationNodeGeneratingExpression": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a += ((b + 2) + (c + 2))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b += 2; c += 2; a += b; a += c; c -= 2; b -= 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+    }
+  },
+  "checkAssignmentAssignedToSignalPartsPrecedenceOverTopmostOperationNodeWithMinusAssignOperationAndTopmostOperationNodeExpressionAssignment": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a -= ((b + 2) + (c + 2))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b += 2; c += 2; a -= b; a -= c; c -= 2; b -= 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+    }
+  },
+  "checkAssignmentAssignedToSignalPartsPrecedenceOverTopmostOperationNodeWithXorAssignOperationAndTopmostOperationNodeGeneratingExpressionAndXorOperation": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a ^= ((b + 2) ^ (c + 2))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b += 2; c += 2; b ^= c; c -= 2; a ^= b; c += 2; b ^= c; c -= 2; b -= 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+    }
+  },
+  "checkAssignmentAssignedToSignalPartsPrecedenceOverTopmostOperationNodeWithXorAssignOperationAndTopmostOperationNodeGeneratingExpressionAndNoneXorOperationAndAssignedToSignalPartsOfInitialAssignmentHavingValueZero": {
+    "circuit": "module main(out a(4), inout b(4), inout c(4)) a ^= ((b + 2) + (c + 2))",
+    "expectedCircuit": "module main(out a(4), inout b(4), inout c(4)) b += 2; c += 2; a ^= b; a += c; c -= 2; b -= 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+    }
+  },
+  "checkAssignmentAssignedToSignalPartsPrecedenceOverTopmostOperationNodeWithXorAssignOperationAndTopmostOperationNodeGeneratingExpressionWithAssignedtoSignalPartsOfInitialAssignmentHavingNoneZeroValue": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a ^= (b + (c + 2))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) c += 2; c += b; a ^= c; c -= b; c -= 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+    }
+  },
+  "checkAssignmentAssignedToSignalPartsPrecedenceOverTopmostOperationNodeWithXorAssignOperationAndTopmostOperationNodeGeneratingAssignmentWithAssignedToSignalPartsOfInitialAssignmentHavingNoneZeroValue": {
+    "circuit": "module main(inout a(4), inout b(4), inout c(4)) a ^= ((b + 2) * (c + 2))",
+    "expectedCircuit": "module main(inout a(4), inout b(4), inout c(4)) b += 2; c += 2; a ^= (b * c); c -= 2; b -= 2",
+    "optimizations": {
+      "noAddLineSynAlwaysUseGenByChoiceAssignmentsON": "1"
+    }
   }
 }

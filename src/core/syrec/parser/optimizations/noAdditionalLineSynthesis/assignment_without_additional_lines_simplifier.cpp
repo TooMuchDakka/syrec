@@ -2036,10 +2036,8 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logCr
 #endif
 }
 
-// TODO IMPORTANT - Sub assignment generation at topmost assignment node should not happen if the sub-assignments with the assigned to signal parts of the topmost assignment can be created
-// TODO FURTHER - Replacement generation tests with generation of multiple assignments
 
-
+// TODO: FURTHER - Replacement generation tests with generation of multiple assignments
 // TODO: If the synthesis would support boxing, the replacement generated in this function could use smaller bitwidth than the one derived from the assigned to signal of the original assignment lhs operand
 // TODO: Correct handling of transformation of two subsequent subtraction operations still requires checks whether correctly implementation and probabily does not work with the current backtracking implementation/replacement generation
 // TODO: Implement conflicts being allowed at intermediate nodes by remembering which operand was chosen and from which operation node it was inherited (we should probably store the pointer of the chosen operand instead of the enum value)
