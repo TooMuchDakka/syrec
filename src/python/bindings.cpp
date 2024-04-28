@@ -72,7 +72,7 @@ PYBIND11_MODULE(pysyrec, m) {
             .def_readwrite("prefer_assignments_generated_by_choice_regardless_of_cost", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::preferAssignmentsGeneratedByChoiceRegardlessOfCost)
             .def_readwrite("expression_nesting_penalty", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::expressionNestingPenalty)
             .def_readwrite("expression_nesting_penalty_scaling_per_nesting_level", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::expressionNestingPenaltyScalingPerNestingLevel)
-            .def_readwrite("optional_new_replacement_signal_idents_prefix", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::optionalNewReplacementSignalIdentsPrefix);
+            .def_readwrite("optional_new_replacement_signal_idents_prefix", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::optionalNewReplacementSignalIdentsPrefix)
             .def_readwrite("transformation_of_subtraction_and_addition_cascade_for_subassignment_generation_enabled", &noAdditionalLineSynthesis::NoAdditionalLineSynthesisConfig::transformationOfSubtractionAndAdditionOperandsForSubAssignmentCreationEnabled);
 
     /*
