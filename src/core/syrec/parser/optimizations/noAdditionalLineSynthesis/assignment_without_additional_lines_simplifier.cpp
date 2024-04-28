@@ -89,6 +89,10 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::Simplifica
     }
 
     expressionTraversalHelper->buildTraversalQueue(transformedAssignmentStmt->rhs, *symbolTableReference);
+    if (const std::optional<ExpressionTraversalHelper::OperationNodeReference>& peekedTopmostOperationNode = expressionTraversalHelper->peekNextOperationNode()) {
+        doesAssignmentOperationAndOperationOfTopmostOperationNodeAllowSplitIntoTwoSubassignments = determineWhetherAssignmentOperationAndOperationOfTopmostOperationNodeAllowsSplitIntoTwoSubassignments(*transformedAssignmentStmt->lhs, *topmostAssignmentOperation, peekedTopmostOperationNode->get()->operation, signalValueLookupCallback);    
+    }
+
     disableValueLookup();
     const std::vector<syrec::VariableAccess::ptr> replacementCandidateRestrictionsStemmingFromAssignment = defineNotUsableReplacementCandidatesFromAssignmentForGenerator(*transformedAssignmentStmt);
     determinedBitWidthOfAssignmentToSimplify                                                             = determineBitwidthOfSignalAccess(*assignmentStatement.lhs);
@@ -862,6 +866,7 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::reset
     determinedBitWidthOfAssignmentToSimplify.reset();
     wholeExpressionOfOperationNodeReplacementLookup.clear();
     topmostAssignmentOperation.reset();
+    doesAssignmentOperationAndOperationOfTopmostOperationNodeAllowSplitIntoTwoSubassignments = false;
     enabledValueLookup();
 }
 
@@ -1426,6 +1431,30 @@ bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::exist
     return false;
 }
 
+bool noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::determineWhetherAssignmentOperationAndOperationOfTopmostOperationNodeAllowsSplitIntoTwoSubassignments(const syrec::VariableAccess& assignedToSignalPartsOfUserDefinedAssignment, syrec_operation::operation assignmentOperation, syrec_operation::operation operationAtTopmostOperationNode, const SignalValueLookupCallback& signalValueLookupCallback) {
+    const std::optional<syrec_operation::operation>& matchingAssignmentOperationOfOperationOfTopmostOperationNode = syrec_operation::getMatchingAssignmentOperationForOperation(operationAtTopmostOperationNode);
+
+    switch (assignmentOperation) {
+        case syrec_operation::operation::AddAssign:
+        case syrec_operation::operation::MinusAssign:
+            return matchingAssignmentOperationOfOperationOfTopmostOperationNode.has_value();
+        case syrec_operation::operation::XorAssign:
+            if (const std::optional<unsigned int>& determinedValueOfAssignedToSignal = matchingAssignmentOperationOfOperationOfTopmostOperationNode.has_value() ? signalValueLookupCallback(assignedToSignalPartsOfUserDefinedAssignment) : std::nullopt; determinedValueOfAssignedToSignal.has_value()) {
+                switch (*matchingAssignmentOperationOfOperationOfTopmostOperationNode) {
+                    case syrec_operation::operation::AddAssign:
+                    case syrec_operation::operation::MinusAssign:
+                        return !*determinedValueOfAssignedToSignal;
+                    case syrec_operation::operation::XorAssign:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+            return false;
+        default:
+            return false;
+    }
+}
 
 /*
  * Is this check only relevant for operation nodes with one leaf node where the leaf node is now chosen.
@@ -2012,8 +2041,6 @@ void noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::logCr
 
 
 // TODO: If the synthesis would support boxing, the replacement generated in this function could use smaller bitwidth than the one derived from the assigned to signal of the original assignment lhs operand
-// TODO: Check whether replacement of whole expressions is implemented
-// TODO: Inversion of data dependency overlapping with active assignment problem STILL REQUIRES IMPLEMENTATION
 // TODO: Correct handling of transformation of two subsequent subtraction operations still requires checks whether correctly implementation and probabily does not work with the current backtracking implementation/replacement generation
 // TODO: Implement conflicts being allowed at intermediate nodes by remembering which operand was chosen and from which operation node it was inherited (we should probably store the pointer of the chosen operand instead of the enum value)
 // TODO: When replacing an operand with a replacement, should we also clear any existing learned conflicts for that operand in the operation node ?
@@ -2101,7 +2128,14 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
             const TemporaryAssignmentsContainer::OrderedAssignmentIdContainer transformedRhsExprDataDependenciesContainer(dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfRhsOperand.cend());
             if (const std::optional<OverlappingSignalAccessDuringReplayOrInversionResult>& searchResultForOverlappingSignalAccessForLhsOperandInRhsDataDependencies = areAssignedToSignalPartsAccessedDuringReplayOrInversionOfDataDependencies(operationNodeId, Decision::ChoosenOperand::Left, **lhsOperandAsSignalAccess, transformedRhsExprDataDependenciesContainer); searchResultForOverlappingSignalAccessForLhsOperandInRhsDataDependencies.has_value()) {
                 if (!(searchResultForOverlappingSignalAccessForLhsOperandInRhsDataDependencies->overlapSearchResult & OverlapSearchResult::NoneFound)) {
-                    if (!lhsOperandSimplificationResult.wasResultManuallyCreated()) {
+                    /*
+                     * If the signal parts of the to be chosen operands are accessed during the inversion or replay of the determined data dependencies we have to distinguish the following cases.
+                     * - The signal parts of the chosen operand where not inherited, we cannot chose said operand.
+                     * - The signal parts of the chosen operand where inherited from another operation node.
+                     *  - If the operation node is not the topmost one (i.e. id > 0), we have derived a conflict and need to handle it appropriately.
+                     *  - Additionally, if the combination of the initial assignment operation and the operation of the topmost operation node do not allow the generation of two sub-assignments for the topmost operation node (i.e. the currently processed operation node), a conflict was detected.
+                     */
+                    if (!lhsOperandSimplificationResult.wasResultManuallyCreated() && (operationNodeId || !doesAssignmentOperationAndOperationOfTopmostOperationNodeAllowSplitIntoTwoSubassignments)) {
                         handleConflictCausedByOverlapOfInactiveDataDependencyWithInheritedChosenOperand(operationNodeId, Decision::ChoosenOperand::Left, *lhsOperandSimplificationResult.getIdOfGeneratedAssignment(), *searchResultForOverlappingSignalAccessForLhsOperandInRhsDataDependencies->idOfLastAssignmentInInheritanceChainWithOverlappingSignalParts);
                         return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);   
                     }
@@ -2136,7 +2170,8 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
             const TemporaryAssignmentsContainer::OrderedAssignmentIdContainer transformedLhsExprDataDependenciesContainer(dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cbegin(), dataDependenciesAsIdsOfDependentAssignmentsOfLhsOperand.cend());
             if (const std::optional<OverlappingSignalAccessDuringReplayOrInversionResult>& searchForOverlappingSignalAccessForRhsOperandInLhsDataDependencies = areAssignedToSignalPartsAccessedDuringReplayOrInversionOfDataDependencies(operationNodeId, Decision::ChoosenOperand::Right, **rhsOperandAsSignalAccess, transformedLhsExprDataDependenciesContainer); searchForOverlappingSignalAccessForRhsOperandInLhsDataDependencies.has_value()) {
                 if (!(searchForOverlappingSignalAccessForRhsOperandInLhsDataDependencies->overlapSearchResult & OverlapSearchResult::NoneFound)) {
-                    if (!rhsOperandSimplificationResult.wasResultManuallyCreated()) {
+                    // The detection and handling of the conflict of the signal parts of the chosen operand being defined at any to be replayed or inverted data dependency is the same as for the lhs operand.
+                    if (!rhsOperandSimplificationResult.wasResultManuallyCreated() && (operationNodeId || !doesAssignmentOperationAndOperationOfTopmostOperationNodeAllowSplitIntoTwoSubassignments)) {
                         handleConflictCausedByOverlapOfInactiveDataDependencyWithInheritedChosenOperand(operationNodeId, potentialOperandChoiceForAlternative, *rhsOperandSimplificationResult.getIdOfGeneratedAssignment(), *searchForOverlappingSignalAccessForRhsOperandInLhsDataDependencies->idOfLastAssignmentInInheritanceChainWithOverlappingSignalParts);
                         return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);
                     }
@@ -2197,7 +2232,7 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
         }
     }
     
-    if (!isChosenOperandPreselected && chosenOperand == Decision::ChoosenOperand::None && matchingAssignmentCounterpartForDefinedOperation.has_value() && determinedBitWidthOfAssignmentToSimplify.has_value()) {
+    if (operationNodeId && !isChosenOperandPreselected && chosenOperand == Decision::ChoosenOperand::None && matchingAssignmentCounterpartForDefinedOperation.has_value() && determinedBitWidthOfAssignmentToSimplify.has_value()) {
         constexpr Decision::ChoosenOperand operandSelectableByFirstAlternative = Decision::ChoosenOperand::Left;
         // Signal access operands can only be replaced in operation nodes with only leaf nodes
         if (lhsOperandAsSignalAccess.has_value() && lhsOperandSimplificationResult.wasResultManuallyCreated() && !wasOriginalLhsOperandModified) {
@@ -2256,7 +2291,7 @@ noAdditionalLineSynthesis::AssignmentWithoutAdditionalLineSimplifier::DecisionRe
         return DecisionResult::fromUnknownResult(UnknownResultReason::Conflict);
     }
 
-    if (chosenOperand != Decision::ChoosenOperand::None) {
+    if (chosenOperand != Decision::ChoosenOperand::None && (operationNodeId || !doesAssignmentOperationAndOperationOfTopmostOperationNodeAllowSplitIntoTwoSubassignments)) {
         syrec::VariableAccess::ptr assignedToSignalParts;
         syrec::Expression::ptr     assignmentRhsExpr;
         TemporaryAssignmentsContainer::OrderedAssignmentIdContainer dataDependenciesOfGeneratedAssignmentRhs;

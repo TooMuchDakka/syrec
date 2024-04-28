@@ -91,9 +91,10 @@ namespace noAdditionalLineSynthesis {
             if (config.optionalNewReplacementSignalIdentsPrefix.has_value()) {
                 substitutionGenerator = std::make_unique<ExpressionSubstitutionGenerator>(config.optionalNewReplacementSignalIdentsPrefix.value());
             }
-            assignmentTransformer                             = std::make_unique<AssignmentTransformer>();
-            learnedConflictsLookup                            = std::make_unique<LearnedConflictsLookup>();
-            disabledValueLookupToggle                         = false;
+            assignmentTransformer                                                                    = std::make_unique<AssignmentTransformer>();
+            learnedConflictsLookup                                                                   = std::make_unique<LearnedConflictsLookup>();
+            disabledValueLookupToggle                                                                = false;
+            doesAssignmentOperationAndOperationOfTopmostOperationNodeAllowSplitIntoTwoSubassignments = false;
         }
 
     protected:
@@ -142,6 +143,7 @@ namespace noAdditionalLineSynthesis {
         NoAdditionalLineSynthesisConfig                              internalConfig;
         std::optional<unsigned int>                                  determinedBitWidthOfAssignmentToSimplify;
         std::optional<syrec_operation::operation>                    topmostAssignmentOperation;
+        bool                                                         doesAssignmentOperationAndOperationOfTopmostOperationNodeAllowSplitIntoTwoSubassignments;
         std::unordered_map<std::size_t, syrec::AssignStatement::ptr> wholeExpressionOfOperationNodeReplacementLookup;
         
         using LearnedConflictsLookupKey = std::pair<std::size_t, Decision::ChoosenOperand>;
@@ -448,7 +450,8 @@ namespace noAdditionalLineSynthesis {
         [[nodiscard]] std::optional<std::size_t>                                          getIdOfOverlappingActiveAssignmentForSignalPartsOfToBeReplayedAssignment(const syrec::VariableAccess& assignedToSignalPartsWhichShouldNotOverlapActiveAssignment, const TemporaryAssignmentsContainer::OrderedBasicActiveAssignmentDataLookup& activeAssignmentsLookup) const;
         [[nodiscard]] bool                                                                determineWhetherConflictShouldBeTriggeredInCurrentOperationNodeOrOverlappingDataDependencyBasedOnInheritanceChainLength(std::size_t idOfAssignmentFromWhichAssignedToSignalPartsInCurrentOperationNodeWhereInherited, std::size_t idOfLastAssignmentInInheritanceChainOverlappingAssignedToSignalParts) const;
         [[nodiscard]] bool                                                                existsActiveAssignmentWhereReplayOfAnyOfItsDataDependenciesAccessesSameSignalPartsAsChosenOperand(const syrec::VariableAccess& assignedToSignalPartsForWhichNoOverlappingActiveAssignmentShouldExist, std::size_t operationNodeWhereSearchIsTriggered, Decision::ChoosenOperand chosenOperandAtOperationNode) const;
-        
+        [[nodiscard]] bool                                                                determineWhetherAssignmentOperationAndOperationOfTopmostOperationNodeAllowsSplitIntoTwoSubassignments(const syrec::VariableAccess& assignedToSignalPartsOfUserDefinedAssignment, syrec_operation::operation assignmentOperation, syrec_operation::operation operationAtTopmostOperationNode, const SignalValueLookupCallback& signalValueLookupCallback);
+
         void handleConflictCausesByReplayOrInversion(std::size_t idOfOperationNodeWhereConflictCheckWasInitiated, const OverlappingSignalAccessDuringReplayOrInversionResult& conflictResult);
         void handleConflictCausedByOverlapOfInactiveDataDependencyWithInheritedChosenOperand(std::size_t idOfOperationNodeWhereDecisionWasMade, Decision::ChoosenOperand chosenOperationAtOperationNode, std::size_t idOfInheritedAssignmentInOperationNode, std::size_t idOfAssignmentWhereOverlappingSignalAccessInAssignedToSignalPartsWasDefined);
 
@@ -490,7 +493,6 @@ namespace noAdditionalLineSynthesis {
          * \return The found exclusion vector containing all non-usable replacement candidate parts
          */
         [[nodiscard]] static std::vector<syrec::VariableAccess::ptr> determineSignalPartsNotUsableAsPotentialReplacementCandidates(const syrec::Expression& expr, const parser::SymbolTable& symbolTable);
-
         [[nodiscard]] static constexpr bool shouldLogMessageBePrinted();
         [[nodiscard]] static std::string    stringifyChosenOperandForLogMessage(Decision::ChoosenOperand chosenOperand);
         [[nodiscard]] static std::string    stringifyRepetitionOfChoice(Decision::ChoiceRepetition setRepetitionOfChoice);
