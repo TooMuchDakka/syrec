@@ -163,7 +163,7 @@ std::any SyReCExpressionVisitor::visitShiftExpression(SyReCParser::ShiftExpressi
         return std::nullopt;
     }
 
-    const auto& lhsOperandAsExpr = *expressionToShift->get()->getAsExpression();
+    const syrec::Expression::ptr lhsOperandAsExpr = expressionToShift->get()->getAsExpression().value();
     const auto& shiftExprContainer = std::make_shared<syrec::ShiftExpression>(lhsOperandAsExpr, *syrec_operation::tryMapShiftOperationEnumToFlag(*definedShiftOperation), *shiftAmount);
     // TODO: Size after shift
     return std::make_optional(ExpressionEvaluationResult::createFromExpression(shiftExprContainer, exprToShiftSizeInformation.explicitlyAccessedValuesPerDimension));
