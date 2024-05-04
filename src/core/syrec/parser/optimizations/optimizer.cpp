@@ -1511,7 +1511,7 @@ std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations:
     bool wasOriginalBitRangeStartSimplified = false;
     auto bitRangeStartEvaluationStatus      = IndexValidityStatus::Unknown;
     std::unique_ptr<syrec::Number> evaluationResultOfBitRangeStart;
-    if (auto optimizationResultOfBitRangeStart = handleNumber(*accessedBitRange->first); optimizationResultOfBitRangeStart.getStatusOfResult() != OptimizationResultFlag::RemovedByOptimization) {
+    if (auto optimizationResultOfBitRangeStart = handleNumber(*accessedBitRange->first); optimizationResultOfBitRangeStart.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
         if (auto temporaryContainerOwningOptimizationResult = optimizationResultOfBitRangeStart.tryTakeOwnershipOfOptimizationResult(); temporaryContainerOwningOptimizationResult.has_value()) {
             evaluationResultOfBitRangeStart = std::move(temporaryContainerOwningOptimizationResult->front());
         }
@@ -1527,7 +1527,7 @@ std::optional<optimizations::Optimizer::BitRangeEvaluationResult> optimizations:
     std::unique_ptr<syrec::Number> evaluationResultOfBitRangeEnd;
 
     if (accessedBitRange->first != accessedBitRange->second) {
-        if (auto optimizationResultOfBitRangeEnd = handleNumber(*accessedBitRange->second); optimizationResultOfBitRangeEnd.getStatusOfResult() != OptimizationResultFlag::WasOptimized) {
+        if (auto optimizationResultOfBitRangeEnd = handleNumber(*accessedBitRange->second); optimizationResultOfBitRangeEnd.getStatusOfResult() != OptimizationResultFlag::IsUnchanged) {
             if (auto temporaryContainerOwningOptimizationResult = optimizationResultOfBitRangeEnd.tryTakeOwnershipOfOptimizationResult(); temporaryContainerOwningOptimizationResult.has_value()) {
                 evaluationResultOfBitRangeEnd = std::move(temporaryContainerOwningOptimizationResult->front());
             }
