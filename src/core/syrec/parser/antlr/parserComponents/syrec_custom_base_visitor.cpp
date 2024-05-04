@@ -464,14 +464,13 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(c
         const auto& bitRangeStart = variableExpression->var->range->first;
         const auto& bitRangeEnd   = variableExpression->var->range->second;
 
-        if (bitRangeStart->isLoopVariable() && bitRangeEnd->isLoopVariable() && bitRangeStart->variableName() == bitRangeEnd->variableName()) {
-            return 1;
+        if (bitRangeStart->isLoopVariable() ^ bitRangeEnd->isLoopVariable()) {
+            return std::nullopt;
         }
         if (bitRangeStart->isConstant() && bitRangeEnd->isConstant()) {
             return (bitRangeEnd->evaluate({}) - bitRangeStart->evaluate({})) + 1;
         }
-
-        return variableExpression->var->bitwidth();
+        return bitRangeStart->variableName() == bitRangeEnd->variableName() ? std::make_optional(1) : std::nullopt;
     }
 
     createError(evaluationErrorPosition,  "Could not determine bitwidth for unknown type of expression");
