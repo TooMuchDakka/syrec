@@ -138,7 +138,7 @@ namespace optimizations {
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleIfStmt(const syrec::IfStatement& ifStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleLoopStmt(const syrec::ForStatement& forStatement);
         [[nodiscard]] OptimizationResult<syrec::Statement>               handleSwapStmt(const syrec::SwapStatement& swapStatement);
-        [[nodiscard]] static OptimizationResult<syrec::Statement>        handleSkipStmt();
+        [[nodiscard]] OptimizationResult<syrec::Statement>               handleSkipStmt();
 
         [[nodiscard]] OptimizationResult<syrec::Expression>     handleBinaryExpr(const syrec::BinaryExpression& expression) const;
         [[nodiscard]] OptimizationResult<syrec::Expression>     handleShiftExpr(const syrec::ShiftExpression& expression) const;

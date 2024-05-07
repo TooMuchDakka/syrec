@@ -99,6 +99,8 @@ std::optional<std::vector<unsigned int>> tryEvaluateDimensionAccess(const syrec:
     for (std::size_t i = 0; i < definedDimensionAccess.size(); ++i) {
         if (const auto& valueOfDimensionEvaluated = tryFetchValueOfExpr(*definedDimensionAccess.at(i), symbolTable); valueOfDimensionEvaluated.has_value()) {
             evaluatedDimensionAccess.at(i) = *valueOfDimensionEvaluated;
+        } else {
+            return std::nullopt;
         }
     }
     return evaluatedDimensionAccess;

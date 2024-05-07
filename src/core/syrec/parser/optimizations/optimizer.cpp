@@ -1030,6 +1030,9 @@ optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Op
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::Statement> optimizations::Optimizer::handleSkipStmt() {
+    if (parserConfig.deadCodeEliminationEnabled) {
+        return OptimizationResult<syrec::Statement>::asOptimizedAwayContainer();
+    }
     return OptimizationResult<syrec::Statement>::asUnchangedOriginal();
 }
 
