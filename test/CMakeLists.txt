@@ -15,55 +15,57 @@ target_include_directories(${PROJECT_NAME}_test_utils
 
  # create an executable in which the tests will be stored
 add_executable(${PROJECT_NAME}_test 
-    unittests/test_parser.cpp
-    unittests/test_line_aware_synthesis.cpp
-    unittests/test_line_aware_simulation.cpp
-    unittests/test_cost_aware_synthesis.cpp
-    unittests/test_cost_aware_simulation.cpp
-    unittests/test_tt_to_dd.cpp
-    unittests/test_extend_tt.cpp
-    unittests/test_huffman.cpp
-    unittests/test_pla_parser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_parser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_line_aware_synthesis.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_line_aware_simulation.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_cost_aware_synthesis.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_cost_aware_simulation.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_tt_to_dd.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_extend_tt.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_huffman.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_pla_parser.cpp
 
-    unittests/syrecOptimizerComponentsTests/test_constant_propagation_optimization.cpp
-    unittests/syrecOptimizerComponentsTests/test_combine_redundant_instructions.cpp
-    unittests/syrecOptimizerComponentsTests/test_dead_code_elimination.cpp
-    unittests/syrecOptimizerComponentsTests/test_dead_store_elimination.cpp
-    unittests/syrecOptimizerComponentsTests/test_multiplication_simplification.cpp
-    unittests/syrecOptimizerComponentsTests/test_no_additional_line_synthesis.cpp
-    unittests/syrecOptimizerComponentsTests/test_operation_strength_reduction.cpp
-    unittests/syrecOptimizerComponentsTests/test_reassociate_expression_optimization.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/test_constant_propagation_optimization.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/test_combine_redundant_instructions.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/test_dead_code_elimination.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/test_dead_store_elimination.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/test_multiplication_simplification.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/test_no_additional_line_synthesis.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/test_operation_strength_reduction.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/test_reassociate_expression_optimization.cpp
 
-    unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.cpp unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
-    unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_lift_restriction_by_assignment.cpp unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
-    unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_restriction_for_complete_signal.cpp unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
-    unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_restriction_for_global_bitrange.cpp unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
-    unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_restriction_for_value_of_dimension.cpp unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
-    unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_restriction_for_whole_dimension.cpp unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
-    unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_swap.cpp unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_swap.hpp
-    unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_update_from_variable.cpp unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
-    unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_update_value.cpp unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_lift_restriction_by_assignment.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_restriction_for_complete_signal.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_restriction_for_global_bitrange.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_restriction_for_value_of_dimension.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_restriction_for_whole_dimension.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_swap.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_swap.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_update_from_variable.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup_update_value.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecOptimizerComponentsTests/signalValueLookupTests/test_signal_value_lookup.hpp
 
-    unittests/syrecParserComponentsTests/fixtures/syrec_parser_error_cases_fixture.cpp
-    unittests/syrecParserComponentsTests/fixtures/syrec_parser_method_call_guess_fixture.cpp
-    unittests/syrecParserComponentsTests/fixtures/syrec_parser_range_check_fixture.cpp
-    unittests/syrecParserComponentsTests/fixtures/syrec_parser_success_cases_fixture.cpp
-    unittests/syrecParserComponentsTests/fixtures/syrec_parser_symbol_table_fixture.cpp
-    unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_error_fixture.cpp unittests/syrecParserComponentsTests/fixtures/syrec_signal_operand_builder.hpp unittests/syrecParserComponentsTests/fixtures/syrec_signal_operand_builder_utilities.hpp unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_error_fixture.hpp
-    unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_fixture.cpp unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_fixture.hpp
-    unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_success_fixture.cpp unittests/syrecParserComponentsTests/fixtures/syrec_signal_operand_builder.hpp  unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_success_fixture.hpp
-    unittests/test_dd_synthesis.cpp
-    unittests/test_dd_synthesis_dc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_error_cases_fixture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_method_call_guess_fixture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_range_check_fixture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_success_cases_fixture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_symbol_table_fixture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_error_fixture.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_signal_operand_builder.hpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_signal_operand_builder_utilities.hpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_error_fixture.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_fixture.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_fixture.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_success_fixture.cpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_signal_operand_builder.hpp ${CMAKE_CURRENT_SOURCE_DIR}/unittests/syrecParserComponentsTests/fixtures/syrec_parser_signal_access_restriction_success_fixture.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_dd_synthesis.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/unittests/test_dd_synthesis_dc.cpp
 )
 # link the Google test infrastructure and a default main function to the test executable.
 target_link_libraries(${PROJECT_NAME}_test PRIVATE ${PROJECT_NAME} ${PROJECT_NAME}_test_utils gmock gtest_main)
+
 # discover tests
-#gtest_discover_tests(
-#    ${PROJECT_NAME}_test
-#    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-#    PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-gtest_discover_tests(${PROJECT_NAME}_test)
-set_target_properties(${PROJECT_NAME}_test PROPERTIES FOLDER tests)
+gtest_discover_tests(
+    ${PROJECT_NAME}_test
+    FOLDER tests
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    DISCOVERY_TIMEOUT 60
+)
 
 add_custom_command(
   TARGET ${PROJECT_NAME}_test
