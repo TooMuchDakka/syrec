@@ -31,6 +31,11 @@ else()
   set(ANTLR4_OUTPUT_DIR ${ANTLR4_ROOT}/runtime/Cpp/dist)
 endif()
 
+message(STATUS "ANTLR will use CMake generator: ${CMAKE_GENERATOR}")
+message(STATUS "ANLTR libraries output directory was defined based on compiler id: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "ANLTR libraries will use output directory: ${ANTLR4_OUTPUT_DIR}")
+message(STATUS "ANTLR will be compiled using compiler: ${CMAKE_CXX_COMPILER}")
+
 if(MSVC)
   set(ANTLR4_STATIC_LIBRARIES
       ${ANTLR4_OUTPUT_DIR}/antlr4-runtime-static.lib)
@@ -99,12 +104,15 @@ ExternalProject_Add(
       BUILD_IN_SOURCE 1
       SOURCE_DIR ${ANTLR4_ROOT}
       SOURCE_SUBDIR runtime/Cpp
+      CMAKE_ARGS
+          # -DCMAKE_CXX_STANDARD:STRING=17 # if desired, compile the runtime with a different C++ standard
+         -DCMAKE_CXX_STANDARD:STRING=${CMAKE_CXX_STANDARD} # alternatively, compile the runtime with the same C++ standard as the outer project
+         -DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER} # omitting this parameter will cause ANTLR to be compiled with MSVC compiler when generated/built with visual studio instead of another compiler (i.e. clang)
+         -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER} # omitting this parameter will cause ANTLR to be compiled with MSVC compiler when generated/built with visual studio instead of another compiler (i.e. clang)
       CMAKE_CACHE_ARGS
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
           -DWITH_STATIC_CRT:BOOL=${ANTLR4_WITH_STATIC_CRT}
-          -DDISABLE_WARNINGS:BOOL=ON
-          # -DCMAKE_CXX_STANDARD:STRING=17 # if desired, compile the runtime with a different C++ standard
-           -DCMAKE_CXX_STANDARD:STRING=${CMAKE_CXX_STANDARD} # alternatively, compile the runtime with the same C++ standard as the outer project
+          -DDISABLE_WARNINGS:BOOL=ON 
       INSTALL_COMMAND ""
       EXCLUDE_FROM_ALL 1)
       
