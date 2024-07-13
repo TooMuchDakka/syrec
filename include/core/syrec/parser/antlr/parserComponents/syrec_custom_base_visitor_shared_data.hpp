@@ -42,8 +42,8 @@ namespace parser {
             signalAccessRestriction = assignedToSignalPart;
         }
 
-        [[nodiscard]] std::optional<std::reference_wrapper<const syrec::VariableAccess>> getSignalAccessRestriction() const {
-            return signalAccessRestriction ? std::make_optional(*signalAccessRestriction) : std::nullopt;
+        [[nodiscard]] std::optional<syrec::VariableAccess::ptr> getSignalAccessRestriction() const {
+            return signalAccessRestriction ? std::make_optional(signalAccessRestriction) : std::nullopt;
         }
         
     protected:

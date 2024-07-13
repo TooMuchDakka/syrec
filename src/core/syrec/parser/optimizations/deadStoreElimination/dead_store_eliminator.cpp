@@ -311,20 +311,19 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
                         removeDeadStoresFrom(referenceStatementAsIfStatement->thenStatements, foundDeadStores, currDeadStoreIndex, nestingLevelOfCurrentBlock + 1);
                         if (referenceStatementAsIfStatement->thenStatements.empty()) {
                             const auto anyDeadStoresRemaining = currDeadStoreIndex < foundDeadStores.size();
-                            if (!anyDeadStoresRemaining || !isNextDeadStoreInSameBranch(copyOfCurrentDeadStoreIndex, foundDeadStores, nestingLevelOfCurrentBlock + 1)) {
-                                referenceStatementAsIfStatement->thenStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
-                            } else {
-                                const auto& nextDeadStore               = foundDeadStores.at(currDeadStoreIndex);
-                                const auto& nestingLevelOfNextDeadStore = nextDeadStore.relativeStatementIndexPerControlBlock.size();
+
+                            if ((!anyDeadStoresRemaining || !isNextDeadStoreInFalseBranchOfIfStatement(currDeadStoreIndex - 1, foundDeadStores) || doesStatementListContainOnlySkipStatements(referenceStatementAsIfStatement->elseStatements)) 
+                                && referenceStatementAsIfStatement->elseStatements.empty() || doesStatementListContainOnlySkipStatements(referenceStatementAsIfStatement->elseStatements) && !doesExpressionContainPotentiallyUnsafeOperation(referenceStatementAsIfStatement->condition)) {
+                                decrementReferenceCountOfUsedSignalsInStatement(referenceStatementAsIfStatement);
+                                statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
+                                numRemovedStmtsInBlock++;
+                            }
+                            else {
                                 /*
-                                 * We know that if the next dead store is found at a higher nesting level that there are no remaining dead stores in the else branch
-                                 * and thus if the latter was empty, we are now allowed to remove the whole if statement since the true branch is empty after all dead stores were removed
+                                 * Since empty branches are not allowed by the SyReC grammar, we need to insert a skip statement into the
+                                 * else branch so that the if statement conforms to the grammar
                                  */
-                                if (nestingLevelOfNextDeadStore < nestingLevelOfDeadStore && referenceStatementAsIfStatement->elseStatements.empty()) {
-                                    decrementReferenceCountOfUsedSignalsInStatement(referenceStatementAsIfStatement);
-                                    statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
-                                    numRemovedStmtsInBlock++;
-                                }
+                                referenceStatementAsIfStatement->thenStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
                             }
                         }
                     }
@@ -334,31 +333,23 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
                     if (auto referenceStatementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(referencedStatement); referenceStatementAsIfStatement != nullptr) {
                         removeDeadStoresFrom(referenceStatementAsIfStatement->elseStatements, foundDeadStores, currDeadStoreIndex, nestingLevelOfCurrentBlock + 1);
                         if (referenceStatementAsIfStatement->elseStatements.empty()) {
-                            if (referenceStatementAsIfStatement->thenStatements.empty()) {
+                            if ((referenceStatementAsIfStatement->thenStatements.empty() || doesStatementListOnlyContainSingleSkipStatement(referenceStatementAsIfStatement->thenStatements)) && !doesExpressionContainPotentiallyUnsafeOperation(referenceStatementAsIfStatement->condition)) {
                                 decrementReferenceCountOfUsedSignalsInStatement(referenceStatementAsIfStatement);
                                 statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
                                 numRemovedStmtsInBlock++;
-                            }
-                            else {
+                            } else {
                                 /*
                                  * Since empty branches are not allowed by the SyReC grammar, we need to insert a skip statement into the
                                  * else branch so that the if statement conforms to the grammar
-                                 */ 
+                                 */
                                 referenceStatementAsIfStatement->elseStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
                             }
-                        } else if (!doesExpressionContainPotentiallyUnsafeOperation(referenceStatementAsIfStatement->condition) && doesStatementListOnlyContainSingleSkipStatement(referenceStatementAsIfStatement->thenStatements) && doesStatementListOnlyContainSingleSkipStatement(referenceStatementAsIfStatement->elseStatements)) {
-                            decrementReferenceCountOfUsedSignalsInStatement(referenceStatementAsIfStatement);
-                            statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
-                            numRemovedStmtsInBlock++;
-                        }
-                        else {
-                            if (referenceStatementAsIfStatement->thenStatements.empty()) {
-                                /*
-                                 * Since empty branches are not allowed by the SyReC grammar, we need to insert a skip statement into the
-                                 * true branch so that the if statement conforms to the grammar
-                                 */ 
-                                referenceStatementAsIfStatement->thenStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
-                            }
+                        } else if (referenceStatementAsIfStatement->thenStatements.empty()) {
+                            /*
+                             * Since empty branches are not allowed by the SyReC grammar, we need to insert a skip statement into the
+                             * true branch so that the if statement conforms to the grammar
+                             */
+                            referenceStatementAsIfStatement->thenStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
                         }
                     }
                     break;
@@ -793,3 +784,62 @@ bool DeadStoreEliminator::doesStatementListOnlyContainSingleSkipStatement(const 
     const syrec::Statement* statementOfInterest = statementsToCheck.front().get();
     return typeid(*statementOfInterest) == typeid(syrec::SkipStatement);
 }
+
+bool DeadStoreEliminator::doesStatementListContainOnlySkipStatements(const syrec::Statement::vec& statementsToCheck) {
+    if (statementsToCheck.empty())
+        return true;
+
+    return std::all_of(
+            statementsToCheck.cbegin(),
+            statementsToCheck.cend(),
+            [](const syrec::Statement::ptr& statementToCheck) {
+                return typeid(*statementToCheck) == typeid(syrec::SkipStatement);
+            });
+}
+
+
+bool DeadStoreEliminator::isNextDeadStoreInFalseBranchOfIfStatement(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores) {
+    const auto nextDeadStoreIndex = currentDeadStoreIndex + 1;
+    if (foundDeadStores.empty() || currentDeadStoreIndex >= foundDeadStores.size() || nextDeadStoreIndex >= foundDeadStores.size()) {
+        return false;
+    }
+
+    const auto& nextDeadStore    = foundDeadStores.at(nextDeadStoreIndex);
+    const auto& currentDeadStore = foundDeadStores.at(currentDeadStoreIndex);
+
+    if (currentDeadStore.relativeStatementIndexPerControlBlock.size() > nextDeadStore.relativeStatementIndexPerControlBlock.size())
+        return false;
+
+    const auto& decidingIndexForCurrentBlockInCurrentDeadStore = currentDeadStore.relativeStatementIndexPerControlBlock.back();
+    const auto& decidingIndexForCurrentBlockInNextDeadStore    = nextDeadStore.relativeStatementIndexPerControlBlock.at(currentDeadStore.relativeStatementIndexPerControlBlock.size() - 1);
+
+    if (decidingIndexForCurrentBlockInCurrentDeadStore.blockType != StatementIterationHelper::IfConditionTrueBranch)
+        return false;
+
+    bool isNextDeadStoreInFalseBranch = decidingIndexForCurrentBlockInNextDeadStore.blockType == StatementIterationHelper::IfConditionFalseBranch;
+    if (currentDeadStore.relativeStatementIndexPerControlBlock.size() > 1) {
+        const std::size_t numBlockIndicesToCheck = currentDeadStore.relativeStatementIndexPerControlBlock.size() - 1;
+
+        const auto& firstIndexOfCurrentDeadStore = currentDeadStore.relativeStatementIndexPerControlBlock.cbegin();
+        const auto& lastIndexOfCurrentDeadStore  = std::next(currentDeadStore.relativeStatementIndexPerControlBlock.cbegin(), numBlockIndicesToCheck - 1);
+
+        const auto& firstIndexOfNextDeadStore = nextDeadStore.relativeStatementIndexPerControlBlock.cbegin();
+        const auto& lastIndexOfNextDeadStore  = std::next(nextDeadStore.relativeStatementIndexPerControlBlock.cbegin(), numBlockIndicesToCheck - 1);
+
+        if (numBlockIndicesToCheck == 1) {
+            isNextDeadStoreInFalseBranch &= firstIndexOfCurrentDeadStore->relativeIndexInBlock == firstIndexOfNextDeadStore->relativeIndexInBlock && firstIndexOfCurrentDeadStore->blockType == firstIndexOfNextDeadStore->blockType;
+        }
+        else {
+            isNextDeadStoreInFalseBranch &= std::mismatch(
+            firstIndexOfCurrentDeadStore,
+            lastIndexOfCurrentDeadStore,
+            firstIndexOfNextDeadStore,
+            lastIndexOfNextDeadStore,
+            [](const StatementIterationHelper::StatementIndexInBlock& relativeIndexInBlockForCurrentDeadStore, const StatementIterationHelper::StatementIndexInBlock& relativeIndexInBlockForNextDeadStore) {
+                return relativeIndexInBlockForCurrentDeadStore.relativeIndexInBlock == relativeIndexInBlockForNextDeadStore.relativeIndexInBlock && relativeIndexInBlockForCurrentDeadStore.blockType == relativeIndexInBlockForNextDeadStore.blockType;
+            }).first == lastIndexOfCurrentDeadStore;   
+        }
+    }
+    return isNextDeadStoreInFalseBranch;
+}
+

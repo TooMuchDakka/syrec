@@ -544,7 +544,7 @@ bool SyReCCustomBaseVisitor::existsRestrictionForAccessedSignalParts(const syrec
     if (const auto& existingSignalAccessRestriction = sharedData->getSignalAccessRestriction(); existingSignalAccessRestriction.has_value()) {
         const auto& signalAccessOverlapCheckResult = SignalAccessUtils::areSignalAccessesEqual(
                 accessedSignalPart,
-                *existingSignalAccessRestriction,
+                **existingSignalAccessRestriction,
                 SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::DimensionAccess::Overlapping,
                 SignalAccessUtils::SignalAccessComponentEquivalenceCriteria::BitRange::Overlapping,
                 *sharedData->currentSymbolTableScope);

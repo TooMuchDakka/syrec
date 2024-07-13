@@ -220,6 +220,8 @@ namespace deadStoreElimination {
         [[nodiscard]] std::vector<syrec::VariableAccess::ptr> getAccessedLocalSignalsFromExpression(const syrec::Expression::ptr& expr) const;
         [[nodiscard]] bool                                    isAccessedSignalLocalOfModule(const syrec::VariableAccess::ptr& accessedSignal) const;
         [[nodiscard]] static bool                             doesStatementListOnlyContainSingleSkipStatement(const syrec::Statement::vec& statementsToCheck);
+        [[nodiscard]] static bool                             doesStatementListContainOnlySkipStatements(const syrec::Statement::vec& statementsToCheck);
+        [[nodiscard]] static bool                             isNextDeadStoreInFalseBranchOfIfStatement(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores);
     };
 } // namespace deadStoreElimination
 #endif
