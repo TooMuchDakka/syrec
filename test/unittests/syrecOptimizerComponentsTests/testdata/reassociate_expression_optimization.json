@@ -152,5 +152,9 @@
   "identityElementOfModuloOperationAsRhsOperandSimplifiesToLhsOperand": {
     "circuit": "module main(out a(16), in b(16)) a += (b % 1)",
     "expectedCircuit": "module main(out a(16), in b(16)) a += b"
+  },
+  "binaryExpressionOptimizationsAreNotAppliedToShiftExpressionButOnlyToItsOperands": {
+    "circuit": "module morton(in a(16), in b(16), out r(32)) for $i = 0 to (#a - 1) step 1 do r.$i:($i + (#a - 1)) ^= ((((a & 1) << $i) << $i) | (((b & 1) << $i) << ($i + 1))) rof",
+    "expectedCircuit": "module morton(in a(16), in b(16), out r(32)) for $i = 0 to 15 step 1 do r.$i:($i + 15) ^= ((((a & 1) << $i) << $i) | (((b & 1) << $i) << ($i + 1))) rof"
   }
 }

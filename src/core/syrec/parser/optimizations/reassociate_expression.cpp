@@ -223,7 +223,7 @@ syrec::Expression::ptr optimizations::simplifyBinaryExpression(const syrec::Expr
         }
         /*
          * If we could not simplify the given shift expression we can only try and simplify the lhs operand of the shift operations
-         * because the rhs can only be a number (with the curretn version of the specification [12.02.2023])
+         * because the rhs can only be a number (with the current version of the specification [12.02.2023])
          */
         if (exprAsShiftExpr != nullptr) {
             const auto& lhsOperandSimplified = simplifyBinaryExpression(exprAsShiftExpr->lhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses);
@@ -235,6 +235,14 @@ syrec::Expression::ptr optimizations::simplifyBinaryExpression(const syrec::Expr
             }
             return exprAsShiftExpr;
         }
+    }
+
+    if (!binaryExpr) {
+        if (const auto& simplifiedShiftExprLhs = simplifyBinaryExpression(exprAsShiftExpr->lhs, operationStrengthReductionEnabled, optionalMultiplicationSimplifier, symbolTable, droppedSignalAccesses); simplifiedShiftExprLhs && simplifiedShiftExprLhs != exprAsShiftExpr->lhs) {
+            if (const auto& resultContainer = std::make_shared<syrec::ShiftExpression>(simplifiedShiftExprLhs, exprAsShiftExpr->op, exprAsShiftExpr->rhs); resultContainer)
+                return resultContainer;
+        }
+        return exprAsShiftExpr;
     }
 
     if ((binaryOperationOfExpr != syrec_operation::operation::Multiplication && binaryOperationOfExpr != syrec_operation::operation::Addition) 
