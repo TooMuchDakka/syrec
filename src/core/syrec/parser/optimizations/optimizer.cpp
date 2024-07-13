@@ -1266,13 +1266,12 @@ optimizations::Optimizer::OptimizationResult<syrec::Expression> optimizations::O
         return OptimizationResult<syrec::Expression>::asUnchangedOriginal();
     }
 
-    syrec::Expression::ptr simplifiedLhsOperand = simplifiedToBeShiftedExpr ? std::move(simplifiedToBeShiftedExpr) : expression.lhs;
-    syrec::Number::ptr     simplifiedRhsOperand = simplifiedShiftAmount ? std::move(simplifiedShiftAmount) : expression.rhs;
-    auto                   simplifiedShiftExpr  = std::make_unique<syrec::ShiftExpression>(
-            simplifiedToBeShiftedExpr ? std::move(simplifiedToBeShiftedExpr) : expression.lhs,
-            expression.op,
-            simplifiedShiftAmount ? std::move(simplifiedShiftAmount) : expression.rhs);
-    return OptimizationResult<syrec::Expression>::fromOptimizedContainer(std::move(simplifiedShiftExpr));
+    const syrec::Expression::ptr simplifiedLhsOperand = simplifiedToBeShiftedExpr ? std::move(simplifiedToBeShiftedExpr) : expression.lhs;
+    const syrec::Number::ptr     simplifiedRhsOperand = simplifiedShiftAmount ? std::move(simplifiedShiftAmount) : expression.rhs;
+    if (auto                   simplifiedShiftExpr  = std::make_unique<syrec::ShiftExpression>(simplifiedLhsOperand, expression.op, simplifiedRhsOperand); simplifiedShiftExpr)
+        return OptimizationResult<syrec::Expression>::fromOptimizedContainer(std::move(simplifiedShiftExpr));
+
+    return OptimizationResult<syrec::Expression>::asUnchangedOriginal();
 }
 
 optimizations::Optimizer::OptimizationResult<syrec::Number> optimizations::Optimizer::handleNumber(const syrec::Number& number) const {
