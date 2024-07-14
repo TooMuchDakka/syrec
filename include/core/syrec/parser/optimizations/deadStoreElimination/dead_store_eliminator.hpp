@@ -70,9 +70,10 @@ namespace deadStoreElimination {
                     const bool isThisStatementIndexInIfCondition  = thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
                     const bool isOtherStatementIndexInIfCondition = otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
 
-                    isCurrentEntrySmaller |= isThisStatementIndexInIfCondition && isOtherStatementIndexInIfCondition ? getBlockTypePrecedence(thisStatementIndexInBlock.blockType) <= getBlockTypePrecedence(otherStatementIndexInBlock.blockType) : true;
+                    isCurrentEntrySmaller &= isThisStatementIndexInIfCondition && isOtherStatementIndexInIfCondition ? getBlockTypePrecedence(thisStatementIndexInBlock.blockType) <= getBlockTypePrecedence(otherStatementIndexInBlock.blockType) : true;
                     isCurrentEntrySmaller &= relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock < other.relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock;
                 }
+                // TODO:
                 return isCurrentEntrySmaller;
             }
         };

@@ -313,7 +313,7 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
                             const auto anyDeadStoresRemaining = currDeadStoreIndex < foundDeadStores.size();
 
                             if ((!anyDeadStoresRemaining || !isNextDeadStoreInFalseBranchOfIfStatement(currDeadStoreIndex - 1, foundDeadStores) || doesStatementListContainOnlySkipStatements(referenceStatementAsIfStatement->elseStatements)) 
-                                && referenceStatementAsIfStatement->elseStatements.empty() || doesStatementListContainOnlySkipStatements(referenceStatementAsIfStatement->elseStatements) && !doesExpressionContainPotentiallyUnsafeOperation(referenceStatementAsIfStatement->condition)) {
+                                && (referenceStatementAsIfStatement->elseStatements.empty() || doesStatementListContainOnlySkipStatements(referenceStatementAsIfStatement->elseStatements)) && !doesExpressionContainPotentiallyUnsafeOperation(referenceStatementAsIfStatement->condition)) {
                                 decrementReferenceCountOfUsedSignalsInStatement(referenceStatementAsIfStatement);
                                 statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
                                 numRemovedStmtsInBlock++;
