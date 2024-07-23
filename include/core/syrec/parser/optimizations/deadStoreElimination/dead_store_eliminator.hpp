@@ -54,7 +54,7 @@ namespace deadStoreElimination {
                     const bool isThisStatementIndexInIfCondition  = thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
                     const bool isOtherStatementIndexInIfCondition = otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
 
-                    areEqual &= isThisStatementIndexInIfCondition && isOtherStatementIndexInIfCondition ? getBlockTypePrecedence(thisStatementIndexInBlock.blockType) == getBlockTypePrecedence(otherStatementIndexInBlock.blockType) : true;
+                    areEqual &= isThisStatementIndexInIfCondition == isOtherStatementIndexInIfCondition ? getBlockTypePrecedence(thisStatementIndexInBlock.blockType) == getBlockTypePrecedence(otherStatementIndexInBlock.blockType) : true;
                     areEqual &= thisStatementIndexInBlock.relativeIndexInBlock == otherStatementIndexInBlock.relativeIndexInBlock;
                 }
                 return areEqual;
@@ -62,18 +62,17 @@ namespace deadStoreElimination {
 
             bool operator<(const AssignmentStatementIndexInControlFlowGraph& other) const {
                 const std::size_t numElemsToCheck       = std::min(relativeStatementIndexPerControlBlock.size(), other.relativeStatementIndexPerControlBlock.size());
-                bool              isCurrentEntrySmaller = false;
-                for (std::size_t i = 0; i < numElemsToCheck && !isCurrentEntrySmaller; ++i) {
+                bool              isCurrentEntrySmaller = true;
+                for (std::size_t i = 0; i < numElemsToCheck && isCurrentEntrySmaller; ++i) {
                     const StatementIterationHelper::StatementIndexInBlock& thisStatementIndexInBlock  = relativeStatementIndexPerControlBlock.at(i);
                     const StatementIterationHelper::StatementIndexInBlock& otherStatementIndexInBlock = other.relativeStatementIndexPerControlBlock.at(i);
 
                     const bool isThisStatementIndexInIfCondition  = thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
                     const bool isOtherStatementIndexInIfCondition = otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
 
-                    isCurrentEntrySmaller &= isThisStatementIndexInIfCondition && isOtherStatementIndexInIfCondition ? getBlockTypePrecedence(thisStatementIndexInBlock.blockType) <= getBlockTypePrecedence(otherStatementIndexInBlock.blockType) : true;
-                    isCurrentEntrySmaller &= relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock < other.relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock;
+                    isCurrentEntrySmaller = isThisStatementIndexInIfCondition == isOtherStatementIndexInIfCondition ? getBlockTypePrecedence(thisStatementIndexInBlock.blockType) <= getBlockTypePrecedence(otherStatementIndexInBlock.blockType) : true;
+                    isCurrentEntrySmaller &= relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock < other.relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock;    
                 }
-                // TODO:
                 return isCurrentEntrySmaller;
             }
         };
