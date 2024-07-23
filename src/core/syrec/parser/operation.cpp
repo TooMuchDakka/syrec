@@ -17,8 +17,10 @@ bool syrec_operation::isOperandUsedAsLhsInOperationIdentityElement(operation ope
         case operation::ShiftRight:
         case operation::BitwiseXor:
         case operation::XorAssign:
+        case operation::LogicalOr:
             return operand == 0;
         case operation::Multiplication:
+        case operation::LogicalAnd:
             return operand == 1;
         default:
             return false;
@@ -35,10 +37,12 @@ bool syrec_operation::isOperandUseAsRhsInOperationIdentityElement(const operatio
         case operation::ShiftRight:
         case operation::BitwiseXor:
         case operation::XorAssign:
+        case operation::LogicalOr:
             return operand == 0;
         case operation::Division:
         case operation::Multiplication:
         case operation::Modulo:
+        case operation::LogicalAnd:
             return operand == 1;
         default:
             return false;
