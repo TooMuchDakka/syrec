@@ -122,6 +122,16 @@ bool parser::isNumberAndEquivalentToReference(const syrec::Number::ptr& referenc
     if (referenceNumber->isConstant()) {
         return numberToCheck->isConstant() && referenceNumber->evaluate({}) == numberToCheck->evaluate({});
     }
+    if (referenceNumber->isCompileTimeConstantExpression()) {
+        if (!numberToCheck->isCompileTimeConstantExpression())
+            return false;
+
+        const auto& referenceNumberAsCompileTimeExpression = referenceNumber->getExpression();
+        const auto& numberToCheckAsCompileTimeExpression   = numberToCheck->getExpression();
+        return referenceNumberAsCompileTimeExpression.operation == numberToCheckAsCompileTimeExpression.operation
+            && isNumberAndEquivalentToReference(referenceNumberAsCompileTimeExpression.lhsOperand, numberToCheckAsCompileTimeExpression.lhsOperand)
+            && isNumberAndEquivalentToReference(referenceNumberAsCompileTimeExpression.rhsOperand, numberToCheckAsCompileTimeExpression.rhsOperand);
+    }
     return numberToCheck->isLoopVariable() && referenceNumber->variableName() == numberToCheck->variableName();
 }
 

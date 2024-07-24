@@ -470,6 +470,9 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(c
         if (bitRangeStart->isConstant() && bitRangeEnd->isConstant()) {
             return (bitRangeEnd->evaluate({}) - bitRangeStart->evaluate({})) + 1;
         }
+        if (bitRangeStart->isCompileTimeConstantExpression() || bitRangeEnd->isCompileTimeConstantExpression()) {
+            return std::nullopt;   
+        }
         return bitRangeStart->variableName() == bitRangeEnd->variableName() ? std::make_optional(1) : std::nullopt;
     }
 
