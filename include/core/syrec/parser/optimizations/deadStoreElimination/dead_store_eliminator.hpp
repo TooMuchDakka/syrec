@@ -71,7 +71,14 @@ namespace deadStoreElimination {
                     const bool isOtherStatementIndexInIfCondition = otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
 
                     isCurrentEntrySmaller = isThisStatementIndexInIfCondition == isOtherStatementIndexInIfCondition ? getBlockTypePrecedence(thisStatementIndexInBlock.blockType) <= getBlockTypePrecedence(otherStatementIndexInBlock.blockType) : true;
-                    isCurrentEntrySmaller &= relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock < other.relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock;    
+                    if (relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock == other.relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock && isCurrentEntrySmaller) {
+                        if (i + 1 == numElemsToCheck)
+                            break;
+
+                        isCurrentEntrySmaller = i + 1 < numElemsToCheck;
+                    } else {
+                        isCurrentEntrySmaller &= relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock < other.relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock;
+                    }
                 }
                 return isCurrentEntrySmaller;
             }
@@ -202,7 +209,7 @@ namespace deadStoreElimination {
         [[nodiscard]] static std::optional<unsigned int> tryEvaluateNumber(const syrec::Number& number);
         [[nodiscard]] static std::optional<unsigned int> tryEvaluateExprToConstant(const syrec::Expression& expr);
 
-        [[nodiscard]] bool               isNextDeadStoreInSameBranch(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores, std::size_t currentNestingLevel) const;
+        [[nodiscard]] bool               isNextDeadStoreInSameBranch(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores) const;
         [[nodiscard]] static std::size_t getBlockTypePrecedence(StatementIterationHelper::BlockType blockType);
 
         void resetInternalData();

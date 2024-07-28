@@ -377,7 +377,7 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
             currDeadStoreIndex++;
         }
         
-        stopProcessing = currDeadStoreIndex >= foundDeadStores.size() || statementList.empty() || !isNextDeadStoreInSameBranch(copyOfCurrentDeadStoreIndex, foundDeadStores, nestingLevelOfCurrentBlock + 1);
+        stopProcessing = currDeadStoreIndex >= foundDeadStores.size() || statementList.empty() || !isNextDeadStoreInSameBranch(copyOfCurrentDeadStoreIndex, foundDeadStores);
     }
 }
 
@@ -719,7 +719,7 @@ std::size_t DeadStoreEliminator::getBlockTypePrecedence(const StatementIteration
     }
 }
 
-bool DeadStoreEliminator::isNextDeadStoreInSameBranch(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores, std::size_t currentNestingLevel) const {
+bool DeadStoreEliminator::isNextDeadStoreInSameBranch(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores) const {
     const auto nextDeadStoreIndex = currentDeadStoreIndex + 1;
     if (foundDeadStores.empty() || nextDeadStoreIndex >= foundDeadStores.size()) {
         return false;
@@ -727,27 +727,19 @@ bool DeadStoreEliminator::isNextDeadStoreInSameBranch(std::size_t currentDeadSto
 
     const auto& nextDeadStore = foundDeadStores.at(nextDeadStoreIndex);
     const auto& currentDeadStore = foundDeadStores.at(currentDeadStoreIndex);
-    
+    const auto numBlocksToCheck =  std::min(currentDeadStore.relativeStatementIndexPerControlBlock.size(), nextDeadStore.relativeStatementIndexPerControlBlock.size());
 
-    const auto numBlocksToCheck = std::min(currentNestingLevel, std::min(currentDeadStore.relativeStatementIndexPerControlBlock.size(), nextDeadStore.relativeStatementIndexPerControlBlock.size()));
+    auto relativeStatementIndexPerBlockOfCurrDeadStore = currentDeadStore.relativeStatementIndexPerControlBlock.begin();
+    auto relativeStatementIndexPerBlockOfNextDeadStore = nextDeadStore.relativeStatementIndexPerControlBlock.begin();
 
-    const auto& firstElementToCheckInCurrentDeadStore = currentDeadStore.relativeStatementIndexPerControlBlock.cbegin();
-    const auto& lastElementToCheckInCurrentDeadStore  = std::next(currentDeadStore.relativeStatementIndexPerControlBlock.cbegin(), numBlocksToCheck);
+    bool isInSameBlock = currentDeadStore.relativeStatementIndexPerControlBlock.size() <= nextDeadStore.relativeStatementIndexPerControlBlock.size();
+    for (std::size_t i = 0; i < numBlocksToCheck && isInSameBlock; ++i) {
+        isInSameBlock = relativeStatementIndexPerBlockOfCurrDeadStore->relativeIndexInBlock <= relativeStatementIndexPerBlockOfNextDeadStore->relativeIndexInBlock && relativeStatementIndexPerBlockOfCurrDeadStore->blockType == relativeStatementIndexPerBlockOfNextDeadStore->blockType;
+        ++relativeStatementIndexPerBlockOfCurrDeadStore;
+        ++relativeStatementIndexPerBlockOfNextDeadStore;
+    }
 
-    const auto& firstElementToCheckInNextDeadStore = nextDeadStore.relativeStatementIndexPerControlBlock.cbegin();
-    const auto& lastElementToCheckInNextDeadStore  = std::next(nextDeadStore.relativeStatementIndexPerControlBlock.cbegin(), numBlocksToCheck);
-
-    const auto& foundMismatchInIndexOrBlockType = std::mismatch(
-    firstElementToCheckInCurrentDeadStore,
-    lastElementToCheckInCurrentDeadStore,
-    firstElementToCheckInNextDeadStore,
-    lastElementToCheckInNextDeadStore,
-    [](const StatementIterationHelper::StatementIndexInBlock& relativeIndexInBlockForCurrentDeadStore, const StatementIterationHelper::StatementIndexInBlock& relativeIndexInBlockForNextDeadStore) {
-        return relativeIndexInBlockForCurrentDeadStore.relativeIndexInBlock <= relativeIndexInBlockForNextDeadStore.relativeIndexInBlock
-            && relativeIndexInBlockForCurrentDeadStore.blockType == relativeIndexInBlockForNextDeadStore.blockType;      
-    });
-
-    return foundMismatchInIndexOrBlockType.first == lastElementToCheckInCurrentDeadStore;
+    return isInSameBlock;
 }
 
 std::vector<syrec::VariableAccess::ptr> DeadStoreEliminator::getAccessedLocalSignalsFromExpression(const syrec::Expression::ptr& expr) const {
