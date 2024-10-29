@@ -426,7 +426,7 @@ std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineBitwidthAfterVariabl
 
 std::optional<unsigned> SyReCCustomBaseVisitor::tryDetermineExpressionBitwidth(const syrec::Expression& expression, const messageUtils::Message::Position& evaluationErrorPosition) {
     if (auto const* numericExpression = dynamic_cast<const syrec::NumericExpression*>(&expression)) {
-        return tryEvaluateNumber(*numericExpression->value, &evaluationErrorPosition);
+        return numericExpression->bitwidth();
     }
 
     if (auto const* binaryExpression = dynamic_cast<const syrec::BinaryExpression*>(&expression)) {
