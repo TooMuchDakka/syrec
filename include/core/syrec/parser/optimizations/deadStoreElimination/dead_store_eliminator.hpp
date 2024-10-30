@@ -47,16 +47,9 @@ namespace deadStoreElimination {
 
             bool operator==(const AssignmentStatementIndexInControlFlowGraph& other) const {
                 bool areEqual = relativeStatementIndexPerControlBlock.size() == other.relativeStatementIndexPerControlBlock.size();
-                for (std::size_t i = 0; i < relativeStatementIndexPerControlBlock.size() && areEqual; ++i) {
-                    const StatementIterationHelper::StatementIndexInBlock& thisStatementIndexInBlock  = relativeStatementIndexPerControlBlock.at(i);
-                    const StatementIterationHelper::StatementIndexInBlock& otherStatementIndexInBlock = other.relativeStatementIndexPerControlBlock.at(i);
+                for (std::size_t i = 0; i < relativeStatementIndexPerControlBlock.size() && areEqual; ++i)
+                    areEqual = relativeStatementIndexPerControlBlock.at(i) == other.relativeStatementIndexPerControlBlock.at(i);
 
-                    const bool isThisStatementIndexInIfCondition  = thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
-                    const bool isOtherStatementIndexInIfCondition = otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
-
-                    areEqual &= isThisStatementIndexInIfCondition == isOtherStatementIndexInIfCondition ? getBlockTypePrecedence(thisStatementIndexInBlock.blockType) == getBlockTypePrecedence(otherStatementIndexInBlock.blockType) : true;
-                    areEqual &= thisStatementIndexInBlock.relativeIndexInBlock == otherStatementIndexInBlock.relativeIndexInBlock;
-                }
                 return areEqual;
             }
 
@@ -64,22 +57,20 @@ namespace deadStoreElimination {
                 const std::size_t numElemsToCheck       = std::min(relativeStatementIndexPerControlBlock.size(), other.relativeStatementIndexPerControlBlock.size());
                 bool              isCurrentEntrySmaller = true;
                 for (std::size_t i = 0; i < numElemsToCheck && isCurrentEntrySmaller; ++i) {
-                    const StatementIterationHelper::StatementIndexInBlock& thisStatementIndexInBlock  = relativeStatementIndexPerControlBlock.at(i);
-                    const StatementIterationHelper::StatementIndexInBlock& otherStatementIndexInBlock = other.relativeStatementIndexPerControlBlock.at(i);
+                    const StatementIterationHelper::StatementIndexInBlock& lOperandStatementIndexInBlock  = relativeStatementIndexPerControlBlock.at(i);
+                    const StatementIterationHelper::StatementIndexInBlock& rOperandStatementIndexInBlock = other.relativeStatementIndexPerControlBlock.at(i);
 
-                    const bool isThisStatementIndexInIfCondition  = thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || thisStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
-                    const bool isOtherStatementIndexInIfCondition = otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch || otherStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch;
-
-                    isCurrentEntrySmaller = isThisStatementIndexInIfCondition == isOtherStatementIndexInIfCondition ? getBlockTypePrecedence(thisStatementIndexInBlock.blockType) <= getBlockTypePrecedence(otherStatementIndexInBlock.blockType) : true;
-                    if (relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock == other.relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock && isCurrentEntrySmaller) {
-                        if (i + 1 == numElemsToCheck)
-                            break;
-
-                        isCurrentEntrySmaller = i + 1 < numElemsToCheck;
-                    } else {
-                        isCurrentEntrySmaller &= relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock < other.relativeStatementIndexPerControlBlock.at(i).relativeIndexInBlock;
+                    if (lOperandStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionTrueBranch 
+                        && rOperandStatementIndexInBlock.blockType == StatementIterationHelper::BlockType::IfConditionFalseBranch)
+                        continue;
+                    if (lOperandStatementIndexInBlock.blockType == rOperandStatementIndexInBlock.blockType)
+                        isCurrentEntrySmaller = lOperandStatementIndexInBlock.relativeIndexInBlock <= rOperandStatementIndexInBlock.relativeIndexInBlock;
+                    else {
+                        isCurrentEntrySmaller = getBlockTypePrecedence(lOperandStatementIndexInBlock.blockType) < getBlockTypePrecedence(rOperandStatementIndexInBlock.blockType);
+                        break;
                     }
                 }
+                isCurrentEntrySmaller &= relativeStatementIndexPerControlBlock.size() <= other.relativeStatementIndexPerControlBlock.size();
                 return isCurrentEntrySmaller;
             }
         };

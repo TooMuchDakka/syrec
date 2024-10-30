@@ -21,6 +21,10 @@ namespace deadStoreElimination {
 
             StatementIndexInBlock(BlockType blockType, std::size_t relativeIndexInBlock):
                 blockType(blockType), relativeIndexInBlock(relativeIndexInBlock) {}
+
+            bool operator==(const StatementIndexInBlock& other) const noexcept {
+                return blockType == other.blockType && relativeIndexInBlock == other.relativeIndexInBlock;
+            }
         };
 
         struct StatementAndRelativeIndexPair {
