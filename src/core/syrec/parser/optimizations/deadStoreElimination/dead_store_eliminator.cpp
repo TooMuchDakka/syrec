@@ -29,7 +29,7 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
 }
 
 [[nodiscard]] std::optional<DeadStoreEliminator::InternalAssignmentData::ptr> DeadStoreEliminator::getOrCreateEntryInInternalLookupForSwapStatement(const InternalAssignmentData::SwapOperands& swapOperands, const AssignmentStatementIndexInControlFlowGraph& indexOfSwapStatementInControlFlowGraph) {
-    const InternalAssignmentData::ptr entry = std::make_shared<InternalAssignmentData>(swapOperands, indexOfSwapStatementInControlFlowGraph);
+    InternalAssignmentData::ptr entry = std::make_shared<InternalAssignmentData>(swapOperands, indexOfSwapStatementInControlFlowGraph);
     if (!entry) {
         return std::nullopt;
     }
@@ -143,7 +143,7 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
                 for (const auto& callerArgument: nextStatementAsCallStatement->parameters) {
                     if (internalAssignmentData.count(callerArgument)) {
                         for (const auto& definedAssignmentWithAssignedToSignalPartsIdentMatchingCallerArgument: internalAssignmentData.at(callerArgument)) {
-                            removeDataDependenciesOfAssignmentFromGraveyard(definedAssignmentWithAssignedToSignalPartsIdentMatchingCallerArgument);
+                            removeDataDependenciesOfAssignmentFromGraveyard(definedAssignmentWithAssignedToSignalPartsIdentMatchingCallerArgument); 
                         }
                     }
                 }   
@@ -162,6 +162,17 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
             if ((isAssignedToSignalAModifiableParameter(swapOperandLhsSignalIdent) || isAssignedToSignalAModifiableParameter(swapOperandRhsSignalIdent)) && isAssignmentDefinedInLoopPerformingMoreThanOneIteration()) {
                 removeEntryFromGraveyard(swapOperandLhsSignalIdent, matchingInternalEntryForSwapStatement);
                 removeEntryFromGraveyard(swapOperandRhsSignalIdent, matchingInternalEntryForSwapStatement);
+                const auto& lhsOperandSymbolTableData = symbolTable->getVariable(swapOperandLhsSignalIdent);
+                const auto& rhsOperandSymbolTableData = symbolTable->getVariable(swapOperandRhsSignalIdent);
+                if (!lhsOperandSymbolTableData.has_value() || !rhsOperandSymbolTableData.has_value() || (!std::holds_alternative<syrec::Variable::ptr>(*lhsOperandSymbolTableData) || !std::holds_alternative<syrec::Variable::ptr>(*rhsOperandSymbolTableData)))
+                    return {};
+
+                auto accessedVariablePartsOfLhsOperand = syrec::VariableAccess();
+                auto accessedVariablePartsOfRhsOperand = syrec::VariableAccess();
+                accessedVariablePartsOfLhsOperand.var = std::get<syrec::Variable::ptr>(*lhsOperandSymbolTableData);
+                accessedVariablePartsOfRhsOperand.var = std::get<syrec::Variable::ptr>(*rhsOperandSymbolTableData);
+                removeOverlappingAssignmentsFromGraveyard(accessedVariablePartsOfLhsOperand, matchingInternalEntryForSwapStatement->indexInControlFlowGraph);
+                removeOverlappingAssignmentsFromGraveyard(accessedVariablePartsOfRhsOperand, matchingInternalEntryForSwapStatement->indexInControlFlowGraph);
             }
         } else {
             const syrec::Statement* internalPointerOfStatement = nextStatement->statement.get();
@@ -326,6 +337,8 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
                                 referenceStatementAsIfStatement->thenStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
                             }
                         }
+                        if (!isNextDeadStoreInFalseBranchOfIfStatement(currDeadStoreIndex -1, foundDeadStores))
+                            stopProcessing = !isNextDeadStoreDefinedAsSuccessorOnSameNestingLevel(deadStoreIndex, currDeadStoreIndex, nestingLevelOfCurrentBlock + 1, foundDeadStores);
                     }
                     break;
                 }
@@ -351,6 +364,7 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
                              */
                             referenceStatementAsIfStatement->thenStatements.emplace_back(std::make_shared<syrec::SkipStatement>());
                         }
+                        stopProcessing = !isNextDeadStoreDefinedAsSuccessorOnSameNestingLevel(deadStoreIndex, currDeadStoreIndex, nestingLevelOfCurrentBlock + 1, foundDeadStores);
                     }
                     break;
                 }
@@ -375,9 +389,13 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
             statementList.erase(std::next(statementList.begin(), relativeStatementIndexInCurrentBlockOfDeadStore));
             numRemovedStmtsInBlock++;
             currDeadStoreIndex++;
+            stopProcessing = currDeadStoreIndex >= foundDeadStores.size() || statementList.empty() || !isNextDeadStoreInSameBranch(copyOfCurrentDeadStoreIndex, foundDeadStores);
+            continue;
         }
-        
-        stopProcessing = currDeadStoreIndex >= foundDeadStores.size() || statementList.empty() || !isNextDeadStoreInSameBranch(copyOfCurrentDeadStoreIndex, foundDeadStores);
+
+        stopProcessing |= currDeadStoreIndex >= foundDeadStores.size() || statementList.empty();
+        //stopProcessing |= currDeadStoreIndex >= foundDeadStores.size() || statementList.empty();
+        //stopProcessing = currDeadStoreIndex >= foundDeadStores.size() || statementList.empty() || !isNextDeadStoreInSameBranch(copyOfCurrentDeadStoreIndex, foundDeadStores);
     }
 }
 
@@ -835,3 +853,28 @@ bool DeadStoreEliminator::isNextDeadStoreInFalseBranchOfIfStatement(std::size_t 
     return isNextDeadStoreInFalseBranch;
 }
 
+bool DeadStoreEliminator::isNextDeadStoreDefinedAsSuccessorOnSameNestingLevel(const AssignmentStatementIndexInControlFlowGraph& currentDeadStoreIndexInControlFlowGraph, const std::size_t nextDeadStoreIndex, const std::size_t currentNestingLevelOfStatement, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores) {
+    if (foundDeadStores.empty())
+        return false;
+
+    if (nextDeadStoreIndex >= foundDeadStores.size())
+        return false;
+
+    const auto& nextDeadStore = foundDeadStores.at(nextDeadStoreIndex);
+    if (currentNestingLevelOfStatement == 0)
+        return currentDeadStoreIndexInControlFlowGraph.relativeStatementIndexPerControlBlock.front().relativeIndexInBlock >
+            nextDeadStore.relativeStatementIndexPerControlBlock.front().relativeIndexInBlock;
+
+    if (nextDeadStore.relativeStatementIndexPerControlBlock.size() < currentNestingLevelOfStatement + 1)
+        return false;
+
+    const std::size_t decidingIndex                                       = currentNestingLevelOfStatement;
+    const auto        currDeadStoreIndexInControlFlowGraphForNestingLevel = currentDeadStoreIndexInControlFlowGraph.relativeStatementIndexPerControlBlock.at(decidingIndex);
+    const auto        nextDeadStoreIndexInControlFlowGraphForNestingLevel = nextDeadStore.relativeStatementIndexPerControlBlock.at(decidingIndex);
+
+    if (currDeadStoreIndexInControlFlowGraphForNestingLevel.blockType == nextDeadStoreIndexInControlFlowGraphForNestingLevel.blockType) {
+        if (nextDeadStoreIndexInControlFlowGraphForNestingLevel.relativeIndexInBlock > currDeadStoreIndexInControlFlowGraphForNestingLevel.relativeIndexInBlock)
+            return true;
+    }
+    return currDeadStoreIndexInControlFlowGraphForNestingLevel.blockType == StatementIterationHelper::IfConditionTrueBranch && nextDeadStoreIndexInControlFlowGraphForNestingLevel.blockType == StatementIterationHelper::IfConditionFalseBranch;
+}

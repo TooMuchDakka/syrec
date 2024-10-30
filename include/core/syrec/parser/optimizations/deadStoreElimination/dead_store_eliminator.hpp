@@ -229,6 +229,7 @@ namespace deadStoreElimination {
         [[nodiscard]] static bool                             doesStatementListOnlyContainSingleSkipStatement(const syrec::Statement::vec& statementsToCheck);
         [[nodiscard]] static bool                             doesStatementListContainOnlySkipStatements(const syrec::Statement::vec& statementsToCheck);
         [[nodiscard]] static bool                             isNextDeadStoreInFalseBranchOfIfStatement(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores);
+        [[nodiscard]] static bool                             isNextDeadStoreDefinedAsSuccessorOnSameNestingLevel(const AssignmentStatementIndexInControlFlowGraph& currentDeadStoreIndexInControlFlowGraph, std::size_t currentDeadStoreIndex, std::size_t currentNestingLevelOfStatement, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores);
     };
 } // namespace deadStoreElimination
 #endif
