@@ -35,10 +35,7 @@ void DeadStoreEliminator::removeDeadStoresFrom(syrec::Statement::vec& statementL
     }
 
     insertNewEntryIntoInternalLookup(swapOperands.lhsOperand->var->name, entry);
-    insertNewEntryIntoInternalLookup(swapOperands.rhsOperand->var->name, entry);
-
     insertEntryIntoGraveyard(swapOperands.lhsOperand->var->name, entry);
-    insertEntryIntoGraveyard(swapOperands.rhsOperand->var->name, entry);
     return entry;
 }
 
@@ -305,8 +302,9 @@ std::vector<DeadStoreEliminator::InternalAssignmentData::ptr> DeadStoreEliminato
 std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> DeadStoreEliminator::determineDeadStores() const {
     std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> deadStoreIndicesInControlFlowGraph;
     for (const std::pair<std::string, std::unordered_set<DeadStoreEliminator::InternalAssignmentData::ptr>> graveYardEntryForGroupOfAssignmentsToSignalIdent: graveyard) {
-        for (const auto& graveYardEntry: graveYardEntryForGroupOfAssignmentsToSignalIdent.second) {
-            deadStoreIndicesInControlFlowGraph.emplace_back(graveYardEntry->indexInControlFlowGraph);
+        if (!graveYardEntryForGroupOfAssignmentsToSignalIdent.second.empty()) {
+            for (const auto& graveYardEntry: graveYardEntryForGroupOfAssignmentsToSignalIdent.second)
+                deadStoreIndicesInControlFlowGraph.emplace_back(graveYardEntry->indexInControlFlowGraph);
         }
     }
     std::sort(deadStoreIndicesInControlFlowGraph.begin(), deadStoreIndicesInControlFlowGraph.end());

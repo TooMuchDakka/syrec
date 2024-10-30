@@ -34,7 +34,7 @@ namespace deadStoreElimination {
          * \param statementList The list of statements from which dead stores shall be removed
          */
         void removeDeadStoresFrom(syrec::Statement::vec& statementList);
-
+         
     private:
         /*
          * BEGIN: Internal helper data structures
