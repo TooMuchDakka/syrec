@@ -84,6 +84,15 @@ namespace deadStoreElimination {
             }
         };
 
+        struct IfStatementAnchorInControlFlowGraph {
+            AssignmentStatementIndexInControlFlowGraph relativeStatementIndexPerControlBlock;
+            bool                                       isConsideredAsDead;
+            syrec::Expression::ptr                     guardExpression;
+
+            explicit IfStatementAnchorInControlFlowGraph(AssignmentStatementIndexInControlFlowGraph relativeStatementIndexPerControlBlock, syrec::Expression::ptr guardExpression):
+                relativeStatementIndexPerControlBlock(std::move(relativeStatementIndexPerControlBlock)), isConsideredAsDead(true), guardExpression(std::move(guardExpression)) {}
+        };
+
         // Could also be renamed to liveness status lookup conditional scope since a new scope is only opened for a branch in an if statement
         struct LivenessStatusLookupScope {
             std::map<std::string, DeadStoreStatusLookup::ptr> livenessStatusLookup;
@@ -224,12 +233,14 @@ namespace deadStoreElimination {
         void               markStatementAsProcessedInLoopBody(const syrec::Statement::ptr& stmt, std::size_t nestingLevelOfStmt);
         void               addInformationAboutLoopWithMoreThanOneStatement(const std::shared_ptr<syrec::ForStatement>& loopStmt, std::size_t nestingLevelOfStmt);
 
+        [[nodiscard]] bool                                    removeOverlappingAssignmentsForIfStatementAnchorsFromGraveyard(const std::vector<std::size_t>& selectedAnchors, std::vector<IfStatementAnchorInControlFlowGraph>& ifStatementAnchors);
         [[nodiscard]] std::vector<syrec::VariableAccess::ptr> getAccessedLocalSignalsFromExpression(const syrec::Expression::ptr& expr) const;
         [[nodiscard]] bool                                    isAccessedSignalLocalOfModule(const syrec::VariableAccess::ptr& accessedSignal) const;
         [[nodiscard]] static bool                             doesStatementListOnlyContainSingleSkipStatement(const syrec::Statement::vec& statementsToCheck);
         [[nodiscard]] static bool                             doesStatementListContainOnlySkipStatements(const syrec::Statement::vec& statementsToCheck);
         [[nodiscard]] static bool                             isNextDeadStoreInFalseBranchOfIfStatement(std::size_t currentDeadStoreIndex, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores);
-        [[nodiscard]] static bool                             isNextDeadStoreDefinedAsSuccessorOnSameNestingLevel(const AssignmentStatementIndexInControlFlowGraph& currentDeadStoreIndexInControlFlowGraph, std::size_t currentDeadStoreIndex, std::size_t currentNestingLevelOfStatement, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores);
+        [[nodiscard]] static bool                             isNextDeadStoreDefinedAsSuccessorOnSameNestingLevel(const AssignmentStatementIndexInControlFlowGraph& currentDeadStoreIndexInControlFlowGraph, std::size_t nextDeadStoreIndex, std::size_t currentNestingLevelOfStatement, const std::vector<AssignmentStatementIndexInControlFlowGraph>& foundDeadStores);
+        [[nodiscard]] static std::vector<std::size_t>         determineReachableIfStatementAnchors(const AssignmentStatementIndexInControlFlowGraph& currStatementIndexInControlFlow, const std::vector<IfStatementAnchorInControlFlowGraph>& ifStatementAnchors);
     };
 } // namespace deadStoreElimination
 #endif

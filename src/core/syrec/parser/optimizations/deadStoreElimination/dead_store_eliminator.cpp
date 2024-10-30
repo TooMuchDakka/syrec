@@ -100,6 +100,7 @@ void DeadStoreEliminator::removeEntryFromGraveyard(const std::string_view& assig
 std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> DeadStoreEliminator::findDeadStores(const syrec::Statement::vec& statementList) {
     resetInternalData();
     const std::unique_ptr<StatementIterationHelper> statementIterationHelper = std::make_unique<StatementIterationHelper>(statementList);
+    std::vector<IfStatementAnchorInControlFlowGraph> ifStatementAnchors; 
 
     std::optional<StatementIterationHelper::StatementAndRelativeIndexPair> nextStatement = statementIterationHelper->getNextStatement();
     while (nextStatement.has_value()) {
@@ -108,7 +109,9 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
 
        if (const auto& nextStatementAsLoopStatement = std::dynamic_pointer_cast<syrec::ForStatement>(nextStatement->statement); nextStatementAsLoopStatement != nullptr) {
             addInformationAboutLoopWithMoreThanOneStatement(nextStatementAsLoopStatement, nextStatement->relativeIndexInControlFlowGraph.size());
-        } else if (const auto& nextStatementAsAssignmentStatement = std::dynamic_pointer_cast<syrec::AssignStatement>(nextStatement->statement); nextStatementAsAssignmentStatement != nullptr) {
+        } else 
+            
+        if (const auto& nextStatementAsAssignmentStatement = std::dynamic_pointer_cast<syrec::AssignStatement>(nextStatement->statement); nextStatementAsAssignmentStatement != nullptr) {
             const std::optional<syrec_operation::operation> mappedToAssignmentOperation = syrec_operation::tryMapAssignmentOperationFlagToEnum(nextStatementAsAssignmentStatement->op);
             const std::optional<unsigned int>               assignmentRhsExprAsConstant = tryEvaluateExprToConstant(*nextStatementAsAssignmentStatement->rhs);
 
@@ -122,6 +125,8 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
                 if (doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsAssignmentStatement) || (isAssignedToSignalAModifiableParameter(*matchingInternalEntryForAssignment->getAssignedToSignalPartsIdent()) && isAssignmentDefinedInLoopPerformingMoreThanOneIteration())) {
                     removeEntryFromGraveyard(*matchingInternalEntryForAssignment->getAssignedToSignalPartsIdent(), matchingInternalEntryForAssignment);
                     removeDataDependenciesOfAssignmentFromGraveyard(matchingInternalEntryForAssignment);
+                    if (!removeOverlappingAssignmentsForIfStatementAnchorsFromGraveyard(determineReachableIfStatementAnchors(indexOfCurrentStmtInControlFlowGraph, ifStatementAnchors), ifStatementAnchors))
+                        return {};
                 }
             }
         } else if (const auto& nextStatementAsUnaryAssignmentStatement = std::dynamic_pointer_cast<syrec::UnaryStatement>(nextStatement->statement); nextStatementAsUnaryAssignmentStatement != nullptr) {
@@ -133,17 +138,22 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
             if (doesAssignmentContainPotentiallyUnsafeOperation(nextStatementAsAssignmentStatement) || (isAssignedToSignalAModifiableParameter(*matchingInternalEntryForAssignment->getAssignedToSignalPartsIdent()) && isAssignmentDefinedInLoopPerformingMoreThanOneIteration())) {
                 removeEntryFromGraveyard(*matchingInternalEntryForAssignment->getAssignedToSignalPartsIdent(), matchingInternalEntryForAssignment);
                 removeDataDependenciesOfAssignmentFromGraveyard(matchingInternalEntryForAssignment);
+                if (!removeOverlappingAssignmentsForIfStatementAnchorsFromGraveyard(determineReachableIfStatementAnchors(indexOfCurrentStmtInControlFlowGraph, ifStatementAnchors), ifStatementAnchors))
+                    return {};
             }
         } else if (const auto& nextStatementAsIfStatement = std::dynamic_pointer_cast<syrec::IfStatement>(nextStatement->statement); nextStatementAsIfStatement != nullptr) {
             if (isAssignmentDefinedInLoopPerformingMoreThanOneIteration() || doesExpressionContainPotentiallyUnsafeOperation(nextStatementAsIfStatement->condition)) {
                 removeOverlappingAssignmentsForSignalAccessesInExpressionFromGraveyard(nextStatementAsIfStatement->condition, indexOfCurrentStmtInControlFlowGraph);    
             }
+            ifStatementAnchors.emplace_back(IfStatementAnchorInControlFlowGraph {indexOfCurrentStmtInControlFlowGraph, nextStatementAsIfStatement->condition});
         } else if (const auto& nextStatementAsCallStatement = std::dynamic_pointer_cast<syrec::CallStatement>(nextStatement->statement); nextStatementAsCallStatement != nullptr) {
             if (isAssignmentDefinedInLoopPerformingMoreThanOneIteration()) {
                 for (const auto& callerArgument: nextStatementAsCallStatement->parameters) {
                     if (internalAssignmentData.count(callerArgument)) {
                         for (const auto& definedAssignmentWithAssignedToSignalPartsIdentMatchingCallerArgument: internalAssignmentData.at(callerArgument)) {
-                            removeDataDependenciesOfAssignmentFromGraveyard(definedAssignmentWithAssignedToSignalPartsIdentMatchingCallerArgument); 
+                            removeDataDependenciesOfAssignmentFromGraveyard(definedAssignmentWithAssignedToSignalPartsIdentMatchingCallerArgument);
+                            if (!removeOverlappingAssignmentsForIfStatementAnchorsFromGraveyard(determineReachableIfStatementAnchors(indexOfCurrentStmtInControlFlowGraph, ifStatementAnchors), ifStatementAnchors))
+                                return {};
                         }
                     }
                 }   
@@ -173,6 +183,8 @@ std::vector<DeadStoreEliminator::AssignmentStatementIndexInControlFlowGraph> Dea
                 accessedVariablePartsOfRhsOperand.var = std::get<syrec::Variable::ptr>(*rhsOperandSymbolTableData);
                 removeOverlappingAssignmentsFromGraveyard(accessedVariablePartsOfLhsOperand, matchingInternalEntryForSwapStatement->indexInControlFlowGraph);
                 removeOverlappingAssignmentsFromGraveyard(accessedVariablePartsOfRhsOperand, matchingInternalEntryForSwapStatement->indexInControlFlowGraph);
+                if (!removeOverlappingAssignmentsForIfStatementAnchorsFromGraveyard(determineReachableIfStatementAnchors(indexOfCurrentStmtInControlFlowGraph, ifStatementAnchors), ifStatementAnchors))
+                    return {};
             }
         } else {
             const syrec::Statement* internalPointerOfStatement = nextStatement->statement.get();
@@ -233,6 +245,7 @@ void DeadStoreEliminator::removeOverlappingAssignmentsForSignalAccessesInExpress
         const std::vector<InternalAssignmentData::ptr> overlappingAssignmentsForAccessedSignalParts = determineOverlappingAssignmentsForGivenSignalAccess(*definedSignalAccessInAssignmentRhsExpr, indexOfAssignmentWhereSignalAccessWasDefined);
         for (const InternalAssignmentData::ptr& overlappingAssignmentsForAccessedToSignalParts: overlappingAssignmentsForAccessedSignalParts) {
             removeEntryFromGraveyard(definedSignalAccessInAssignmentRhsExpr->var->name, overlappingAssignmentsForAccessedToSignalParts);
+            removeDataDependenciesOfAssignmentFromGraveyard(overlappingAssignmentsForAccessedToSignalParts);
         }
     }
 }
@@ -679,28 +692,34 @@ std::size_t DeadStoreEliminator::determineNestingLevelMeasuredForIfStatements(co
 }
 
 bool DeadStoreEliminator::isReachableInReverseControlFlowGraph(const AssignmentStatementIndexInControlFlowGraph& assignmentStatement, const AssignmentStatementIndexInControlFlowGraph& usageOfAssignedToSignal) const {
-    const std::size_t& numIndizesToCheck = std::min(assignmentStatement.relativeStatementIndexPerControlBlock.size(), usageOfAssignedToSignal.relativeStatementIndexPerControlBlock.size());
-    bool        isReachable       = true;
+     const std::size_t& numIndicesToCheck = std::min(assignmentStatement.relativeStatementIndexPerControlBlock.size(), usageOfAssignedToSignal.relativeStatementIndexPerControlBlock.size());
+    bool               isReachable       = true;
 
-    for (std::size_t i = 0; i < numIndizesToCheck && isReachable; ++i) {
+    for (std::size_t i = 0; i < numIndicesToCheck && isReachable; ++i) {
         const auto& currRelativeIndexForAssignmentStmt = assignmentStatement.relativeStatementIndexPerControlBlock.at(i);
         const auto& currRelativeIndexForUsageStmt = usageOfAssignedToSignal.relativeStatementIndexPerControlBlock.at(i);
-        
-        if (currRelativeIndexForUsageStmt.relativeIndexInBlock < currRelativeIndexForAssignmentStmt.relativeIndexInBlock) {
+
+        const bool wasUsageDefinedInTrueBranch      = currRelativeIndexForUsageStmt.blockType == StatementIterationHelper::IfConditionTrueBranch;
+        const bool wasUsageDefinedInFalseBranch = currRelativeIndexForUsageStmt.blockType == StatementIterationHelper::IfConditionFalseBranch;
+        const bool wasAssignmentDefinedInTrueBranch = currRelativeIndexForAssignmentStmt.blockType == StatementIterationHelper::IfConditionTrueBranch;
+        const bool wasAssignmentDefinedInFalseBranch = currRelativeIndexForAssignmentStmt.blockType == StatementIterationHelper::IfConditionFalseBranch;
+
+        if ((wasAssignmentDefinedInTrueBranch && wasUsageDefinedInFalseBranch) || (wasAssignmentDefinedInFalseBranch && wasUsageDefinedInTrueBranch))
             isReachable = false;
-            continue;
-        }
+        else if (currRelativeIndexForUsageStmt.blockType == currRelativeIndexForAssignmentStmt.blockType)
+            isReachable = currRelativeIndexForUsageStmt.relativeIndexInBlock >= currRelativeIndexForAssignmentStmt.relativeIndexInBlock;
+    }
 
-        const bool isCurrentIndexOfAssignmentStmtInIfBranch = currRelativeIndexForAssignmentStmt.blockType == StatementIterationHelper::IfConditionTrueBranch || currRelativeIndexForAssignmentStmt.blockType == StatementIterationHelper::IfConditionFalseBranch;
-        const bool isCurrentIndexOfUsageStmtInIfBranch      = currRelativeIndexForUsageStmt.blockType == StatementIterationHelper::IfConditionTrueBranch || currRelativeIndexForUsageStmt.blockType == StatementIterationHelper::IfConditionFalseBranch;
+    if (isReachable && usageOfAssignedToSignal.relativeStatementIndexPerControlBlock.size() < assignmentStatement.relativeStatementIndexPerControlBlock.size()) {
+        for (std::size_t i = 0; i < numIndicesToCheck; ++i) {
+            const auto blockTypeForCurrentNestingLevelOfUsage      = usageOfAssignedToSignal.relativeStatementIndexPerControlBlock.at(i);
+            const auto blockTypeForCurrentNestingLevelOfAssignment = assignmentStatement.relativeStatementIndexPerControlBlock.at(i);
 
-        // If the current relative statement index for both statements is in a branch of an if statement check whether they are in the same branch (otherwise the assignment statement is not reachable from the current one)
-        if (isCurrentIndexOfAssignmentStmtInIfBranch && isCurrentIndexOfUsageStmtInIfBranch) {
-            isReachable = currRelativeIndexForAssignmentStmt.blockType == currRelativeIndexForUsageStmt.blockType;
+            if (blockTypeForCurrentNestingLevelOfUsage.blockType == blockTypeForCurrentNestingLevelOfAssignment.blockType &&
+                blockTypeForCurrentNestingLevelOfUsage.relativeIndexInBlock > blockTypeForCurrentNestingLevelOfAssignment.relativeIndexInBlock)
+                return true;
         }
-        else {
-            isReachable = true;
-        }
+        isReachable = false;
     }
     return isReachable;
 }
@@ -877,4 +896,42 @@ bool DeadStoreEliminator::isNextDeadStoreDefinedAsSuccessorOnSameNestingLevel(co
             return true;
     }
     return currDeadStoreIndexInControlFlowGraphForNestingLevel.blockType == StatementIterationHelper::IfConditionTrueBranch && nextDeadStoreIndexInControlFlowGraphForNestingLevel.blockType == StatementIterationHelper::IfConditionFalseBranch;
+}
+
+bool DeadStoreEliminator::removeOverlappingAssignmentsForIfStatementAnchorsFromGraveyard(const std::vector<std::size_t>& selectedAnchors, std::vector<IfStatementAnchorInControlFlowGraph>& ifStatementAnchors) {
+    for (const std::size_t anchorIndex : selectedAnchors) {
+        if (anchorIndex >= ifStatementAnchors.size())
+            return false;
+
+        IfStatementAnchorInControlFlowGraph& anchor = ifStatementAnchors.at(anchorIndex);
+        if (!anchor.isConsideredAsDead)
+            continue;
+
+        removeOverlappingAssignmentsForSignalAccessesInExpressionFromGraveyard(anchor.guardExpression, anchor.relativeStatementIndexPerControlBlock);
+        anchor.isConsideredAsDead = false;
+    }
+    return true;
+}
+
+std::vector<std::size_t> DeadStoreEliminator::determineReachableIfStatementAnchors(const AssignmentStatementIndexInControlFlowGraph& currStatementIndexInControlFlow, const std::vector<IfStatementAnchorInControlFlowGraph>& ifStatementAnchors) {
+    if (ifStatementAnchors.empty())
+        return {};
+
+    std::vector<std::size_t> foundAnchors;
+    std::size_t              searchedForNestingLevel = currStatementIndexInControlFlow.relativeStatementIndexPerControlBlock.size() - 1;
+    std::size_t              anchorIdx               = ifStatementAnchors.size() - 1;
+
+    if (ifStatementAnchors.front().isConsideredAsDead)
+        foundAnchors.emplace_back(0);
+
+    for (auto revrAnchorIterator = ifStatementAnchors.crbegin(); revrAnchorIterator > ifStatementAnchors.crend(); --revrAnchorIterator) {
+        if (revrAnchorIterator->relativeStatementIndexPerControlBlock.relativeStatementIndexPerControlBlock.size() < searchedForNestingLevel) {
+            if (ifStatementAnchors.at(anchorIdx + 1).isConsideredAsDead)
+                foundAnchors.emplace_back(anchorIdx + 1);
+
+            --searchedForNestingLevel;
+        }
+        --anchorIdx;
+    }
+    return foundAnchors;
 }
