@@ -5291,6 +5291,43 @@
       }
     ]
   },
+  "SynthesisOfRepeatedCallsOfSameModule": {
+    "inputCircuit": "module incrByOne(inout a(3)) wire t(3) ++= t; a += t module main(inout a(3)) for 2 do call incrByOne(a) rof",
+    "simulationRuns": [
+      {
+        "in": "000",
+        "out": "110"
+      },
+      {
+        "in": "100",
+        "out": "001"
+      },
+      {
+        "in": "010",
+        "out": "101"
+      },
+      {
+        "in": "110",
+        "out": "011"
+      },
+      {
+        "in": "001",
+        "out": "111"
+      },
+      {
+        "in": "101",
+        "out": "000"
+      },
+      {
+        "in": "011",
+        "out": "100"
+      },
+      {
+        "in": "111",
+        "out": "010"
+      }
+    ]
+  },
 
   "UsageOfVariableOfTypeInAsValueForParameterOfTypeInOfUncalledModule": {
     "inputCircuit": "module add(inout a(2), in b(2)) a += b module main(inout a(2), in b(2)) call add(a, b)",
@@ -6774,6 +6811,43 @@
       {
         "in": "111",
         "out": "011"
+      }
+    ]
+  },
+  "SynthesisOfRepeatedUncallsOfSameModule": {
+    "inputCircuit": "module incrByOne(inout a(3)) wire t(3) a += t; --= t module main(inout a(3)) for 2 do uncall incrByOne(a) rof",
+    "simulationRuns": [
+      {
+        "in": "000",
+        "out": "101"
+      },
+      {
+        "in": "100",
+        "out": "011"
+      },
+      {
+        "in": "010",
+        "out": "111"
+      },
+      {
+        "in": "110",
+        "out": "000"
+      },
+      {
+        "in": "001",
+        "out": "100"
+      },
+      {
+        "in": "101",
+        "out": "010"
+      },
+      {
+        "in": "011",
+        "out": "110"
+      },
+      {
+        "in": "111",
+        "out": "001"
       }
     ]
   }
