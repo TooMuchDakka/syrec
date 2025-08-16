@@ -1255,6 +1255,18 @@ namespace syrec {
             std::cerr << "Failed to remove last added statement execution order from internal stack\n";
             synthesisOfModuleBodyOk = false;
         }
+
+        // The mapping of SyReC variables to its associated qubits is no longer needed for the local variables of a SyReC module after the body of a called/uncalled module was synthesized, thus we remove these mappings
+        for (auto localModuleVariableIterator = targetModule->variables.begin(); localModuleVariableIterator != targetModule->variables.end() && synthesisOfModuleBodyOk; ++localModuleVariableIterator) {
+            auto matchingVarLinesLookupEntryForLocalVariable = varLines.find(*localModuleVariableIterator);
+            if (matchingVarLinesLookupEntryForLocalVariable == varLines.cend()) {
+                std::cerr << "Failed to remove qubit lines for local module variable " << matchingVarLinesLookupEntryForLocalVariable->first->name << " during cleanup of " << (callStmt != nullptr ? "called" : "uncalled") << " module " << targetModule->name;
+                synthesisOfModuleBodyOk = false;
+            } else {
+                varLines.erase(*localModuleVariableIterator);
+            }
+        }
+
         modules.pop();
         return synthesisOfModuleBodyOk;
     }
