@@ -90,6 +90,12 @@ namespace syrec {
          */
         [[nodiscard]] std::unordered_set<qc::Qubit> getAddedPreliminaryAncillaryQubitIndices() const { return addedAncillaryQubitIndices; }
 
+        // TODO: Tests
+        /**
+         * Clear all preliminary ancillary qubit indices that have been promoted to "actual" ancillary qubits after all necessary quantum operations where added to the quantum computation.
+         */
+        void clearAddedPreliminiaryAncillaryQubitIndices() { addedAncillaryQubitIndices.clear(); }
+
         /**
          * Promote a previously added preliminary ancillary qubit status to a permanent one. No qubits can be added to the quantum computation after this point.
          * @param qubit The index of the qubit in the quantum computation.

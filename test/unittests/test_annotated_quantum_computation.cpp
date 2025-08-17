@@ -2289,6 +2289,8 @@ TEST_F(AnnotatedQuantumComputationTestsFixture, DeactivatingControlQubitPropagat
 }
 // BEGIN Control line propagation scopes tests
 
+// TODO: Update python syrec-editor application to use new indirection from annotation key -> label
+// TODO: Tests for clearing of preliminary ancillary qubits
 // TODO: Update tests to use new key lookup
 // BEGIN Annotation tests
 //TEST_F(AnnotatedQuantumComputationTestsFixture, SetAnnotationsForQuantumOperation) {

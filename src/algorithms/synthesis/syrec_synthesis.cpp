@@ -138,6 +138,10 @@ namespace syrec {
             }
         }
 
+        // After the complete SyReC program was synthesized (i.e. no further quantum operations are going to be added to the quantum computation), the previously recorded preliminary ancillary qubits
+        // have been promoted to "actual" ancillary qubits thus the former no longer need to be recorded and can be freed up.
+        synthesizer->annotatableQuantumComputation.clearAddedPreliminiaryAncillaryQubitIndices();
+
         if (statistics != nullptr) {
             const TimeStamp simulationEndTime = std::chrono::steady_clock::now();
             const auto      simulationRunTime = std::chrono::duration_cast<std::chrono::milliseconds>(simulationEndTime - simulationStartTime);
