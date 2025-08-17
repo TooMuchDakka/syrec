@@ -13,6 +13,7 @@
 #include "algorithms/synthesis/syrec_line_aware_synthesis.hpp"
 #include "core/annotatable_quantum_computation.hpp"
 #include "core/properties.hpp"
+#include "core/quantum_gate_annotations_key_stringifier.hpp"
 #include "core/qubit_inlining_stack.hpp"
 #include "core/syrec/parser/utils/syrec_operation_utils.hpp"
 #include "core/syrec/program.hpp"
@@ -30,6 +31,11 @@ using namespace syrec;
 PYBIND11_MODULE(pysyrec, m) {
     py::module::import("mqt.core.ir");
     m.doc() = "Python interface for the SyReC programming language for the synthesis of reversible circuits";
+
+    py::class_<QuantumGateAnnotationsKeyStringifier>(m, "quantum_gate_annotations_key_to_label_lookup")
+            .def(py::init<>(), "Constructs an empty lookup")
+            .def("exists_label_for_key", &QuantumGateAnnotationsKeyStringifier::existsLabelForKey, "key"_a, "Determine whether a label for a given key exists")
+            .def("get_label_for_key", &QuantumGateAnnotationsKeyStringifier::getLabelForKey, "key"_a, "Fetch the label registered for a given key");
 
     py::class_<QubitInliningStack::QubitInliningStackEntry, std::shared_ptr<QubitInliningStack::QubitInliningStackEntry>>(m, "qubit_inlining_stack_entry")
             .def(py::init<>(), "Constructs an empty qubit inlining stack entry")
@@ -53,7 +59,8 @@ PYBIND11_MODULE(pysyrec, m) {
             .def("get_quantum_cost_for_synthesis", &AnnotatableQuantumComputation::getQuantumCostForSynthesis, "Get the quantum cost to synthesis the quantum computation")
             .def("get_transistor_cost_for_synthesis", &AnnotatableQuantumComputation::getTransistorCostForSynthesis, "Get the transistor cost to synthesis the quantum computation")
             .def("get_annotations_of_quantum_operation", &AnnotatableQuantumComputation::getAnnotationsOfQuantumOperation, "quantum_operation_index_in_quantum_operation"_a, "Get the annotations of a specific quantum operation in the quantum computation")
-            .def("get_inlining_information_of_qubit", &AnnotatableQuantumComputation::getInliningInformationOfQubit, "qubit_label"_a, "Get the inlining information for a qubit", py::return_value_policy::reference_internal);
+            .def("get_inlining_information_of_qubit", &AnnotatableQuantumComputation::getInliningInformationOfQubit, "qubit_label"_a, "Get the inlining information for a qubit", py::return_value_policy::reference_internal)
+            .def("get_quantum_operation_annotations_key_to_label_lookup", &AnnotatableQuantumComputation::getQuantumOperationAnnotationsKeyToLabelLookup, py::return_value_policy::reference_internal);
 
     py::class_<NBitValuesContainer>(m, "n_bit_values_container")
             .def(py::init<>(), "Constructs an empty container of size zero.")

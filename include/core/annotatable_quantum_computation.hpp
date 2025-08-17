@@ -14,6 +14,7 @@
 #include "ir/QuantumComputation.hpp"
 #include "ir/operations/Control.hpp"
 #include "ir/operations/Operation.hpp"
+#include "quantum_gate_annotations_key_stringifier.hpp"
 #include "qubit_inlining_stack.hpp"
 
 #include <cstddef>
@@ -33,7 +34,7 @@ namespace syrec {
      */
     class AnnotatableQuantumComputation: public qc::QuantumComputation {
     public:
-        using QuantumOperationAnnotationsLookup = std::map<std::string, std::string, std::less<>>;
+        using QuantumOperationAnnotationsLookup = std::map<QuantumGateAnnotationsKeyStringifier::AnnotationKey, std::string, std::less<>>;
         using SynthesisCostMetricValue          = std::uint64_t;
 
         /**
@@ -148,25 +149,25 @@ namespace syrec {
          * Already existing quantum computations in the qc::QuantumComputation are not modified.
          * @param key The key of the global quantum operation annotation
          * @param value The value of the global quantum operation annotation
-         * @return Whether an existing global annotation was updated.
+         * @return If a mapping from the annotation key to its human readable label existed then whether an existing global annotation was updated, otherwise false.
          */
-        [[maybe_unused]] bool setOrUpdateGlobalQuantumOperationAnnotation(const std::string_view& key, const std::string& value);
+        [[maybe_unused]] bool setOrUpdateGlobalQuantumOperationAnnotation(QuantumGateAnnotationsKeyStringifier::AnnotationKey key, const std::string& value);
 
         /**
          * Remove a global gate annotation. Existing annotations of the gates of the circuit are not modified.
          * @param key The key of the global gate annotation to be removed
          * @return Whether a global gate annotation was removed.
          */
-        [[maybe_unused]] bool removeGlobalQuantumOperationAnnotation(const std::string_view& key);
+        [[maybe_unused]] bool removeGlobalQuantumOperationAnnotation(QuantumGateAnnotationsKeyStringifier::AnnotationKey key);
 
         /**
-         * Set a key value annotation for a quantum operation
+         * Set or update a key value annotation for a quantum operation
          * @param indexOfQuantumOperationInQuantumComputation The index of the quantum operation in the quantum computation
          * @param annotationKey The key of the quantum operation annotation
          * @param annotationValue The value of the quantum operation annotation
-         * @return Whether an operation at the user-provided index existed in the quantum operation
+         * @return If a mapping from the annotation key to its human readable label existed then whether an operation at the user-provided index existed in the quantum operation, otherwise false.
          */
-        [[maybe_unused]] bool setOrUpdateAnnotationOfQuantumOperation(std::size_t indexOfQuantumOperationInQuantumComputation, const std::string_view& annotationKey, const std::string& annotationValue);
+        [[maybe_unused]] bool setOrUpdateAnnotationOfQuantumOperation(std::size_t indexOfQuantumOperationInQuantumComputation, QuantumGateAnnotationsKeyStringifier::AnnotationKey annotationKey, const std::string& annotationValue);
 
         /**
          * Get the inline information of a qubit.
@@ -176,6 +177,20 @@ namespace syrec {
          * @remark The inline stack of a qubit is only recorded if the qubit inlining feature is activated via a boolean flag in the synthesis settings
          */
         [[nodiscard]] const InlinedQubitInformation* getInliningInformationOfQubit(const std::string& qubitLabel) const;
+
+        /**
+         * Register a mapping between the key of a quantum annotation property and its human readable label
+         * @param key The numeric value of the quantum annotation property
+         * @param value The humand readable label for the \p key
+         * @return If the internal lookup is not null then the return values can be used to determine whether a new entry was created (return value true) or if an existing entry was updated. Otherwise, std::nullopt is returned.
+         */
+        [[maybe_unused]] std::optional<bool> registerQuantumAnnotationKeyToLabelMapping(QuantumGateAnnotationsKeyStringifier::AnnotationKey key, const std::string& value) const;
+
+        /**
+         * Fetch the internal lookup used to get a human readable value for the annotations of a quantum operation.
+         * @return A lookup to map quantum operation annotations to human readable values.
+         */
+        [[nodiscard]] const QuantumGateAnnotationsKeyStringifier* getQuantumOperationAnnotationsKeyToLabelLookup() const { return quantumOperationAnnotationsKeyToLabelLookup.get(); }
 
     protected:
         [[maybe_unused]] bool annotateAllQuantumOperationsAtPositions(std::size_t fromQuantumOperationIndex, std::size_t toQuantumOperationIndex, const QuantumOperationAnnotationsLookup& userProvidedAnnotationsPerQuantumOperation);
@@ -196,5 +211,6 @@ namespace syrec {
         std::unordered_set<qc::Qubit>                  addedAncillaryQubitIndices;
 
         std::unordered_map<std::string, InlinedQubitInformation> inlinedQubitsInformationLookup;
+        std::unique_ptr<QuantumGateAnnotationsKeyStringifier>    quantumOperationAnnotationsKeyToLabelLookup;
     };
 } // namespace syrec

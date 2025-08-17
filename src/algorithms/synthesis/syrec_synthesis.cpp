@@ -48,6 +48,8 @@ namespace syrec {
     // Helper Functions for the synthesis methods
     SyrecSynthesis::SyrecSynthesis(AnnotatableQuantumComputation& annotatableQuantumComputation):
         annotatableQuantumComputation(annotatableQuantumComputation) {
+        annotatableQuantumComputation.registerQuantumAnnotationKeyToLabelMapping(LINE_NUMBER_ANNOTATION_KEY, std::string(LINE_NUMBER_ANNOTATION_KEY_VALUE));
+
         freeConstLinesMap.try_emplace(false /* emplacing a default constructed object */);
         freeConstLinesMap.try_emplace(true /* emplacing a default constructed object */);
         statementExecutionOrderStack = std::make_unique<StatementExecutionOrderStack>();
@@ -190,7 +192,7 @@ namespace syrec {
     bool SyrecSynthesis::onStatement(const Statement::ptr& statement) {
         stmts.push(statement);
 
-        annotatableQuantumComputation.setOrUpdateGlobalQuantumOperationAnnotation(GATE_ANNOTATION_KEY_ASSOCIATED_STATEMENT_LINE_NUMBER, std::to_string(static_cast<std::size_t>(statement->lineNumber)));
+        annotatableQuantumComputation.setOrUpdateGlobalQuantumOperationAnnotation(LINE_NUMBER_ANNOTATION_KEY, std::to_string(static_cast<std::size_t>(statement->lineNumber)));
 
         bool okay = true;
         if (auto const* swapStat = dynamic_cast<SwapStatement*>(statement.get()); swapStat != nullptr) {

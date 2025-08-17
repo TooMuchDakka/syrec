@@ -50,7 +50,7 @@ namespace syrec {
         }
 
         // To be able to associate which gates are associated with a statement in the syrec-editor we need to set the appropriate annotation that will be added for each created gate
-        annotatableQuantumComputation.setOrUpdateGlobalQuantumOperationAnnotation(GATE_ANNOTATION_KEY_ASSOCIATED_STATEMENT_LINE_NUMBER, std::to_string(static_cast<std::size_t>(statement->lineNumber)));
+        annotatableQuantumComputation.setOrUpdateGlobalQuantumOperationAnnotation(LINE_NUMBER_ANNOTATION_KEY, std::to_string(static_cast<std::size_t>(statement->lineNumber)));
 
         // Binaryexpression ADD=0, MINUS=1, EXOR=2
         // AssignOperation ADD=0, MINUS=1, EXOR=2

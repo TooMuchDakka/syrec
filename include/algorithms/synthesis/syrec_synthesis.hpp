@@ -13,6 +13,7 @@
 #include "algorithms/synthesis/statement_execution_order_stack.hpp"
 #include "core/annotatable_quantum_computation.hpp"
 #include "core/properties.hpp"
+#include "core/quantum_gate_annotations_key_stringifier.hpp"
 #include "core/qubit_inlining_stack.hpp"
 #include "core/syrec/expression.hpp"
 #include "core/syrec/module.hpp"
@@ -56,8 +57,10 @@ namespace syrec {
         [[maybe_unused]] static bool synthesize(SyrecSynthesis* synthesizer, const Program& program, const Properties::ptr& settings, const Properties::ptr& statistics);
 
     protected:
-        constexpr static std::string_view GATE_ANNOTATION_KEY_ASSOCIATED_STATEMENT_LINE_NUMBER = "lno";
-        using OperationVariant                                                                 = std::variant<AssignStatement::AssignOperation, BinaryExpression::BinaryOperation, ShiftExpression::ShiftOperation, UnaryExpression::UnaryOperation>;
+        constexpr static QuantumGateAnnotationsKeyStringifier::AnnotationKey LINE_NUMBER_ANNOTATION_KEY       = 0;
+        constexpr static std::string_view                                    LINE_NUMBER_ANNOTATION_KEY_VALUE = "lno";
+
+        using OperationVariant = std::variant<AssignStatement::AssignOperation, BinaryExpression::BinaryOperation, ShiftExpression::ShiftOperation, UnaryExpression::UnaryOperation>;
 
         virtual bool processStatement(const Statement::ptr& statement) = 0;
         virtual bool onModule(const Module::ptr&);

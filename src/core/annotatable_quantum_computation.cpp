@@ -10,6 +10,7 @@
 
 #include "core/annotatable_quantum_computation.hpp"
 
+#include "core/quantum_gate_annotations_key_stringifier.hpp"
 #include "core/qubit_inlining_stack.hpp"
 #include "ir/Definitions.hpp"
 #include "ir/operations/Control.hpp"
@@ -313,17 +314,21 @@ bool AnnotatableQuantumComputation::registerControlQubitForPropagationInCurrentA
     return true;
 }
 
-bool AnnotatableQuantumComputation::setOrUpdateGlobalQuantumOperationAnnotation(const std::string_view& key, const std::string& value) {
+bool AnnotatableQuantumComputation::setOrUpdateGlobalQuantumOperationAnnotation(const QuantumGateAnnotationsKeyStringifier::AnnotationKey key, const std::string& value) {
+    if (quantumOperationAnnotationsKeyToLabelLookup == nullptr || !quantumOperationAnnotationsKeyToLabelLookup->existsLabelForKey(key)) {
+        return false;
+    }
+
     auto existingAnnotationForKey = activateGlobalQuantumOperationAnnotations.find(key);
     if (existingAnnotationForKey != activateGlobalQuantumOperationAnnotations.end()) {
         existingAnnotationForKey->second = value;
         return true;
     }
-    activateGlobalQuantumOperationAnnotations.emplace(static_cast<std::string>(key), value);
+    activateGlobalQuantumOperationAnnotations.emplace(key, value);
     return false;
 }
 
-bool AnnotatableQuantumComputation::removeGlobalQuantumOperationAnnotation(const std::string_view& key) {
+bool AnnotatableQuantumComputation::removeGlobalQuantumOperationAnnotation(const QuantumGateAnnotationsKeyStringifier::AnnotationKey key) {
     // We utilize the ability to use a std::string_view to erase a matching element
     // of std::string in a std::map<std::string, ...> without needing to cast the
     // std::string_view to std::string for the std::map<>::erase() operation
@@ -336,8 +341,8 @@ bool AnnotatableQuantumComputation::removeGlobalQuantumOperationAnnotation(const
     return false;
 }
 
-bool AnnotatableQuantumComputation::setOrUpdateAnnotationOfQuantumOperation(std::size_t indexOfQuantumOperationInQuantumComputation, const std::string_view& annotationKey, const std::string& annotationValue) {
-    if (indexOfQuantumOperationInQuantumComputation >= annotationsPerQuantumOperation.size()) {
+bool AnnotatableQuantumComputation::setOrUpdateAnnotationOfQuantumOperation(const std::size_t indexOfQuantumOperationInQuantumComputation, const QuantumGateAnnotationsKeyStringifier::AnnotationKey annotationKey, const std::string& annotationValue) {
+    if (quantumOperationAnnotationsKeyToLabelLookup == nullptr || !quantumOperationAnnotationsKeyToLabelLookup->existsLabelForKey(annotationKey) || indexOfQuantumOperationInQuantumComputation >= annotationsPerQuantumOperation.size()) {
         return false;
     }
 
@@ -345,7 +350,7 @@ bool AnnotatableQuantumComputation::setOrUpdateAnnotationOfQuantumOperation(std:
     if (auto matchingEntryForKey = annotationsForQuantumOperation.find(annotationKey); matchingEntryForKey != annotationsForQuantumOperation.end()) {
         matchingEntryForKey->second = annotationValue;
     } else {
-        annotationsForQuantumOperation.emplace(std::string(annotationKey), annotationValue);
+        annotationsForQuantumOperation.emplace(annotationKey, annotationValue);
     }
     return true;
 }
@@ -357,11 +362,19 @@ const AnnotatableQuantumComputation::InlinedQubitInformation* AnnotatableQuantum
     return &inlinedQubitsInformationLookup.at(qubitLabel);
 }
 
+std::optional<bool> AnnotatableQuantumComputation::registerQuantumAnnotationKeyToLabelMapping(const QuantumGateAnnotationsKeyStringifier::AnnotationKey key, const std::string& value) const {
+    if (quantumOperationAnnotationsKeyToLabelLookup == nullptr) {
+        return std::nullopt;
+    }
+    return quantumOperationAnnotationsKeyToLabelLookup->registerLabelForKey(key, value);
+}
+
 // BEGIN NON-PUBLIC FUNCTIONALITY
 bool AnnotatableQuantumComputation::isQubitWithinRange(const qc::Qubit qubit) const noexcept {
     return qubit < getNqubits();
 }
 
+// TODO: Rather high on the call stack in the hot path due to frequent copies of QuantumOperationsAnnotationLookups
 bool AnnotatableQuantumComputation::annotateAllQuantumOperationsAtPositions(std::size_t fromQuantumOperationIndex, std::size_t toQuantumOperationIndex, const QuantumOperationAnnotationsLookup& userProvidedAnnotationsPerQuantumOperation) {
     if (fromQuantumOperationIndex > annotationsPerQuantumOperation.size() || fromQuantumOperationIndex > toQuantumOperationIndex) {
         return false;
@@ -373,8 +386,10 @@ bool AnnotatableQuantumComputation::annotateAllQuantumOperationsAtPositions(std:
         gateAnnotations[annotationKey] = annotationValue;
     }
 
-    for (std::size_t i = fromQuantumOperationIndex; i < toQuantumOperationIndex; ++i) {
-        annotationsPerQuantumOperation[i] = gateAnnotations;
+    if (!gateAnnotations.empty()) {
+        for (std::size_t i = fromQuantumOperationIndex; i < toQuantumOperationIndex; ++i) {
+            annotationsPerQuantumOperation[i] = gateAnnotations;
+        }
     }
     return true;
 }
