@@ -381,14 +381,11 @@ bool AnnotatableQuantumComputation::annotateAllQuantumOperationsAtPositions(std:
     }
     annotationsPerQuantumOperation.resize(toQuantumOperationIndex);
 
-    QuantumOperationAnnotationsLookup gateAnnotations = userProvidedAnnotationsPerQuantumOperation;
-    for (const auto& [annotationKey, annotationValue]: activateGlobalQuantumOperationAnnotations) {
-        gateAnnotations[annotationKey] = annotationValue;
-    }
-
-    if (!gateAnnotations.empty()) {
+    if (!userProvidedAnnotationsPerQuantumOperation.empty() || !activateGlobalQuantumOperationAnnotations.empty()) {
         for (std::size_t i = fromQuantumOperationIndex; i < toQuantumOperationIndex; ++i) {
-            annotationsPerQuantumOperation[i] = gateAnnotations;
+            QuantumOperationAnnotationsLookup& gateAnnotations = annotationsPerQuantumOperation[i];
+            gateAnnotations.insert(userProvidedAnnotationsPerQuantumOperation.cbegin(), userProvidedAnnotationsPerQuantumOperation.cend());
+            gateAnnotations.insert(activateGlobalQuantumOperationAnnotations.cbegin(), activateGlobalQuantumOperationAnnotations.cend());
         }
     }
     return true;
