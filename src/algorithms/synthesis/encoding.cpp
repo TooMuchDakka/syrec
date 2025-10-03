@@ -22,16 +22,35 @@
 #include <utility>
 #include <vector>
 
+namespace {
+    void appendNCopiesOfBooleanToCollection(std::vector<bool>& vectorToModify, const bool booleanValue, const std::size_t nCopiesToAppend) {
+        vectorToModify.resize(vectorToModify.size() + nCopiesToAppend, booleanValue);
+    }
+
+    void appendNCopiesOfBooleanToCollection(syrec::TruthTable::Cube& cubeMapEntry, const bool booleanValue, const std::size_t nCopiesToAppend) {
+        cubeMapEntry.resize(cubeMapEntry.size() + nCopiesToAppend, booleanValue);
+    }
+
+    void prependNCopiesOfBooleanToCollection(std::vector<bool>& vectorToModify, const bool booleanValue, const std::size_t nCopiesToPrepend) {
+        vectorToModify.insert(vectorToModify.begin(), nCopiesToPrepend, booleanValue);
+    }
+
+    void prependNCopiesOfBooleanToCollection(syrec::TruthTable::Cube& cubeMapEntry, const bool booleanValue, const std::size_t nCopiesToPrepend) {
+        cubeMapEntry.resize(cubeMapEntry.size() + nCopiesToPrepend, booleanValue);
+        std::ranges::rotate(cubeMapEntry, std::prev(cubeMapEntry.end(), static_cast<std::ptrdiff_t>(nCopiesToPrepend)));
+    }
+} // namespace
+
 namespace syrec {
 
     template<class T>
     auto computeOutputFreq(TruthTable const& tt, T& outputFreq) -> void {
-        for (const auto& [input, output]: tt) {
-            auto it = outputFreq.find(output);
-            if (it == outputFreq.end()) {
-                outputFreq.emplace(output, 1U);
+        for (auto cubeMapIterator = tt.cbegin(); cubeMapIterator != tt.cend(); ++cubeMapIterator) {
+            const auto& matchingElementInOutputFreq = outputFreq.find(cubeMapIterator->second);
+            if (matchingElementInOutputFreq == outputFreq.end()) {
+                outputFreq.emplace(cubeMapIterator->second, 1U);
             } else {
-                ++it->second;
+                ++matchingElementInOutputFreq->second;
             }
         }
     }
@@ -81,7 +100,7 @@ namespace syrec {
         const auto nPrimaryOutputs = tt.nPrimaryOutputs();
 
         // resize garbage to the correct size.
-        tt.getGarbage().resize(requiredGarbage);
+        tt.getGarbage().resize(nBits);
 
         // the bits excluding the primary outputs.
         const auto garbageBits = nBits - nPrimaryOutputs;
@@ -90,7 +109,7 @@ namespace syrec {
         assert(garbageBits <= requiredGarbage);
 
         // the bits excluding the primary outputs are set to garbage.
-        for (auto i = 0U; i < garbageBits; i++) {
+        for (auto i = nPrimaryOutputs; i < nBits; ++i) {
             tt.setGarbage(i);
         }
 
@@ -210,68 +229,50 @@ namespace syrec {
         return encoding;
     }
 
-    auto augmentWithConstants(TruthTable& tt, std::size_t const& nBits, bool appendZero) -> void {
-        const auto requiredOutConstants = nBits - tt.nOutputs();
-        const auto requiredInConstants  = nBits - tt.nInputs();
+    // TODO: Helpful links: https://agra.informatik.uni-bremen.de/doc/konf/12aspdac_qmdd_synth_rev.pdf
+    // TODO: https://www.cda.cit.tum.de/files/eda/2017_tcad_one_pass_synthesis_reversible_circuits.pdf (regarding addition of ancillary variables)
+    auto augmentWithConstants(TruthTable& tt, const std::size_t expectedTotalNumberOfBitsPerTruthTableEntry) -> void {
+        const std::size_t nConstantFlagsToAdd = expectedTotalNumberOfBitsPerTruthTableEntry - tt.getConstants().size();
+        const std::size_t nGarbageFlagsToAdd  = expectedTotalNumberOfBitsPerTruthTableEntry - tt.getGarbage().size();
 
-        for (auto& [input, output]: tt) {
-            const auto currentGarbageVecSize = tt.getGarbage().size();
+        prependNCopiesOfBooleanToCollection(tt.getConstants(), true, nConstantFlagsToAdd);
+        appendNCopiesOfBooleanToCollection(tt.getGarbage(), true, nGarbageFlagsToAdd);
 
-            if (appendZero) {
-                // based on the requiredOutConstants, zeros are appended to the outputs.
-                for (auto i = 0U; i < requiredOutConstants; i++) {
-                    // based on the requiredOutConstants, zeros are appended to the outputs.
-                    output.emplace_back(false);
-                    if (currentGarbageVecSize != nBits) {
-                        // add garbage at the LSB.
-                        tt.getGarbage().insert(tt.getGarbage().begin(), true);
-                    }
-                }
+        std::vector<std::uint64_t> cubeMapInputKeys;
+        cubeMapInputKeys.reserve(tt.size());
+        for (const auto& cubeInput: std::views::keys(tt)) {
+            cubeMapInputKeys.emplace_back(cubeInput.toInteger());
+        }
 
-            } else {
-                for (auto i = 0U; i < requiredOutConstants; i++) {
-                    // based on the requiredOutConstants, zeros are inserted to the outputs.
-                    output.insertZero();
-                    if (currentGarbageVecSize != nBits) {
-                        tt.getGarbage().resize(currentGarbageVecSize + 1);
-                    }
-                }
+        const std::size_t numInputsBitsOfCubeMapEntry = tt.nInputs();
+        const std::size_t requiredOutConstants        = expectedTotalNumberOfBitsPerTruthTableEntry - tt.nOutputs();
+        const std::size_t requiredInConstants         = expectedTotalNumberOfBitsPerTruthTableEntry - tt.nInputs();
+
+        if (requiredInConstants == 0 && requiredOutConstants == 0) {
+            return;
+        }
+
+        for (const auto cubeMapInputKey: cubeMapInputKeys) {
+            const auto& readonlyMatchingCubeMapEntry = tt.find(cubeMapInputKey, numInputsBitsOfCubeMapEntry);
+            assert(readonlyMatchingCubeMapEntry != tt.end());
+
+            const auto distanceToMatchingCubeMapEntry = std::distance(tt.cbegin(), readonlyMatchingCubeMapEntry);
+            const auto modifiableMatchingCubeMapEntry = std::next(tt.begin(), distanceToMatchingCubeMapEntry);
+
+            // We need to prepend a number of zero bits to the input pattern of the truth table entry, an operation that cannot be applied directly to the input pattern
+            // due to restrictions by the data structure used to store the truthtable (when iterating over the entries of a std::map<...> the keys are const) so we need to create
+            // a copy of the input pattern, prepend the required bits and then modify the key of the associated entry via the std::map<...> and not the iterator. Since this "update"
+            // operation of the key in the std::map<...> can cause a emplace/rebalance operation, iterators have to be assumed to be invalidated after the operation is completed thus
+            // explaining our prior collection of the integer values of the entries of the truth table to traverse the latter.
+            auto copyOfExistingCubeMapEntryKey = modifiableMatchingCubeMapEntry->first;
+            prependNCopiesOfBooleanToCollection(copyOfExistingCubeMapEntryKey, false, requiredInConstants);
+            appendNCopiesOfBooleanToCollection(modifiableMatchingCubeMapEntry->second, false, requiredOutConstants);
+
+            if (requiredInConstants > 0) {
+                auto backingNodeTypeOfCubeMapEntryInLookup  = tt.extract(readonlyMatchingCubeMapEntry->first);
+                backingNodeTypeOfCubeMapEntryInLookup.key() = copyOfExistingCubeMapEntryKey;
+                tt.insert(std::move(backingNodeTypeOfCubeMapEntryInLookup));
             }
-
-            const auto inputSize  = input.size();
-            const auto outputSize = output.size();
-            if (inputSize >= outputSize) {
-                continue;
-            }
-
-            const auto requiredConstants = outputSize - inputSize;
-            auto       newCube           = input;
-            newCube.reserve(outputSize);
-
-            const auto currentConstantVecSize = tt.getConstants().size();
-
-            if (appendZero) {
-                for (std::size_t i = 0; i < requiredInConstants; i++) {
-                    // based on the requiredInConstants, zeros are appended to the inputs.
-                    newCube.emplace_back(false);
-                    if (currentConstantVecSize != nBits) {
-                        // add a constant at the LSB.
-                        tt.getConstants().insert(tt.getConstants().begin(), true);
-                    }
-                }
-            } else {
-                // based on the requiredConstants, zeros are inserted to the inputs.
-                for (std::size_t i = 0; i < requiredConstants; i++) {
-                    newCube.insertZero();
-                    if (currentConstantVecSize != nBits) {
-                        // add a constant at the MSB.
-                        tt.getConstants().emplace_back(true);
-                    }
-                }
-            }
-            auto nh  = tt.extract(input);
-            nh.key() = newCube;
-            tt.insert(std::move(nh));
         }
     }
 

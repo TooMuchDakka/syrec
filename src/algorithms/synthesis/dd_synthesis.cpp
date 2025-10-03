@@ -46,11 +46,12 @@ namespace syrec {
 
         // base case
         if (tt.nInputs() == 1U) {
-            for (const auto& [input, output]: tt) {
+            for (auto cubeMapIterator = tt.cbegin(); cubeMapIterator != tt.cend(); ++cubeMapIterator) {
                 // truth table has to be completely specified
-                const auto in = input[0].value();
-                if (output[0].has_value()) {
-                    const auto index = (static_cast<std::size_t>(*output[0]) * 2U) + static_cast<std::size_t>(in);
+                const auto& [inputs, outputs] = *cubeMapIterator;
+                const auto in                 = inputs.front().value();
+                if (outputs.front().has_value()) {
+                    const auto index = (static_cast<std::size_t>(*outputs.front()) * 2U) + static_cast<std::size_t>(in);
                     edges.at(index)  = dd::mEdge::one();
                 } else {
                     const auto offset     = in ? 1U : 0U;
@@ -63,15 +64,16 @@ namespace syrec {
 
         // generate sub-tables
         std::array<TruthTable, 4U> subTables{};
-        for (const auto& [input, output]: tt) {
+        for (auto cubeMapIterator = tt.cbegin(); cubeMapIterator != tt.cend(); ++cubeMapIterator) {
             // truth table has to be completely specified
-            const auto in = input[0].value();
+            const auto& [inputs, outputs] = *cubeMapIterator;
+            const auto in                 = inputs.front().value();
 
-            TruthTable::Cube reducedInput(input.begin() + 1, input.end());
-            TruthTable::Cube reducedOutput(output.begin() + 1, output.end());
+            TruthTable::Cube reducedInput(inputs.cbegin() + 1, inputs.cend());
+            TruthTable::Cube reducedOutput(outputs.cbegin() + 1, outputs.cend());
 
-            if (output[0].has_value()) {
-                const auto index = (static_cast<std::size_t>(*output[0]) * 2U) + static_cast<std::size_t>(in);
+            if (outputs.front().has_value()) {
+                const auto index = (static_cast<std::size_t>(*outputs.front()) * 2U) + static_cast<std::size_t>(in);
                 subTables.at(index).try_emplace(std::move(reducedInput), std::move(reducedOutput));
             } else {
                 const auto offset = in ? 1U : 0U;
@@ -514,7 +516,7 @@ namespace syrec {
         // decode the r most significant bits of the original output pattern.
         if (r != 0U) {
             for (const auto& [pattern, code]: codewords) {
-                TruthTable::Cube targetCube(pattern.begin(), pattern.begin() + static_cast<int>(r));
+                TruthTable::Cube targetCube(pattern.cbegin(), pattern.cbegin() + static_cast<int>(r));
 
                 qc::Controls ctrl;
                 for (auto i = 0U; i < codeLength; i++) {
@@ -549,7 +551,7 @@ namespace syrec {
             TruthTable::Cube outCube(pattern);
             outCube.resize(totalNoBits);
 
-            TruthTable::Cube inCube(pattern.begin(), pattern.begin() + static_cast<int>(r));
+            TruthTable::Cube inCube(pattern.cbegin(), pattern.cbegin() + static_cast<int>(r));
             for (auto i = 0U; i < codeLength; i++) {
                 inCube.emplace_back(code[i]);
             }
@@ -695,40 +697,26 @@ namespace syrec {
         reset();
         initializeSynthesizer(tt);
 
+        if (tt.empty()) {
+            return qc;
+        }
+
         // Refer to the one-pass synthesis algorithm of https://www.cda.cit.tum.de/files/eda/2017_tcad_one_pass_synthesis_reversible_circuits.pdf.
-
-        if (m > n) {
-            for (auto i = 0U; i < m - n; i++) {
-                // corresponding bits are considered as ancillary bits.
-                qc->setLogicalQubitAncillary(static_cast<qc::Qubit>((totalNoBits - 1) - i));
-            }
-            // zeros are inserted to match the length of the output patterns.
-            augmentWithConstants(tt, m);
-        }
-
-        const auto oldPrimaryInputs  = tt.nInputs();
-        const auto oldPrimaryOutputs = tt.nOutputs();
-
         // based on the totalNoBits, zeros are appended to the inputs and the outputs.
-        augmentWithConstants(tt, totalNoBits, true);
+        const std::size_t numBitsPrependedToInputOfTruthTableEntries = totalNoBits - tt.nInputs();
+        const std::size_t numBitsAppendedToOutputOfTruthTableEntries = totalNoBits - tt.nOutputs();
+        augmentWithConstants(tt, totalNoBits);
 
-        const auto nAncillaBits = tt.nInputs() - oldPrimaryInputs;
-        const auto nGarbageBits = tt.nOutputs() - oldPrimaryOutputs;
-
-        for (qc::Qubit i = 0U; i < nAncillaBits; i++) {
-            // corresponding bits are considered as ancillary bits.
-            qc->setLogicalQubitAncillary(i);
+        if (numBitsPrependedToInputOfTruthTableEntries > 0) {
+            qc->setLogicalQubitsAncillary(0U, static_cast<qc::Qubit>(numBitsPrependedToInputOfTruthTableEntries - 1U));
         }
-        for (qc::Qubit i = 0U; i < nGarbageBits; i++) {
-            // corresponding bits are considered as garbage bits.
-            qc->setLogicalQubitGarbage(i);
+        if (numBitsAppendedToOutputOfTruthTableEntries > 0) {
+            qc->setLogicalQubitsGarbage(static_cast<qc::Qubit>(tt.nOutputs()), static_cast<qc::Qubit>(totalNoBits - 1));
         }
 
         // If the one-pass synthesis is selected, the appended garbage bits need not be considered during the synthesis process.
         garbageFlag = true;
-
         buildAndSynthesize(tt);
-
         return qc;
     }
 
@@ -739,32 +727,30 @@ namespace syrec {
         TruthTable::CubeMultiMap codewordWithoutAdditionalLine{};
         TruthTable::CubeMap      codewordWithAdditionalLine{};
 
+        // TODO: Is encoder correct? Currently that seems to be the case.
         if (withAdditionalLine) {
             codewordWithAdditionalLine = encodeWithAdditionalLine(tt);
         } else {
             codewordWithoutAdditionalLine = encodeWithoutAdditionalLine(tt);
         }
 
-        r = totalNoBits - tt.nOutputs();
+        r                                                            = totalNoBits - tt.nOutputs();
+        const std::size_t numBitsPrependedToInputOfTruthTableEntries = totalNoBits - tt.nInputs();
+        const std::size_t numBitsAppendedToOutputOfTruthTableEntries = totalNoBits - tt.nOutputs();
         augmentWithConstants(tt, totalNoBits);
 
-        const auto nAncillaBits = totalNoBits - n;
-        const auto nGarbageBits = totalNoBits - m;
-
-        for (qc::Qubit i = 0U; i < nAncillaBits; i++) {
-            // corresponding bits are considered as ancillary bits.
-            qc->setLogicalQubitAncillary(static_cast<qc::Qubit>((totalNoBits - 1) - i));
+        if (numBitsPrependedToInputOfTruthTableEntries > 0) {
+            qc->setLogicalQubitsAncillary(0U, static_cast<qc::Qubit>(numBitsPrependedToInputOfTruthTableEntries - 1U));
         }
-        for (qc::Qubit i = 0U; i < nGarbageBits; i++) {
-            // corresponding bits are considered as garbage bits.
-            qc->setLogicalQubitGarbage(i);
+        if (numBitsAppendedToOutputOfTruthTableEntries > 0) {
+            qc->setLogicalQubitsGarbage(static_cast<qc::Qubit>(m), static_cast<qc::Qubit>(totalNoBits - 1));
         }
-
         buildAndSynthesize(tt);
 
         const auto start = std::chrono::steady_clock::now();
 
         // synthesizing the corresponding decoder circuit.
+        // TODO: Is deencoder correct?
         withAdditionalLine ? decoder(codewordWithAdditionalLine) : decoder(codewordWithoutAdditionalLine);
 
         runtime = runtime + static_cast<double>((std::chrono::steady_clock::now() - start).count());

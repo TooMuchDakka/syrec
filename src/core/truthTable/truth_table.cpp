@@ -55,7 +55,10 @@ namespace syrec {
         Cube filteredInput{};
         filteredInput.reserve(nPrimaryInputs());
         for (auto i = 0U; i < inputSize; i++) {
-            if (!isConstant(inputSize - 1 - i)) {
+            // if (!isConstant(inputSize - 1 - i)) {
+            //     filteredInput.emplace_back(input[i]);
+            // }
+            if (!isConstant(i)) {
                 filteredInput.emplace_back(input[i]);
             }
         }
@@ -71,9 +74,12 @@ namespace syrec {
         Cube filteredOutput{};
         filteredOutput.reserve(nPrimaryOutputs());
         for (auto i = 0U; i < outputSize; i++) {
-            if (!isGarbage(outputSize - 1 - i)) {
+            if (!isGarbage(i)) {
                 filteredOutput.emplace_back(output[i]);
             }
+            // if (!isGarbage(outputSize - 1 - i)) {
+            //     filteredOutput.emplace_back(output[i]);
+            // }
         }
         return filteredOutput;
     }
@@ -88,13 +94,27 @@ namespace syrec {
             return false;
         }
 
-        auto tt1It = tt1.begin();
-        auto tt2It = tt2.begin();
+        auto tt1It = tt1.cbegin();
+        auto tt2It = tt2.cbegin();
 
-        while (tt1It != tt1.end() || tt2It != tt2.end()) {
+        while (tt1It != tt1.cend() || tt2It != tt2.cend()) {
             const auto& [input1, output1] = *tt1It;
-            const auto& [input2, output2] = *tt2It;
+            // TODO: How should the different input sizes due to the added ancillary qubits be handled correctly (do we need to filter them or append bits so that the lookup in the other truthtable works correctly)?
+            const auto x = tt1.filteredInput(input1);
+            const auto y = x.toInteger();
+            const auto z = Cube::fromInteger(y, tt2.nInputs());
+
+            const auto& matchingEntryInTT2 = tt2.cubeMap.find(z);
+            if (matchingEntryInTT2 == tt2.cubeMap.cend()) {
+                return false;
+            }
+            const auto& [input2, output2] = *matchingEntryInTT2;
+            //const auto& [input2, output2] = *tt2It;
             if ((tt1.filteredInput(input1) != tt2.filteredInput(input2)) || (!TruthTable::Cube::checkCubeEquality(tt1.filteredOutput(output1), tt2.filteredOutput(output2)))) {
+                const auto i1 = tt1.filteredInput(input1);
+                const auto i2 = tt2.filteredInput(input2);
+                const auto o1 = tt1.filteredOutput(output1);
+                const auto o2 = tt2.filteredOutput(output2);
                 return false;
             }
             ++tt1It;

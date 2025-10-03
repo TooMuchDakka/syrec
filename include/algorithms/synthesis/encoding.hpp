@@ -60,6 +60,6 @@ namespace syrec {
 
     auto encodeWithoutAdditionalLine(TruthTable& tt) -> TruthTable::CubeMultiMap;
 
-    auto augmentWithConstants(TruthTable& tt, std::size_t const& nBits, bool appendZero = false) -> void;
+    auto augmentWithConstants(TruthTable& tt, std::size_t expectedTotalNumberOfBitsPerTruthTableEntry) -> void;
 
 } //namespace syrec

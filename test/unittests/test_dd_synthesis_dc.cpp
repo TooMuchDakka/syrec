@@ -68,40 +68,40 @@ INSTANTIATE_TEST_SUITE_P(TestDDSynth, TestDDSynthDc,
                              return s; });
 
 TEST_P(TestDDSynthDc, GenericDDSynthesisDcTest) {
-    EXPECT_TRUE(readPla(tt, fileName));
+    ASSERT_TRUE(readPla(tt, fileName));
 
     const auto& qc = DDSynthesizer::synthesizeCodingTechniques(tt);
 
     buildTruthTable(*qc, ttqc);
 
-    EXPECT_TRUE(TruthTable::equal(ttqc, tt));
-    EXPECT_TRUE(TruthTable::equal(tt, ttqc));
+    ASSERT_TRUE(TruthTable::equal(ttqc, tt));
+    ASSERT_TRUE(TruthTable::equal(tt, ttqc));
 
     std::cout << qc->getNops() << "\n";
 }
 
 TEST_P(TestDDSynthDc, GenericDDSynthesisDcTestEncodingWithoutAdditionalLine) {
-    EXPECT_TRUE(readPla(tt, fileName));
+    ASSERT_TRUE(readPla(tt, fileName));
 
     const auto& qc = DDSynthesizer::synthesizeCodingTechniques(tt, false);
 
     buildTruthTable(*qc, ttqc);
 
-    EXPECT_TRUE(TruthTable::equal(ttqc, tt));
-    EXPECT_TRUE(TruthTable::equal(tt, ttqc));
+    ASSERT_TRUE(TruthTable::equal(ttqc, tt));
+    ASSERT_TRUE(TruthTable::equal(tt, ttqc));
 
     std::cout << qc->getNops() << "\n";
 }
 
 TEST_P(TestDDSynthDc, GenericDDSynthesisOnePass) {
-    EXPECT_TRUE(readPla(tt, fileName));
+    ASSERT_TRUE(readPla(tt, fileName));
 
     const auto& qc = DDSynthesizer::synthesizeOnePass(tt);
 
     buildTruthTable(*qc, ttqc);
 
-    EXPECT_TRUE(TruthTable::equal(ttqc, tt));
-    EXPECT_TRUE(TruthTable::equal(tt, ttqc));
+    ASSERT_TRUE(TruthTable::equal(ttqc, tt));
+    ASSERT_TRUE(TruthTable::equal(tt, ttqc));
 
     std::cout << qc->getNops() << "\n";
 }

@@ -84,10 +84,14 @@ namespace syrec {
             // construct a cube from a (64bit) number with a given bitwidth
             static auto fromInteger(const std::uint64_t number, const std::size_t bw) -> Cube {
                 assert(bw <= 64U);
-                Cube cube{};
-                cube.reserve(bw);
+
+                Cube                cube(bw, false);
+                const std::uint64_t truncatedNumberBitMask = (bw < 64U ? (1ULL << (bw + 1U)) : 0U) - 1ULL;
+                const std::uint64_t truncatedNumber        = number & truncatedNumberBitMask;
+
+                std::uint64_t bitExtractorFlagShiftAmount = bw - 1U;
                 for (std::size_t i = 0U; i < bw; ++i) {
-                    cube.emplace_back((number & (1ULL << (bw - 1U - i))) != 0U);
+                    cube[i] = static_cast<bool>(truncatedNumber & (1ULL << bitExtractorFlagShiftAmount--));
                 }
                 return cube;
             }
@@ -102,26 +106,33 @@ namespace syrec {
                 return cube;
             }
 
-            // return integer representation of the cube
+            /**
+             * Get the numeric value of the cube.
+             * @return The numeric value of the boolean values of the cube.
+             * @remark The cube is assumed to store its values in big-endian order [IDX: 0, VAL: MSB] -> [IDX: n - 1, VAL: LSB].
+             */
             [[nodiscard]] auto toInteger() const -> std::uint64_t {
                 assert(cube.size() <= 64U);
-                assert(std::none_of(cube.cbegin(), cube.cend(), [](auto const& v) { return !v.has_value(); }));
-                std::uint64_t result = 0U;
+                assert(std::ranges::all_of(cube, [](const Value& v) { return v.has_value(); }));
+
+                std::uint64_t bitPosition = cube.size() - 1U;
+                std::uint64_t result      = 0U;
                 for (std::size_t i = 0U; i < cube.size(); ++i) {
-                    if (*cube[i]) {
-                        result |= (1ULL << (cube.size() - 1U - i));
-                    }
+                    result |= (1ULL & *cube[i]) << bitPosition--;
                 }
                 return result;
             }
 
-            // return bool vec representation of the cube (order is b0,b1,b2......bn)
+            /**
+             * Return the boolean values of the cube.
+             * @return A vector storing the values of the cube in big endian order.
+             * @remark The cube is assumed to store its values in big-endian order [IDX: 0, VAL: MSB] -> [IDX: n - 1, VAL: LSB].
+             */
             [[nodiscard]] auto toBoolVec() const -> std::vector<bool> {
-                assert(std::all_of(cube.cbegin(), cube.cend(), [](auto const& v) { return v.has_value(); }));
-                const auto        nBits = size();
-                std::vector<bool> result(nBits);
-                for (std::size_t i = 0U; i < nBits; ++i) {
-                    result[nBits - 1 - i] = *cube[i];
+                assert(std::ranges::all_of(cube, [](const Value& v) { return v.has_value(); }));
+                std::vector<bool> result(cube.size());
+                for (std::size_t i = 0U; i < result.size(); ++i) {
+                    result[i] = *cube[i];
                 }
                 return result;
             }
@@ -183,6 +194,10 @@ namespace syrec {
                 return cube[pos];
             }
 
+            auto front() const -> Value {
+                return cube.front();
+            }
+
             auto operator<(const Cube& cv) const -> bool {
                 return (cube < cv.cube);
             }
@@ -204,10 +219,6 @@ namespace syrec {
             }
 
             auto resize(const std::size_t n, Value val = Value()) -> void {
-                cube.resize(n, val);
-            }
-
-            auto resize(const std::size_t n, const Value& val) -> void {
                 cube.resize(n, val);
             }
 
@@ -233,13 +244,13 @@ namespace syrec {
             [[nodiscard]] auto empty() const -> bool {
                 return cube.empty();
             }
-            [[nodiscard]] auto begin() const -> decltype(cube.begin()) {
+            [[nodiscard]] auto begin() -> decltype(cube.begin()) {
                 return cube.begin();
             }
             [[nodiscard]] auto cbegin() const -> decltype(cube.cbegin()) {
                 return cube.cbegin();
             }
-            [[nodiscard]] auto end() const -> decltype(cube.end()) {
+            [[nodiscard]] auto end() -> decltype(cube.end()) {
                 return cube.end();
             }
             [[nodiscard]] auto cend() const -> decltype(cube.cend()) {
@@ -247,8 +258,12 @@ namespace syrec {
             }
         };
 
-        using CubeMap      = std::map<Cube, Cube>;
-        using CubeMultiMap = std::multimap<Cube, Cube>;
+        struct CubeComparator {
+            [[nodiscard]] bool operator()(const Cube& lCube, const Cube& rCube) const { return lCube < rCube; }
+        };
+
+        using CubeMap      = std::map<Cube, Cube, CubeComparator>;
+        using CubeMultiMap = std::multimap<Cube, Cube, CubeComparator>;
 
     private:
         CubeMap           cubeMap{};
@@ -316,12 +331,12 @@ namespace syrec {
             return cubeMap.end();
         }
 
-        [[nodiscard]] auto begin() const -> decltype(cubeMap.begin()) {
-            return cubeMap.begin();
+        [[nodiscard]] auto cbegin() const -> decltype(cubeMap.cbegin()) {
+            return cubeMap.cbegin();
         }
 
-        [[nodiscard]] auto end() const -> decltype(cubeMap.end()) {
-            return cubeMap.end();
+        [[nodiscard]] auto cend() const -> decltype(cubeMap.cend()) {
+            return cubeMap.cend();
         }
 
         [[nodiscard]] auto empty() const -> bool {
