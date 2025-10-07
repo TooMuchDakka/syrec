@@ -155,6 +155,14 @@ namespace syrec {
             output.resize(requiredGarbage);
         }
 
+        // TODO: With this call the don't care values of the code words for the output patterns of the truth table are set (why do they need to be set when the encoding algorithm described in (This statement is not correct and only left here temporarily for completeness)
+        // With the following call only the output patterns are replaced by their associated code word from the encoder (while also resizing the code word to the number of bits required in the decoder a step that should not be necessary).
+        // One should be able to then transform the permutation matrix that contains don't care values to the identity matrix (see algorithm Q in https://agra.informatik.uni-bremen.de/doc/konf/12aspdac_qmdd_synth_rev.pdf [can this algorithm be applied with existing don't care values])?
+        // TODO: The bug should then be somewhere in the implementation of the Q algorithm.
+        // https://www.cda.cit.tum.de/files/eda/2018_aspdac_coding_techniques_in_synthesis.pdf [Section IV.B] synthesizes the permutation matrix [we still dont now when the dont care values are then finally set or how the permutation matrix is then synthesized]).
+        // TODO: The crucial missing link currently is how are the values of the don't care garbage outputs determined (various algorithms for the diagonalization of the permutation matrix are defined in literature:
+        // - https://agra.informatik.uni-bremen.de/doc/konf/12aspdac_qmdd_synth_rev.pdf
+        // - https://iic.jku.at/files/eda/2017_date_efficient_embedding_of_non_reversible_functions.pdf
         alterTTAndCodewords(tt, encoding, requiredGarbage);
 
         // encode all the outputs
@@ -162,6 +170,7 @@ namespace syrec {
             output = encoding[output];
         }
 
+        // TODO: The encoding
         return encoding;
     }
 

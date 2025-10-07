@@ -35,6 +35,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestDDSynth, TestDDSynthDc,
                          testing::Values(
+                                 "2018_paper_example",
                                  "huff_1",
                                  "dcX2bit",
                                  "dc3bit",

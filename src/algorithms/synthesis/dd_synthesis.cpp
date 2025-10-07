@@ -729,6 +729,11 @@ namespace syrec {
 
         // TODO: Is encoder correct? Currently that seems to be the case.
         if (withAdditionalLine) {
+            // Reference algorithm uses a huffman tree to determine the code word for the output patterns. While the number of garbage bits required
+            // for said code word is used as the value of the associated vertex in the tree, however the reference algorithm does not define how the one determines how
+            // the to be merged nodes are added as children of the merged node (i.e. which of the merge child nodes is the left/right child node). It should not make a
+            // difference which of the two merged nodes serves as the left or right child since this will only determine whether a 0 or 1 is encoded in the code word when
+            // traversing the huffman tree.
             codewordWithAdditionalLine = encodeWithAdditionalLine(tt);
         } else {
             codewordWithoutAdditionalLine = encodeWithoutAdditionalLine(tt);
@@ -745,6 +750,11 @@ namespace syrec {
         if (numBitsAppendedToOutputOfTruthTableEntries > 0) {
             qc->setLogicalQubitsGarbage(static_cast<qc::Qubit>(m), static_cast<qc::Qubit>(totalNoBits - 1));
         }
+        // TODO: If the encoder defined in (https://www.cda.cit.tum.de/files/eda/2018_aspdac_coding_techniques_in_synthesis.pdf section IV.B) is use to synthesize the truth table or its associated permutation matrix
+        // then added ancillary qubits are not storing the original values of some of the primary outputs. Are now Fredkin gates required to "swap" the decoded output value to the "correct"/expected primary output qubit?
+
+        // Builds the QMDD for the given truth table (T) and transforms it so that QMDD represents the identity permutation matrix with the generated quantum operations being equal to the reversible circuit for T^(-1).
+        // The transformation algorithm to get the identity permutation matrix for a given QMDD is described in (https://agra.informatik.uni-bremen.de/doc/konf/12aspdac_qmdd_synth_rev.pdf [Section IV - Algorithm Algorithm Q])
         buildAndSynthesize(tt);
 
         const auto start = std::chrono::steady_clock::now();
