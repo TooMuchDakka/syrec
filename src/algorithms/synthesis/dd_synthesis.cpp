@@ -33,63 +33,85 @@
 
 using namespace qc::literals;
 
-namespace syrec {
-    auto buildDD(const TruthTable& tt, std::unique_ptr<dd::Package>& dd) -> dd::mEdge {
-        // truth table has to have the same number of inputs and outputs
-        assert(tt.nInputs() == tt.nOutputs());
+namespace {
+    struct PermutationMatrixSubmatrix {
+        std::size_t idxOfFirstRowInclusive;
+        std::size_t idxOfLastRowExclusive;
+        std::size_t idxOfFirstColInclusive;
+        std::size_t idxOfLastColExclusive;
+    };
 
-        if (tt.nInputs() == 0U) {
+    // TODO: We are assuming that the row and column index can be combined into an std::unit64_t without overflowing which would place a restriction on the maximum supported truth table size.
+    [[nodiscard]] std::uint64_t generateCombinedIndexFromRowAndColumnIndexInPermutationMatrix(const std::size_t numRowsInPermutationMatrix, const std::size_t rowIndex, const std::size_t colIndex) {
+        return rowIndex * numRowsInPermutationMatrix + colIndex;
+    }
+
+    [[nodiscard]] dd::mEdge determineTerminalNodeForIndexInPermutationMatrix(const std::unordered_set<std::uint64_t>& combinedIndicesOfOneEntriesInPermutationMatrix, const std::uint64_t indexOfEntryInUnrolledPermutationMatrix) {
+        return combinedIndicesOfOneEntriesInPermutationMatrix.contains(indexOfEntryInUnrolledPermutationMatrix) ? dd::mEdge::one() : dd::mEdge::zero();
+    }
+
+    [[nodiscard]] dd::mEdge buildDDFromTruthtable(const syrec::TruthTable& truthTable, const std::unordered_set<std::uint64_t>& combinedIndicesOfOneEntriesInPermutationMatrix, const dd::Qubit idxOfQubitAssociatedWithLevelInDecisionDiagram, const PermutationMatrixSubmatrix& processedPermutationMatrixSubmatrix, dd::Package& ddPackage) {
+        if (idxOfQubitAssociatedWithLevelInDecisionDiagram == truthTable.nInputs() - 1U) {
+            assert(processedPermutationMatrixSubmatrix.idxOfLastRowExclusive - processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive == 2);
+            assert(processedPermutationMatrixSubmatrix.idxOfLastColExclusive - processedPermutationMatrixSubmatrix.idxOfFirstColInclusive == 2);
+
+            const std::size_t numRowsInPermutationMatrix                          = truthTable.size();
+            const auto        combinedIndexForTopLeftEntryOfPermutationMatrix     = generateCombinedIndexFromRowAndColumnIndexInPermutationMatrix(numRowsInPermutationMatrix, processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive, processedPermutationMatrixSubmatrix.idxOfFirstColInclusive);
+            const auto        combinedIndexForTopRightEntryOfPermutationMatrix    = generateCombinedIndexFromRowAndColumnIndexInPermutationMatrix(numRowsInPermutationMatrix, processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive, processedPermutationMatrixSubmatrix.idxOfFirstColInclusive + 1U);
+            const auto        combinedIndexForBottomLeftEntryOfPermutationMatrix  = generateCombinedIndexFromRowAndColumnIndexInPermutationMatrix(numRowsInPermutationMatrix, processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive + 1U, processedPermutationMatrixSubmatrix.idxOfFirstColInclusive);
+            const auto        combinedIndexForBottomRightEntryOfPermutationMatrix = generateCombinedIndexFromRowAndColumnIndexInPermutationMatrix(numRowsInPermutationMatrix, processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive + 1U, processedPermutationMatrixSubmatrix.idxOfFirstColInclusive + 1U);
+
+            if (combinedIndicesOfOneEntriesInPermutationMatrix.contains(combinedIndexForTopLeftEntryOfPermutationMatrix) || combinedIndicesOfOneEntriesInPermutationMatrix.contains(combinedIndexForTopRightEntryOfPermutationMatrix) || combinedIndicesOfOneEntriesInPermutationMatrix.contains(combinedIndexForBottomLeftEntryOfPermutationMatrix) || combinedIndicesOfOneEntriesInPermutationMatrix.contains(combinedIndexForBottomRightEntryOfPermutationMatrix)) {
+                // TODO: What if garbage qubits were added?
+                // TODO: dd::Qubit type is smaller than mqt::Qubit type
+
+                const auto topLeftSubmatrixOfPermutationMatrix     = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForTopLeftEntryOfPermutationMatrix);
+                const auto topRightSubmatrixOfPermutationMatrix    = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForTopRightEntryOfPermutationMatrix);
+                const auto bottomLeftSubmatrixOfPermutationMatrix  = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForBottomLeftEntryOfPermutationMatrix);
+                const auto bottomRightSubmatrixOfPermutationMatrix = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForBottomRightEntryOfPermutationMatrix);
+                return ddPackage.makeDDNode(idxOfQubitAssociatedWithLevelInDecisionDiagram, std::array<dd::mEdge, 4U>({topLeftSubmatrixOfPermutationMatrix, topRightSubmatrixOfPermutationMatrix, bottomLeftSubmatrixOfPermutationMatrix, bottomRightSubmatrixOfPermutationMatrix}));
+            }
             return dd::mEdge::zero();
         }
 
-        auto edges = std::array<dd::mEdge, 4U>{dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero()};
+        const auto rowMid = (processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive + processedPermutationMatrixSubmatrix.idxOfLastRowExclusive) / 2;
+        const auto colMid = (processedPermutationMatrixSubmatrix.idxOfFirstColInclusive + processedPermutationMatrixSubmatrix.idxOfLastColExclusive) / 2;
+        // TODO: What if garbage qubits were added?
+        // TODO: dd::Qubit type is smaller than mqt::Qubit type
+        const auto& topLeftSubmatrixOfPermutationMatrix     = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, idxOfQubitAssociatedWithLevelInDecisionDiagram + 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive, .idxOfLastRowExclusive = rowMid, .idxOfFirstColInclusive = processedPermutationMatrixSubmatrix.idxOfFirstColInclusive, .idxOfLastColExclusive = colMid}), ddPackage);
+        const auto& topRightSubmatrixOfPermutationMatrix    = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, idxOfQubitAssociatedWithLevelInDecisionDiagram + 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive, .idxOfLastRowExclusive = rowMid, .idxOfFirstColInclusive = colMid, .idxOfLastColExclusive = processedPermutationMatrixSubmatrix.idxOfLastColExclusive}), ddPackage);
+        const auto& bottomLeftSubmatrixOfPermutationMatrix  = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, idxOfQubitAssociatedWithLevelInDecisionDiagram + 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = rowMid, .idxOfLastRowExclusive = processedPermutationMatrixSubmatrix.idxOfLastRowExclusive, .idxOfFirstColInclusive = processedPermutationMatrixSubmatrix.idxOfFirstColInclusive, .idxOfLastColExclusive = colMid}), ddPackage);
+        const auto& bottomRightSubmatrixOfPermutationMatrix = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, idxOfQubitAssociatedWithLevelInDecisionDiagram + 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = rowMid, .idxOfLastRowExclusive = processedPermutationMatrixSubmatrix.idxOfLastRowExclusive, .idxOfFirstColInclusive = colMid, .idxOfLastColExclusive = processedPermutationMatrixSubmatrix.idxOfLastColExclusive}), ddPackage);
+        return ddPackage.makeDDNode(idxOfQubitAssociatedWithLevelInDecisionDiagram, std::array<dd::mEdge, 4U>({topLeftSubmatrixOfPermutationMatrix, topRightSubmatrixOfPermutationMatrix, bottomLeftSubmatrixOfPermutationMatrix, bottomRightSubmatrixOfPermutationMatrix}));
+    }
 
-        // base case
-        if (tt.nInputs() == 1U) {
-            for (auto cubeMapIterator = tt.cbegin(); cubeMapIterator != tt.cend(); ++cubeMapIterator) {
-                // truth table has to be completely specified
-                const auto& [inputs, outputs] = *cubeMapIterator;
-                const auto in                 = inputs.front().value();
-                if (outputs.front().has_value()) {
-                    const auto index = (static_cast<std::size_t>(*outputs.front()) * 2U) + static_cast<std::size_t>(in);
-                    edges.at(index)  = dd::mEdge::one();
-                } else {
-                    const auto offset     = in ? 1U : 0U;
-                    edges.at(0U + offset) = dd::mEdge::one();
-                    edges.at(2U + offset) = dd::mEdge::one();
-                }
-            }
-            return dd->makeDDNode(0, edges);
+    [[nodiscard]] dd::mEdge buildDDFromTruthtable(const syrec::TruthTable& truthTable, dd::Package& ddPackage) {
+        // TODO: Validate that truth table is square, etc. see dd::Package::makeDDFromMatrix, the code below is essentially a copy of the validation performed in the latter.
+        if (truthTable.empty()) {
+            return dd::mEdge::one();
+        }
+        assert(truthTable.nInputs() == truthTable.nOutputs());
+
+        // TODO: Handle base case in which truth table only has a single entry?
+        const std::size_t                 nRowsInTruthTable = truthTable.size();
+        std::unordered_set<std::uint64_t> combinedIndicesOfOneEntriesInPermutationMatrix;
+        for (auto truthTableEntriesIterator = truthTable.cbegin(); truthTableEntriesIterator != truthTable.cend(); ++truthTableEntriesIterator) {
+            const auto& [inputValuesOfTruthTableEntry, outputValuesOfTruthTableEntry] = *truthTableEntriesIterator;
+            combinedIndicesOfOneEntriesInPermutationMatrix.emplace(generateCombinedIndexFromRowAndColumnIndexInPermutationMatrix(nRowsInTruthTable, static_cast<std::size_t>(outputValuesOfTruthTableEntry.toInteger()), static_cast<std::size_t>(inputValuesOfTruthTableEntry.toInteger())));
         }
 
-        // generate sub-tables
-        std::array<TruthTable, 4U> subTables{};
-        for (auto cubeMapIterator = tt.cbegin(); cubeMapIterator != tt.cend(); ++cubeMapIterator) {
-            // truth table has to be completely specified
-            const auto& [inputs, outputs] = *cubeMapIterator;
-            const auto in                 = inputs.front().value();
+        const auto initialPermutationMatrixDimensions = PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = 0U, .idxOfLastRowExclusive = nRowsInTruthTable, .idxOfFirstColInclusive = 0U, .idxOfLastColExclusive = nRowsInTruthTable});
+        return buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, 0U, initialPermutationMatrixDimensions, ddPackage);
+    }
 
-            TruthTable::Cube reducedInput(inputs.cbegin() + 1, inputs.cend());
-            TruthTable::Cube reducedOutput(outputs.cbegin() + 1, outputs.cend());
+} // namespace
 
-            if (outputs.front().has_value()) {
-                const auto index = (static_cast<std::size_t>(*outputs.front()) * 2U) + static_cast<std::size_t>(in);
-                subTables.at(index).try_emplace(std::move(reducedInput), std::move(reducedOutput));
-            } else {
-                const auto offset = in ? 1U : 0U;
-                subTables.at(0 + offset).try_emplace(reducedInput, reducedOutput);
-                subTables.at(2 + offset).try_emplace(reducedInput, reducedOutput);
-            }
-        }
-        // recursively build the DD for each sub-table
-        for (std::size_t i = 0U; i < 4U; ++i) {
-            edges.at(i) = buildDD(subTables.at(i), dd);
-            // free up the memory used by the sub-table as fast as possible.
-            subTables.at(i).clear();
-        }
-
-        const auto label = static_cast<dd::Qubit>(tt.nInputs() - 1U);
-        return dd->makeDDNode(label, edges);
+namespace syrec {
+    // Essentially a reimplementation of mEdge Package::makeDDFromMatrix(const CMat& matrix) {
+    // TODO: Interface can be simplified to use reference to dd::Package instead of std::unique_ptr&
+    auto buildDD(const TruthTable& tt, std::unique_ptr<dd::Package>& dd) -> dd::mEdge {
+        auto iteratorToFirstEntryInTruthtable = tt.cbegin();
+        return buildDDFromTruthtable(tt, *dd);
     }
 
     // This algorithm provides all paths with their signatures from the `src` node to the `current` node.
