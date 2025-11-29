@@ -53,10 +53,10 @@ namespace syrec {
         // totalNoBits -> Total no. of bits required to create the circuit
         // r -> Additional variables/bits required to decode the output patterns.
         struct TruthTableQubitInformation {
-            std::size_t n;
-            std::size_t m;
-            std::size_t totalNoQubits;
-            std::size_t r;
+            std::size_t n             = 0;
+            std::size_t m             = 0;
+            std::size_t totalNoQubits = 0;
+            std::size_t r             = 0;
         };
 
         struct SynthesizerComponents {

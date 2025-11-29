@@ -40,10 +40,11 @@ namespace syrec {
         using QmddPath = std::vector<QmddPathComponent>;
 
         struct QmddPathsStartingFromNode {
-            std::vector<QmddPath> nEdgePaths;
-            std::vector<QmddPath> pPrimeEdgePaths;
-            std::vector<QmddPath> nPrimeEdgePaths;
-            std::vector<QmddPath> pEdgePaths;
+            std::reference_wrapper<dd::mNode> associatedQmddNode;
+            std::vector<QmddPath>             nEdgePaths;
+            std::vector<QmddPath>             pPrimeEdgePaths;
+            std::vector<QmddPath>             nPrimeEdgePaths;
+            std::vector<QmddPath>             pEdgePaths;
         };
 
         struct QmddEdgeTraversalHelper {
@@ -57,23 +58,30 @@ namespace syrec {
 
         void applyOperation(qc::Qubit targetBit, dd::mEdge& to, const qc::Controls& ctrl) const;
 
-        [[nodiscard]] dd::mEdge swapPaths(dd::mEdge src, dd::mEdge const& current, const QmddPathsStartingFromNode& qmddNodePathSignatures);
-        [[nodiscard]] dd::mEdge shiftUniquePaths(dd::mEdge src, const dd::mEdge& current, const QmddPathsStartingFromNode& qmddNodePathSignatures);
-        [[nodiscard]] dd::mEdge unifyPath(dd::mEdge src, const dd::mEdge& current, const QmddPathsStartingFromNode& p1SigVec, const QmddPathsStartingFromNode& p2SigVec);
-        [[nodiscard]] dd::mEdge shiftingPaths(const dd::mEdge& src, const dd::mEdge& current);
+        [[nodiscard]] bool swapPaths(dd::mEdge& src, const QmddPathsStartingFromNode& qmddNodePathSignatures) const;
+        void               shiftUniquePaths(dd::mEdge& src, QmddPathsStartingFromNode& qmddNodePathSignatures) const;
+        void               makePathsOfEdgeOfQmddNodeUnique(dd::mEdge& src, QmddEdgeIndex processedEdge, QmddPathsStartingFromNode& qmddNodePathSignatures) const;
+        void               shiftPathsFromPPrimeEdgeToNPrimeEdge(dd::mEdge& src) const;
 
         [[nodiscard]] static bool                       terminate(const dd::mNode& nodeToCheck);
         [[maybe_unused]] static constexpr QmddEdgeIndex increment(QmddEdgeIndex& qmddEdgeIndex) noexcept;
         [[nodiscard]] static constexpr bool             getBooleanSignatureComponentForQmddEdge(QmddEdgeIndex qmddEdgeIndex) noexcept;
 
+        friend constexpr QmddEdgeIndex               operator&(QmddEdgeIndex lOperand, QmddEdgeIndex rOperand) noexcept;
+        friend constexpr QmddEdgeIndex               operator|(QmddEdgeIndex lOperand, QmddEdgeIndex rOperand) noexcept;
+        friend constexpr void                        operator|=(QmddEdgeIndex& assignedToOperand, QmddEdgeIndex rOperand) noexcept;
+        [[nodiscard]] static std::optional<QmddPath> determineUniquePathFromCollection(const std::vector<QmddPath>& qmddPaths);
+
         // TODO: How should garbage qubits be handled? Can their path components be skipped?
         // TODO: One should be able to pass a whole existing path signature as a parameter to define the path from the root to the current node
         // TODO: Memoize intermediate results?
-        [[nodiscard]] static TruthTable::Cube::Set getAllPathSignaturesStartingFromNode(QmddEdgeIndex qmddPathTakenToReachNode, const dd::mNode& node);
-        [[nodiscard]] static std::vector<QmddPath> getAllPathsStartingFromNode(QmddEdgeIndex qmddPathTakenToReachNode, const dd::mNode& node);
-        [[nodiscard]] static qc::Controls          getControlsQubitsFromQmddPath(const QmddPath& qmddPath);
-        [[nodiscard]] static std::vector<QmddPath> getAllPathsFromRootToNode(const dd::mNode& root, const dd::mNode& node);
-        [[nodiscard]] static std::vector<QmddPath> getUniquePathsForQmddNodeEdge(const std::vector<QmddPath>& collectionOfPathsToExtractUniqueOnesFrom, const std::vector<QmddPath>& collectionOfPathsUsedToIdentifyDuplicates);
-        [[nodiscard]] static const dd::mNode*      getRootNode(dd::Package& qmddPackage);
+        [[nodiscard]] static TruthTable::Cube::Set      getAllPathSignaturesStartingFromNode(QmddEdgeIndex qmddPathTakenToReachNode, const dd::mNode& node);
+        [[nodiscard]] static std::vector<QmddPath>      getAllPathsStartingFromNode(QmddEdgeIndex qmddPathTakenToReachNode, const dd::mNode& node);
+        [[nodiscard]] static qc::Controls               getControlsQubitsFromQmddPath(const QmddPath& qmddPath);
+        [[nodiscard]] static std::vector<QmddPath>      getAllPathsFromRootToNode(const dd::mNode& root, const dd::mNode& node);
+        [[nodiscard]] static std::vector<std::size_t>   getIndicesOfUniquePathsForQmddNodeEdge(const std::vector<QmddPath>& collectionOfPathsToExtractUniqueOnesFrom, const std::vector<QmddPath>& collectionOfPathsUsedToIdentifyDuplicates);
+        [[nodiscard]] static std::optional<std::size_t> getIndexOfFirstSharedPathBetweenQmddNodeEdgeSubtrees(const std::vector<QmddPath>& collectionOfPathsToFindSharedOneFrom, const std::vector<QmddPath>& collectionUsedToDetermineWhetherDuplicatePathExists);
+        [[nodiscard]] static const dd::mNode*           getRootNode(dd::Package& qmddPackage);
+        [[nodiscard]] static bool                       doQmddPathsOverlap(const QmddPath& lQmddPath, const QmddPath& rQmddPath);
     };
 } // namespace syrec
