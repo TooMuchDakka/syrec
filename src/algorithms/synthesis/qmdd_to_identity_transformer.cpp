@@ -17,14 +17,18 @@ using namespace syrec;
 
 namespace {
     // TODO: Only for debugging purposes
-    void dumpQmdd(const dd::mEdge& edgeToRootOfQmdd, const bool clearPreviousDumpFileContents) {
+    void dumpQmdd(const dd::mEdge* edgeToRootOfQmdd, const bool clearPreviousDumpFileContents) {
+        if (edgeToRootOfQmdd == nullptr) {
+            return;
+        }
+
         std::ofstream ofs;
         if (clearPreviousDumpFileContents) {
             ofs.open("C:\\School\\MThesis\\test.txt", std::ofstream::out | std::ofstream::trunc);
         } else {
             ofs.open("C:\\School\\MThesis\\test.txt", std::ofstream::out | std::ofstream::app);
         }
-        dd::serialize(edgeToRootOfQmdd, ofs);
+        dd::serialize(*edgeToRootOfQmdd, ofs);
         ofs.flush();
     }
 } // namespace
@@ -34,32 +38,12 @@ bool QmddToIdentityTransformer::synthesize(dd::mEdge src) {
         return false;
     }
 
-    // this->qc = std::make_unique<qc::QuantumComputation>(src.p->v + 1U);
-
     // This following ensures that the `src` node resembles an identity structure.
     // Refer to algorithm Q of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf.
-
-    // TODO: to preserve the `src` DD throughout the synthesis, its reference count has to be at least 2. (Why?)
-    const dd::mNode* rootSet = getRootNode(this->qmddPackage);
-    // if (!rootSet) {
-    //     // Is this double invocation necessary?
-    //     this->qmddPackage.get().incRef(src);
-    //     this->qmddPackage.get().incRef(src);
-    // } else {
-    //     this->qmddPackage.get().incRef(src);
-    // }
     this->qmddPackage.get().incRef(src);
 
     // TODO: Only for debugging purposes
-    dumpQmdd(*getEdgeToRootNode(this->qmddPackage), true);
-
-    // TODO:
-    // if (!rootSet->contains(src)) {
-    //     this->qmddPackage.incRef(src);
-    //     this->qmddPackage.incRef(src);
-    // } else if (rootSet->at(src) == 1U) {
-    //     this->qmddPackage.incRef(src);
-    // }
+    dumpQmdd(getEdgeToRootNode(this->qmddPackage), true);
 
     // queue for the nodes to be processed in a breadth-first manner.
     std::queue<dd::mEdge> queue{};
@@ -74,65 +58,66 @@ bool QmddToIdentityTransformer::synthesize(dd::mEdge src) {
     // TODO: Compare with reference algorithm from dd_synthesis
     // TODO: Add handling for garbage/ancillary qubits
 
-    // while there are nodes left to process.
+    // TODO: Is the queue really necessary when we are often jumping back to the root in case that an operation was performed?
+    // TODO: Due to jumping to the root one could use the visited set to skip already processed subtrees?
     while (!queue.empty()) {
-        dd::mEdge current = queue.front();
+        const dd::mEdge current = queue.front();
         queue.pop();
 
-        // shift the paths of the current node.
+        assert(current.p != nullptr);
+        const auto& nodeToProcess = *current.p;
+        assert(current.p->e.size() == 4);
 
-        // first, increment the reference count of the `src` node,
-        // to prevent it from being garbage collected in the `shiftingPaths` call.
-        // TODO: Is this really necessary
-        //this->qmddPackage.get().incRef(current);
+        QmddPathsStartingFromNode pathsStartingFromNode = {
+                .associatedQmddNode = nodeToProcess,
+                .nEdgePaths         = getAllPathsStartingFromNode(&nodeToProcess, QmddEdgeIndex::N_Path),
+                .pPrimeEdgePaths    = getAllPathsStartingFromNode(&nodeToProcess, QmddEdgeIndex::P_Prime_Path),
+                .nPrimeEdgePaths    = {},
+                .pEdgePaths         = {}};
 
-        // perform the shifting paths algorithm.
-        shiftPathsFromPPrimeEdgeToNPrimeEdge(current);
-        // TODO: How can we assert this in release mode.
-        //assert(src.isIdentity());
+        // P1 algorithm.
+        if (swapPaths(pathsStartingFromNode)) {
+            // TODO: Make conditional
+            dumpQmdd(getEdgeToRootNode(this->qmddPackage), false);
 
-        for (const dd::mEdge& edgesOfCurrentNode: current.p->e) {
-            if (edgesOfCurrentNode.isTerminal()) {
-                continue;
+            queue = {};
+            if (const dd::mEdge* edgeToRootNodeAfterSwap = getEdgeToRootNode(this->qmddPackage); edgeToRootNodeAfterSwap != nullptr) {
+                queue.push(*edgeToRootNodeAfterSwap);
             }
-            queue.emplace(edgesOfCurrentNode);
-            this->qmddPackage.get().incRef(edgesOfCurrentNode);
+            continue;
         }
-        //
-        // const auto srcShifted = shiftPathsFromPPrimeEdgeToNPrimeEdge(src, current);
-        // // TODO: Only for debugging purposes
-        // dumpQmdd(srcShifted, false);
-        // return true;
-        //
-        // const auto pathsShifted = (srcShifted != src);
-        //
-        // // TODO: If a new edge is created by a multiplication operation decrementing its reference count will cause it to be potentially deleted
-        // //          the subsequent garbage collection operation?
-        // // decrement reference count of `src` node again and trigger garbage collection.
-        // // this->qmddPackage.get().decRef(src);
-        // // this->qmddPackage.get().garbageCollect();
-        //
-        // if (pathsShifted) {
-        //     // stopping criterion
-        //     if (srcShifted.isIdentity()) {
-        //         break;
-        //     }
-        //
-        //     // if paths were shifted, synthesis starts again from the new `src` node.
-        //     src = srcShifted;
-        //     visited.clear();
-        //     queue = {};
-        //     queue.emplace(src);
-        //     continue;
-        // }
-        //
-        // // if no paths have been shifted, the children of the current node need to be processed.
-        // for (const auto& e: current.p->e) {
-        //     if (!e.isTerminal() && !visited.contains(e)) {
-        //         queue.emplace(e);
-        //         visited.emplace(e);
-        //     }
-        // }
+
+        pathsStartingFromNode.nPrimeEdgePaths = getAllPathsStartingFromNode(&nodeToProcess, QmddEdgeIndex::N_Prime_Path);
+        pathsStartingFromNode.pEdgePaths      = getAllPathsStartingFromNode(&nodeToProcess, QmddEdgeIndex::P_Path);
+
+        // P2 algorithm.
+        if (shiftUniquePaths(nodeToProcess, pathsStartingFromNode)) {
+            // TODO: Make conditional
+            dumpQmdd(getEdgeToRootNode(this->qmddPackage), false);
+
+            queue = {};
+            if (const dd::mEdge* edgeToRootNodeAfterSwap = getEdgeToRootNode(this->qmddPackage); edgeToRootNodeAfterSwap != nullptr) {
+                queue.push(*edgeToRootNodeAfterSwap);
+            }
+            continue;
+        }
+
+        // P3 algorithm.
+        if (!terminate(nodeToProcess)) {
+            // TODO:
+            // P4 algorithm.
+            //makePathsOfEdgeOfQmddNodeUnique(src, QmddEdgeIndex::P_Prime_Path, uniquePathsStartingFromNode);
+
+            // TODO: Make conditional
+            dumpQmdd(getEdgeToRootNode(this->qmddPackage), false);
+        } else {
+            for (const dd::mEdge& edgesOfCurrentNode: nodeToProcess.e) {
+                if (edgesOfCurrentNode.isTerminal()) {
+                    continue;
+                }
+                queue.emplace(edgesOfCurrentNode);
+            }
+        }
     }
     const auto transformationEndTime = std::chrono::steady_clock::now();
     // TODO: Update signature to return statistics?
@@ -140,38 +125,36 @@ bool QmddToIdentityTransformer::synthesize(dd::mEdge src) {
     return true;
 }
 
-// This function performs the multi-control (if any) X operation.
-void QmddToIdentityTransformer::applyOperation(const qc::Qubit targetBit, dd::mEdge& to, const qc::Controls& ctrl) const {
-    // create operation and corresponding decision diagram
-    qc.get().mcx(ctrl, targetBit);
+dd::mEdge QmddToIdentityTransformer::applyOperationToQmdd(const qc::Qubit targetQubit, const qc::Controls& controlQubits, const dd::mEdge& currentEdgeToRootNode) const {
+    qc.get().mcx(controlQubits, targetQubit);
     const qc::Operation& generatedQuantumOperationForMCXGate = *qc.get().back();
-    to                                                       = dd::applyUnitaryOperation(generatedQuantumOperationForMCXGate, to, this->qmddPackage);
-
     // TODO:
     //++numGates;
+    return dd::applyUnitaryOperation(generatedQuantumOperationForMCXGate, currentEdgeToRootNode, this->qmddPackage);
 }
 
 // This algorithm swaps the paths present in the p' edge to the n edge and vice versa.
 // TODO: In the reimplementation this check is not implemented: "If n' and p paths exists, we move on to P2 algorithm"
 // Refer to the P1 algorithm of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf
-bool QmddToIdentityTransformer::swapPaths(dd::mEdge& src, const QmddPathsStartingFromNode& qmddNodePathSignatures) const {
-    assert(!src.isTerminal());
+bool QmddToIdentityTransformer::swapPaths(const QmddPathsStartingFromNode& qmddNodePathSignatures) const {
     if (qmddNodePathSignatures.pPrimeEdgePaths.size() <= qmddNodePathSignatures.nEdgePaths.size()) {
         return false;
     }
 
-    const dd::mNode* rootNode = getRootNode(qmddPackage);
-    assert(rootNode != nullptr);
+    const dd::mEdge* edgeToRootNode = getEdgeToRootNode(qmddPackage);
+    assert(edgeToRootNode != nullptr);
+    assert(edgeToRootNode->p != nullptr);
+    const dd::mNode& rootNode = *edgeToRootNode->p;
 
     const dd::Qubit targetQubit = qmddNodePathSignatures.associatedQmddNode.get().v;
-    if (targetQubit == rootNode->v) {
+    if (targetQubit == rootNode.v) {
         const qc::Controls controlQubitsForPathFromRootToCurrentNode;
-        applyOperation(targetQubit, src, controlQubitsForPathFromRootToCurrentNode);
+        applyOperationToQmdd(targetQubit, controlQubitsForPathFromRootToCurrentNode, *edgeToRootNode);
     } else {
         // TODO: Iterate all paths from the root to the current node and record the controls for each path P as c(P) then add a toffoli gate TOFF(controls: c(P), target: current)
-        for (const QmddPath& pathFromRootToCurrentNode: getAllPathsFromRootToNode(*rootNode, qmddNodePathSignatures.associatedQmddNode)) {
-            const qc::Controls controlQubitsForPathFromRootToCurrentNode = getControlQubitsForQmddPathFromRootToNode(rootNode->v, pathFromRootToCurrentNode);
-            applyOperation(targetQubit, src, controlQubitsForPathFromRootToCurrentNode);
+        for (const QmddPath& pathFromRootToCurrentNode: getAllPathsFromRootToNode(rootNode, qmddNodePathSignatures.associatedQmddNode)) {
+            const qc::Controls controlQubitsForPathFromRootToCurrentNode = getControlQubitsForQmddPathFromRootToNode(rootNode.v, pathFromRootToCurrentNode);
+            applyOperationToQmdd(targetQubit, controlQubitsForPathFromRootToCurrentNode, *edgeToRootNode);
         }
     }
     return true;
@@ -180,18 +163,19 @@ bool QmddToIdentityTransformer::swapPaths(dd::mEdge& src, const QmddPathsStartin
 // This algorithm moves the unique paths present in the p' edge to the n edge.
 // TODO: In the reimplementation this step is not implemented: 'If there are no unique paths in p' edge, the unique paths present in the n' edge are moved to the p edge if required.'
 // Refer to the P2 algorithm of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf
-void QmddToIdentityTransformer::shiftUniquePaths(dd::mEdge& src, QmddPathsStartingFromNode& qmddNodePathSignatures) const {
-    assert(!src.isTerminal());
+bool QmddToIdentityTransformer::shiftUniquePaths(const dd::mNode& node, const QmddPathsStartingFromNode& qmddNodePathSignatures) const {
     // Collect all unique paths from the p' edge of the current node by excluding all shared paths from the n edge.
     const std::vector<std::size_t> uniquePathIndicesFromPPrimeEdge = getIndicesOfUniquePathsForQmddNodeEdge(qmddNodePathSignatures.pPrimeEdgePaths, qmddNodePathSignatures.nEdgePaths);
     if (uniquePathIndicesFromPPrimeEdge.empty()) {
-        return;
+        return false;
     }
 
-    const dd::mNode* rootNode = getRootNode(qmddPackage);
-    assert(rootNode != nullptr);
-    const std::vector<QmddPath> pathsFromRootToCurrentNode = getAllPathsFromRootToNode(*rootNode, qmddNodePathSignatures.associatedQmddNode);
+    const dd::mEdge* edgeToRootNode = getEdgeToRootNode(qmddPackage);
+    assert(edgeToRootNode != nullptr);
+    assert(edgeToRootNode->p != nullptr);
+    const dd::mNode& rootNode = *edgeToRootNode->p;
 
+    const std::vector<QmddPath> pathsFromRootToCurrentNode = getAllPathsFromRootToNode(rootNode, qmddNodePathSignatures.associatedQmddNode);
     for (const auto& pathIndexInPPrimeEdgeSubtree: uniquePathIndicesFromPPrimeEdge) {
         const QmddPath& uniquePathInPPrimeEdgeSubstree = qmddNodePathSignatures.pPrimeEdgePaths[pathIndexInPPrimeEdgeSubtree];
 
@@ -200,38 +184,17 @@ void QmddToIdentityTransformer::shiftUniquePaths(dd::mEdge& src, QmddPathsStarti
         const qc::Qubit    targetQubit                                = qmddNodePathSignatures.associatedQmddNode.get().v;
 
         if (pathsFromRootToCurrentNode.empty()) {
-            assert(rootNode->v == src.p->v);
-            applyOperation(targetQubit, src, controlQubitsForUniquePathStartingFromNode);
+            assert(rootNode.v == node.v);
+            applyOperationToQmdd(targetQubit, controlQubitsForUniquePathStartingFromNode, *edgeToRootNode);
         } else {
             for (const QmddPath& pathFromRootToCurrentNode: pathsFromRootToCurrentNode) {
-                qc::Controls controlQubitsToTargetPathFromRootToCurrentNode = getControlQubitsForQmddPathFromRootToNode(rootNode->v, pathFromRootToCurrentNode);
+                qc::Controls controlQubitsToTargetPathFromRootToCurrentNode = getControlQubitsForQmddPathFromRootToNode(rootNode.v, pathFromRootToCurrentNode);
                 controlQubitsToTargetPathFromRootToCurrentNode.insert(controlQubitsForUniquePathStartingFromNode.cbegin(), controlQubitsForUniquePathStartingFromNode.cend());
-                applyOperation(targetQubit, src, controlQubitsToTargetPathFromRootToCurrentNode);
+                applyOperationToQmdd(targetQubit, controlQubitsToTargetPathFromRootToCurrentNode, *edgeToRootNode);
             }
         }
-
-        // Update internal path signature data structure by adding the unique path of the p' edge to the n edge.
-        qmddNodePathSignatures.nEdgePaths.emplace_back(uniquePathInPPrimeEdgeSubstree);
-        // While we have moved the unique path to the n edge paths collection, the first edge of the former is still marked as originating from the p' edge thus an update is needed.
-        QmddPath& uniquePathFromPPrimeEdgeInNEdge                              = qmddNodePathSignatures.nEdgePaths.back();
-        uniquePathFromPPrimeEdgeInNEdge.front().incomingEdgeFromParentQmddNode = QmddEdgeIndex::N_Path;
-
-        // TODO: This operation updates all paths of the p and p' in the subtrees of the p' and n' subtree of the parent node.
     }
-
-    // Update internal path signature data structure by removing all unique paths from the p' edge using the erase-remove idiom.
-    const std::unordered_set uniquePathsOfPPrimeEdgeLookup(uniquePathIndicesFromPPrimeEdge.cbegin(), uniquePathIndicesFromPPrimeEdge.cend());
-
-    auto       iteratorInPPrimeEdgePaths                   = qmddNodePathSignatures.pPrimeEdgePaths.begin();
-    const auto predicateIdentifyingUniquePathsInPPrimeEdge = [&](const QmddPath&) {
-        if (iteratorInPPrimeEdgePaths == qmddNodePathSignatures.pPrimeEdgePaths.end()) {
-            return false;
-        }
-        const auto indexOfElementInPPrimePathsContainer = static_cast<std::size_t>(std::distance(qmddNodePathSignatures.pPrimeEdgePaths.begin(), iteratorInPPrimeEdgePaths));
-        ++iteratorInPPrimeEdgePaths;
-        return uniquePathsOfPPrimeEdgeLookup.contains(indexOfElementInPPrimePathsContainer);
-    };
-    std::erase_if(qmddNodePathSignatures.pPrimeEdgePaths, predicateIdentifyingUniquePathsInPPrimeEdge);
+    return true;
 }
 
 // This algorithm checks whether the p' edge is pointing to zero terminal node.
@@ -243,156 +206,72 @@ bool QmddToIdentityTransformer::terminate(const dd::mNode& nodeToCheck) {
     return edgesOfCurrentNode[static_cast<std::size_t>(QmddEdgeIndex::P_Prime_Path)].isZeroTerminal() && edgesOfCurrentNode[static_cast<std::size_t>(QmddEdgeIndex::N_Prime_Path)].isZeroTerminal();
 }
 
-void QmddToIdentityTransformer::makePathsOfEdgeOfQmddNodeUnique(dd::mEdge& src, const QmddEdgeIndex processedEdge, QmddPathsStartingFromNode& qmddNodePathSignatures) const {
-    return;
-
-    // assert(processedEdge == QmddEdgeIndex::P_Prime_Path);
-    //
-    // const std::optional<std::size_t> idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree = getIndexOfFirstSharedPathBetweenQmddNodeEdgeSubtrees(qmddNodePathSignatures.pPrimeEdgePaths, qmddNodePathSignatures.nEdgePaths);
-    // assert(idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree.has_value());
-    //
-    // // TODO: Determine subsequent vertex that can be used as target qubit t to make the shared path unique. Additionally, all qubits q < t need to be used as control qubits?
-    // const std::optional<QmddPath> optionalNotOverlappingPathFromPPrimeEdgeSubstree = determineUniquePathFromCollection(qmddNodePathSignatures.pPrimeEdgePaths);
-    // assert(optionalNotOverlappingPathFromPPrimeEdgeSubstree.has_value());
-    //
-    // const QmddPath& notOverlappingPathFromPPrimeEdgeSubstree = *optionalNotOverlappingPathFromPPrimeEdgeSubstree;
-    // const QmddPath& sharedPathBetweenNAndPPrimeEdgeSubstree  = qmddNodePathSignatures.pPrimeEdgePaths[*idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree];
-    // assert(sharedPathBetweenNAndPPrimeEdgeSubstree.size() == notOverlappingPathFromPPrimeEdgeSubstree.size());
-    //
-    // std::size_t       startIndexInPathForSearchOfEdgeMismatch = 0;
-    // const std::size_t pathLengthFromCurrentNodeToTerminal     = notOverlappingPathFromPPrimeEdgeSubstree.size();
-    //
-    // const dd::mNode* rootNode = getRootNode(qmddPackage);
-    // assert(rootNode != nullptr);
-    // const std::vector<QmddPath> pathsFromRootToCurrentNode = getAllPathsFromRootToNode(*rootNode, qmddNodePathSignatures.associatedQmddNode);
-    //
-    // qc::Controls controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit;
-    // // Add control qubit for p' edge of current vertex
-    // controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.emplace(qc::Control(src.p->v, qc::Control::Type::Pos));
-    //
-    // for (std::size_t i = startIndexInPathForSearchOfEdgeMismatch; i < pathLengthFromCurrentNodeToTerminal; ++i) {
-    //     const auto& firstMismatchedPathComponent = std::find_first_of(
-    //             std::next(notOverlappingPathFromPPrimeEdgeSubstree.cbegin(), static_cast<std::ptrdiff_t>(startIndexInPathForSearchOfEdgeMismatch)),
-    //             notOverlappingPathFromPPrimeEdgeSubstree.cend(),
-    //             std::next(sharedPathBetweenNAndPPrimeEdgeSubstree.cbegin(), static_cast<std::ptrdiff_t>(startIndexInPathForSearchOfEdgeMismatch + 1U)),
-    //             sharedPathBetweenNAndPPrimeEdgeSubstree.cend(),
-    //             [](const QmddPathComponent& lPathComponent, const QmddPathComponent& rPathComponent) {
-    //                 return lPathComponent.edgeIndex != rPathComponent.edgeIndex;
-    //             });
-    //
-    //     if (firstMismatchedPathComponent == notOverlappingPathFromPPrimeEdgeSubstree.cend()) {
-    //         break;
-    //     }
-    //
-    //     const auto idxOfFirstMismatchedPathComponent = std::distance(notOverlappingPathFromPPrimeEdgeSubstree.cbegin(), firstMismatchedPathComponent);
-    //     // Add control qubits for shared path up to first mismatched qubit
-    //     for (auto sharedPathComponentsIterator = std::next(sharedPathBetweenNAndPPrimeEdgeSubstree.begin(), static_cast<std::ptrdiff_t>(startIndexInPathForSearchOfEdgeMismatch));
-    //          sharedPathComponentsIterator != std::next(sharedPathBetweenNAndPPrimeEdgeSubstree.begin(), idxOfFirstMismatchedPathComponent + 1U);
-    //          ++sharedPathComponentsIterator) {
-    //         controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.emplace(
-    //                 sharedPathComponentsIterator->qubitAssociatedWithNodeDefiningOriginOfEdge, getBooleanSignatureComponentForQmddEdge(sharedPathComponentsIterator->edgeIndex) ? qc::Control::Type::Pos : qc::Control::Type::Neg);
-    //     }
-    //
-    //     const qc::Qubit targetQubit = firstMismatchedPathComponent->qubitAssociatedWithNodeDefiningOriginOfEdge;
-    //     for (const auto& pathFromRootToCurrentNode: pathsFromRootToCurrentNode) {
-    //         // All control qubits from the root to the current node as well as for the p' edge of the latter are now set.
-    //         qc::Controls controlQubitsForPathFromRootToCurrentNode = getControlsQubitsFromQmddPath(pathFromRootToCurrentNode);
-    //         // Add the subpath from the current vertex up to but excluding the target qubit
-    //         controlQubitsForPathFromRootToCurrentNode.insert(controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.cbegin(), controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.cend());
-    //         // Modify the portion of the shared path
-    //         applyOperation(targetQubit, src, controlQubitsForPathFromRootToCurrentNode);
-    //     }
-    //     // Target qubit is now part of control qubits
-    //     controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.emplace(qc::Control(targetQubit, getBooleanSignatureComponentForQmddEdge(firstMismatchedPathComponent->edgeIndex) ? qc::Control::Type::Pos : qc::Control::Type::Neg));
-    //     // And search continues for next mismatch path component starting at qubit targetQubit + 1
-    //     startIndexInPathForSearchOfEdgeMismatch += static_cast<std::size_t>(idxOfFirstMismatchedPathComponent) + 1U;
-    // }
-    // TODO: We now should be able to remove the shared path from the QmddPathsStartingFromNode container for the p' edge paths and insert the unique path?
-}
-
-// This algorithm ensures that the `current` node has the identity structure.
-// Refer to algorithm P of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf)
-void QmddToIdentityTransformer::shiftPathsFromPPrimeEdgeToNPrimeEdge(dd::mEdge& src) const {
-    assert(!src.isTerminal());
-
-    dd::mNode* processedNode = src.p;
-    assert(processedNode != nullptr);
-    assert(processedNode->e.size() == 4);
-
-    // For the first step of the P algorithm we only need to know the paths from the "n" and "p'" edge of the currently processed node.
-    // After the first step is done, the paths for the "n'" and "p" edge can be determined which will save us one swap operation if said first step of the
-    // algorithms performs a swap of the paths of the edges of the currently processed node.
-    // TODO: processedNode->e[X].p could be a nullptr if it references the 0-terminal.
-    QmddPathsStartingFromNode uniquePathsStartingFromNode = {
-            .associatedQmddNode = *src.p,
-            .nEdgePaths         = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::N_Path),
-            .pPrimeEdgePaths    = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::P_Prime_Path),
-            .nPrimeEdgePaths    = {},
-            .pEdgePaths         = {}};
-
-    // P1 algorithm.
-    if (swapPaths(src, uniquePathsStartingFromNode)) {
-        processedNode = src.p;
-        // TODO: Can processedNode now be null?
-        uniquePathsStartingFromNode = {
-                .associatedQmddNode = *processedNode,
-                .nEdgePaths         = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::N_Path),
-                .pPrimeEdgePaths    = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::P_Prime_Path),
-                .nPrimeEdgePaths    = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::N_Prime_Path),
-                .pEdgePaths         = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::P_Path)};
-        // TODO: Swap swapped paths in helper struct
-        // At this point in the qmdd the respective swap operation was already performed but we still need to update out helper struct by performing said swap of the paths originated from the currently processed qmdd node.
-        // TODO: Instead of a costly swap operation one could also only store references to the path objects in the helper struct.
-        // std::swap(uniquePathsStartingFromNode.nEdgePaths, uniquePathsStartingFromNode.pPrimeEdgePaths);
-        // uniquePathsStartingFromNode.nPrimeEdgePaths = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::P_Path);
-        // uniquePathsStartingFromNode.pEdgePaths      = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::N_Prime_Path);
-        //
-        // for (auto& originalNEdgePath: uniquePathsStartingFromNode.pPrimeEdgePaths) {
-        //     originalNEdgePath.front().incomingEdgeFromParentQmddNode = QmddEdgeIndex::P_Prime_Path;
-        // }
-        // for (auto& originalPPrimeEdgePath: uniquePathsStartingFromNode.nEdgePaths) {
-        //     originalPPrimeEdgePath.front().incomingEdgeFromParentQmddNode = QmddEdgeIndex::N_Path;
-        // }
-        // for (auto& originalPEdgePath: uniquePathsStartingFromNode.nPrimeEdgePaths) {
-        //     originalPEdgePath.front().incomingEdgeFromParentQmddNode = QmddEdgeIndex::N_Prime_Path;
-        // }
-        // for (auto& originalNPrimeEdgePath: uniquePathsStartingFromNode.pEdgePaths) {
-        //     originalNPrimeEdgePath.front().incomingEdgeFromParentQmddNode = QmddEdgeIndex::P_Path;
-        // }
-        // TODO: Make conditional
-        dumpQmdd(*getEdgeToRootNode(this->qmddPackage), false);
-    } else {
-        uniquePathsStartingFromNode.nPrimeEdgePaths = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::N_Prime_Path);
-        uniquePathsStartingFromNode.pEdgePaths      = getAllPathsStartingFromNode(processedNode, QmddEdgeIndex::P_Path);
-    }
-
-    for (;;) {
-        // P2 algorithm.
-        shiftUniquePaths(src, uniquePathsStartingFromNode);
-        // TODO: Recalculate paths?
-
-        // TODO: Make conditional
-        dumpQmdd(*getEdgeToRootNode(this->qmddPackage), false);
-
-        // P3 algorithm.
-        if (terminate(*src.p)) {
-            break;
-        }
-        // P4 algorithm.
-        makePathsOfEdgeOfQmddNodeUnique(src, QmddEdgeIndex::P_Prime_Path, uniquePathsStartingFromNode);
-        // TODO: Recalculate paths?
-
-        // TODO: Make conditional
-        dumpQmdd(*getEdgeToRootNode(this->qmddPackage), false);
-
-        // if changePaths flag is set, p and n' edges are considered instead of n and p' edges.
-        // TODO: Implement me
-        // if (changePaths) {
-        //     return unifyPath(src, current, uniquePathsStartingFromNode.pEdgePaths, uniquePathsStartingFromNode.nPrimeEdgePaths, changePaths, this->qmddPackage);
-        // }
-        // return unifyPath(src, current, uniquePathsStartingFromNode.nEdgePaths, uniquePathsStartingFromNode.pPrimeEdgePaths, changePaths, this->qmddPackage);
-    }
-}
+// void QmddToIdentityTransformer::makePathsOfEdgeOfQmddNodeUnique(dd::mEdge& src, const QmddEdgeIndex processedEdge, QmddPathsStartingFromNode& qmddNodePathSignatures) const {
+//     return;
+//
+//     // assert(processedEdge == QmddEdgeIndex::P_Prime_Path);
+//     //
+//     // const std::optional<std::size_t> idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree = getIndexOfFirstSharedPathBetweenQmddNodeEdgeSubtrees(qmddNodePathSignatures.pPrimeEdgePaths, qmddNodePathSignatures.nEdgePaths);
+//     // assert(idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree.has_value());
+//     //
+//     // // TODO: Determine subsequent vertex that can be used as target qubit t to make the shared path unique. Additionally, all qubits q < t need to be used as control qubits?
+//     // const std::optional<QmddPath> optionalNotOverlappingPathFromPPrimeEdgeSubstree = determineUniquePathFromCollection(qmddNodePathSignatures.pPrimeEdgePaths);
+//     // assert(optionalNotOverlappingPathFromPPrimeEdgeSubstree.has_value());
+//     //
+//     // const QmddPath& notOverlappingPathFromPPrimeEdgeSubstree = *optionalNotOverlappingPathFromPPrimeEdgeSubstree;
+//     // const QmddPath& sharedPathBetweenNAndPPrimeEdgeSubstree  = qmddNodePathSignatures.pPrimeEdgePaths[*idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree];
+//     // assert(sharedPathBetweenNAndPPrimeEdgeSubstree.size() == notOverlappingPathFromPPrimeEdgeSubstree.size());
+//     //
+//     // std::size_t       startIndexInPathForSearchOfEdgeMismatch = 0;
+//     // const std::size_t pathLengthFromCurrentNodeToTerminal     = notOverlappingPathFromPPrimeEdgeSubstree.size();
+//     //
+//     // const dd::mNode* rootNode = getRootNode(qmddPackage);
+//     // assert(rootNode != nullptr);
+//     // const std::vector<QmddPath> pathsFromRootToCurrentNode = getAllPathsFromRootToNode(*rootNode, qmddNodePathSignatures.associatedQmddNode);
+//     //
+//     // qc::Controls controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit;
+//     // // Add control qubit for p' edge of current vertex
+//     // controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.emplace(qc::Control(src.p->v, qc::Control::Type::Pos));
+//     //
+//     // for (std::size_t i = startIndexInPathForSearchOfEdgeMismatch; i < pathLengthFromCurrentNodeToTerminal; ++i) {
+//     //     const auto& firstMismatchedPathComponent = std::find_first_of(
+//     //             std::next(notOverlappingPathFromPPrimeEdgeSubstree.cbegin(), static_cast<std::ptrdiff_t>(startIndexInPathForSearchOfEdgeMismatch)),
+//     //             notOverlappingPathFromPPrimeEdgeSubstree.cend(),
+//     //             std::next(sharedPathBetweenNAndPPrimeEdgeSubstree.cbegin(), static_cast<std::ptrdiff_t>(startIndexInPathForSearchOfEdgeMismatch + 1U)),
+//     //             sharedPathBetweenNAndPPrimeEdgeSubstree.cend(),
+//     //             [](const QmddPathComponent& lPathComponent, const QmddPathComponent& rPathComponent) {
+//     //                 return lPathComponent.edgeIndex != rPathComponent.edgeIndex;
+//     //             });
+//     //
+//     //     if (firstMismatchedPathComponent == notOverlappingPathFromPPrimeEdgeSubstree.cend()) {
+//     //         break;
+//     //     }
+//     //
+//     //     const auto idxOfFirstMismatchedPathComponent = std::distance(notOverlappingPathFromPPrimeEdgeSubstree.cbegin(), firstMismatchedPathComponent);
+//     //     // Add control qubits for shared path up to first mismatched qubit
+//     //     for (auto sharedPathComponentsIterator = std::next(sharedPathBetweenNAndPPrimeEdgeSubstree.begin(), static_cast<std::ptrdiff_t>(startIndexInPathForSearchOfEdgeMismatch));
+//     //          sharedPathComponentsIterator != std::next(sharedPathBetweenNAndPPrimeEdgeSubstree.begin(), idxOfFirstMismatchedPathComponent + 1U);
+//     //          ++sharedPathComponentsIterator) {
+//     //         controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.emplace(
+//     //                 sharedPathComponentsIterator->qubitAssociatedWithNodeDefiningOriginOfEdge, getBooleanSignatureComponentForQmddEdge(sharedPathComponentsIterator->edgeIndex) ? qc::Control::Type::Pos : qc::Control::Type::Neg);
+//     //     }
+//     //
+//     //     const qc::Qubit targetQubit = firstMismatchedPathComponent->qubitAssociatedWithNodeDefiningOriginOfEdge;
+//     //     for (const auto& pathFromRootToCurrentNode: pathsFromRootToCurrentNode) {
+//     //         // All control qubits from the root to the current node as well as for the p' edge of the latter are now set.
+//     //         qc::Controls controlQubitsForPathFromRootToCurrentNode = getControlsQubitsFromQmddPath(pathFromRootToCurrentNode);
+//     //         // Add the subpath from the current vertex up to but excluding the target qubit
+//     //         controlQubitsForPathFromRootToCurrentNode.insert(controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.cbegin(), controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.cend());
+//     //         // Modify the portion of the shared path
+//     //         applyOperation(targetQubit, src, controlQubitsForPathFromRootToCurrentNode);
+//     //     }
+//     //     // Target qubit is now part of control qubits
+//     //     controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.emplace(qc::Control(targetQubit, getBooleanSignatureComponentForQmddEdge(firstMismatchedPathComponent->edgeIndex) ? qc::Control::Type::Pos : qc::Control::Type::Neg));
+//     //     // And search continues for next mismatch path component starting at qubit targetQubit + 1
+//     //     startIndexInPathForSearchOfEdgeMismatch += static_cast<std::size_t>(idxOfFirstMismatchedPathComponent) + 1U;
+//     // }
+//     // TODO: We now should be able to remove the shared path from the QmddPathsStartingFromNode container for the p' edge paths and insert the unique path?
+// }
 
 constexpr QmddToIdentityTransformer::QmddEdgeIndex QmddToIdentityTransformer::increment(QmddEdgeIndex& qmddEdgeIndex) noexcept {
     switch (qmddEdgeIndex) {

@@ -20,7 +20,8 @@
 namespace syrec {
     class QmddToIdentityTransformer {
     public:
-        explicit QmddToIdentityTransformer(const std::reference_wrapper<qc::QuantumComputation> quantumComputation, const std::reference_wrapper<dd::Package> qmddPackage): qc(quantumComputation), qmddPackage(qmddPackage) {}
+        explicit QmddToIdentityTransformer(const std::reference_wrapper<qc::QuantumComputation> quantumComputation, const std::reference_wrapper<dd::Package> qmddPackage):
+            qc(quantumComputation), qmddPackage(qmddPackage) {}
 
         [[nodiscard]] bool synthesize(dd::mEdge src);
 
@@ -40,11 +41,11 @@ namespace syrec {
         using QmddPath = std::vector<QmddPathComponent>;
 
         struct QmddPathsStartingFromNode {
-            std::reference_wrapper<dd::mNode> associatedQmddNode;
-            std::vector<QmddPath>             nEdgePaths;
-            std::vector<QmddPath>             pPrimeEdgePaths;
-            std::vector<QmddPath>             nPrimeEdgePaths;
-            std::vector<QmddPath>             pEdgePaths;
+            std::reference_wrapper<const dd::mNode> associatedQmddNode;
+            std::vector<QmddPath>                   nEdgePaths;
+            std::vector<QmddPath>                   pPrimeEdgePaths;
+            std::vector<QmddPath>                   nPrimeEdgePaths;
+            std::vector<QmddPath>                   pEdgePaths;
         };
 
         struct QmddEdgeTraversalHelper {
@@ -56,12 +57,11 @@ namespace syrec {
         std::reference_wrapper<qc::QuantumComputation> qc;
         std::reference_wrapper<dd::Package>            qmddPackage;
 
-        void applyOperation(qc::Qubit targetBit, dd::mEdge& to, const qc::Controls& ctrl) const;
+        [[maybe_unused]] dd::mEdge applyOperationToQmdd(qc::Qubit targetQubit, const qc::Controls& controlQubits, const dd::mEdge& currentEdgeToRootNode) const;
 
-        [[nodiscard]] bool swapPaths(dd::mEdge& src, const QmddPathsStartingFromNode& qmddNodePathSignatures) const;
-        void               shiftUniquePaths(dd::mEdge& src, QmddPathsStartingFromNode& qmddNodePathSignatures) const;
-        void               makePathsOfEdgeOfQmddNodeUnique(dd::mEdge& src, QmddEdgeIndex processedEdge, QmddPathsStartingFromNode& qmddNodePathSignatures) const;
-        void               shiftPathsFromPPrimeEdgeToNPrimeEdge(dd::mEdge& src) const;
+        [[nodiscard]] bool swapPaths(const QmddPathsStartingFromNode& qmddNodePathSignatures) const;
+        [[nodiscard]] bool shiftUniquePaths(const dd::mNode& node, const QmddPathsStartingFromNode& qmddNodePathSignatures) const;
+        //void               makePathsOfEdgeOfQmddNodeUnique(dd::mEdge& src, QmddEdgeIndex processedEdge, QmddPathsStartingFromNode& qmddNodePathSignatures) const;
 
         [[nodiscard]] static bool                       terminate(const dd::mNode& nodeToCheck);
         [[maybe_unused]] static constexpr QmddEdgeIndex increment(QmddEdgeIndex& qmddEdgeIndex) noexcept;
