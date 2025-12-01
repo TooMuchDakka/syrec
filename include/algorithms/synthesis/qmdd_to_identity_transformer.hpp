@@ -83,8 +83,10 @@ namespace syrec {
         [[nodiscard]] static std::vector<std::size_t>    getIndicesOfUniquePathsForQmddNodeEdge(const std::vector<QmddPath>& collectionOfPathsToExtractUniqueOnesFrom, const std::vector<QmddPath>& collectionOfPathsUsedToIdentifyDuplicates);
         [[nodiscard]] static std::optional<std::size_t>  getIndexOfFirstSharedPathBetweenQmddNodeEdgeSubtrees(const std::vector<QmddPath>& collectionOfPathsToFindSharedOneFrom, const std::vector<QmddPath>& collectionUsedToDetermineWhetherDuplicatePathExists);
         [[nodiscard]] static const dd::mNode*            getRootNode(dd::Package& qmddPackage);
+        [[nodiscard]] static const dd::mEdge*            getEdgeToRootNode(dd::Package& qmddPackage);
         [[nodiscard]] static bool                        doQmddPathsOverlap(const QmddPath& lQmddPath, const QmddPath& rQmddPath);
         [[nodiscard]] static constexpr qc::Control::Type getControlQubitPolarityForQmddEdge(QmddEdgeIndex qmddEdge) noexcept;
         [[nodiscard]] static std::optional<qc::Qubit>    getQubitOfQmddNodeReachedByEdge(const dd::mNode* qmddNodeBeingOriginOfEdge, QmddEdgeIndex edgeToTake);
+        [[nodiscard]] static std::vector<QmddPath>       generatePathsForQmddNodeWithOnlyTerminalNodeChildren(QmddEdgeIndex qmddEdgeToNode, const dd::mNode& qmddNode);
     };
 } // namespace syrec

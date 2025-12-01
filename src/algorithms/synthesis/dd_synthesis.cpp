@@ -50,8 +50,8 @@ namespace {
         return combinedIndicesOfOneEntriesInPermutationMatrix.contains(indexOfEntryInUnrolledPermutationMatrix) ? dd::mEdge::one() : dd::mEdge::zero();
     }
 
-    [[nodiscard]] dd::mEdge buildDDFromTruthtable(const syrec::TruthTable& truthTable, const std::unordered_set<std::uint64_t>& combinedIndicesOfOneEntriesInPermutationMatrix, const dd::Qubit idxOfQubitAssociatedWithLevelInDecisionDiagram, const PermutationMatrixSubmatrix& processedPermutationMatrixSubmatrix, dd::Package& ddPackage) {
-        if (idxOfQubitAssociatedWithLevelInDecisionDiagram == truthTable.nInputs() - 1U) {
+    [[nodiscard]] dd::mEdge buildDDFromTruthtable(const syrec::TruthTable& truthTable, const std::unordered_set<std::uint64_t>& combinedIndicesOfOneEntriesInPermutationMatrix, const std::size_t levelInDecisionDiagram, const PermutationMatrixSubmatrix& processedPermutationMatrixSubmatrix, dd::Package& ddPackage) {
+        if (levelInDecisionDiagram == 0) {
             assert(processedPermutationMatrixSubmatrix.idxOfLastRowExclusive - processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive == 2);
             assert(processedPermutationMatrixSubmatrix.idxOfLastColExclusive - processedPermutationMatrixSubmatrix.idxOfFirstColInclusive == 2);
 
@@ -65,11 +65,11 @@ namespace {
                 // TODO: What if garbage qubits were added?
                 // TODO: dd::Qubit type is smaller than mqt::Qubit type
 
-                const auto topLeftSubmatrixOfPermutationMatrix     = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForTopLeftEntryOfPermutationMatrix);
-                const auto topRightSubmatrixOfPermutationMatrix    = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForTopRightEntryOfPermutationMatrix);
-                const auto bottomLeftSubmatrixOfPermutationMatrix  = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForBottomLeftEntryOfPermutationMatrix);
-                const auto bottomRightSubmatrixOfPermutationMatrix = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForBottomRightEntryOfPermutationMatrix);
-                return ddPackage.makeDDNode(idxOfQubitAssociatedWithLevelInDecisionDiagram, std::array<dd::mEdge, 4U>({topLeftSubmatrixOfPermutationMatrix, topRightSubmatrixOfPermutationMatrix, bottomLeftSubmatrixOfPermutationMatrix, bottomRightSubmatrixOfPermutationMatrix}));
+                const dd::mEdge topLeftSubmatrixOfPermutationMatrix     = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForTopLeftEntryOfPermutationMatrix);
+                const dd::mEdge topRightSubmatrixOfPermutationMatrix    = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForTopRightEntryOfPermutationMatrix);
+                const dd::mEdge bottomLeftSubmatrixOfPermutationMatrix  = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForBottomLeftEntryOfPermutationMatrix);
+                const dd::mEdge bottomRightSubmatrixOfPermutationMatrix = determineTerminalNodeForIndexInPermutationMatrix(combinedIndicesOfOneEntriesInPermutationMatrix, combinedIndexForBottomRightEntryOfPermutationMatrix);
+                return ddPackage.makeDDNode(static_cast<dd::Qubit>(levelInDecisionDiagram), std::array<dd::mEdge, 4U>({topLeftSubmatrixOfPermutationMatrix, topRightSubmatrixOfPermutationMatrix, bottomLeftSubmatrixOfPermutationMatrix, bottomRightSubmatrixOfPermutationMatrix}));
             }
             return dd::mEdge::zero();
         }
@@ -78,13 +78,15 @@ namespace {
         const auto colMid = (processedPermutationMatrixSubmatrix.idxOfFirstColInclusive + processedPermutationMatrixSubmatrix.idxOfLastColExclusive) / 2;
         // TODO: What if garbage qubits were added?
         // TODO: dd::Qubit type is smaller than mqt::Qubit type
-        const auto& topLeftSubmatrixOfPermutationMatrix     = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, idxOfQubitAssociatedWithLevelInDecisionDiagram + 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive, .idxOfLastRowExclusive = rowMid, .idxOfFirstColInclusive = processedPermutationMatrixSubmatrix.idxOfFirstColInclusive, .idxOfLastColExclusive = colMid}), ddPackage);
-        const auto& topRightSubmatrixOfPermutationMatrix    = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, idxOfQubitAssociatedWithLevelInDecisionDiagram + 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive, .idxOfLastRowExclusive = rowMid, .idxOfFirstColInclusive = colMid, .idxOfLastColExclusive = processedPermutationMatrixSubmatrix.idxOfLastColExclusive}), ddPackage);
-        const auto& bottomLeftSubmatrixOfPermutationMatrix  = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, idxOfQubitAssociatedWithLevelInDecisionDiagram + 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = rowMid, .idxOfLastRowExclusive = processedPermutationMatrixSubmatrix.idxOfLastRowExclusive, .idxOfFirstColInclusive = processedPermutationMatrixSubmatrix.idxOfFirstColInclusive, .idxOfLastColExclusive = colMid}), ddPackage);
-        const auto& bottomRightSubmatrixOfPermutationMatrix = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, idxOfQubitAssociatedWithLevelInDecisionDiagram + 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = rowMid, .idxOfLastRowExclusive = processedPermutationMatrixSubmatrix.idxOfLastRowExclusive, .idxOfFirstColInclusive = colMid, .idxOfLastColExclusive = processedPermutationMatrixSubmatrix.idxOfLastColExclusive}), ddPackage);
-        return ddPackage.makeDDNode(idxOfQubitAssociatedWithLevelInDecisionDiagram, std::array<dd::mEdge, 4U>({topLeftSubmatrixOfPermutationMatrix, topRightSubmatrixOfPermutationMatrix, bottomLeftSubmatrixOfPermutationMatrix, bottomRightSubmatrixOfPermutationMatrix}));
+        const dd::mEdge& topLeftSubmatrixOfPermutationMatrix     = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, levelInDecisionDiagram - 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive, .idxOfLastRowExclusive = rowMid, .idxOfFirstColInclusive = processedPermutationMatrixSubmatrix.idxOfFirstColInclusive, .idxOfLastColExclusive = colMid}), ddPackage);
+        const dd::mEdge& topRightSubmatrixOfPermutationMatrix    = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, levelInDecisionDiagram - 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = processedPermutationMatrixSubmatrix.idxOfFirstRowInclusive, .idxOfLastRowExclusive = rowMid, .idxOfFirstColInclusive = colMid, .idxOfLastColExclusive = processedPermutationMatrixSubmatrix.idxOfLastColExclusive}), ddPackage);
+        const dd::mEdge& bottomLeftSubmatrixOfPermutationMatrix  = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, levelInDecisionDiagram - 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = rowMid, .idxOfLastRowExclusive = processedPermutationMatrixSubmatrix.idxOfLastRowExclusive, .idxOfFirstColInclusive = processedPermutationMatrixSubmatrix.idxOfFirstColInclusive, .idxOfLastColExclusive = colMid}), ddPackage);
+        const dd::mEdge& bottomRightSubmatrixOfPermutationMatrix = buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, levelInDecisionDiagram - 1U, PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = rowMid, .idxOfLastRowExclusive = processedPermutationMatrixSubmatrix.idxOfLastRowExclusive, .idxOfFirstColInclusive = colMid, .idxOfLastColExclusive = processedPermutationMatrixSubmatrix.idxOfLastColExclusive}), ddPackage);
+        return ddPackage.makeDDNode(static_cast<dd::Qubit>(levelInDecisionDiagram), std::array<dd::mEdge, 4U>({topLeftSubmatrixOfPermutationMatrix, topRightSubmatrixOfPermutationMatrix, bottomLeftSubmatrixOfPermutationMatrix, bottomRightSubmatrixOfPermutationMatrix}));
     }
 
+    // TODO: Most significant qubit is expected to have label n-1 in QMDD instead of the initially assumed index 0 that it would have in a truth table.
+    // TODO: TODO: Do we need to apply a permutation in the generated qc::QuantumComputation that will generate this mapping from qubit 0->(n-1), ..., (n-1)->0 and use swap gates after the QMDD was synthesized?
     [[nodiscard]] dd::mEdge buildDDFromTruthtable(const syrec::TruthTable& truthTable, dd::Package& ddPackage) {
         // TODO: Validate that truth table is square, etc. see dd::Package::makeDDFromMatrix, the code below is essentially a copy of the validation performed in the latter.
         if (truthTable.empty()) {
@@ -101,7 +103,8 @@ namespace {
         }
 
         const auto initialPermutationMatrixDimensions = PermutationMatrixSubmatrix({.idxOfFirstRowInclusive = 0U, .idxOfLastRowExclusive = nRowsInTruthTable, .idxOfFirstColInclusive = 0U, .idxOfLastColExclusive = nRowsInTruthTable});
-        return buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, 0U, initialPermutationMatrixDimensions, ddPackage);
+        // TODO: What if garbage or ancillary qubits exist?
+        return buildDDFromTruthtable(truthTable, combinedIndicesOfOneEntriesInPermutationMatrix, truthTable.nInputs() - 1, initialPermutationMatrixDimensions, ddPackage);
     }
 } // namespace
 
