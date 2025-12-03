@@ -28,6 +28,8 @@ namespace syrec {
             qc(quantumComputation), qmddPackage(qmddPackage) {}
 
         [[nodiscard]] bool synthesize(dd::mEdge src, QmddTransformationStatistics* optionalCollectedStatisticsContainer = nullptr, const std::string* optionalPathToFileWhichWillContainQmddExport = nullptr);
+        // TODO: Add parameters to print intermediate qmdds
+        [[nodiscard]] static dd::mEdge constructQmddFromQuantumComputationStartingFromIdentityQmdd(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage);
 
     protected:
         enum class QmddEdgeIndex : std::uint8_t {

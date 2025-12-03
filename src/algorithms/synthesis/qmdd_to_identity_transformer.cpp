@@ -126,6 +126,23 @@ bool QmddToIdentityTransformer::synthesize(dd::mEdge src, QmddTransformationStat
     return true;
 }
 
+dd::mEdge QmddToIdentityTransformer::constructQmddFromQuantumComputationStartingFromIdentityQmdd(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage) {
+    // TODO: Implementation taken from dd::FunctionalityConstruction::buildFunctionality(...) which does not apply the inverse of each operation.
+    auto permutation    = quantumComputation.initialLayout;
+    auto edgeToRootNode = qmddPackage.createInitialMatrix(quantumComputation.getAncillary());
+
+    for (auto op = quantumComputation.crbegin(); op != quantumComputation.crend(); ++op) {
+        auto copyOfOperation = op->get()->clone();
+        copyOfOperation->invert();
+        edgeToRootNode = dd::applyUnitaryOperation(*copyOfOperation, edgeToRootNode, qmddPackage, permutation);
+    }
+
+    // correct permutation if necessary
+    changePermutation(edgeToRootNode, permutation, quantumComputation.outputPermutation, qmddPackage);
+    edgeToRootNode = qmddPackage.reduceAncillae(edgeToRootNode, quantumComputation.getAncillary());
+    return qmddPackage.reduceGarbage(edgeToRootNode, quantumComputation.getGarbage());
+}
+
 dd::mEdge QmddToIdentityTransformer::applyOperationToQmdd(const qc::Qubit targetQubit, const qc::Controls& controlQubits, const dd::mEdge& currentEdgeToRootNode) const {
     qc.get().mcx(controlQubits, targetQubit);
     const qc::Operation& generatedQuantumOperationForMCXGate = *qc.get().back();
