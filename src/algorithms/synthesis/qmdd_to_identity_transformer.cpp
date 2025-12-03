@@ -15,35 +15,30 @@
 
 using namespace syrec;
 
-namespace {
-    // TODO: Only for debugging purposes
-    void dumpQmdd(const dd::mEdge* edgeToRootOfQmdd, const bool clearPreviousDumpFileContents) {
-        if (edgeToRootOfQmdd == nullptr) {
-            return;
-        }
-
-        std::ofstream ofs;
-        if (clearPreviousDumpFileContents) {
-            ofs.open("C:\\School\\MThesis\\test.txt", std::ofstream::out | std::ofstream::trunc);
-        } else {
-            ofs.open("C:\\School\\MThesis\\test.txt", std::ofstream::out | std::ofstream::app);
-        }
-        dd::serialize(*edgeToRootOfQmdd, ofs);
-        ofs.flush();
-    }
-} // namespace
-
-bool QmddToIdentityTransformer::synthesize(dd::mEdge src) {
-    if (src.isTerminal()) {
+bool QmddToIdentityTransformer::synthesize(dd::mEdge src, QmddTransformationStatistics* optionalCollectedStatisticsContainer, const std::string* optionalPathToFileWhichWillContainQmddExport) {
+    if (src.isTerminal() || qc.get().getNqubitsWithoutAncillae() == 0) {
         return false;
     }
+
+    // TODO: Is this really necessary?
+    // const auto numQubitsWithoutAncillae = static_cast<qc::Qubit>(qc.get().getNqubitsWithoutAncillae());
+    // const auto mostSignificantQubitInQuantumComputation = numQubitsWithoutAncillae - 1U;
+    // for (qc::Qubit deviceQubit = 0; deviceQubit < numQubitsWithoutAncillae; ++deviceQubit) {
+    //     const qc::Qubit circuitQubit = mostSignificantQubitInQuantumComputation - deviceQubit;
+    //     qc.get().initialLayout.at(deviceQubit) = circuitQubit;
+    //     qc.get().outputPermutation.at(circuitQubit) = deviceQubit;
+    //     // Create mapping for initial layout (i.e. from device to circuit qubits).
+    //     //qc.get().initialLayout.emplace(std::make_pair(deviceQubit, circuitQubit));
+    //     // Create output permutation to map circuit qubits back to device qubits (do we need to insert SWAP gates to perform this permutation)?
+    //     //qc.get().outputPermutation.emplace(std::make_pair(circuitQubit, deviceQubit));
+    // }
 
     // This following ensures that the `src` node resembles an identity structure.
     // Refer to algorithm Q of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf.
     this->qmddPackage.get().incRef(src);
 
     // TODO: Only for debugging purposes
-    dumpQmdd(getEdgeToRootNode(this->qmddPackage), true);
+    exportQmddToFile(getEdgeToRootNode(this->qmddPackage), optionalPathToFileWhichWillContainQmddExport, true);
 
     // queue for the nodes to be processed in a breadth-first manner.
     std::queue<dd::mEdge> queue{};
@@ -78,7 +73,7 @@ bool QmddToIdentityTransformer::synthesize(dd::mEdge src) {
         // P1 algorithm.
         if (swapPaths(pathsStartingFromNode)) {
             // TODO: Make conditional
-            dumpQmdd(getEdgeToRootNode(this->qmddPackage), false);
+            exportQmddToFile(getEdgeToRootNode(this->qmddPackage), optionalPathToFileWhichWillContainQmddExport);
 
             queue = {};
             if (const dd::mEdge* edgeToRootNodeAfterSwap = getEdgeToRootNode(this->qmddPackage); edgeToRootNodeAfterSwap != nullptr) {
@@ -93,7 +88,7 @@ bool QmddToIdentityTransformer::synthesize(dd::mEdge src) {
         // P2 algorithm.
         if (shiftUniquePaths(nodeToProcess, pathsStartingFromNode)) {
             // TODO: Make conditional
-            dumpQmdd(getEdgeToRootNode(this->qmddPackage), false);
+            exportQmddToFile(getEdgeToRootNode(this->qmddPackage), optionalPathToFileWhichWillContainQmddExport);
 
             queue = {};
             if (const dd::mEdge* edgeToRootNodeAfterSwap = getEdgeToRootNode(this->qmddPackage); edgeToRootNodeAfterSwap != nullptr) {
@@ -104,12 +99,16 @@ bool QmddToIdentityTransformer::synthesize(dd::mEdge src) {
 
         // P3 algorithm.
         if (!terminate(nodeToProcess)) {
-            // TODO:
             // P4 algorithm.
-            //makePathsOfEdgeOfQmddNodeUnique(src, QmddEdgeIndex::P_Prime_Path, uniquePathsStartingFromNode);
+            assert(makeSharedPathOfQmddNodeUnique(nodeToProcess, pathsStartingFromNode));
 
             // TODO: Make conditional
-            dumpQmdd(getEdgeToRootNode(this->qmddPackage), false);
+            exportQmddToFile(getEdgeToRootNode(this->qmddPackage), optionalPathToFileWhichWillContainQmddExport);
+
+            queue = {};
+            if (const dd::mEdge* edgeToRootNodeAfterSwap = getEdgeToRootNode(this->qmddPackage); edgeToRootNodeAfterSwap != nullptr) {
+                queue.push(*edgeToRootNodeAfterSwap);
+            }
         } else {
             for (const dd::mEdge& edgesOfCurrentNode: nodeToProcess.e) {
                 if (edgesOfCurrentNode.isTerminal()) {
@@ -119,9 +118,11 @@ bool QmddToIdentityTransformer::synthesize(dd::mEdge src) {
             }
         }
     }
-    const auto transformationEndTime = std::chrono::steady_clock::now();
-    // TODO: Update signature to return statistics?
-    const auto transformationRuntimeInMs = (transformationEndTime - transformationStartTime).count();
+
+    if (optionalCollectedStatisticsContainer != nullptr) {
+        const auto transformationFinishedTime                       = std::chrono::steady_clock::now();
+        optionalCollectedStatisticsContainer->runtimeInMilliseconds = (transformationFinishedTime - transformationStartTime).count();
+    }
     return true;
 }
 
@@ -197,6 +198,52 @@ bool QmddToIdentityTransformer::shiftUniquePaths(const dd::mNode& node, const Qm
     return true;
 }
 
+bool QmddToIdentityTransformer::makeSharedPathOfQmddNodeUnique(const dd::mNode& node, const QmddPathsStartingFromNode& qmddNodePathSignatures) const {
+    const std::optional<std::size_t> idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree = getIndexOfFirstSharedPathBetweenQmddNodeEdgeSubtrees(qmddNodePathSignatures.pPrimeEdgePaths, qmddNodePathSignatures.nEdgePaths);
+    if (!idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree.has_value()) {
+        return false;
+    }
+
+    const std::optional<QmddPath> optionalNotOverlappingPathFromPPrimeEdgeSubstree = determineUniquePathFromCollection(qmddNodePathSignatures.pPrimeEdgePaths);
+    assert(optionalNotOverlappingPathFromPPrimeEdgeSubstree.has_value());
+
+    const QmddPath&   uniquePathNotExistingInPPrimedgeSubtreeToOneTerminal = *optionalNotOverlappingPathFromPPrimeEdgeSubstree;
+    const QmddPath&   sharedPathBetweenNAndPPrimeEdgeSubtreeToOneTerminal  = qmddNodePathSignatures.pPrimeEdgePaths[*idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree];
+    const std::size_t minimumSharedPathLength                              = std::min(uniquePathNotExistingInPPrimedgeSubtreeToOneTerminal.size(), sharedPathBetweenNAndPPrimeEdgeSubtreeToOneTerminal.size());
+    assert(minimumSharedPathLength > 0);
+
+    std::optional<qc::Qubit> targetQubitToMakeSharedPathUnique;
+    std::optional<qc::Qubit> controlQubitForEdgeOnSharedPath = node.v;
+    qc::Controls             sharedControlQubitsBetweenSharedAndUniquePathStartingFromNode;
+    for (std::size_t i = 0; i < minimumSharedPathLength && !targetQubitToMakeSharedPathUnique.has_value(); ++i) {
+        const bool doEdgesOnComparedPathsMatch = uniquePathNotExistingInPPrimedgeSubtreeToOneTerminal[i].qubitAssociatedWithQmddNodeThatHasIncomingEdge == sharedPathBetweenNAndPPrimeEdgeSubtreeToOneTerminal[i].qubitAssociatedWithQmddNodeThatHasIncomingEdge && uniquePathNotExistingInPPrimedgeSubtreeToOneTerminal[i].incomingEdgeFromParentQmddNode == sharedPathBetweenNAndPPrimeEdgeSubtreeToOneTerminal[i].incomingEdgeFromParentQmddNode;
+
+        if (doEdgesOnComparedPathsMatch) {
+            sharedControlQubitsBetweenSharedAndUniquePathStartingFromNode.emplace(qc::Control(*controlQubitForEdgeOnSharedPath, getControlQubitPolarityForQmddEdge(uniquePathNotExistingInPPrimedgeSubtreeToOneTerminal[i].incomingEdgeFromParentQmddNode)));
+            controlQubitForEdgeOnSharedPath = uniquePathNotExistingInPPrimedgeSubtreeToOneTerminal[i].qubitAssociatedWithQmddNodeThatHasIncomingEdge;
+        } else {
+            targetQubitToMakeSharedPathUnique = controlQubitForEdgeOnSharedPath;
+        }
+    }
+    assert(targetQubitToMakeSharedPathUnique.has_value());
+    assert(!sharedControlQubitsBetweenSharedAndUniquePathStartingFromNode.empty());
+
+    const dd::mEdge* edgeToRootNode = getEdgeToRootNode(qmddPackage);
+    assert(edgeToRootNode != nullptr);
+    assert(edgeToRootNode->p != nullptr);
+    const dd::mNode& rootNode = *edgeToRootNode->p;
+
+    for (const auto& pathFromRootToCurrentNode: getAllPathsFromRootToNode(rootNode, qmddNodePathSignatures.associatedQmddNode)) {
+        // All control qubits from the root to the current node as well as for the p' edge of the latter are now set.
+        qc::Controls controlQubitsFromRootUpToTargetQubit = getControlQubitsForQmddPathFromRootToNode(rootNode.v, pathFromRootToCurrentNode);
+        // Add the subpath from the current vertex up to but excluding the target qubit
+        controlQubitsFromRootUpToTargetQubit.insert(sharedControlQubitsBetweenSharedAndUniquePathStartingFromNode.cbegin(), sharedControlQubitsBetweenSharedAndUniquePathStartingFromNode.cend());
+        // Modify the portion of the shared path
+        applyOperationToQmdd(*targetQubitToMakeSharedPathUnique, controlQubitsFromRootUpToTargetQubit, *edgeToRootNode);
+    }
+    return true;
+}
+
 // This algorithm checks whether the p' edge is pointing to zero terminal node.
 // TODO: In the reimplementation this step is not implemented: 'This algorithm also checks if n paths == n' paths and p' paths == p paths.'
 // Refer to P3 algorithm of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf
@@ -205,73 +252,6 @@ bool QmddToIdentityTransformer::terminate(const dd::mNode& nodeToCheck) {
     assert(edgesOfCurrentNode.size() == 4);
     return edgesOfCurrentNode[static_cast<std::size_t>(QmddEdgeIndex::P_Prime_Path)].isZeroTerminal() && edgesOfCurrentNode[static_cast<std::size_t>(QmddEdgeIndex::N_Prime_Path)].isZeroTerminal();
 }
-
-// void QmddToIdentityTransformer::makePathsOfEdgeOfQmddNodeUnique(dd::mEdge& src, const QmddEdgeIndex processedEdge, QmddPathsStartingFromNode& qmddNodePathSignatures) const {
-//     return;
-//
-//     // assert(processedEdge == QmddEdgeIndex::P_Prime_Path);
-//     //
-//     // const std::optional<std::size_t> idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree = getIndexOfFirstSharedPathBetweenQmddNodeEdgeSubtrees(qmddNodePathSignatures.pPrimeEdgePaths, qmddNodePathSignatures.nEdgePaths);
-//     // assert(idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree.has_value());
-//     //
-//     // // TODO: Determine subsequent vertex that can be used as target qubit t to make the shared path unique. Additionally, all qubits q < t need to be used as control qubits?
-//     // const std::optional<QmddPath> optionalNotOverlappingPathFromPPrimeEdgeSubstree = determineUniquePathFromCollection(qmddNodePathSignatures.pPrimeEdgePaths);
-//     // assert(optionalNotOverlappingPathFromPPrimeEdgeSubstree.has_value());
-//     //
-//     // const QmddPath& notOverlappingPathFromPPrimeEdgeSubstree = *optionalNotOverlappingPathFromPPrimeEdgeSubstree;
-//     // const QmddPath& sharedPathBetweenNAndPPrimeEdgeSubstree  = qmddNodePathSignatures.pPrimeEdgePaths[*idxOfPathInPPrimeEdgeSubtreeSharedWithNEdgeSubstree];
-//     // assert(sharedPathBetweenNAndPPrimeEdgeSubstree.size() == notOverlappingPathFromPPrimeEdgeSubstree.size());
-//     //
-//     // std::size_t       startIndexInPathForSearchOfEdgeMismatch = 0;
-//     // const std::size_t pathLengthFromCurrentNodeToTerminal     = notOverlappingPathFromPPrimeEdgeSubstree.size();
-//     //
-//     // const dd::mNode* rootNode = getRootNode(qmddPackage);
-//     // assert(rootNode != nullptr);
-//     // const std::vector<QmddPath> pathsFromRootToCurrentNode = getAllPathsFromRootToNode(*rootNode, qmddNodePathSignatures.associatedQmddNode);
-//     //
-//     // qc::Controls controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit;
-//     // // Add control qubit for p' edge of current vertex
-//     // controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.emplace(qc::Control(src.p->v, qc::Control::Type::Pos));
-//     //
-//     // for (std::size_t i = startIndexInPathForSearchOfEdgeMismatch; i < pathLengthFromCurrentNodeToTerminal; ++i) {
-//     //     const auto& firstMismatchedPathComponent = std::find_first_of(
-//     //             std::next(notOverlappingPathFromPPrimeEdgeSubstree.cbegin(), static_cast<std::ptrdiff_t>(startIndexInPathForSearchOfEdgeMismatch)),
-//     //             notOverlappingPathFromPPrimeEdgeSubstree.cend(),
-//     //             std::next(sharedPathBetweenNAndPPrimeEdgeSubstree.cbegin(), static_cast<std::ptrdiff_t>(startIndexInPathForSearchOfEdgeMismatch + 1U)),
-//     //             sharedPathBetweenNAndPPrimeEdgeSubstree.cend(),
-//     //             [](const QmddPathComponent& lPathComponent, const QmddPathComponent& rPathComponent) {
-//     //                 return lPathComponent.edgeIndex != rPathComponent.edgeIndex;
-//     //             });
-//     //
-//     //     if (firstMismatchedPathComponent == notOverlappingPathFromPPrimeEdgeSubstree.cend()) {
-//     //         break;
-//     //     }
-//     //
-//     //     const auto idxOfFirstMismatchedPathComponent = std::distance(notOverlappingPathFromPPrimeEdgeSubstree.cbegin(), firstMismatchedPathComponent);
-//     //     // Add control qubits for shared path up to first mismatched qubit
-//     //     for (auto sharedPathComponentsIterator = std::next(sharedPathBetweenNAndPPrimeEdgeSubstree.begin(), static_cast<std::ptrdiff_t>(startIndexInPathForSearchOfEdgeMismatch));
-//     //          sharedPathComponentsIterator != std::next(sharedPathBetweenNAndPPrimeEdgeSubstree.begin(), idxOfFirstMismatchedPathComponent + 1U);
-//     //          ++sharedPathComponentsIterator) {
-//     //         controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.emplace(
-//     //                 sharedPathComponentsIterator->qubitAssociatedWithNodeDefiningOriginOfEdge, getBooleanSignatureComponentForQmddEdge(sharedPathComponentsIterator->edgeIndex) ? qc::Control::Type::Pos : qc::Control::Type::Neg);
-//     //     }
-//     //
-//     //     const qc::Qubit targetQubit = firstMismatchedPathComponent->qubitAssociatedWithNodeDefiningOriginOfEdge;
-//     //     for (const auto& pathFromRootToCurrentNode: pathsFromRootToCurrentNode) {
-//     //         // All control qubits from the root to the current node as well as for the p' edge of the latter are now set.
-//     //         qc::Controls controlQubitsForPathFromRootToCurrentNode = getControlsQubitsFromQmddPath(pathFromRootToCurrentNode);
-//     //         // Add the subpath from the current vertex up to but excluding the target qubit
-//     //         controlQubitsForPathFromRootToCurrentNode.insert(controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.cbegin(), controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.cend());
-//     //         // Modify the portion of the shared path
-//     //         applyOperation(targetQubit, src, controlQubitsForPathFromRootToCurrentNode);
-//     //     }
-//     //     // Target qubit is now part of control qubits
-//     //     controlQubitsForPathFromFirstVertexInPPrimeSubstreeToTargetQubit.emplace(qc::Control(targetQubit, getBooleanSignatureComponentForQmddEdge(firstMismatchedPathComponent->edgeIndex) ? qc::Control::Type::Pos : qc::Control::Type::Neg));
-//     //     // And search continues for next mismatch path component starting at qubit targetQubit + 1
-//     //     startIndexInPathForSearchOfEdgeMismatch += static_cast<std::size_t>(idxOfFirstMismatchedPathComponent) + 1U;
-//     // }
-//     // TODO: We now should be able to remove the shared path from the QmddPathsStartingFromNode container for the p' edge paths and insert the unique path?
-// }
 
 constexpr QmddToIdentityTransformer::QmddEdgeIndex QmddToIdentityTransformer::increment(QmddEdgeIndex& qmddEdgeIndex) noexcept {
     switch (qmddEdgeIndex) {
@@ -329,33 +309,32 @@ std::optional<QmddToIdentityTransformer::QmddPath> QmddToIdentityTransformer::de
     if (qmddPaths.empty()) {
         return std::nullopt;
     }
-    assert(false);
-    // std::vector aggregateOfAllPaths(qmddPaths.front().size(), QmddPathComponent({.qubitAssociatedWithNodeDefiningOriginOfEdge = 0U, .edgeIndex = QmddEdgeIndex::N_Path}));
-    // // TODO: If all paths have the same length (and under the assumption that the variable ordering is from qubit 0 to N - 1) then the variables associated with each path component could be implemented as an
-    // //  collection with a stepsize of one between its elements starting at qubit i. The path objects then would also not have to store its associated component?
-    // for (std::size_t i = 0; i < aggregateOfAllPaths.size(); ++i) {
-    //     aggregateOfAllPaths[i].qubitAssociatedWithNodeDefiningOriginOfEdge = qmddPaths.front()[i].qubitAssociatedWithNodeDefiningOriginOfEdge;
-    // }
-    //
-    // for (const auto& qmddPath: qmddPaths) {
-    //     const std::size_t minElementsToAddFromPath = std::min(qmddPath.size(), aggregateOfAllPaths.size());
-    //     // TODO: All paths in qmdd should have same length but what if identities during creation of qmdd are already removed?
-    //     for (std::size_t i = 0; i < minElementsToAddFromPath; ++i) {
-    //         aggregateOfAllPaths[i].edgeIndex |= qmddPath[i].edgeIndex;
-    //     }
-    // }
-    //
-    // std::vector uniquePath(aggregateOfAllPaths.size(), QmddPathComponent({.qubitAssociatedWithNodeDefiningOriginOfEdge = 0U, .edgeIndex = QmddEdgeIndex::N_Path}));
-    // for (std::size_t i = 0; i < aggregateOfAllPaths.size(); ++i) {
-    //     uniquePath[i].qubitAssociatedWithNodeDefiningOriginOfEdge = aggregateOfAllPaths[i].qubitAssociatedWithNodeDefiningOriginOfEdge;
-    //     // Since the aggregate could only consist some of the available edges we need to use the bitwise and operation instead of a bitwise or to get a singular edge instead of another aggregate state that
-    //     // could stem from an aggregation of the subresults via a bitwise or operation.
-    //     uniquePath[i].edgeIndex = aggregateOfAllPaths[i].edgeIndex & QmddEdgeIndex::N_Path;
-    //     uniquePath[i].edgeIndex = aggregateOfAllPaths[i].edgeIndex & QmddEdgeIndex::N_Prime_Path;
-    //     uniquePath[i].edgeIndex = aggregateOfAllPaths[i].edgeIndex & QmddEdgeIndex::P_Prime_Path;
-    //     uniquePath[i].edgeIndex = aggregateOfAllPaths[i].edgeIndex & QmddEdgeIndex::P_Path;
-    // }
-    // return uniquePath;
+    std::vector aggregateOfAllPaths(qmddPaths.front().size(), QmddPathComponent({.qubitAssociatedWithQmddNodeThatHasIncomingEdge = 0U, .incomingEdgeFromParentQmddNode = QmddEdgeIndex::N_Path}));
+    // TODO: If all paths have the same length (and under the assumption that the variable ordering is from qubit 0 to N - 1) then the variables associated with each path component could be implemented as an
+    //  collection with a stepsize of one between its elements starting at qubit i. The path objects then would also not have to store its associated component?
+    for (std::size_t i = 0; i < aggregateOfAllPaths.size(); ++i) {
+        aggregateOfAllPaths[i].qubitAssociatedWithQmddNodeThatHasIncomingEdge = qmddPaths.front()[i].qubitAssociatedWithQmddNodeThatHasIncomingEdge;
+    }
+
+    for (const auto& qmddPath: qmddPaths) {
+        const std::size_t minElementsToAddFromPath = std::min(qmddPath.size(), aggregateOfAllPaths.size());
+        // TODO: All paths in qmdd should have same length but what if identities during creation of qmdd are already removed?
+        for (std::size_t i = 0; i < minElementsToAddFromPath; ++i) {
+            aggregateOfAllPaths[i].incomingEdgeFromParentQmddNode |= qmddPath[i].incomingEdgeFromParentQmddNode;
+        }
+    }
+
+    std::vector uniquePath(aggregateOfAllPaths.size(), QmddPathComponent({.qubitAssociatedWithQmddNodeThatHasIncomingEdge = 0U, .incomingEdgeFromParentQmddNode = QmddEdgeIndex::N_Path}));
+    for (std::size_t i = 0; i < aggregateOfAllPaths.size(); ++i) {
+        uniquePath[i].qubitAssociatedWithQmddNodeThatHasIncomingEdge = aggregateOfAllPaths[i].qubitAssociatedWithQmddNodeThatHasIncomingEdge;
+        // Since the aggregate could only consist some of the available edges we need to use the bitwise and operation instead of a bitwise or to get a singular edge instead of another aggregate state that
+        // could stem from an aggregation of the subresults via a bitwise or operation.
+        uniquePath[i].incomingEdgeFromParentQmddNode = aggregateOfAllPaths[i].incomingEdgeFromParentQmddNode & QmddEdgeIndex::N_Path;
+        uniquePath[i].incomingEdgeFromParentQmddNode = aggregateOfAllPaths[i].incomingEdgeFromParentQmddNode & QmddEdgeIndex::N_Prime_Path;
+        uniquePath[i].incomingEdgeFromParentQmddNode = aggregateOfAllPaths[i].incomingEdgeFromParentQmddNode & QmddEdgeIndex::P_Prime_Path;
+        uniquePath[i].incomingEdgeFromParentQmddNode = aggregateOfAllPaths[i].incomingEdgeFromParentQmddNode & QmddEdgeIndex::P_Path;
+    }
+    return uniquePath;
 }
 
 [[nodiscard]] std::vector<QmddToIdentityTransformer::QmddPath> QmddToIdentityTransformer::getAllPathsStartingFromNode(const dd::mNode* node, const QmddEdgeIndex qmddPathToTake) {
@@ -465,7 +444,8 @@ qc::Controls QmddToIdentityTransformer::getControlQubitsForPathFromQmddNodeToTer
                 collectedPaths.emplace_back(pathToVisitedNode);
             } else {
                 const dd::mNode* toBeVisitedNode = edgeToToBeVisitedChildQmddNode.p;
-                assert(toBeVisitedNode->e.size() == 4);
+
+                assert(toBeVisitedNode == nullptr || toBeVisitedNode->e.size() == 4);
                 toBeVisitedQmddNodes.emplace(QmddEdgeTraversalHelper({.refToQmddNode = toBeVisitedNode, .lastProcessedEdge = QmddEdgeIndex::P_Path, .visitedAllEdgesOfNodeFlag = false}));
                 pathToVisitedNode.emplace_back(QmddPathComponent({.qubitAssociatedWithQmddNodeThatHasIncomingEdge = toBeVisitedNode != nullptr ? std::make_optional(toBeVisitedNode->v) : std::nullopt, .incomingEdgeFromParentQmddNode = visitedQmddNode.lastProcessedEdge}));
             }
@@ -554,4 +534,18 @@ std::vector<QmddToIdentityTransformer::QmddPath> QmddToIdentityTransformer::gene
                                                          QmddPathComponent({.qubitAssociatedWithQmddNodeThatHasIncomingEdge = std::nullopt, .incomingEdgeFromParentQmddNode = edge})}));
     }
     return qmddPathsStartingFromNode;
+}
+
+void QmddToIdentityTransformer::exportQmddToFile(const dd::mEdge* edgeToRootOfQmdd, const std::string* optionalPathToFileWhichWillContainQmddExport, const bool clearContentsOfFileBeforeExport) {
+    if (edgeToRootOfQmdd == nullptr || optionalPathToFileWhichWillContainQmddExport == nullptr) {
+        return;
+    }
+
+    const int     outputStreamFlags = std::ofstream::out | (clearContentsOfFileBeforeExport ? std::ofstream::trunc : std::ofstream::app);
+    std::ofstream ofs;
+    ofs.open(*optionalPathToFileWhichWillContainQmddExport, outputStreamFlags);
+    if (!ofs.good()) {
+        return;
+    }
+    dd::serialize(*edgeToRootOfQmdd, ofs);
 }

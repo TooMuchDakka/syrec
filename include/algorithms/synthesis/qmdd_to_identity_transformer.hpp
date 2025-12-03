@@ -20,10 +20,14 @@
 namespace syrec {
     class QmddToIdentityTransformer {
     public:
+        struct QmddTransformationStatistics {
+            long long runtimeInMilliseconds;
+        };
+
         explicit QmddToIdentityTransformer(const std::reference_wrapper<qc::QuantumComputation> quantumComputation, const std::reference_wrapper<dd::Package> qmddPackage):
             qc(quantumComputation), qmddPackage(qmddPackage) {}
 
-        [[nodiscard]] bool synthesize(dd::mEdge src);
+        [[nodiscard]] bool synthesize(dd::mEdge src, QmddTransformationStatistics* optionalCollectedStatisticsContainer = nullptr, const std::string* optionalPathToFileWhichWillContainQmddExport = nullptr);
 
     protected:
         enum class QmddEdgeIndex : std::uint8_t {
@@ -35,7 +39,7 @@ namespace syrec {
 
         struct QmddPathComponent {
             std::optional<dd::Qubit> qubitAssociatedWithQmddNodeThatHasIncomingEdge;
-            QmddEdgeIndex            incomingEdgeFromParentQmddNode;
+            QmddEdgeIndex            incomingEdgeFromParentQmddNode = QmddEdgeIndex::N_Path;
         };
 
         using QmddPath = std::vector<QmddPathComponent>;
@@ -61,7 +65,7 @@ namespace syrec {
 
         [[nodiscard]] bool swapPaths(const QmddPathsStartingFromNode& qmddNodePathSignatures) const;
         [[nodiscard]] bool shiftUniquePaths(const dd::mNode& node, const QmddPathsStartingFromNode& qmddNodePathSignatures) const;
-        //void               makePathsOfEdgeOfQmddNodeUnique(dd::mEdge& src, QmddEdgeIndex processedEdge, QmddPathsStartingFromNode& qmddNodePathSignatures) const;
+        [[nodiscard]] bool makeSharedPathOfQmddNodeUnique(const dd::mNode& node, const QmddPathsStartingFromNode& qmddNodePathSignatures) const;
 
         [[nodiscard]] static bool                       terminate(const dd::mNode& nodeToCheck);
         [[maybe_unused]] static constexpr QmddEdgeIndex increment(QmddEdgeIndex& qmddEdgeIndex) noexcept;
@@ -88,5 +92,6 @@ namespace syrec {
         [[nodiscard]] static constexpr qc::Control::Type getControlQubitPolarityForQmddEdge(QmddEdgeIndex qmddEdge) noexcept;
         [[nodiscard]] static std::optional<qc::Qubit>    getQubitOfQmddNodeReachedByEdge(const dd::mNode* qmddNodeBeingOriginOfEdge, QmddEdgeIndex edgeToTake);
         [[nodiscard]] static std::vector<QmddPath>       generatePathsForQmddNodeWithOnlyTerminalNodeChildren(QmddEdgeIndex qmddEdgeToNode, const dd::mNode& qmddNode);
+        static void                                      exportQmddToFile(const dd::mEdge* edgeToRootOfQmdd, const std::string* optionalPathToFileWhichWillContainQmddExport, bool clearContentsOfFileBeforeExport = false);
     };
 } // namespace syrec
