@@ -44,8 +44,8 @@ namespace syrec {
         };
 
         struct QmddPathComponent {
-            std::optional<dd::Qubit> qubitAssociatedWithQmddNodeThatHasIncomingEdge;
-            QmddEdgeIndex            incomingEdgeFromParentQmddNode = QmddEdgeIndex::N_Path;
+            dd::Qubit     qubitAssociatedWithQmddNodeThatIsOriginOfEdge;
+            QmddEdgeIndex outgoingEdgeIndex = QmddEdgeIndex::N_Path;
         };
 
         using QmddPath = std::vector<QmddPathComponent>;
@@ -99,7 +99,6 @@ namespace syrec {
         [[nodiscard]] static bool                        doQmddPathsOverlap(const std::span<const QmddPathComponent>& lQmddPath, const std::span<const QmddPathComponent>& rQmddPath);
         [[nodiscard]] static constexpr qc::Control::Type getControlQubitPolarityForQmddEdge(QmddEdgeIndex qmddEdge) noexcept;
         [[nodiscard]] static std::optional<qc::Qubit>    getQubitOfQmddNodeReachedByEdge(const dd::mNode* qmddNodeBeingOriginOfEdge, QmddEdgeIndex edgeToTake);
-        [[nodiscard]] static std::vector<QmddPath>       generatePathsForQmddNodeWithOnlyTerminalNodeChildren(QmddEdgeIndex qmddEdgeToNode, const dd::mNode& qmddNode);
         static void                                      exportQmddToFile(const dd::mEdge* edgeToRootOfQmdd, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig = std::nullopt);
     };
 } // namespace syrec
