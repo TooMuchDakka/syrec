@@ -74,10 +74,10 @@ namespace syrec {
         [[maybe_unused]] static constexpr QmddEdgeIndex decrement(QmddEdgeIndex& qmddEdgeIndex) noexcept;
         [[nodiscard]] static constexpr bool             getBooleanSignatureComponentForQmddEdge(QmddEdgeIndex qmddEdgeIndex) noexcept;
 
-        friend constexpr QmddEdgeIndex               operator&(QmddEdgeIndex lOperand, QmddEdgeIndex rOperand) noexcept;
-        friend constexpr QmddEdgeIndex               operator|(QmddEdgeIndex lOperand, QmddEdgeIndex rOperand) noexcept;
-        friend constexpr void                        operator|=(QmddEdgeIndex& assignedToOperand, QmddEdgeIndex rOperand) noexcept;
-        [[nodiscard]] static std::optional<QmddPath> determineUniquePathFromCollection(const std::vector<QmddPath>& qmddPaths);
+        friend constexpr QmddEdgeIndex                                         operator&(QmddEdgeIndex lOperand, QmddEdgeIndex rOperand) noexcept;
+        friend constexpr QmddEdgeIndex                                         operator|(QmddEdgeIndex lOperand, QmddEdgeIndex rOperand) noexcept;
+        friend constexpr void                                                  operator|=(QmddEdgeIndex& assignedToOperand, QmddEdgeIndex rOperand) noexcept;
+        [[nodiscard]] static std::optional<std::pair<qc::Controls, qc::Qubit>> determineControlAndTargetQubitsToMakeSharedQmddPathUnique(const QmddPath& sharedQmddPath, const std::vector<QmddPath>& qmddPaths);
 
         // TODO: How should garbage qubits be handled? Can their path components be skipped?
         // TODO: One should be able to pass a whole existing path signature as a parameter to define the path from the root to the current node
