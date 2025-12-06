@@ -278,9 +278,9 @@ namespace syrec {
 
     bool DDSynthesizer::synthesize(const dd::mEdge& src, dd::Package& qmddPackage, qc::QuantumComputation& qc) {
         const auto qmddToIdentityTransformer = std::make_unique<QmddToIdentityTransformer>(qc, qmddPackage);
-        // TODO: Fix me
-        const std::string x = "C:\\School\\MThesis\\test.txt";
-        return qmddToIdentityTransformer->synthesize(src, nullptr, &x);
+        // TODO: Add additional parameter to configure qmdd dump
+        const QmddToIdentityTransformer::QmddDumpConfig qmddDumpConfig({.pathToFileToDumpQmddTo = "C:\\School\\MThesis\\test.txt", .clearContentsOfFileBeforeExport = true});
+        return qmddToIdentityTransformer->synthesize(src, nullptr, qmddDumpConfig);
     }
 
     // explicitly instantiate the template function decoder.
