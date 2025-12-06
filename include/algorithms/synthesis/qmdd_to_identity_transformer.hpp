@@ -82,15 +82,17 @@ namespace syrec {
         // TODO: How should garbage qubits be handled? Can their path components be skipped?
         // TODO: One should be able to pass a whole existing path signature as a parameter to define the path from the root to the current node
         // TODO: Memoize intermediate results?
-        [[nodiscard]] static std::vector<QmddPath>       getAllPathsStartingFromNode(const dd::mNode* node, QmddEdgeIndex qmddPathToTake);
-        [[nodiscard]] static qc::Controls                getControlQubitsForQmddPathFromRootToNode(qc::Qubit qubitAssociatedToQmddRootNode, const QmddPath& qmddPath);
-        [[nodiscard]] static qc::Controls                getControlQubitsForPathFromQmddNodeToTerminal(const QmddPath& qmddPath);
-        [[nodiscard]] static std::vector<QmddPath>       getAllPathsFromRootToNode(const dd::mNode& root, const dd::mNode& node);
-        [[nodiscard]] static std::vector<std::size_t>    getIndicesOfUniquePathsForQmddNodeEdge(const std::vector<QmddPath>& collectionOfPathsToExtractUniqueOnesFrom, const std::vector<QmddPath>& collectionOfPathsUsedToIdentifyDuplicates);
-        [[nodiscard]] static std::optional<std::size_t>  getIndexOfFirstSharedPathBetweenQmddNodeEdgeSubtrees(const std::vector<QmddPath>& collectionOfPathsToFindSharedOneFrom, const std::vector<QmddPath>& collectionUsedToDetermineWhetherDuplicatePathExists);
-        [[nodiscard]] static const dd::mNode*            getRootNode(dd::Package& qmddPackage);
-        [[nodiscard]] static const dd::mEdge*            getEdgeToRootNode(dd::Package& qmddPackage);
-        [[nodiscard]] static bool                        doQmddPathsOverlap(const QmddPath& lQmddPath, const QmddPath& rQmddPath);
+        [[nodiscard]] static std::vector<QmddPath>      getAllPathsStartingFromNode(const dd::mNode* node, QmddEdgeIndex qmddPathToTake);
+        [[nodiscard]] static qc::Controls               getControlQubitsForQmddPathFromRootToNode(qc::Qubit qubitAssociatedToQmddRootNode, const QmddPath& qmddPath);
+        [[nodiscard]] static qc::Controls               getControlQubitsForQmddPathStartingFromQmddNode(const QmddPath& qmddPath, bool skipFirstPathEntry = false);
+        [[nodiscard]] static std::vector<QmddPath>      getAllPathsFromRootToNode(const dd::mNode& root, const dd::mNode& node);
+        [[nodiscard]] static std::vector<std::size_t>   getIndicesOfUniquePathsForQmddNodeEdge(const std::vector<QmddPath>& collectionOfPathsToExtractUniqueOnesFrom, const std::vector<QmddPath>& collectionOfPathsUsedToIdentifyDuplicates);
+        [[nodiscard]] static std::optional<std::size_t> getIndexOfFirstSharedPathBetweenQmddNodeEdgeSubtrees(const std::vector<QmddPath>& collectionOfPathsToFindSharedOneFrom, const std::vector<QmddPath>& collectionUsedToDetermineWhetherDuplicatePathExists);
+        [[nodiscard]] static const dd::mNode*           getRootNode(dd::Package& qmddPackage);
+        [[nodiscard]] static const dd::mEdge*           getEdgeToRootNode(dd::Package& qmddPackage);
+
+        [[nodiscard]] static bool                        existsQmddPathWithSameSignatureInCollection(const QmddPath& potentiallyUniqueQmddPath, const std::vector<QmddPath>& qmddPathCollectionToSearchThrough);
+        [[nodiscard]] static bool                        doQmddPathsOverlap(const std::span<const QmddPathComponent>& lQmddPath, const std::span<const QmddPathComponent>& rQmddPath);
         [[nodiscard]] static constexpr qc::Control::Type getControlQubitPolarityForQmddEdge(QmddEdgeIndex qmddEdge) noexcept;
         [[nodiscard]] static std::optional<qc::Qubit>    getQubitOfQmddNodeReachedByEdge(const dd::mNode* qmddNodeBeingOriginOfEdge, QmddEdgeIndex edgeToTake);
         [[nodiscard]] static std::vector<QmddPath>       generatePathsForQmddNodeWithOnlyTerminalNodeChildren(QmddEdgeIndex qmddEdgeToNode, const dd::mNode& qmddNode);
