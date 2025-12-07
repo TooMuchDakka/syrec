@@ -293,18 +293,6 @@ constexpr QmddToIdentityTransformer::QmddEdgeIndex QmddToIdentityTransformer::de
     return qmddEdgeIndex == QmddEdgeIndex::P_Path || qmddEdgeIndex == QmddEdgeIndex::P_Prime_Path;
 }
 
-constexpr QmddToIdentityTransformer::QmddEdgeIndex syrec::operator&(const QmddToIdentityTransformer::QmddEdgeIndex lOperand, const QmddToIdentityTransformer::QmddEdgeIndex rOperand) noexcept {
-    return static_cast<QmddToIdentityTransformer::QmddEdgeIndex>(static_cast<std::uint8_t>(lOperand) & static_cast<std::uint8_t>(rOperand));
-}
-
-constexpr QmddToIdentityTransformer::QmddEdgeIndex syrec::operator|(const QmddToIdentityTransformer::QmddEdgeIndex lOperand, const QmddToIdentityTransformer::QmddEdgeIndex rOperand) noexcept {
-    return static_cast<QmddToIdentityTransformer::QmddEdgeIndex>(static_cast<std::uint8_t>(lOperand) | static_cast<std::uint8_t>(rOperand));
-}
-
-constexpr void syrec::operator|=(QmddToIdentityTransformer::QmddEdgeIndex& assignedToOperand, const QmddToIdentityTransformer::QmddEdgeIndex rOperand) noexcept {
-    assignedToOperand = assignedToOperand | rOperand;
-}
-
 // TODO: Pass input edge as parameter?, we are assuming that qmdd paths start in same qmdd node (more like targeting the same qubit since the single path and path collection stem from the subtree of two different edges)
 std::optional<std::pair<qc::Controls, qc::Qubit>> QmddToIdentityTransformer::determineControlAndTargetQubitsToMakeSharedQmddPathUnique(const QmddPath& sharedQmddPath, const std::vector<QmddPath>& qmddPaths) {
     if (qmddPaths.empty() || sharedQmddPath.size() < 2) {

@@ -78,8 +78,18 @@ namespace syrec {
         [[maybe_unused]] static constexpr QmddEdgeIndex decrement(QmddEdgeIndex& qmddEdgeIndex) noexcept;
         [[nodiscard]] static constexpr bool             getBooleanSignatureComponentForQmddEdge(QmddEdgeIndex qmddEdgeIndex) noexcept;
 
-        friend constexpr QmddEdgeIndex                                         operator&(QmddEdgeIndex lOperand, QmddEdgeIndex rOperand) noexcept;
-        friend constexpr QmddEdgeIndex                                         operator|(QmddEdgeIndex lOperand, QmddEdgeIndex rOperand) noexcept;
+        friend constexpr QmddEdgeIndex operator&(const QmddEdgeIndex lOperand, const QmddEdgeIndex rOperand) noexcept {
+            return static_cast<QmddEdgeIndex>(static_cast<std::uint8_t>(lOperand) & static_cast<std::uint8_t>(rOperand));
+        }
+
+        friend constexpr QmddEdgeIndex operator|(const QmddEdgeIndex lOperand, const QmddEdgeIndex rOperand) noexcept {
+            return static_cast<QmddEdgeIndex>(static_cast<std::uint8_t>(lOperand) | static_cast<std::uint8_t>(rOperand));
+        }
+
+        friend constexpr void operator|=(QmddEdgeIndex& assignedToOperand, const QmddEdgeIndex rOperand) noexcept {
+            assignedToOperand = assignedToOperand | rOperand;
+        }
+
         friend constexpr void                                                  operator|=(QmddEdgeIndex& assignedToOperand, QmddEdgeIndex rOperand) noexcept;
         [[nodiscard]] static std::optional<std::pair<qc::Controls, qc::Qubit>> determineControlAndTargetQubitsToMakeSharedQmddPathUnique(const QmddPath& sharedQmddPath, const std::vector<QmddPath>& qmddPaths);
 
