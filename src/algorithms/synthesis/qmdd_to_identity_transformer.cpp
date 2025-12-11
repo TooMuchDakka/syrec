@@ -159,6 +159,8 @@ bool QmddToIdentityTransformer::swapPaths(const QmddPathsStartingFromNode& qmddN
             assert(!pathFromRootToCurrentNode.empty());
             const qc::Controls controlQubitsForPathFromRootToCurrentNode = getControlQubitsForQmddPathFromRootToNode(pathFromRootToCurrentNode);
             applyOperationToQmdd(targetQubit, controlQubitsForPathFromRootToCurrentNode, *edgeToRootNode);
+            // TODO: Application of QMDD operation can change structure of QMDD thus previously determined paths may no longer exist
+            break;
         }
     }
     return true;
@@ -202,6 +204,8 @@ bool QmddToIdentityTransformer::shiftUniquePaths(const dd::mNode& node, const Qm
                 qc::Controls controlQubitsToTargetPathFromRootToCurrentNode = getControlQubitsForQmddPathFromRootToNode(pathFromRootToCurrentNode);
                 controlQubitsToTargetPathFromRootToCurrentNode.insert(controlQubitsForUniquePathStartingFromNode.cbegin(), controlQubitsForUniquePathStartingFromNode.cend());
                 applyOperationToQmdd(targetQubit, controlQubitsToTargetPathFromRootToCurrentNode, *edgeToRootNode);
+                // TODO: Application of QMDD operation can change structure of QMDD thus previously determined paths may no longer exist
+                break;
             }
         }
         // TODO: Currently SHE exception with code 0xc0000005 for multiple paths since QMDD could be changed after an operation is applied.
@@ -228,19 +232,33 @@ bool QmddToIdentityTransformer::makeSharedPathOfQmddNodeUnique(const dd::mNode& 
     assert(controlAndTargetQubitsToMakeSharedQmddPathUnique.has_value());
     const auto [controlQubitsForPathFromQmddNodeUpToButExcludingTargetQubit, targetQubitToMakeSharedQmddPathUnique] = *controlAndTargetQubitsToMakeSharedQmddPathUnique;
 
-    if (node.v == rootNode.v) {
-        applyOperationToQmdd(targetQubitToMakeSharedQmddPathUnique, controlQubitsForPathFromQmddNodeUpToButExcludingTargetQubit, *edgeToRootNode);
-    } else {
-        for (const auto& pathFromRootToCurrentNode: getAllPathsFromRootToNode(rootNode, qmddNodePathSignatures.associatedQmddNode)) {
-            assert(!pathFromRootToCurrentNode.empty());
-            // All control qubits from the root to the current node as well as for the p' edge of the latter are now set.
-            qc::Controls controlQubitsFromRootUpToTargetQubit = getControlQubitsForQmddPathFromRootToNode(pathFromRootToCurrentNode);
-            // Add the subpath from the current vertex up to but excluding the target qubit
-            controlQubitsFromRootUpToTargetQubit.insert(controlQubitsForPathFromQmddNodeUpToButExcludingTargetQubit.cbegin(), controlQubitsForPathFromQmddNodeUpToButExcludingTargetQubit.cend());
-            // Modify the portion of the shared path
-            applyOperationToQmdd(targetQubitToMakeSharedQmddPathUnique, controlQubitsFromRootUpToTargetQubit, *edgeToRootNode);
-        }
+    for (const auto& pathFromRootToCurrentNode: getAllPathsFromRootToNode(rootNode, qmddNodePathSignatures.associatedQmddNode)) {
+        assert(!pathFromRootToCurrentNode.empty());
+        // All control qubits from the root to the current node as well as for the p' edge of the latter are now set.
+        qc::Controls controlQubitsFromRootUpToTargetQubit = getControlQubitsForQmddPathFromRootToNode(pathFromRootToCurrentNode);
+        // Add the subpath from the current vertex up to but excluding the target qubit
+        controlQubitsFromRootUpToTargetQubit.insert(controlQubitsForPathFromQmddNodeUpToButExcludingTargetQubit.cbegin(), controlQubitsForPathFromQmddNodeUpToButExcludingTargetQubit.cend());
+        // Modify the portion of the shared path
+        applyOperationToQmdd(targetQubitToMakeSharedQmddPathUnique, controlQubitsFromRootUpToTargetQubit, *edgeToRootNode);
+        // TODO: Application of QMDD operation can change structure of QMDD thus previously determined paths may no longer exist
+        break;
     }
+
+    // if (node.v == rootNode.v) {
+    //     applyOperationToQmdd(targetQubitToMakeSharedQmddPathUnique, controlQubitsForPathFromQmddNodeUpToButExcludingTargetQubit, *edgeToRootNode);
+    // } else {
+    //     for (const auto& pathFromRootToCurrentNode: getAllPathsFromRootToNode(rootNode, qmddNodePathSignatures.associatedQmddNode)) {
+    //         assert(!pathFromRootToCurrentNode.empty());
+    //         // All control qubits from the root to the current node as well as for the p' edge of the latter are now set.
+    //         qc::Controls controlQubitsFromRootUpToTargetQubit = getControlQubitsForQmddPathFromRootToNode(pathFromRootToCurrentNode);
+    //         // Add the subpath from the current vertex up to but excluding the target qubit
+    //         controlQubitsFromRootUpToTargetQubit.insert(controlQubitsForPathFromQmddNodeUpToButExcludingTargetQubit.cbegin(), controlQubitsForPathFromQmddNodeUpToButExcludingTargetQubit.cend());
+    //         // Modify the portion of the shared path
+    //         applyOperationToQmdd(targetQubitToMakeSharedQmddPathUnique, controlQubitsFromRootUpToTargetQubit, *edgeToRootNode);
+    //         // TODO: Application of QMDD operation can change structure of QMDD thus previously determined paths may no longer exist
+    //         break;
+    //     }
+    // }
     return true;
 }
 
@@ -337,7 +355,8 @@ std::optional<std::pair<qc::Controls, qc::Qubit>> QmddToIdentityTransformer::det
         const QmddPathComponent& sharedPathComponent = sharedQmddPath[i];
         controlsForSharedPathComponents.emplace(qc::Control(sharedPathComponent.qubitAssociatedWithQmddNodeThatIsOriginOfEdge, getControlQubitPolarityForQmddEdge(sharedPathComponent.outgoingEdgeIndex)));
     }
-    const qc::Qubit targetQubit = sharedQmddPath[*indexToSharedPathComponentAtLowestLevelInQmdd].qubitAssociatedWithQmddNodeThatIsOriginOfEdge;
+
+    const qc::Qubit targetQubit = sharedQmddPath[1U + *indexToSharedPathComponentAtLowestLevelInQmdd].qubitAssociatedWithQmddNodeThatIsOriginOfEdge;
     // TODO: Do we need this second portion of the shared path after the target qubit?
     // for (std::size_t i = *indexToSharedPathComponentAtLowestLevelInQmdd + 1U; i < sharedQmddPath.size(); ++i) {
     //     const QmddPathComponent& sharedPathComponent = sharedQmddPath[i];
