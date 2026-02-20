@@ -90,7 +90,6 @@ namespace syrec {
             assignedToOperand = assignedToOperand | rOperand;
         }
 
-        friend constexpr void                                                  operator|=(QmddEdgeIndex& assignedToOperand, QmddEdgeIndex rOperand) noexcept;
         [[nodiscard]] static std::optional<std::pair<qc::Controls, qc::Qubit>> determineControlAndTargetQubitsToMakeSharedQmddPathUnique(const QmddPath& sharedQmddPath, const std::vector<QmddPath>& qmddPaths);
 
         // TODO: How should garbage qubits be handled? Can their path components be skipped?
@@ -107,6 +106,7 @@ namespace syrec {
 
         [[nodiscard]] static bool                        existsQmddPathWithSameSignatureInCollection(const QmddPath& potentiallyUniqueQmddPath, const std::vector<QmddPath>& qmddPathCollectionToSearchThrough);
         [[nodiscard]] static bool                        doQmddPathsOverlap(const std::span<const QmddPathComponent>& lQmddPath, const std::span<const QmddPathComponent>& rQmddPath);
+        [[nodiscard]] static constexpr bool              doesAggregateOfQmddEdgesContainEdgeWithSamePolarity(QmddEdgeIndex qmddEdgesAggregate, QmddEdgeIndex qmddEdgeCheckedWhetherContainedInAggregate) noexcept;
         [[nodiscard]] static constexpr qc::Control::Type getControlQubitPolarityForQmddEdge(QmddEdgeIndex qmddEdge) noexcept;
         [[nodiscard]] static std::optional<qc::Qubit>    getQubitOfQmddNodeReachedByEdge(const dd::mNode* qmddNodeBeingOriginOfEdge, QmddEdgeIndex edgeToTake);
         static void                                      exportQmddToFile(const dd::mEdge* edgeToRootOfQmdd, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig = std::nullopt);

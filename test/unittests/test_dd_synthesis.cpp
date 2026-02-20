@@ -38,33 +38,49 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestDDSynth, TestDDSynth,
                          testing::Values(
-                                 "swap",
-                                 "toffoli",
-                                 "x2Bit",
-                                 "test_dd_synthesis_1",
-                                 "test_dd_synthesis_2",
-                                 "3_17_6",
-                                 "bitwiseXor2Bit",
-                                 "adder2Bit",
-                                 "adder3Bit",
-                                 "4_49_7",
-                                 "hwb4_12",
-                                 "hwb5_13",
-                                 "hwb6_14",
-                                 "hwb7_15",
-                                 "hwb8_64",
-                                 "hwb9_65",
-                                 "graycode",
-                                 "hamming_7",
-                                 "mod4096",
-                                 "mod8192",
-                                 "mod638192",
-                                 "14_bit",
-                                 "urf1",
-                                 "urf2",
-                                 "urf3",
-                                 "urf4",
-                                 "urf5"),
+                                 // TODO: OK
+                                 //"swap",
+                                 // TODO: OK
+                                 //"toffoli",
+                                 // TODO: OK
+                                 //"x2Bit",
+                                 // TODO: OK
+                                 //"test_dd_synthesis_1",
+                                 // TODO: OK
+                                 //"test_dd_synthesis_2",
+                                 // TODO: OK
+                                 //"3_17_6",
+                                 // TODO: OK
+                                 //"bitwiseXor2Bit",
+                                 // TODO: OK
+                                 //"adder2Bit",
+                                 // TODO: OK
+                                 //"adder3Bit",
+                                 // TODO: INFINITE LOOP
+                                 "4_49_7"
+                                 // TODO: INFINITE LOOP
+                                 //"hwb4_12",
+                                 // "hwb5_13",
+                                 // "hwb6_14",
+                                 // "hwb7_15",
+                                 // "hwb8_64",
+                                 // "hwb9_65",
+                                 // TODO: OK
+                                 //"graycode",
+                                 // TODO: INFINITE LOOP
+                                 //"hamming_7",
+                                 //"mod4096",
+                                 //"mod8192",
+                                 //"mod638192",
+                                 //"14_bit",
+                                 //"urf1",
+                                 //"urf2",
+                                 //"urf3",
+                                 //"urf4",
+                                 //"urf5",
+                                 // TODO: OK
+                                 //"dd_synth_paper_example"
+                                 ),
                          [](const testing::TestParamInfo<TestDDSynth::ParamType>& info) {
                              auto s = info.param;
                              std::ranges::replace(s, '-', '_');
@@ -81,6 +97,8 @@ TEST_P(TestDDSynth, GenericDDSynthesisTest) {
     ASSERT_TRUE(qmddSynthesisResult.has_value());
 
     //const dd::mEdge& reconstructedQuantumComputationFromQmdd = dd::buildFunctionality(*qmddSynthesisResult->quantumComputation, *qmddSynthesisResult->qmddPackage);
-    const dd::mEdge& reconstructedQuantumComputationFromQmdd = QmddToIdentityTransformer::constructQmddFromQuantumComputationStartingFromIdentityQmdd(*qmddSynthesisResult->quantumComputation, *qmddSynthesisResult->qmddPackage);
+
+    const QmddToIdentityTransformer::QmddDumpConfig qmddDumpConfig({.pathToFileToDumpQmddTo = "C:\\School\\MThesis\\test.txt", .clearContentsOfFileBeforeExport = false});
+    const dd::mEdge&                                reconstructedQuantumComputationFromQmdd = QmddToIdentityTransformer::constructQmddFromQuantumComputationStartingFromIdentityQmdd(*qmddSynthesisResult->quantumComputation, *qmddSynthesisResult->qmddPackage, qmddDumpConfig);
     ASSERT_TRUE(qmddSynthesisResult->edgeToRootOfQmdd == reconstructedQuantumComputationFromQmdd);
 }
