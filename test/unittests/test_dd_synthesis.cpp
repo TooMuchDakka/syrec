@@ -9,7 +9,7 @@
  */
 
 #include "algorithms/synthesis/dd_synthesis.hpp"
-#include "algorithms/synthesis/qmdd_to_identity_transformer.hpp"
+#include "algorithms/synthesis/qmddTransformer.hpp"
 #include "core/io/pla_parser.hpp"
 #include "core/truthTable/truth_table.hpp"
 #include "dd/Export.hpp"
@@ -39,25 +39,25 @@ protected:
 INSTANTIATE_TEST_SUITE_P(TestDDSynth, TestDDSynth,
                          testing::Values(
                                  // TODO: OK
-                                 //"swap",
+                                 "swap",
                                  // TODO: OK
-                                 //"toffoli",
+                                 "toffoli",
                                  // TODO: OK
-                                 //"x2Bit",
+                                 "x2Bit",
                                  // TODO: OK
-                                 //"test_dd_synthesis_1",
+                                 "test_dd_synthesis_1",
                                  // TODO: OK
-                                 //"test_dd_synthesis_2",
+                                 "test_dd_synthesis_2",
                                  // TODO: OK
-                                 //"3_17_6",
+                                 "3_17_6",
                                  // TODO: OK
-                                 //"bitwiseXor2Bit",
+                                 "bitwiseXor2Bit",
                                  // TODO: OK
-                                 //"adder2Bit",
+                                 "adder2Bit",
                                  // TODO: OK
-                                 //"adder3Bit",
+                                 "adder3Bit"
                                  // TODO: INFINITE LOOP
-                                 "4_49_7"
+                                 //"4_49_7"
                                  // TODO: INFINITE LOOP
                                  //"hwb4_12",
                                  // "hwb5_13",
@@ -98,7 +98,8 @@ TEST_P(TestDDSynth, GenericDDSynthesisTest) {
 
     //const dd::mEdge& reconstructedQuantumComputationFromQmdd = dd::buildFunctionality(*qmddSynthesisResult->quantumComputation, *qmddSynthesisResult->qmddPackage);
 
-    const QmddToIdentityTransformer::QmddDumpConfig qmddDumpConfig({.pathToFileToDumpQmddTo = "C:\\School\\MThesis\\test.txt", .clearContentsOfFileBeforeExport = false});
-    const dd::mEdge&                                reconstructedQuantumComputationFromQmdd = QmddToIdentityTransformer::constructQmddFromQuantumComputationStartingFromIdentityQmdd(*qmddSynthesisResult->quantumComputation, *qmddSynthesisResult->qmddPackage, qmddDumpConfig);
+    const QmddTransformer::QmddDumpConfig qmddDumpConfig({.pathToDumpFile = "C:\\School\\MThesis\\test.txt"});
+    // TODO: One could optionally disable to dump the qmdd during the reconstruction?
+    const dd::mEdge& reconstructedQuantumComputationFromQmdd = QmddTransformer::constructQmddFromGatesOfQuantumComputation(*qmddSynthesisResult->quantumComputation, *qmddSynthesisResult->qmddPackage, qmddDumpConfig);
     ASSERT_TRUE(qmddSynthesisResult->edgeToRootOfQmdd == reconstructedQuantumComputationFromQmdd);
 }

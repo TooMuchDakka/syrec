@@ -12,6 +12,7 @@
 
 #include "algorithms/optimization/esop_minimization.hpp"
 #include "algorithms/synthesis/encoding.hpp"
+#include "algorithms/synthesis/qmddTransformer.hpp"
 #include "algorithms/synthesis/qmdd_to_identity_transformer.hpp"
 #include "core/truthTable/truth_table.hpp"
 #include "dd/DDDefinitions.hpp"
@@ -277,10 +278,14 @@ namespace syrec {
     }
 
     bool DDSynthesizer::synthesize(const dd::mEdge& src, dd::Package& qmddPackage, qc::QuantumComputation& qc) {
-        const auto qmddToIdentityTransformer = std::make_unique<QmddToIdentityTransformer>(qc, qmddPackage);
+        //const auto qmddToIdentityTransformer = std::make_unique<QmddToIdentityTransformer>(qc, qmddPackage);
         // TODO: Add additional parameter to configure qmdd dump
-        const QmddToIdentityTransformer::QmddDumpConfig qmddDumpConfig({.pathToFileToDumpQmddTo = "C:\\School\\MThesis\\test.txt", .clearContentsOfFileBeforeExport = true});
-        return qmddToIdentityTransformer->synthesize(src, nullptr, qmddDumpConfig);
+        //const QmddToIdentityTransformer::QmddDumpConfig qmddDumpConfig({.pathToFileToDumpQmddTo = "C:\\School\\MThesis\\test.txt", .clearContentsOfFileBeforeExport = true});
+        //return qmddToIdentityTransformer->synthesize(src, nullptr, qmddDumpConfig);
+
+        const auto                            qmddTransformer = std::make_unique<QmddTransformer>(qc, qmddPackage);
+        const QmddTransformer::QmddDumpConfig qmddDumpConfig({.pathToDumpFile = "C:\\School\\MThesis\\test.txt"});
+        return qmddTransformer->synthesizeQmdd(src, nullptr, qmddDumpConfig);
     }
 
     // explicitly instantiate the template function decoder.
