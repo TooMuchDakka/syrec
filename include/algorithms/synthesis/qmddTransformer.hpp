@@ -50,7 +50,11 @@ namespace syrec {
             dd::Qubit    qubitAssociatedWithQmddNode = 0U;
             QmddNodeEdge qmddEdgeToChildNode         = QmddNodeEdge::N;
         };
-        using QmddPath = std::vector<QmddPathComponent>;
+
+        struct QmddPath {
+            std::vector<QmddPathComponent> nonTruncatedPathComponents;
+            std::optional<dd::Qubit>       firstQubitOfTruncatedPathToOneTerminal;
+        };
 
         struct QmddNodeAndPathsPerEdge {
             std::reference_wrapper<const dd::mNode> associatedQmddNode;
@@ -63,6 +67,7 @@ namespace syrec {
         struct VisitedQmddNodeEdgesAggregation {
             const dd::mNode*            associatedQmddNode;
             std::optional<QmddNodeEdge> visitedEdges;
+            std::optional<QmddNodeEdge> currVisitedEdge;
 
             explicit VisitedQmddNodeEdgesAggregation(const dd::mNode* associatedQmddNode): associatedQmddNode(associatedQmddNode) {}
 
@@ -72,32 +77,51 @@ namespace syrec {
 
             [[maybe_unused]] QmddNodeEdge advanceToNextEdge() noexcept {
                 if (!visitedEdges.has_value()) {
-                    visitedEdges = QmddNodeEdge::N;
-                    return QmddNodeEdge::N;
+                    currVisitedEdge = QmddNodeEdge::N;
+                    visitedEdges    = QmddNodeEdge::N;
+                    return *currVisitedEdge;
                 }
-
-                for (const QmddNodeEdge qmddNodeEdge: {QmddNodeEdge::P, QmddNodeEdge::N_Prime, QmddNodeEdge::P_Prime, QmddNodeEdge::N}) {
-                    if (*visitedEdges & qmddNodeEdge) {
+                bool                   advancedToNextEdge = false;
+                constexpr QmddNodeEdge qmddNodeEdges[4]   = {QmddNodeEdge::P, QmddNodeEdge::N_Prime, QmddNodeEdge::P_Prime, QmddNodeEdge::N};
+                for (std::size_t i = 0; i < 4 && !advancedToNextEdge; ++i) {
+                    if (const QmddNodeEdge qmddNodeEdge = qmddNodeEdges[i]; *visitedEdges & qmddNodeEdge) {
                         switch (qmddNodeEdge) {
                             case QmddNodeEdge::N:
-                                *visitedEdges |= QmddNodeEdge::P_Prime;
-                                return QmddNodeEdge::P_Prime;
+                                currVisitedEdge    = QmddNodeEdge::P_Prime;
+                                advancedToNextEdge = true;
+                                break;
                             case QmddNodeEdge::P_Prime:
-                                *visitedEdges |= QmddNodeEdge::N_Prime;
-                                return QmddNodeEdge::N_Prime;
+                                currVisitedEdge    = QmddNodeEdge::N_Prime;
+                                advancedToNextEdge = true;
+                                break;
                             case QmddNodeEdge::N_Prime:
-                                *visitedEdges |= QmddNodeEdge::P;
-                                return QmddNodeEdge::P;
+                                currVisitedEdge    = QmddNodeEdge::P;
+                                advancedToNextEdge = true;
+                                break;
                             case QmddNodeEdge::P:
-                                *visitedEdges |= QmddNodeEdge::N;
-                                return QmddNodeEdge::N;
+                                currVisitedEdge    = QmddNodeEdge::N;
+                                advancedToNextEdge = true;
+                                break;
                             default:
                                 break;
                         }
                     }
                 }
-                // TODO:
-                return QmddNodeEdge::N;
+                *visitedEdges |= *currVisitedEdge;
+                return *currVisitedEdge;
+            }
+
+            [[maybe_unused]] std::optional<QmddNodeEdge> advanceToNextEdgeInPathFromRootToNode() noexcept {
+                if (!visitedEdges.has_value()) {
+                    visitedEdges = QmddNodeEdge::N;
+                    return QmddNodeEdge::N;
+                }
+
+                if (*visitedEdges & QmddNodeEdge::N) {
+                    *visitedEdges = QmddNodeEdge::N | QmddNodeEdge::P_Prime | QmddNodeEdge::N_Prime | QmddNodeEdge::P;
+                    return QmddNodeEdge::P;
+                }
+                return std::nullopt;
             }
 
             void markAllEdgesAsVisited() noexcept {
@@ -142,10 +166,12 @@ namespace syrec {
             OverwriteExisting,
             Append
         };
-        static void                                      exportQmddToFile(const dd::mEdge* edgeToRootNodeOfQmdd, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig = std::nullopt, QmddExportOutputStreamOperation qmddExportOutputStreamOperation = QmddExportOutputStreamOperation::Append);
-        static void                                      getPathsThroughEdgeStartingFromQmddNode(const dd::mNode& qmddNodeToStartPathsFrom, QmddNodeEdge edgesToGeneratePathsFor, QmddNodeAndPathsPerEdge& containerStoringFoundPaths);
+        static void exportQmddToFile(const dd::mEdge* edgeToRootNodeOfQmdd, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig = std::nullopt, QmddExportOutputStreamOperation qmddExportOutputStreamOperation = QmddExportOutputStreamOperation::Append);
+        static void getPathsToOneTerminalThroughEdgeOfQmddNode(const dd::mNode& qmddNodeToStartPathsFrom, QmddNodeEdge edgesToGeneratePathsFor, QmddNodeAndPathsPerEdge& containerStoringFoundPaths);
+        // TODO: A node should only be reachable from the root node by traversing either the P or N edge of the traversed node until the searched for node is found.
+        // TODO: "Truncated" nodes from the "original" qmdd root to the current qmdd root should be ignorable?
         [[nodiscard]] static std::vector<QmddPath>       getAllPathsFromRootToNode(const dd::mNode& qmddRootNode, const dd::mNode& qmddNodeToReach);
-        [[nodiscard]] static qc::Controls                getControlQubitsFromSignatureOfQmddPath(const QmddPath& qmddPath) noexcept;
+        [[nodiscard]] static qc::Controls                getControlQubitsFromSignatureOfQmddPathComponents(const std::vector<QmddPathComponent>& qmddPathComponents) noexcept;
         [[nodiscard]] static qc::Control                 getControlQubitForQmddPathComponent(QmddPathComponent qmddPathComponent);
         [[nodiscard]] static constexpr qc::Control::Type getControlQubitTypeForQmddNodeEdge(const QmddNodeEdge qmddNodeEdge) noexcept {
             return qmddNodeEdge == QmddNodeEdge::P || qmddNodeEdge == QmddNodeEdge::P_Prime ? qc::Control::Type::Pos : qc::Control::Type::Neg;
@@ -158,8 +184,62 @@ namespace syrec {
         };
         [[nodiscard]] static std::optional<TransformationToUniqueQmddPathData> getTransformationDataToMakeAnyQmddPathUniqueViaSingleSignatureBitFlip(const std::vector<QmddPath>& qmddPathsContainingPotentiallyTransformableOne, const std::vector<QmddPath>& comparedToQmddPaths);
         [[nodiscard]] static std::optional<TransformationToUniqueQmddPathData> getTransformationDataToMakeQmddPathUniqueViaSingleSignatureBitFlip(const QmddPath& qmddPathToTurnUnique, const std::vector<QmddPath>& comparedToQmddPaths);
+        [[nodiscard]] static std::size_t                                       getNumberOfPathsToOneTerminalForQmddPath(const QmddPath& qmddPath) noexcept;
+        [[nodiscard]] static std::size_t                                       getNumberOfPathsToOneTerminalForQmddPaths(const std::vector<QmddPath>& qmddPaths) noexcept;
 
         std::reference_wrapper<qc::QuantumComputation> qc;
         std::reference_wrapper<dd::Package>            qmddPkg;
+
+        struct QmddPathGenerator {
+            std::vector<QmddPathComponent> lastGeneratedCombination;
+            bool                           isGeneratingMoreThanOneCombination;
+            bool                           hasGeneratedFirstCombination;
+            dd::Qubit                      firstNonTruncatedQubit;
+
+            explicit QmddPathGenerator(const QmddPath& qmddPath) {
+                if (qmddPath.nonTruncatedPathComponents.empty() && !qmddPath.firstQubitOfTruncatedPathToOneTerminal.has_value()) {
+                    isGeneratingMoreThanOneCombination = false;
+                    hasGeneratedFirstCombination       = true;
+                    firstNonTruncatedQubit             = 0U;
+                    return;
+                }
+
+                isGeneratingMoreThanOneCombination = qmddPath.firstQubitOfTruncatedPathToOneTerminal.has_value();
+                hasGeneratedFirstCombination       = false;
+                firstNonTruncatedQubit             = qmddPath.nonTruncatedPathComponents.back().qubitAssociatedWithQmddNode;
+
+                lastGeneratedCombination = qmddPath.nonTruncatedPathComponents;
+                if (isGeneratingMoreThanOneCombination) {
+                    const std::size_t nQubitsOptimizedInTruncatedPathComponent = qmddPath.firstQubitOfTruncatedPathToOneTerminal.value() + 1U;
+                    lastGeneratedCombination.reserve(qmddPath.nonTruncatedPathComponents.size() + nQubitsOptimizedInTruncatedPathComponent);
+                    for (dd::Qubit i = 0U; i < nQubitsOptimizedInTruncatedPathComponent; ++i) {
+                        // Qubits in qmdd path are expected to be defined in the same order as the variable ordering of the associated qmdd which in turn defines the variable ordering as starting with the "largest" qubit down to the "lowest" qubit.
+                        lastGeneratedCombination.emplace_back(QmddPathComponent({.qubitAssociatedWithQmddNode = static_cast<dd::Qubit>(*qmddPath.firstQubitOfTruncatedPathToOneTerminal - i), .qmddEdgeToChildNode = QmddNodeEdge::N}));
+                    }
+                    lastGeneratedCombination.back().qmddEdgeToChildNode = QmddNodeEdge::P;
+                }
+            }
+
+            [[nodiscard]] bool generateNextCombination() {
+                if (!isGeneratingMoreThanOneCombination) {
+                    if (hasGeneratedFirstCombination) {
+                        return false;
+                    }
+                    hasGeneratedFirstCombination = true;
+                    return true;
+                }
+
+                bool advanceModificationToNextPosition = true;
+                for (auto lastGeneratedCombinationIterator = lastGeneratedCombination.rbegin(); lastGeneratedCombinationIterator != lastGeneratedCombination.rend() && advanceModificationToNextPosition; ++lastGeneratedCombinationIterator) {
+                    if (lastGeneratedCombinationIterator->qubitAssociatedWithQmddNode == firstNonTruncatedQubit) {
+                        return false;
+                    }
+                    lastGeneratedCombinationIterator->qmddEdgeToChildNode = lastGeneratedCombinationIterator->qmddEdgeToChildNode == QmddNodeEdge::N ? QmddNodeEdge::P : QmddNodeEdge::N;
+                    advanceModificationToNextPosition                     = hasGeneratedFirstCombination ? lastGeneratedCombinationIterator->qmddEdgeToChildNode == QmddNodeEdge::N : false;
+                    hasGeneratedFirstCombination                          = true;
+                }
+                return !advanceModificationToNextPosition;
+            }
+        };
     };
 } // namespace syrec
