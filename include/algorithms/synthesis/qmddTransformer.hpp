@@ -200,25 +200,24 @@ namespace syrec {
         struct QmddPathGenerator {
             UnoptimizedQmddPath             lastGeneratedCombination;
             std::unordered_set<std::size_t> nonGapQmddPathIndices;
-            bool                            isGeneratingMoreThanOneCombination;
-            bool                            hasGeneratedFirstCombination;
+
+            std::size_t nCombinationsToGenerate = 0;
+            std::size_t nGeneratedCombinations  = 0;
+            bool        isGeneratingMoreThanOneCombination;
+            bool        hasGeneratedFirstCombination;
 
             explicit QmddPathGenerator(const OptimizedQmddPath& qmddPath) {
                 if (qmddPath.empty()) {
-                    isGeneratingMoreThanOneCombination = false;
-                    hasGeneratedFirstCombination       = true;
                     return;
                 }
 
+                nCombinationsToGenerate = 1;
                 if (std::ranges::all_of(qmddPath, [](const std::variant<QmddPathComponent, QmddPathGap>& qmddPathComponentVariant) { return std::holds_alternative<QmddPathComponent>(qmddPathComponentVariant); })) {
                     lastGeneratedCombination.reserve(qmddPath.size());
                     std::ranges::transform(qmddPath, std::back_inserter(lastGeneratedCombination), [](const std::variant<QmddPathComponent, QmddPathGap>& qmddPathComponentVariant) { return std::get<QmddPathComponent>(qmddPathComponentVariant); });
-                    isGeneratingMoreThanOneCombination = false;
-                    hasGeneratedFirstCombination       = false;
                     return;
                 }
 
-                isGeneratingMoreThanOneCombination    = true;
                 std::size_t unoptimizedQmddPathLength = 0U;
                 if (const QmddPathGap* qmddPathHeadAsGapEntry = std::get_if<QmddPathGap>(&qmddPath.front()); qmddPathHeadAsGapEntry != nullptr) {
                     unoptimizedQmddPathLength = qmddPathHeadAsGapEntry->qubitAssociatedWithFirstQmddNodeOfGap + 1U;
@@ -231,7 +230,7 @@ namespace syrec {
                 lastGeneratedCombination.reserve(unoptimizedQmddPathLength);
                 // Qubits in qmdd path are expected to be defined in the same order as the variable ordering of the associated qmdd which in turn defines the variable ordering as starting with the "largest" qubit down to the "lowest" qubit.
                 for (const dd::Qubit qubit: std::views::iota(static_cast<dd::Qubit>(0U), static_cast<dd::Qubit>(unoptimizedQmddPathLength)) | std::views::reverse) {
-                    lastGeneratedCombination.emplace_back(qubit, QmddNodeEdge::N);
+                    lastGeneratedCombination.emplace_back(qubit, QmddNodeEdge::P);
                 }
 
                 for (auto qmddPathComponentsIterator = qmddPath.begin(); qmddPathComponentsIterator != qmddPath.end(); ++qmddPathComponentsIterator) {
@@ -241,6 +240,7 @@ namespace syrec {
                     }
 
                     assert(std::holds_alternative<QmddPathComponent>(*qmddPathComponentsIterator));
+                    nCombinationsToGenerate *= 2;
                     const auto&       qmddPathComponentCasted                                   = std::get<QmddPathComponent>(*qmddPathComponentsIterator);
                     const std::size_t qmddPathIndexOfCurrentElement                             = static_cast<std::size_t>(std::distance(qmddPath.begin(), qmddPathComponentsIterator));
                     lastGeneratedCombination[qmddPathIndexOfCurrentElement].qmddEdgeToChildNode = qmddPathComponentCasted.qmddEdgeToChildNode;
@@ -249,25 +249,40 @@ namespace syrec {
             }
 
             [[nodiscard]] bool generateNextCombination() {
-                if (!isGeneratingMoreThanOneCombination) {
-                    if (hasGeneratedFirstCombination) {
-                        return false;
-                    }
-                    hasGeneratedFirstCombination = true;
+                if (nCombinationsToGenerate == nGeneratedCombinations) {
+                    return false;
+                }
+
+                ++nGeneratedCombinations;
+                if (nCombinationsToGenerate == 1) {
                     return true;
                 }
 
-                bool advanceModificationToNextPosition = true;
-                for (auto lastGeneratedCombinationIterator = lastGeneratedCombination.rbegin(); lastGeneratedCombinationIterator != lastGeneratedCombination.rend() && advanceModificationToNextPosition; ++lastGeneratedCombinationIterator) {
-                    // TODO: Check whether we should use the gap indices instead since gaps should occur more rarely (that would be our current assumption).
-                    if (const std::size_t indexOfElementInUnoptimizedQmddPath = static_cast<std::size_t>(std::distance(lastGeneratedCombination.rbegin(), lastGeneratedCombinationIterator)); nonGapQmddPathIndices.contains(indexOfElementInUnoptimizedQmddPath)) {
+                assert(nonGapQmddPathIndices.size() != lastGeneratedCombination.size());
+                for (const std::size_t lastGeneratedCombinationIdx: std::views::iota(0U, lastGeneratedCombination.size()) | std::views::reverse) {
+                    if (nonGapQmddPathIndices.contains(lastGeneratedCombinationIdx)) {
                         continue;
                     }
-                    lastGeneratedCombinationIterator->qmddEdgeToChildNode = lastGeneratedCombinationIterator->qmddEdgeToChildNode == QmddNodeEdge::N ? QmddNodeEdge::P : QmddNodeEdge::N;
-                    advanceModificationToNextPosition                     = hasGeneratedFirstCombination ? lastGeneratedCombinationIterator->qmddEdgeToChildNode == QmddNodeEdge::N : false;
-                    hasGeneratedFirstCombination                          = true;
+                    QmddNodeEdge& lastGenerationCombinationEntry = lastGeneratedCombination[lastGeneratedCombinationIdx].qmddEdgeToChildNode;
+                    lastGenerationCombinationEntry               = lastGenerationCombinationEntry == QmddNodeEdge::P ? QmddNodeEdge::N : QmddNodeEdge::P;
+                    if (lastGenerationCombinationEntry == QmddNodeEdge::P) {
+                        break;
+                    }
                 }
-                return !advanceModificationToNextPosition;
+                return true;
+
+                //
+                // bool advanceModificationToNextPosition = true;
+                // for (auto lastGeneratedCombinationIterator = lastGeneratedCombination.rbegin(); lastGeneratedCombinationIterator != lastGeneratedCombination.rend() && advanceModificationToNextPosition; ++lastGeneratedCombinationIterator) {
+                //     // TODO: Check whether we should use the gap indices instead since gaps should occur more rarely (that would be our current assumption).
+                //     if (const std::size_t indexOfElementInUnoptimizedQmddPath = static_cast<std::size_t>(std::distance(lastGeneratedCombination.rbegin(), lastGeneratedCombinationIterator)); nonGapQmddPathIndices.contains(indexOfElementInUnoptimizedQmddPath)) {
+                //         continue;
+                //     }
+                //     lastGeneratedCombinationIterator->qmddEdgeToChildNode = lastGeneratedCombinationIterator->qmddEdgeToChildNode == QmddNodeEdge::N ? QmddNodeEdge::P : QmddNodeEdge::N;
+                //     advanceModificationToNextPosition                     = hasGeneratedFirstCombination ? lastGeneratedCombinationIterator->qmddEdgeToChildNode == QmddNodeEdge::N : false;
+                //     hasGeneratedFirstCombination                          = true;
+                // }
+                // return !advanceModificationToNextPosition;
             }
         };
     };
