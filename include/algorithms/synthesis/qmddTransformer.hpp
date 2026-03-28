@@ -203,8 +203,6 @@ namespace syrec {
 
             std::size_t nCombinationsToGenerate = 0;
             std::size_t nGeneratedCombinations  = 0;
-            bool        isGeneratingMoreThanOneCombination;
-            bool        hasGeneratedFirstCombination;
 
             explicit QmddPathGenerator(const OptimizedQmddPath& qmddPath) {
                 if (qmddPath.empty()) {

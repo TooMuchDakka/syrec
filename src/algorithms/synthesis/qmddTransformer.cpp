@@ -57,14 +57,15 @@ bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformatio
     // set of nodes that have already been processed.
     // std::unordered_set<dd::mEdge> visited{};
 
-    //const auto transformationStartTime = std::chrono::steady_clock::now();
+    const auto transformationStartTime           = std::chrono::steady_clock::now();
+    bool       forceCancellationOfTransformation = false;
 
     // TODO: Compare with reference algorithm from dd_synthesis
     // TODO: Add handling for garbage/ancillary qubits
 
     // TODO: Is the queue really necessary when we are often jumping back to the root in case that an operation was performed?
     // TODO: Due to jumping to the root one could use the visited set to skip already processed subtrees?
-    while (!queue.empty()) {
+    while (!queue.empty() && !forceCancellationOfTransformation) {
         const dd::mEdge current = queue.front();
         queue.pop();
 
@@ -72,9 +73,15 @@ bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformatio
         const dd::mNode& nodeToProcess = *current.p;
         assert(current.p->e.size() == 4);
 
-        // if (terminate(nodeToProcess)) {
-        //     break;
-        // }
+        if (terminate(nodeToProcess)) {
+            for (const dd::mEdge& edgesOfCurrentNode: nodeToProcess.e) {
+                if (edgesOfCurrentNode.isTerminal()) {
+                    continue;
+                }
+                queue.emplace(edgesOfCurrentNode);
+            }
+            continue;
+        }
 
         // TODO: In test_dd_synthesis_1 some of the found paths contain duplicate entries that are associated with the same qubit but a different edge.
         QmddNodeAndPathsPerEdge qmddPathsStartingFromNode = {.associatedQmddNode = nodeToProcess, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
@@ -90,7 +97,17 @@ bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformatio
 
         // TODO: In the original paper the algorithm should continue with step P2 after P4 was performed but this might not take into account that the structure of the QMDD has changed after the associated operation was executed.
         // P3 and P4 algorithm
-        resetQueue = resetQueue || (!terminate(nodeToProcess) ? tryMakeSharedPathOfQmddNodeUnique(qmddPathsStartingFromNode) : false);
+        if (!resetQueue) {
+            if (!terminate(nodeToProcess)) {
+                // TODO: Comment as to why this case can happen and how the reference algorithm is not able to cope with this case causing an infinite loop.
+                if (!tryMakeSharedPathOfQmddNodeUnique(qmddPathsStartingFromNode)) {
+                    forceCancellationOfTransformation = true;
+                    continue;
+                }
+                resetQueue = true;
+            }
+        }
+
         if (resetQueue) {
             // The resetQueue variable should be set to true if any of the steps P1, P2, P3 or P4 applied an operation thus the qmdd export should dump the qmdd after said operation was applied thus allowing a "single-step" debugging with the dump file contents if necessary.
             exportQmddToFile(tryGetEdgeToQmddRootNode(qmddPkg), optionalQmddDumpConfig);
@@ -109,11 +126,11 @@ bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformatio
         }
     }
 
-    // if (optionalCollectedStatisticsContainer != nullptr) {
-    //     const auto transformationFinishedTime                       = std::chrono::steady_clock::now();
-    //     optionalCollectedStatisticsContainer->runtimeInMilliseconds = (transformationFinishedTime - transformationStartTime).count();
-    // }
-    return true;
+    if (optionalTransformationStatistics != nullptr) {
+        const auto transformationFinishedTime                                 = std::chrono::steady_clock::now();
+        optionalTransformationStatistics->transformationRuntimeInMilliseconds = (transformationFinishedTime - transformationStartTime).count();
+    }
+    return !forceCancellationOfTransformation;
 }
 
 dd::mEdge QmddTransformer::constructQmddFromGatesOfQuantumComputation(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig) {
@@ -147,6 +164,7 @@ void QmddTransformer::exportQmddToFile(const dd::mEdge* edgeToRootNodeOfQmdd, co
     if (!ofs.good()) {
         return;
     }
+    //dd::export2Dot(*edgeToRootNodeOfQmdd, "C:\\School\\MThesis\\export.dot", true, false, true, false, true, false);
     dd::serialize(*edgeToRootNodeOfQmdd, ofs);
 }
 
@@ -376,6 +394,17 @@ void QmddTransformer::getPathsToOneTerminalThroughEdgeOfQmddNode(const dd::mNode
                         qmddPathToOneTerminal.emplace_back(QmddPathComponent({.qubitAssociatedWithQmddNode = qubitAssociatedWithCurrentlyProcessedQmddNodeStackEntry, .qmddEdgeToChildNode = *toBeVisitedQmddNodesStackEntry.currVisitedEdge}));
                     }
                     qubitAssociatedWithLastProcessedQmddNodeStackEntry = qubitAssociatedWithCurrentlyProcessedQmddNodeStackEntry;
+                }
+
+                // TODO: Add a comment as to why this is necessary (check wording)
+                // If the edge of the currently processed qmdd node points to a one terminal then we need to "repeat" our previous check for gaps in
+                // the qmdd path that we performed for the intermediate notes in the visited qmdd nodes stack but this time for the qubits that follow
+                // after the one of the currently processed one. If this qubit is not equal to zero then we need to record the gap from the current qubit
+                // up to the one-terminal in our recorded qmdd path
+                if (toBeVisitedQmddNodesStack.back().associatedQmddNode->v != 0) {
+                    const dd::Qubit firstQubitOnOptimizedPathToOneTerminal = toBeVisitedQmddNodesStack.back().associatedQmddNode->v - 1U;
+                    qmddPathToOneTerminal.emplace_back(QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = firstQubitOnOptimizedPathToOneTerminal,
+                                                                    .nConsecutiveQubitInGap                = static_cast<std::size_t>(firstQubitOnOptimizedPathToOneTerminal + 1U)}));
                 }
 
                 switch (availableQmddNodeEdge) {
