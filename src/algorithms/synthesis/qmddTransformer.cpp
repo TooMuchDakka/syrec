@@ -10,7 +10,8 @@
 
 #include "algorithms/synthesis/qmddTransformer.hpp"
 
-#include "../../../out/build/x64-Debug/_deps/spdlog-src/include/spdlog/fmt/bundled/compile.h"
+#include "algorithms/synthesis/qmddTransformation/qmdd_path_definitions.hpp"
+#include "algorithms/synthesis/qmddTransformation/qmdd_path_generator.hpp"
 #include "dd/Export.hpp"
 #include "dd/Operations.hpp"
 
@@ -85,11 +86,11 @@ bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformatio
 
         // TODO: In test_dd_synthesis_1 some of the found paths contain duplicate entries that are associated with the same qubit but a different edge.
         QmddNodeAndPathsPerEdge qmddPathsStartingFromNode = {.associatedQmddNode = nodeToProcess, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-        getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::N | QmddNodeEdge::P_Prime, qmddPathsStartingFromNode);
+        getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::N | QmddNodeEdge::PPrime, qmddPathsStartingFromNode);
         // P1 algorithm
         bool resetQueue = trySwapPathsOfEdgesOfQmddNode(qmddPathsStartingFromNode);
         if (!resetQueue) {
-            getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::N_Prime | QmddNodeEdge::P, qmddPathsStartingFromNode);
+            getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::NPrime | QmddNodeEdge::P, qmddPathsStartingFromNode);
         }
         // P2 algorithm.
         // Note: The E1 |= E2 assignment operator is equal to E1 = E1 | E2 with the operator | not short circuiting does our P algorithms steps would still be evaluated in case the E1 is true thus explaining our usage of the E1 = E1 || E2 assignment.
@@ -128,7 +129,7 @@ bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformatio
 
     if (optionalTransformationStatistics != nullptr) {
         const auto transformationFinishedTime                                 = std::chrono::steady_clock::now();
-        optionalTransformationStatistics->transformationRuntimeInMilliseconds = (transformationFinishedTime - transformationStartTime).count();
+        optionalTransformationStatistics->transformationRuntimeInMilliseconds = static_cast<std::uint64_t>((transformationFinishedTime - transformationStartTime).count());
     }
     return !forceCancellationOfTransformation;
 }
@@ -320,12 +321,12 @@ bool QmddTransformer::terminate(const dd::mNode& nodeToCheck) {
     // the transformations applied by the algorithm should result in a QMDD node which represents the identity by the P' edge pointing to the zero terminal which in turn would also mean that the N' edge points to the zero terminal.
     // TODO: Should we keep the assert?
     //assert( edgesOfQmddNode[static_cast<std::size_t>(QmddNodeEdge::P_Prime)].isZeroTerminal() && edgesOfQmddNode[static_cast<std::size_t>(QmddNodeEdge::N_Prime)].isZeroTerminal());
-    return edgesOfQmddNode[static_cast<std::size_t>(QmddNodeEdge::P_Prime)].isZeroTerminal();
+    return edgesOfQmddNode[static_cast<std::size_t>(QmddNodeEdge::PPrime)].isZeroTerminal();
 }
 
 void QmddTransformer::getPathsToOneTerminalThroughEdgeOfQmddNode(const dd::mNode& qmddNodeToStartPathsFrom, const QmddNodeEdge edgesToGeneratePathsFor, QmddNodeAndPathsPerEdge& containerStoringFoundPaths) {
     assert(qmddNodeToStartPathsFrom.e.size() == 4);
-    for (const QmddNodeEdge availableQmddNodeEdge: {QmddNodeEdge::N, QmddNodeEdge::P_Prime, QmddNodeEdge::N_Prime, QmddNodeEdge::P}) {
+    for (const QmddNodeEdge availableQmddNodeEdge: {QmddNodeEdge::N, QmddNodeEdge::PPrime, QmddNodeEdge::NPrime, QmddNodeEdge::P}) {
         if (!(availableQmddNodeEdge & edgesToGeneratePathsFor)) {
             continue;
         }
@@ -346,10 +347,10 @@ void QmddTransformer::getPathsToOneTerminalThroughEdgeOfQmddNode(const dd::mNode
                 case QmddNodeEdge::N:
                     containerStoringFoundPaths.nEdgePaths.emplace_back(qmddPathToOneTerminal);
                     break;
-                case QmddNodeEdge::P_Prime:
+                case QmddNodeEdge::PPrime:
                     containerStoringFoundPaths.pPrimeEdgePaths.emplace_back(qmddPathToOneTerminal);
                     break;
-                case QmddNodeEdge::N_Prime:
+                case QmddNodeEdge::NPrime:
                     containerStoringFoundPaths.nPrimeEdgePaths.emplace_back(qmddPathToOneTerminal);
                     break;
                 case QmddNodeEdge::P:
@@ -411,10 +412,10 @@ void QmddTransformer::getPathsToOneTerminalThroughEdgeOfQmddNode(const dd::mNode
                     case QmddNodeEdge::N:
                         containerStoringFoundPaths.nEdgePaths.emplace_back(qmddPathToOneTerminal);
                         break;
-                    case QmddNodeEdge::P_Prime:
+                    case QmddNodeEdge::PPrime:
                         containerStoringFoundPaths.pPrimeEdgePaths.emplace_back(qmddPathToOneTerminal);
                         break;
-                    case QmddNodeEdge::N_Prime:
+                    case QmddNodeEdge::NPrime:
                         containerStoringFoundPaths.nPrimeEdgePaths.emplace_back(qmddPathToOneTerminal);
                         break;
                     case QmddNodeEdge::P:
@@ -440,7 +441,7 @@ void QmddTransformer::getPathsToOneTerminalThroughEdgeOfQmddNode(const dd::mNode
     }
 }
 
-std::vector<QmddTransformer::UnoptimizedQmddPath> QmddTransformer::getAllPathsFromRootToNode(const dd::mNode& qmddRootNode, const dd::mNode& qmddNodeToReach) {
+std::vector<UnoptimizedQmddPath> QmddTransformer::getAllPathsFromRootToNode(const dd::mNode& qmddRootNode, const dd::mNode& qmddNodeToReach) {
     if (qmddRootNode.v == qmddNodeToReach.v) {
         return {};
     }
@@ -505,12 +506,15 @@ qc::Controls QmddTransformer::getControlQubitsFromSignatureOfQmddPathComponents(
 // TODO: Introduct distinction between untrimmed and trimmed path with the former being returned by this function and potentially used as input for the next qmdd transformation algorithm steps while the latter is returned
 // by the initial built of all qmdd paths of the currently processed qmdd node.
 // TODO: Can paths that are considered as potentially unique or search through be skipped if they are empty or have a size smaller than one?
-std::optional<QmddTransformer::UnoptimizedQmddPath> QmddTransformer::getFirstQmddPathWithUniqueSignature(const std::vector<OptimizedQmddPath>& qmddPathsToSearchForUniqueOne, const std::vector<OptimizedQmddPath>& qmddPathsDefiningComparedToSignatures) {
+std::optional<UnoptimizedQmddPath> QmddTransformer::getFirstQmddPathWithUniqueSignature(const std::vector<OptimizedQmddPath>& qmddPathsToSearchForUniqueOne, const std::vector<OptimizedQmddPath>& qmddPathsDefiningComparedToSignatures) {
     for (const OptimizedQmddPath& untrimmedQmddPathWithPotentiallyUniqueSignature: qmddPathsToSearchForUniqueOne) {
         QmddPathGenerator fullUntrimmedQmddPathWithPotentiallyUniqueSignatureGenerator(untrimmedQmddPathWithPotentiallyUniqueSignature);
-        while (fullUntrimmedQmddPathWithPotentiallyUniqueSignatureGenerator.generateNextCombination()) {
+
+        for (const UnoptimizedQmddPath* generatedFullUntrimmedQmddPathWithPotentiallyUniqueSignature = fullUntrimmedQmddPathWithPotentiallyUniqueSignatureGenerator.tryGenerateNextPath();
+             generatedFullUntrimmedQmddPathWithPotentiallyUniqueSignature != nullptr && generatedFullUntrimmedQmddPathWithPotentiallyUniqueSignature->size() > 1;
+             generatedFullUntrimmedQmddPathWithPotentiallyUniqueSignature = fullUntrimmedQmddPathWithPotentiallyUniqueSignatureGenerator.tryGenerateNextPath()) {
             // We need to drop the first component of both QMDD paths due to the uniqueness check starting in the first child qmdd node of each path.
-            const auto trimmedQmddPathSignatureOfPotentiallyUniquePath = fullUntrimmedQmddPathWithPotentiallyUniqueSignatureGenerator.lastGeneratedCombination | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent);
+            const auto trimmedQmddPathSignatureOfPotentiallyUniquePath = *generatedFullUntrimmedQmddPathWithPotentiallyUniqueSignature | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent);
 
             // TODO: What if qmdd paths have different lengths, this should not happen but could
             // TODO: Refactor into own function
@@ -519,16 +523,18 @@ std::optional<QmddTransformer::UnoptimizedQmddPath> QmddTransformer::getFirstQmd
                                                                                                                              bool existsQmddPathThatMatchesPotentiallyUniqueOneInComparedToQmddPathCombinations = false;
 
                                                                                                                              QmddPathGenerator fullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOneGenerator(untrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOne);
-                                                                                                                             while (fullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOneGenerator.generateNextCombination() && !existsQmddPathThatMatchesPotentiallyUniqueOneInComparedToQmddPathCombinations) {
-                                                                                                                                 const auto trimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOne = fullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOneGenerator.lastGeneratedCombination | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent);
 
+                                                                                                                             for (const UnoptimizedQmddPath* generatedFullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOne = fullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOneGenerator.tryGenerateNextPath();
+                                                                                                                                  generatedFullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOne != nullptr && generatedFullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOne->size() > 1;
+                                                                                                                                  generatedFullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOne = fullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOneGenerator.tryGenerateNextPath()) {
+                                                                                                                                 const auto trimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOne             = *generatedFullUntrimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOne | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent);
                                                                                                                                  existsQmddPathThatMatchesPotentiallyUniqueOneInComparedToQmddPathCombinations = std::ranges::equal(trimmedQmddPathSignatureOfPotentiallyUniquePath, trimmedQmddPathNotAllowedToOverlapPotentiallyUniqueOne);
                                                                                                                              }
                                                                                                                              return existsQmddPathThatMatchesPotentiallyUniqueOneInComparedToQmddPathCombinations;
                                                                                                                          });
 
             if (!existsQmddPathThatMatchesPotentiallyUniqueOneInComparedToQmddPathCollection) {
-                return UnoptimizedQmddPath(fullUntrimmedQmddPathWithPotentiallyUniqueSignatureGenerator.lastGeneratedCombination);
+                return UnoptimizedQmddPath(*generatedFullUntrimmedQmddPathWithPotentiallyUniqueSignature);
             }
         }
     }
@@ -547,20 +553,17 @@ std::optional<QmddTransformer::TransformationToUniqueQmddPathData> QmddTransform
 std::optional<QmddTransformer::TransformationToUniqueQmddPathData> QmddTransformer::getTransformationDataToMakeQmddPathUniqueViaSingleSignatureBitFlip(const OptimizedQmddPath& qmddPathToTurnUnique, const std::vector<OptimizedQmddPath>& comparedToQmddPaths) {
     // TODO: Handle empty compare to qmdd paths collection
     QmddPathGenerator qmddPathToTurnUniqueGenerator(qmddPathToTurnUnique);
-    while (qmddPathToTurnUniqueGenerator.generateNextCombination()) {
-        const std::vector<QmddPathComponent>& generatedQmddPathToTurnUnique = qmddPathToTurnUniqueGenerator.lastGeneratedCombination;
-        if (generatedQmddPathToTurnUnique.size() < 2) {
-            return std::nullopt;
-        }
-
-        auto trimmedViewOfSignatureBitsOfQmddPathToTurnUnique     = generatedQmddPathToTurnUnique | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent);
+    for (const UnoptimizedQmddPath* generatedQmddPathToTurnUnique = qmddPathToTurnUniqueGenerator.tryGenerateNextPath();
+         generatedQmddPathToTurnUnique != nullptr && generatedQmddPathToTurnUnique->size() < 2;
+         generatedQmddPathToTurnUnique = qmddPathToTurnUniqueGenerator.tryGenerateNextPath()) {
+        auto trimmedViewOfSignatureBitsOfQmddPathToTurnUnique     = *generatedQmddPathToTurnUnique | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent);
         auto homogeneousViewOfSignatureBitsOfQmddPathToTurnUnique = std::views::common(trimmedViewOfSignatureBitsOfQmddPathToTurnUnique);
 
         qc::Controls signatureBitsContainerOfQmddPathToBeTurnedUnique(homogeneousViewOfSignatureBitsOfQmddPathToTurnUnique.begin(), homogeneousViewOfSignatureBitsOfQmddPathToTurnUnique.end());
         for (std::size_t signatureBitIdx = 0U; signatureBitIdx < signatureBitsContainerOfQmddPathToBeTurnedUnique.size(); ++signatureBitIdx) {
             // TODO: Do we have to skip the first entry in the qmdd path?
             // We need to ignore the first entry in the checked qmdd path since our goal is to turn the path unique so that it can be shifted from the current edge of the parent node (i.e. the qmdd node of the first component of the qmdd path) to another edge.
-            const qc::Control originalSignatureBitValue = getControlQubitFromSignatureOfQmddPathComponent(generatedQmddPathToTurnUnique.at(1U + signatureBitIdx));
+            const qc::Control originalSignatureBitValue = getControlQubitFromSignatureOfQmddPathComponent(generatedQmddPathToTurnUnique->at(1U + signatureBitIdx));
             const auto        flippedSignatureBitValue  = qc::Control(originalSignatureBitValue.qubit, originalSignatureBitValue.type == qc::Control::Type::Pos ? qc::Control::Type::Neg : qc::Control::Type::Pos);
 
             // Flip signature bit "polarity" and check whether generated signature is unique
@@ -574,10 +577,12 @@ std::optional<QmddTransformer::TransformationToUniqueQmddPathData> QmddTransform
             bool didGeneratedSignatureMatchExistingOne = false;
             for (const auto& comparedToQmddPath: comparedToQmddPaths) {
                 QmddPathGenerator comparedToQmddPathGenerator(comparedToQmddPath);
-                while (comparedToQmddPathGenerator.generateNextCombination() && !didGeneratedSignatureMatchExistingOne) {
+                for (const UnoptimizedQmddPath* generatedComparedToQmddPath = comparedToQmddPathGenerator.tryGenerateNextPath();
+                     generatedComparedToQmddPath != nullptr && generatedComparedToQmddPath->size() < 2;
+                     generatedComparedToQmddPath = comparedToQmddPathGenerator.tryGenerateNextPath()) {
                     // TODO: Check correct length (i.e. must be longer than one)
                     // TODO: Check that first qubits of path are equal
-                    auto trimmedViewOfComparedToSignatureBits = comparedToQmddPathGenerator.lastGeneratedCombination | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent);
+                    auto trimmedViewOfComparedToSignatureBits = *generatedComparedToQmddPath | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent);
 
                     didGeneratedSignatureMatchExistingOne = std::ranges::all_of(trimmedViewOfComparedToSignatureBits, [&signatureBitsContainerOfQmddPathToBeTurnedUnique](const qc::Control comparedToSignatureBit) {
                         return signatureBitsContainerOfQmddPathToBeTurnedUnique.contains(comparedToSignatureBit);
@@ -589,7 +594,7 @@ std::optional<QmddTransformer::TransformationToUniqueQmddPathData> QmddTransform
                 const qc::Qubit targetQubitDefiningFlippedSignatureBit = flippedSignatureBitValue.qubit;
                 qc::Controls    controlQubitsToReachTargetQubitFromStartOfQmddPath;
                 for (std::size_t signatureIdxToReachTargetQubit = 0U; signatureIdxToReachTargetQubit < 1U + signatureBitIdx; ++signatureIdxToReachTargetQubit) {
-                    controlQubitsToReachTargetQubitFromStartOfQmddPath.emplace(getControlQubitFromSignatureOfQmddPathComponent(generatedQmddPathToTurnUnique.at(signatureIdxToReachTargetQubit)));
+                    controlQubitsToReachTargetQubitFromStartOfQmddPath.emplace(getControlQubitFromSignatureOfQmddPathComponent(generatedQmddPathToTurnUnique->at(signatureIdxToReachTargetQubit)));
                 }
                 return TransformationToUniqueQmddPathData(controlQubitsToReachTargetQubitFromStartOfQmddPath, targetQubitDefiningFlippedSignatureBit);
             }
