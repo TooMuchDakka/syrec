@@ -8,7 +8,7 @@
  * Licensed under the MIT License
  */
 
-#include "algorithms/synthesis/qmddTransformer.hpp"
+#include "algorithms/synthesis/qmdd_transformer.hpp"
 
 #include "algorithms/synthesis/qmddTransformation/qmdd_path_definitions.hpp"
 #include "algorithms/synthesis/qmddTransformation/qmdd_path_generator.hpp"

@@ -9,7 +9,7 @@
  */
 
 #include "algorithms/synthesis/dd_synthesis.hpp"
-#include "algorithms/synthesis/qmddTransformer.hpp"
+#include "algorithms/synthesis/qmdd_transformer.hpp"
 #include "core/io/pla_parser.hpp"
 #include "core/truthTable/truth_table.hpp"
 #include "dd/Export.hpp"
@@ -55,9 +55,51 @@ INSTANTIATE_TEST_SUITE_P(TestDDSynth, TestDDSynth,
                                  // TODO: OK
                                  "adder2Bit",
                                  // TODO: OK
-                                 "adder3Bit"
+                                 "adder3Bit",
                                  // TODO: INFINITE LOOP
-                                 //"4_49_7"
+                                 "4_49_7",
+                                 // TODO: INFINITE LOOP
+                                 "hwb4_12",
+                                 "hwb5_13",
+                                 "hwb6_14",
+                                 "hwb7_15",
+                                 "hwb8_64",
+                                 "hwb9_65",
+                                 // TODO: OK
+                                 "graycode",
+                                 // TODO: INFINITE LOOP
+                                 "hamming_7",
+                                 "mod4096",
+                                 "mod8192",
+                                 "mod638192",
+                                 "14_bit",
+                                 "urf1",
+                                 "urf2",
+                                 "urf3",
+                                 "urf4",
+                                 "urf5",
+                                 // TODO: OK
+                                 "dd_synth_paper_example"
+                                 // TODO: OK
+                                 //"swap",
+                                 // TODO: OK
+                                 //"toffoli",
+                                 // TODO: OK
+                                 //"x2Bit",
+                                 // TODO: OK
+                                 //"test_dd_synthesis_1",
+                                 // TODO: OK
+                                 //"test_dd_synthesis_2",
+                                 // TODO: OK
+                                 //"3_17_6",
+                                 // TODO: OK
+                                 //"bitwiseXor2Bit",
+                                 // TODO: OK
+                                 //"adder2Bit",
+                                 // TODO: OK
+                                 //"adder3Bit"
+                                 // TODO: INFINITE LOOP
+                                 //"4_49_7",
                                  // TODO: INFINITE LOOP
                                  //"hwb4_12",
                                  // "hwb5_13",

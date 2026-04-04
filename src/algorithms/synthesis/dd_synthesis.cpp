@@ -12,8 +12,8 @@
 
 #include "algorithms/optimization/esop_minimization.hpp"
 #include "algorithms/synthesis/encoding.hpp"
-#include "algorithms/synthesis/qmddTransformer.hpp"
 #include "algorithms/synthesis/qmdd_to_identity_transformer.hpp"
+#include "algorithms/synthesis/qmdd_transformer.hpp"
 #include "core/truthTable/truth_table.hpp"
 #include "dd/DDDefinitions.hpp"
 #include "dd/Node.hpp"
