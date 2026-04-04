@@ -136,16 +136,16 @@ namespace syrec {
         [[nodiscard]] static std::vector<UnoptimizedQmddPath> getAllPathsFromRootToNode(const dd::mNode& qmddRootNode, const dd::mNode& qmddNodeToReach);
         [[nodiscard]] static qc::Controls                     getControlQubitsFromSignatureOfQmddPathComponents(const std::vector<QmddPathComponent>& qmddPathComponents) noexcept;
 
-        [[nodiscard]] static std::optional<UnoptimizedQmddPath> getFirstQmddPathWithUniqueSignature(const std::vector<OptimizedQmddPath>& qmddPathsToSearchForUniqueOne, const std::vector<OptimizedQmddPath>& qmddPathsDefiningComparedToSignatures);
+        //[[nodiscard]] static std::optional<UnoptimizedQmddPath> findQmddPathWithUniqueSignature(const std::vector<OptimizedQmddPath>& qmddPathsToSearchForUniqueOne, const std::vector<OptimizedQmddPath>& qmddPathsDefiningComparedToSignatures);
 
-        struct TransformationToUniqueQmddPathData {
+        struct UniqueSignatureTransformationOperands {
             qc::Controls controlQubitsFromFirstNodeInPathToTargetQubit;
             qc::Qubit    targetQubit;
         };
-        [[nodiscard]] static std::optional<TransformationToUniqueQmddPathData> getTransformationDataToMakeAnyQmddPathUniqueViaSingleSignatureBitFlip(const std::vector<OptimizedQmddPath>& qmddPathsContainingPotentiallyTransformableOne, const std::vector<OptimizedQmddPath>& comparedToQmddPaths);
-        [[nodiscard]] static std::optional<TransformationToUniqueQmddPathData> getTransformationDataToMakeQmddPathUniqueViaSingleSignatureBitFlip(const OptimizedQmddPath& qmddPathToTurnUnique, const std::vector<OptimizedQmddPath>& comparedToQmddPaths);
-        [[nodiscard]] static std::size_t                                       getNumberOfPathsToOneTerminalForQmddPath(const OptimizedQmddPath& qmddPath) noexcept;
-        [[nodiscard]] static std::size_t                                       getNumberOfPathsToOneTerminalForQmddPaths(const std::vector<OptimizedQmddPath>& qmddPaths) noexcept;
+        // [[nodiscard]] static std::optional<UniqueSignatureTransformationOperands> getOperandsToMakeOneOfQmddPathSignaturesUnique(const std::vector<OptimizedQmddPath>& qmddPathsContainingPotentiallyTransformableOne, const std::vector<OptimizedQmddPath>& comparedToQmddPaths);
+        // [[nodiscard]] static std::optional<UniqueSignatureTransformationOperands> getOperandsToMakeQmddPathSignatureUnique(const OptimizedQmddPath& qmddPathToTurnUnique, const std::vector<OptimizedQmddPath>& comparedToQmddPaths);
+        // [[nodiscard]] static std::size_t                                          getNumberOfPathsToOneTerminalForQmddPath(const OptimizedQmddPath& qmddPath) noexcept;
+        // [[nodiscard]] static std::size_t                                          getNumberOfPathsToOneTerminalForQmddPaths(const std::vector<OptimizedQmddPath>& qmddPaths) noexcept;
 
         std::reference_wrapper<qc::QuantumComputation> qc;
         std::reference_wrapper<dd::Package>            qmddPkg;

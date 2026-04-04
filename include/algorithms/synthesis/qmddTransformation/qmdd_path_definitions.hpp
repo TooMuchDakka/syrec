@@ -55,7 +55,7 @@ namespace syrec {
         return qmddNodeEdge == QmddNodeEdge::P || qmddNodeEdge == QmddNodeEdge::PPrime ? qc::Control::Type::Pos : qc::Control::Type::Neg;
     }
     [[nodiscard]] inline qc::Control getControlQubitFromSignatureOfQmddPathComponent(const QmddPathComponent& qmddPathComponent) noexcept {
-        return {qmddPathComponent.qubitAssociatedWithQmddNode, getControlQubitTypeForQmddNodeEdge((qmddPathComponent.qmddEdgeToChildNode))};
+        return {qmddPathComponent.qubitAssociatedWithQmddNode, getControlQubitTypeForQmddNodeEdge(qmddPathComponent.qmddEdgeToChildNode)};
     }
 
     [[nodiscard]] static constexpr std::size_t convertQmddNodeEdgeEnumValueToArrayIdx(const QmddNodeEdge qmddNodeEdge) {
