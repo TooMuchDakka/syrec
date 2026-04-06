@@ -27,12 +27,18 @@
 #include <vector>
 
 namespace syrec {
+    std::size_t getUnrolledLengthOfOptimizedQmddPath(const OptimizedQmddPath& optimizedQmddPath) {
+        return std::transform_reduce(optimizedQmddPath.cbegin(), optimizedQmddPath.cend(), 0U, std::plus{},
+                                     [](const std::variant<QmddPathComponent, QmddPathGap>& qmddPathComponent) {
+                                         const QmddPathGap* qmddPathGap = std::get_if<QmddPathGap>(&qmddPathComponent);
+                                         return qmddPathGap ? qmddPathGap->nConsecutiveQubitInGap : 1U;
+                                     });
+    }
+
     std::size_t getNumberOfPathsToOneTerminalForQmddPath(const OptimizedQmddPath& qmddPath) {
-        return std::transform_reduce(qmddPath.cbegin(), qmddPath.cend(), 1U, std::multiplies{}, [](const std::variant<QmddPathComponent, QmddPathGap>& qmddPathComponent) {
-            if (const QmddPathGap* qmddPathGap = std::get_if<QmddPathGap>(&qmddPathComponent); qmddPathGap != nullptr) {
-                return static_cast<std::size_t>(std::pow(2, qmddPathGap->nConsecutiveQubitInGap));
-            }
-            return static_cast<std::size_t>(1U);
+        return qmddPath.empty() ? 0U : std::transform_reduce(qmddPath.cbegin(), qmddPath.cend(), 1U, std::multiplies{}, [](const std::variant<QmddPathComponent, QmddPathGap>& qmddPathComponent) {
+            const QmddPathGap* qmddPathGap = std::get_if<QmddPathGap>(&qmddPathComponent);
+            return qmddPathGap ? static_cast<std::size_t>(std::pow(2, qmddPathGap->nConsecutiveQubitInGap)) : 1U;
         });
     }
 
@@ -43,15 +49,15 @@ namespace syrec {
     bool doQmddPathSignaturesMatch(const UnoptimizedQmddPath& lQmddPath, const UnoptimizedQmddPath& rQmddPath, const bool skipFirstQmddPathEntry) {
         bool doQmddPathSignaturesMatch = lQmddPath.size() == rQmddPath.size();
         for (std::size_t i = skipFirstQmddPathEntry ? 1U : 0U; i < lQmddPath.size() && doQmddPathSignaturesMatch; ++i) {
-            doQmddPathSignaturesMatch = getControlQubitFromSignatureOfQmddPathComponent(lQmddPath.at(i)) == getControlQubitFromSignatureOfQmddPathComponent(rQmddPath.at(i));
+            doQmddPathSignaturesMatch = lQmddPath.at(i).qubitAssociatedWithQmddNode == rQmddPath.at(i).qubitAssociatedWithQmddNode && getControlQubitFromSignatureOfQmddPathComponent(lQmddPath.at(i)) == getControlQubitFromSignatureOfQmddPathComponent(rQmddPath.at(i));
         }
         return doQmddPathSignaturesMatch;
     }
 
     bool existsQmddPathWithSameSignature(const UnoptimizedQmddPath& referenceQmddPath, const OptimizedQmddPath& comparedToQmddPath, const bool skipFirstQmddPathEntry) {
-        bool existsQmddPathWithSameSignature = false;
-
+        bool              existsQmddPathWithSameSignature = getUnrolledLengthOfOptimizedQmddPath(comparedToQmddPath) != referenceQmddPath.size();
         QmddPathGenerator comparedToQmddPathsGenerator(comparedToQmddPath);
+
         for (const UnoptimizedQmddPath* generatedComparedToQmddPath = comparedToQmddPathsGenerator.tryGenerateNextPath();
              generatedComparedToQmddPath != nullptr && generatedComparedToQmddPath->size() > 1 && !existsQmddPathWithSameSignature;
              generatedComparedToQmddPath = comparedToQmddPathsGenerator.tryGenerateNextPath()) {
@@ -61,8 +67,13 @@ namespace syrec {
     }
 
     std::optional<UnoptimizedQmddPath> findFirstQmddPathWithUniqueSignature(const OptimizedQmddPath& potentiallyUniqueQmddPath, const std::vector<OptimizedQmddPath>& comparedToQmddPaths, const bool skipFirstQmddPathEntry) {
-        QmddPathGenerator potentiallyUniqueQmddPathGenerator(potentiallyUniqueQmddPath);
+        if (std::ranges::any_of(comparedToQmddPaths, [&potentiallyUniqueQmddPath](const OptimizedQmddPath& comparedToQmddPath) {
+                return getUnrolledLengthOfOptimizedQmddPath(potentiallyUniqueQmddPath) != getUnrolledLengthOfOptimizedQmddPath(comparedToQmddPath);
+            })) {
+            return std::nullopt;
+        }
 
+        QmddPathGenerator potentiallyUniqueQmddPathGenerator(potentiallyUniqueQmddPath);
         for (const UnoptimizedQmddPath* generatedPotentiallyUniqueQmddPath = potentiallyUniqueQmddPathGenerator.tryGenerateNextPath();
              generatedPotentiallyUniqueQmddPath != nullptr && generatedPotentiallyUniqueQmddPath->size() > 1;
              generatedPotentiallyUniqueQmddPath = potentiallyUniqueQmddPathGenerator.tryGenerateNextPath()) {
@@ -83,7 +94,29 @@ namespace syrec {
         return qmddPathWithUniqueSignature;
     }
 
+    bool operator==(const ToUniqueQmddPathSignatureOperands& lOperands, const ToUniqueQmddPathSignatureOperands& rOperands) noexcept {
+        return lOperands.targetQubit == rOperands.targetQubit && lOperands.controlQubitsFromFirstNodeInPathToTargetQubit.size() == rOperands.controlQubitsFromFirstNodeInPathToTargetQubit.size() && std::ranges::all_of(lOperands.controlQubitsFromFirstNodeInPathToTargetQubit, [&rOperands](const qc::Control& lOperandControl) {
+                   return rOperands.controlQubitsFromFirstNodeInPathToTargetQubit.contains(lOperandControl);
+               });
+    }
+
+    std::ostream& operator<<(std::ostream& ostream, const ToUniqueQmddPathSignatureOperands& operandsOfQmddOperationToTurnQmddPathUnique) {
+        ostream << "Target qubit: " << operandsOfQmddOperationToTurnQmddPathUnique.targetQubit << " | Control qubits: (";
+        for (const qc::Control& control: operandsOfQmddOperationToTurnQmddPathUnique.controlQubitsFromFirstNodeInPathToTargetQubit) {
+            ostream << control.toString();
+        }
+        ostream << ")";
+        return ostream;
+    }
+
     std::optional<ToUniqueQmddPathSignatureOperands> getOperandsToMakeQmddPathSignatureUnique(const OptimizedQmddPath& qmddPathToTurnUnique, const std::vector<OptimizedQmddPath>& comparedToQmddPaths, const bool skipFirstQmddPathEntry) {
+        if (std::ranges::any_of(comparedToQmddPaths, [&qmddPathToTurnUnique](const OptimizedQmddPath& comparedToQmddPath) {
+                return getUnrolledLengthOfOptimizedQmddPath(qmddPathToTurnUnique) != getUnrolledLengthOfOptimizedQmddPath(comparedToQmddPath);
+            }) ||
+            comparedToQmddPaths.empty()) {
+            return std::nullopt;
+        }
+
         QmddPathGenerator qmddPathToTurnUniqueGenerator(qmddPathToTurnUnique);
         for (const UnoptimizedQmddPath* generatedQmddPathToTurnUnique = qmddPathToTurnUniqueGenerator.tryGenerateNextPath();
              generatedQmddPathToTurnUnique != nullptr && generatedQmddPathToTurnUnique->size() > 1;
@@ -112,8 +145,10 @@ namespace syrec {
 
     std::optional<ToUniqueQmddPathSignatureOperands> getOperandsToMakeOneOfQmddPathSignaturesUnique(const std::vector<OptimizedQmddPath>& qmddPathsContainingPotentiallyTransformableOne, const std::vector<OptimizedQmddPath>& comparedToQmddPaths, const bool skipFirstQmddPathEntry) {
         std::optional<ToUniqueQmddPathSignatureOperands> operandsToMakeQmddPathUnique;
-        for (std::size_t i = 0; i < qmddPathsContainingPotentiallyTransformableOne.size() && !operandsToMakeQmddPathUnique.has_value(); ++i) {
-            operandsToMakeQmddPathUnique = getOperandsToMakeQmddPathSignatureUnique(qmddPathsContainingPotentiallyTransformableOne.at(i), comparedToQmddPaths, skipFirstQmddPathEntry);
+        if (!comparedToQmddPaths.empty()) {
+            for (std::size_t i = 0; i < qmddPathsContainingPotentiallyTransformableOne.size() && !operandsToMakeQmddPathUnique.has_value(); ++i) {
+                operandsToMakeQmddPathUnique = getOperandsToMakeQmddPathSignatureUnique(qmddPathsContainingPotentiallyTransformableOne.at(i), comparedToQmddPaths, skipFirstQmddPathEntry);
+            }
         }
         return operandsToMakeQmddPathUnique;
     }

@@ -14,6 +14,8 @@
 #include "ir/operations/Control.hpp"
 
 #include <cstdint>
+#include <ostream>
+#include <string>
 #include <type_traits>
 #include <variant>
 #include <vector>
@@ -38,6 +40,14 @@ namespace syrec {
 
     using OptimizedQmddPath   = std::vector<std::variant<QmddPathComponent, QmddPathGap>>;
     using UnoptimizedQmddPath = std::vector<QmddPathComponent>;
+
+    constexpr bool operator==(const QmddPathComponent lQmddPathComponent, const QmddPathComponent rQmddPathComponent) noexcept {
+        return lQmddPathComponent.qubitAssociatedWithQmddNode == rQmddPathComponent.qubitAssociatedWithQmddNode && lQmddPathComponent.qmddEdgeToChildNode == rQmddPathComponent.qmddEdgeToChildNode;
+    }
+
+    constexpr bool operator==(const QmddPathGap lQmddPathGap, const QmddPathGap rQmddPathGap) noexcept {
+        return lQmddPathGap.qubitAssociatedWithFirstQmddNodeOfGap == rQmddPathGap.qubitAssociatedWithFirstQmddNodeOfGap && lQmddPathGap.nConsecutiveQubitInGap == rQmddPathGap.nConsecutiveQubitInGap;
+    }
 
     constexpr bool operator&(const QmddNodeEdge lQmddNodeEdge, const QmddNodeEdge rQmddNodeEdge) noexcept {
         return (static_cast<std::underlying_type_t<QmddNodeEdge>>(lQmddNodeEdge) & static_cast<std::underlying_type_t<QmddNodeEdge>>(rQmddNodeEdge)) > 0;
@@ -69,5 +79,36 @@ namespace syrec {
             default:
                 return 3U;
         }
+    }
+
+    inline std::ostream& operator<<(std::ostream& os, const QmddNodeEdge qmddNodeEdge) {
+        switch (qmddNodeEdge) {
+            case QmddNodeEdge::N:
+                os << "N";
+                break;
+            case QmddNodeEdge::PPrime:
+                os << "N";
+                break;
+            case QmddNodeEdge::NPrime:
+                os << "N";
+                break;
+            case QmddNodeEdge::P:
+                os << "N";
+                break;
+            default:
+                os << "UNKNOWN";
+                break;
+        }
+        return os;
+    }
+
+    inline std::ostream& operator<<(std::ostream& os, const QmddPathComponent& qmddPathComponent) {
+        os << "Q: " << qmddPathComponent.qubitAssociatedWithQmddNode << " | E: " << qmddPathComponent.qmddEdgeToChildNode;
+        return os;
+    }
+
+    inline std::ostream& operator<<(std::ostream& os, const QmddPathGap& qmddPathGap) {
+        os << "GAP FIRST QUBIT: " << qmddPathGap.qubitAssociatedWithFirstQmddNodeOfGap << " | # qubits covered by gap: " << qmddPathGap.nConsecutiveQubitInGap;
+        return os;
     }
 } // namespace syrec
