@@ -144,6 +144,17 @@ namespace syrec {
              generatedQmddPathToTurnUnique != nullptr && generatedQmddPathToTurnUnique->size() > 1;
              generatedQmddPathToTurnUnique = qmddPathToTurnUniqueGenerator.tryGenerateNextPath()) {
             UnoptimizedQmddPath modifiableGeneratedQmddPath = *generatedQmddPathToTurnUnique;
+
+            // An overlap between the currently processed and any of the compared to qmdd paths is assumed to exist.
+            // If that is not the case then simply fail the operation. This check is valid for qmdd paths with or without gaps
+            // since unique qmdd paths should have already been swapped between the edges of the currently processed qmdd node
+            // by a previous operation.
+            if (std::ranges::none_of(comparedToQmddPaths, [&modifiableGeneratedQmddPath, skipFirstQmddPathEntry](const OptimizedQmddPath& comparedToQmddPath) {
+                    return existsQmddPathWithSameSignature(modifiableGeneratedQmddPath, comparedToQmddPath, skipFirstQmddPathEntry).value_or(true);
+                })) {
+                return std::nullopt;
+            }
+
             for (std::size_t qmddPathComponentIdx = 1U; qmddPathComponentIdx < modifiableGeneratedQmddPath.size(); ++qmddPathComponentIdx) {
                 QmddPathComponent& modifiedPathComponent  = modifiableGeneratedQmddPath.at(qmddPathComponentIdx);
                 const QmddNodeEdge originalQmddEdge       = modifiedPathComponent.qmddEdgeToChildNode;

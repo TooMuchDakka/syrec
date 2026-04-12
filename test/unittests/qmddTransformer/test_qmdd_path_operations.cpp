@@ -777,3 +777,22 @@ TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueWithReferenceAndComp
     const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
     assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
 }
+
+TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueWillNotSucceedIfReferenceQmddPathIsAlreadyUniqueWithReferencePathContainingNoGaps) {
+    const OptimizedQmddPath referenceQmddPath   = createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)});
+    const auto              comparedToQmddPaths = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::N)})});
+
+    const std::optional<ToUniqueQmddPathSignatureOperands>  expectedOperandsToTurnQmddPathUnique = std::nullopt;
+    const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueWillNotSucceedIfReferenceQmddPathIsAlreadyUniqueWithReferencePathContainingGaps) {
+    const auto referenceQmddPath   = OptimizedQmddPath({QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 1U, .nConsecutiveQubitInGap = 1U}),
+                                                        QmddPathComponent({.qubitAssociatedWithQmddNode = 0U, .qmddEdgeToChildNode = QmddNodeEdge::P})});
+    const auto comparedToQmddPaths = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::N)})});
+
+    const std::optional<ToUniqueQmddPathSignatureOperands>  expectedOperandsToTurnQmddPathUnique = std::nullopt;
+    const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
+}

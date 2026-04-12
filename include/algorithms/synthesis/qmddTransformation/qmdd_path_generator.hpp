@@ -18,6 +18,7 @@
 namespace syrec {
     class QmddPathGenerator {
     public:
+        // TODO: Add documentation
         explicit QmddPathGenerator(const OptimizedQmddPath& qmddPath);
         [[nodiscard]] const UnoptimizedQmddPath* tryGenerateNextPath();
         [[nodiscard]] bool                       canGenerateCombinations() const noexcept;

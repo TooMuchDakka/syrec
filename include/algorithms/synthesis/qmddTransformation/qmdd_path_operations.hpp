@@ -19,6 +19,7 @@
 #include <vector>
 
 namespace syrec {
+    // TODO: Add documentation
     std::size_t getUnrolledLengthOfOptimizedQmddPath(const OptimizedQmddPath& optimizedQmddPath);
     std::size_t getNumberOfPathsToOneTerminalForQmddPath(const OptimizedQmddPath& qmddPath);
     std::size_t getNumberOfPathsToOneTerminalForQmddPaths(const std::vector<OptimizedQmddPath>& qmddPaths);
