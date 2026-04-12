@@ -599,18 +599,80 @@ TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueSuccessfulWithRefere
     assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
 }
 
-// TODO: Tests for already unique qmdd path being passed as input parameter to search?
-// TODO: Tests for search that would require more than one bit flip to turn path unique?
-
 TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueSuccessfulForQmddPathContainingNoGaps) {
-    const OptimizedQmddPath referenceQmddPath = createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::N),
-                                                                                    std::make_pair(0U, QmddNodeEdge::N)});
+    const OptimizedQmddPath referenceQmddPath = createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)});
 
-    const auto                                              comparedToQmddPaths                  = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::NPrime),
-                                                                                                                                                    std::make_pair(0U, QmddNodeEdge::NPrime)}),
-                                                                                                                createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::PPrime),
-                                                                                                                                                    std::make_pair(0U, QmddNodeEdge::PPrime)})});
-    const auto                                              expectedOperandsToTurnQmddPathUnique = ToUniqueQmddPathSignatureOperands({.controlQubitsFromFirstNodeInPathToTargetQubit = qc::Controls({qc::Control(1U, qc::Control::Type::Neg)}),
+    const auto                                              comparedToQmddPaths                  = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::PPrime), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::N)}),
+                                                                                                                createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::PPrime), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::P)})});
+    const auto                                              expectedOperandsToTurnQmddPathUnique = ToUniqueQmddPathSignatureOperands({.controlQubitsFromFirstNodeInPathToTargetQubit = qc::Controls({qc::Control(2U, qc::Control::Type::Neg)}),
+                                                                                                                                      .targetQubit                                   = 1U});
+    const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueSuccessfulForQmddPathStartingAtNEdge) {
+    const OptimizedQmddPath referenceQmddPath = createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)});
+
+    const auto                                              comparedToQmddPaths                  = std::vector({
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::PPrime), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::N)}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::PPrime), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::P)}),
+    });
+    const auto                                              expectedOperandsToTurnQmddPathUnique = ToUniqueQmddPathSignatureOperands({.controlQubitsFromFirstNodeInPathToTargetQubit = qc::Controls({qc::Control(2U, qc::Control::Type::Neg)}),
+                                                                                                                                      .targetQubit                                   = 1U});
+    const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueSuccessfulForQmddPathStartingAtNPrimeEdge) {
+    const OptimizedQmddPath referenceQmddPath = createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::NPrime), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)});
+
+    const auto                                              comparedToQmddPaths                  = std::vector({
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::PPrime), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::N)}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::PPrime), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::P)}),
+    });
+    const auto                                              expectedOperandsToTurnQmddPathUnique = ToUniqueQmddPathSignatureOperands({.controlQubitsFromFirstNodeInPathToTargetQubit = qc::Controls({qc::Control(2U, qc::Control::Type::Neg)}),
+                                                                                                                                      .targetQubit                                   = 1U});
+    const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueSuccessfulForQmddPathStartingAtPEdge) {
+    const OptimizedQmddPath referenceQmddPath = createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)});
+
+    const auto                                              comparedToQmddPaths                  = std::vector({
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::NPrime), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::N)}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::NPrime), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::P)}),
+    });
+    const auto                                              expectedOperandsToTurnQmddPathUnique = ToUniqueQmddPathSignatureOperands({.controlQubitsFromFirstNodeInPathToTargetQubit = qc::Controls({qc::Control(2U, qc::Control::Type::Pos)}),
+                                                                                                                                      .targetQubit                                   = 1U});
+    const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueSuccessfulForQmddPathStartingAtPPrimeEdge) {
+    const OptimizedQmddPath referenceQmddPath = createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::PPrime), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)});
+
+    const auto                                              comparedToQmddPaths                  = std::vector({
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::N)}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::NPrime), std::make_pair(0U, QmddNodeEdge::P)}),
+    });
+    const auto                                              expectedOperandsToTurnQmddPathUnique = ToUniqueQmddPathSignatureOperands({.controlQubitsFromFirstNodeInPathToTargetQubit = qc::Controls({qc::Control(2U, qc::Control::Type::Pos)}),
+                                                                                                                                      .targetQubit                                   = 1U});
+    const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueSuccessfulForQmddPathRequiringMultipleControlQubitsToReachTargetQubit) {
+    const OptimizedQmddPath referenceQmddPath = createOptimizedQmddPathWithoutGaps({std::make_pair(4U, QmddNodeEdge::N), std::make_pair(3U, QmddNodeEdge::P), std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)});
+
+    const auto                                              comparedToQmddPaths                  = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(4U, QmddNodeEdge::P), std::make_pair(3U, QmddNodeEdge::P), std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+                                                                                                                createOptimizedQmddPathWithoutGaps({std::make_pair(4U, QmddNodeEdge::P), std::make_pair(3U, QmddNodeEdge::N), std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+                                                                                                                createOptimizedQmddPathWithoutGaps({std::make_pair(4U, QmddNodeEdge::P), std::make_pair(3U, QmddNodeEdge::P), std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+                                                                                                                createOptimizedQmddPathWithoutGaps({std::make_pair(4U, QmddNodeEdge::P), std::make_pair(3U, QmddNodeEdge::P), std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::P)})});
+    const auto                                              expectedOperandsToTurnQmddPathUnique = ToUniqueQmddPathSignatureOperands({.controlQubitsFromFirstNodeInPathToTargetQubit = qc::Controls({qc::Control(4U, qc::Control::Type::Neg),
+                                                                                                                                                                                                     qc::Control(3U, qc::Control::Type::Pos),
+                                                                                                                                                                                                     qc::Control(2U, qc::Control::Type::Pos),
+                                                                                                                                                                                                     qc::Control(1U, qc::Control::Type::Neg)}),
                                                                                                                                       .targetQubit                                   = 0U});
     const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
     assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
@@ -795,4 +857,103 @@ TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueWillNotSucceedIfRefe
     const std::optional<ToUniqueQmddPathSignatureOperands>  expectedOperandsToTurnQmddPathUnique = std::nullopt;
     const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
     assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeQmddPathUniqueWillNotSucceedIfReferenceQmddPathRequiresMoreThanOneQubitPolarityFlip) {
+    const OptimizedQmddPath referenceQmddPath   = createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::P)});
+    const auto              comparedToQmddPaths = std::vector({
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::N)}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+    });
+
+    const std::optional<ToUniqueQmddPathSignatureOperands>  expectedOperandsToTurnQmddPathUnique = std::nullopt;
+    const std::optional<ToUniqueQmddPathSignatureOperands>& actualOperandsToTurnQmddPathUnique   = getOperandsToMakeQmddPathSignatureUnique(referenceQmddPath, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnQmddPathUnique, actualOperandsToTurnQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeOneQmddPathUniqueWillNotSucceedIfComparedToQmddPathCollectionIsEmpty) {
+    const auto                           referenceQmddPaths = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+                                                                           createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)})});
+    const std::vector<OptimizedQmddPath> comparedToQmddPaths{};
+
+    const std::optional<ToUniqueQmddPathSignatureOperands> expectedOperandsToTurnOneQmddPathUnique = std::nullopt;
+    const std::optional<ToUniqueQmddPathSignatureOperands> actualOperandsToTurnOneQmddPathUnique   = getOperandsToMakeOneOfQmddPathSignaturesUnique(referenceQmddPaths, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnOneQmddPathUnique, actualOperandsToTurnOneQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeOneQmddPathUniqueWillNotSucceedIfReferenceQmddPathCollectionIsEmpty) {
+    const std::vector<OptimizedQmddPath> referenceQmddPaths{};
+    const auto                           comparedToQmddPaths = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+                                                                            createOptimizedQmddPathWithoutGaps({std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)})});
+
+    const std::optional<ToUniqueQmddPathSignatureOperands> expectedOperandsToTurnOneQmddPathUnique = std::nullopt;
+    const std::optional<ToUniqueQmddPathSignatureOperands> actualOperandsToTurnOneQmddPathUnique   = getOperandsToMakeOneOfQmddPathSignaturesUnique(referenceQmddPaths, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnOneQmddPathUnique, actualOperandsToTurnOneQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeOneQmddPathUniqueWillNotSucceedIfNoReferenceQmddPathContainingNoGapsCanBeMadeUnique) {
+    const auto                                             referenceQmddPaths                      = std::vector({
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::N)}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+    });
+    const auto                                             comparedToQmddPaths                     = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::N)}),
+                                                                                                                  createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+                                                                                                                  createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::N)}),
+                                                                                                                  createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::P)})});
+    const std::optional<ToUniqueQmddPathSignatureOperands> expectedOperandsToTurnOneQmddPathUnique = std::nullopt;
+    const std::optional<ToUniqueQmddPathSignatureOperands> actualOperandsToTurnOneQmddPathUnique   = getOperandsToMakeOneOfQmddPathSignaturesUnique(referenceQmddPaths, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnOneQmddPathUnique, actualOperandsToTurnOneQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeOneQmddPathUniqueWillNotSucceedIfNoReferenceQmddPathContainingGapsCanBeMadeUnique) {
+    const auto                                             referenceQmddPaths                      = std::vector({
+            OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                                QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 1U, .nConsecutiveQubitInGap = 2U})}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+    });
+    const auto                                             comparedToQmddPaths                     = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::N)}),
+                                                                                                                  createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+                                                                                                                  createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::N)}),
+                                                                                                                  createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::P)})});
+    const std::optional<ToUniqueQmddPathSignatureOperands> expectedOperandsToTurnOneQmddPathUnique = std::nullopt;
+    const std::optional<ToUniqueQmddPathSignatureOperands> actualOperandsToTurnOneQmddPathUnique   = getOperandsToMakeOneOfQmddPathSignaturesUnique(referenceQmddPaths, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnOneQmddPathUnique, actualOperandsToTurnOneQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeOneQmddPathUniqueWillNotSucceedIfReferenceQmddPathHasLengthOne) {
+    const auto                                             referenceQmddPaths                      = std::vector({
+            OptimizedQmddPath({QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 0U, .nConsecutiveQubitInGap = 1U})}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(0U, QmddNodeEdge::N)}),
+    });
+    const auto                                             comparedToQmddPaths                     = std::vector({OptimizedQmddPath({QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 0U, .nConsecutiveQubitInGap = 1U})})});
+    const std::optional<ToUniqueQmddPathSignatureOperands> expectedOperandsToTurnOneQmddPathUnique = std::nullopt;
+    const std::optional<ToUniqueQmddPathSignatureOperands> actualOperandsToTurnOneQmddPathUnique   = getOperandsToMakeOneOfQmddPathSignaturesUnique(referenceQmddPaths, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnOneQmddPathUnique, actualOperandsToTurnOneQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeOneQmddPathUniqueSucceedsForReferenceQmddPathContainingNoGaps) {
+    const auto referenceQmddPaths  = std::vector({
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::N)}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+    });
+    const auto comparedToQmddPaths = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+                                                  createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::N)})});
+
+    const auto                                             expectedOperandsToTurnOneQmddPathUnique = ToUniqueQmddPathSignatureOperands({.controlQubitsFromFirstNodeInPathToTargetQubit = qc::Controls({qc::Control(2U, qc::Control::Type::Neg)}), .targetQubit = 1U});
+    const std::optional<ToUniqueQmddPathSignatureOperands> actualOperandsToTurnOneQmddPathUnique   = getOperandsToMakeOneOfQmddPathSignaturesUnique(referenceQmddPaths, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnOneQmddPathUnique, actualOperandsToTurnOneQmddPathUnique);
+}
+
+TEST(QmddPathOperationTests, GetOperandsToMakeOneQmddPathUniqueSucceedsForReferenceQmddPathContainingGaps) {
+    const auto referenceQmddPaths  = std::vector({
+            OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::N}), QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 1U, .nConsecutiveQubitInGap = 2U})}),
+            createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::N)}),
+    });
+    const auto comparedToQmddPaths = std::vector({createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::N)}),
+                                                  createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::N), std::make_pair(0U, QmddNodeEdge::P)}),
+                                                  createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::P), std::make_pair(1U, QmddNodeEdge::P), std::make_pair(0U, QmddNodeEdge::N)})});
+
+    const auto                                             expectedOperandsToTurnOneQmddPathUnique = ToUniqueQmddPathSignatureOperands({.controlQubitsFromFirstNodeInPathToTargetQubit = qc::Controls({qc::Control(2U, qc::Control::Type::Neg)}), .targetQubit = 1U});
+    const std::optional<ToUniqueQmddPathSignatureOperands> actualOperandsToTurnOneQmddPathUnique   = getOperandsToMakeOneOfQmddPathSignaturesUnique(referenceQmddPaths, comparedToQmddPaths, false);
+    assertOperandsToTurnQmddPathUniqueMatch(expectedOperandsToTurnOneQmddPathUnique, actualOperandsToTurnOneQmddPathUnique);
 }

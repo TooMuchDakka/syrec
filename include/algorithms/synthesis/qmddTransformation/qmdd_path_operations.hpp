@@ -38,7 +38,6 @@ namespace syrec {
     bool          operator==(const ToUniqueQmddPathSignatureOperands& lOperands, const ToUniqueQmddPathSignatureOperands& rOperands) noexcept;
     std::ostream& operator<<(std::ostream& ostream, const ToUniqueQmddPathSignatureOperands& operandsOfQmddOperationToTurnQmddPathUnique);
 
-    // TODO: Should return type be adapted so that already unique path case can be distinguished from "error"/unsuccessful search?
     std::optional<ToUniqueQmddPathSignatureOperands> getOperandsToMakeQmddPathSignatureUnique(const OptimizedQmddPath& qmddPathToTurnUnique, const std::vector<OptimizedQmddPath>& comparedToQmddPaths, bool skipFirstQmddPathEntry);
     std::optional<ToUniqueQmddPathSignatureOperands> getOperandsToMakeOneOfQmddPathSignaturesUnique(const std::vector<OptimizedQmddPath>& qmddPathsContainingPotentiallyTransformableOne, const std::vector<OptimizedQmddPath>& comparedToQmddPaths, bool skipFirstQmddPathEntry);
 } // namespace syrec
