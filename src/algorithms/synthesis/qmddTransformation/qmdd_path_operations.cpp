@@ -46,22 +46,36 @@ namespace syrec {
         return std::transform_reduce(qmddPaths.cbegin(), qmddPaths.cend(), 0U, std::plus{}, getNumberOfPathsToOneTerminalForQmddPath);
     }
 
-    bool doQmddPathSignaturesMatch(const UnoptimizedQmddPath& lQmddPath, const UnoptimizedQmddPath& rQmddPath, const bool skipFirstQmddPathEntry) {
-        bool doQmddPathSignaturesMatch = lQmddPath.size() == rQmddPath.size();
+    std::optional<bool> doQmddPathSignaturesMatch(const UnoptimizedQmddPath& lQmddPath, const UnoptimizedQmddPath& rQmddPath, const bool skipFirstQmddPathEntry) {
+        if (lQmddPath.size() != rQmddPath.size() || (!lQmddPath.empty() && lQmddPath.front().qubitAssociatedWithQmddNode != rQmddPath.front().qubitAssociatedWithQmddNode)) {
+            return std::nullopt;
+        }
+
+        bool doQmddPathSignaturesMatch = true;
         for (std::size_t i = skipFirstQmddPathEntry ? 1U : 0U; i < lQmddPath.size() && doQmddPathSignaturesMatch; ++i) {
             doQmddPathSignaturesMatch = lQmddPath.at(i).qubitAssociatedWithQmddNode == rQmddPath.at(i).qubitAssociatedWithQmddNode && getControlQubitFromSignatureOfQmddPathComponent(lQmddPath.at(i)) == getControlQubitFromSignatureOfQmddPathComponent(rQmddPath.at(i));
         }
         return doQmddPathSignaturesMatch;
     }
 
-    bool existsQmddPathWithSameSignature(const UnoptimizedQmddPath& referenceQmddPath, const OptimizedQmddPath& comparedToQmddPath, const bool skipFirstQmddPathEntry) {
-        bool              existsQmddPathWithSameSignature = getUnrolledLengthOfOptimizedQmddPath(comparedToQmddPath) != referenceQmddPath.size();
+    std::optional<bool> existsQmddPathWithSameSignature(const UnoptimizedQmddPath& referenceQmddPath, const OptimizedQmddPath& comparedToQmddPath, const bool skipFirstQmddPathEntry) {
+        if (getUnrolledLengthOfOptimizedQmddPath(comparedToQmddPath) != referenceQmddPath.size()) {
+            return std::nullopt;
+        }
+        bool              existsQmddPathWithSameSignature = false;
         QmddPathGenerator comparedToQmddPathsGenerator(comparedToQmddPath);
+        if (!comparedToQmddPathsGenerator.canGenerateCombinations()) {
+            return std::nullopt;
+        }
 
         for (const UnoptimizedQmddPath* generatedComparedToQmddPath = comparedToQmddPathsGenerator.tryGenerateNextPath();
              generatedComparedToQmddPath != nullptr && generatedComparedToQmddPath->size() > 1 && !existsQmddPathWithSameSignature;
              generatedComparedToQmddPath = comparedToQmddPathsGenerator.tryGenerateNextPath()) {
-            existsQmddPathWithSameSignature |= doQmddPathSignaturesMatch(referenceQmddPath, *generatedComparedToQmddPath, skipFirstQmddPathEntry);
+            const std::optional<bool> comparisonResult = doQmddPathSignaturesMatch(referenceQmddPath, *generatedComparedToQmddPath, skipFirstQmddPathEntry);
+            if (!comparisonResult.has_value()) {
+                return std::nullopt;
+            }
+            existsQmddPathWithSameSignature |= *comparisonResult;
         }
         return existsQmddPathWithSameSignature;
     }
@@ -74,11 +88,15 @@ namespace syrec {
         }
 
         QmddPathGenerator potentiallyUniqueQmddPathGenerator(potentiallyUniqueQmddPath);
+        if (!potentiallyUniqueQmddPathGenerator.canGenerateCombinations()) {
+            return std::nullopt;
+        }
+
         for (const UnoptimizedQmddPath* generatedPotentiallyUniqueQmddPath = potentiallyUniqueQmddPathGenerator.tryGenerateNextPath();
              generatedPotentiallyUniqueQmddPath != nullptr && generatedPotentiallyUniqueQmddPath->size() > 1;
              generatedPotentiallyUniqueQmddPath = potentiallyUniqueQmddPathGenerator.tryGenerateNextPath()) {
             if (std::ranges::none_of(comparedToQmddPaths, [generatedPotentiallyUniqueQmddPath, skipFirstQmddPathEntry](const OptimizedQmddPath& comparedToQmddPath) {
-                    return existsQmddPathWithSameSignature(*generatedPotentiallyUniqueQmddPath, comparedToQmddPath, skipFirstQmddPathEntry);
+                    return existsQmddPathWithSameSignature(*generatedPotentiallyUniqueQmddPath, comparedToQmddPath, skipFirstQmddPathEntry).value_or(true);
                 })) {
                 return UnoptimizedQmddPath(*generatedPotentiallyUniqueQmddPath);
             }
@@ -118,6 +136,10 @@ namespace syrec {
         }
 
         QmddPathGenerator qmddPathToTurnUniqueGenerator(qmddPathToTurnUnique);
+        if (!qmddPathToTurnUniqueGenerator.canGenerateCombinations()) {
+            return std::nullopt;
+        }
+
         for (const UnoptimizedQmddPath* generatedQmddPathToTurnUnique = qmddPathToTurnUniqueGenerator.tryGenerateNextPath();
              generatedQmddPathToTurnUnique != nullptr && generatedQmddPathToTurnUnique->size() > 1;
              generatedQmddPathToTurnUnique = qmddPathToTurnUniqueGenerator.tryGenerateNextPath()) {
@@ -128,7 +150,7 @@ namespace syrec {
                 modifiedPathComponent.qmddEdgeToChildNode = (modifiedPathComponent.qmddEdgeToChildNode == QmddNodeEdge::N || modifiedPathComponent.qmddEdgeToChildNode == QmddNodeEdge::NPrime) ? QmddNodeEdge::P : QmddNodeEdge::N;
 
                 if (std::ranges::none_of(comparedToQmddPaths, [&modifiableGeneratedQmddPath, skipFirstQmddPathEntry](const OptimizedQmddPath& comparedToQmddPath) {
-                        return existsQmddPathWithSameSignature(modifiableGeneratedQmddPath, comparedToQmddPath, skipFirstQmddPathEntry);
+                        return existsQmddPathWithSameSignature(modifiableGeneratedQmddPath, comparedToQmddPath, skipFirstQmddPathEntry).value_or(true);
                     })) {
                     const qc::Qubit targetQubit = modifiedPathComponent.qubitAssociatedWithQmddNode;
                     qc::Controls    controlQubitsToReachTargetQubitFromStartOfQmddPath;

@@ -126,3 +126,7 @@ const UnoptimizedQmddPath* QmddPathGenerator::tryGenerateNextPath() {
     }
     return &lastGeneratedCombination;
 }
+
+bool QmddPathGenerator::canGenerateCombinations() const noexcept {
+    return nCombinationsToGenerate > 0;
+}

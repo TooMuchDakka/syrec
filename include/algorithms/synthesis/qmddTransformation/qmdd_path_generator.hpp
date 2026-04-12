@@ -20,6 +20,7 @@ namespace syrec {
     public:
         explicit QmddPathGenerator(const OptimizedQmddPath& qmddPath);
         [[nodiscard]] const UnoptimizedQmddPath* tryGenerateNextPath();
+        [[nodiscard]] bool                       canGenerateCombinations() const noexcept;
 
     private:
         UnoptimizedQmddPath             lastGeneratedCombination;

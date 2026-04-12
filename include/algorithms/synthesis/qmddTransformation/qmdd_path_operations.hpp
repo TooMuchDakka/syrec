@@ -23,8 +23,8 @@ namespace syrec {
     std::size_t getNumberOfPathsToOneTerminalForQmddPath(const OptimizedQmddPath& qmddPath);
     std::size_t getNumberOfPathsToOneTerminalForQmddPaths(const std::vector<OptimizedQmddPath>& qmddPaths);
 
-    bool doQmddPathSignaturesMatch(const UnoptimizedQmddPath& lQmddPath, const UnoptimizedQmddPath& rQmddPath, bool skipFirstQmddPathEntry);
-    bool existsQmddPathWithSameSignature(const UnoptimizedQmddPath& referenceQmddPath, const OptimizedQmddPath& comparedToQmddPath, bool skipFirstQmddPathEntry);
+    std::optional<bool> doQmddPathSignaturesMatch(const UnoptimizedQmddPath& lQmddPath, const UnoptimizedQmddPath& rQmddPath, bool skipFirstQmddPathEntry);
+    std::optional<bool> existsQmddPathWithSameSignature(const UnoptimizedQmddPath& referenceQmddPath, const OptimizedQmddPath& comparedToQmddPath, bool skipFirstQmddPathEntry);
 
     std::optional<UnoptimizedQmddPath> findFirstQmddPathWithUniqueSignature(const OptimizedQmddPath& potentiallyUniqueQmddPath, const std::vector<OptimizedQmddPath>& comparedToQmddPaths, bool skipFirstQmddPathEntry);
     std::optional<UnoptimizedQmddPath> findFirstQmddPathWithUniqueSignature(const std::vector<OptimizedQmddPath>& potentiallyUniqueQmddPaths, const std::vector<OptimizedQmddPath>& comparedToQmddPaths, bool skipFirstQmddPathEntry);

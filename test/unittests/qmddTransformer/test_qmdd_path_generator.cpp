@@ -23,23 +23,29 @@ namespace {
         ASSERT_THAT(actualQmddPath, testing::NotNull());
         ASSERT_EQ(expectedQmddPath.size(), actualQmddPath->size());
         for (std::size_t i = 0; i < expectedQmddPath.size(); ++i) {
-            const QmddPathComponent& expectedQmddPathEntry = expectedQmddPath.at(i);
-            const QmddPathComponent& actualQmddPathEntry   = actualQmddPath->at(i);
-            ASSERT_EQ(expectedQmddPathEntry.qubitAssociatedWithQmddNode, actualQmddPathEntry.qubitAssociatedWithQmddNode) << "Mismatch between qmdd paths at index " << std::to_string(i);
-            ASSERT_EQ(expectedQmddPathEntry.qmddEdgeToChildNode, actualQmddPathEntry.qmddEdgeToChildNode) << "Mismatch between qmdd node edge for qmdd nodes of qubit " << std::to_string(expectedQmddPathEntry.qubitAssociatedWithQmddNode);
+            const auto& [expectedQubitAssociatedWithQmddNode, expectedQmddEdgeToChildNode] = expectedQmddPath.at(i);
+            const auto& [actualQubitAssociatedWithQmddNode, actualQmddEdgeToChildNode]     = actualQmddPath->at(i);
+            ASSERT_EQ(expectedQubitAssociatedWithQmddNode, actualQubitAssociatedWithQmddNode) << "Mismatch between qmdd paths at index " << std::to_string(i);
+            ASSERT_EQ(expectedQmddEdgeToChildNode, actualQmddEdgeToChildNode) << "Mismatch between qmdd node edge for qmdd nodes of qubit " << std::to_string(expectedQubitAssociatedWithQmddNode);
         }
     }
 
     void assertGeneratedPathsCollectionsMatchesExpectedOne(QmddPathGenerator& qmddPathGenerator, const std::vector<UnoptimizedQmddPath>& expectedGeneratedQmddPaths) {
-        for (std::size_t i = 0; i < expectedGeneratedQmddPaths.size(); ++i) {
-            ASSERT_NO_FATAL_FAILURE(assertUnoptimizedQmddPathsMatch(expectedGeneratedQmddPaths.at(i), qmddPathGenerator.tryGenerateNextPath())) << "Mismatch between expected and actual qmdd paths at index " << std::to_string(i) << " in qmdd paths collection";
+        if (expectedGeneratedQmddPaths.empty()) {
+            ASSERT_FALSE(qmddPathGenerator.canGenerateCombinations());
+            ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
+        } else {
+            ASSERT_TRUE(qmddPathGenerator.canGenerateCombinations());
+            for (std::size_t i = 0; i < expectedGeneratedQmddPaths.size(); ++i) {
+                ASSERT_NO_FATAL_FAILURE(assertUnoptimizedQmddPathsMatch(expectedGeneratedQmddPaths.at(i), qmddPathGenerator.tryGenerateNextPath())) << "Mismatch between expected and actual qmdd paths at index " << std::to_string(i) << " in qmdd paths collection";
+            }
         }
     }
 } // namespace
 
 TEST(QmddPathGeneratorTests, CheckGeneratorForEmptyQmddPath) {
     auto qmddPathGenerator = QmddPathGenerator(OptimizedQmddPath());
-    ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
+    assertGeneratedPathsCollectionsMatchesExpectedOne(qmddPathGenerator, {});
 }
 
 TEST(QmddPathGeneratorTests, CheckGeneratorForSingleEntryQmddPathWithoutGaps) {
@@ -267,7 +273,7 @@ TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWith
                                                       QmddPathComponent({.qubitAssociatedWithQmddNode = 1U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime}),
                                                       QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 0U, .nConsecutiveQubitInGap = 1U})});
     auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
-    ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
+    assertGeneratedPathsCollectionsMatchesExpectedOne(qmddPathGenerator, {});
 }
 
 TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWithoutGapsUncoveredQubitsBetweenPathEntries) {
@@ -277,14 +283,14 @@ TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWith
             QmddPathComponent({.qubitAssociatedWithQmddNode = 0U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime}),
     });
     auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
-    ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
+    assertGeneratedPathsCollectionsMatchesExpectedOne(qmddPathGenerator, {});
 }
 
 TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWithoutGapsThatDoesNotCoverRequiredQubitRange) {
     const auto optimizedQmddPath = OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::PPrime}),
                                                       QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime})});
     auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
-    ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
+    assertGeneratedPathsCollectionsMatchesExpectedOne(qmddPathGenerator, {});
 }
 
 TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWithGapsThatDoesNotCoverRequiredQubitRange) {
@@ -292,17 +298,20 @@ TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWith
                                                       QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 3U, .nConsecutiveQubitInGap = 2U}),
                                                       QmddPathComponent({.qubitAssociatedWithQmddNode = 1U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime})});
     auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
+    ASSERT_FALSE(qmddPathGenerator.canGenerateCombinations());
     ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
 }
 
 TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWithSingleEntryWithoutGapsNotCoveringRequiredQubitRange) {
     const auto optimizedQmddPath = OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 1U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime})});
     auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
+    ASSERT_FALSE(qmddPathGenerator.canGenerateCombinations());
     ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
 }
 
 TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWithSingleEntryWithGapNotCoveringRequiredQubitRange) {
     const auto optimizedQmddPath = OptimizedQmddPath({QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 3U, .nConsecutiveQubitInGap = 2U})});
     auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
+    ASSERT_FALSE(qmddPathGenerator.canGenerateCombinations());
     ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
 }
