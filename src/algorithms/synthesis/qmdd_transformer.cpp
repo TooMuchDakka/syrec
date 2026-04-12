@@ -277,8 +277,8 @@ bool QmddTransformer::tryShiftUniquePathsOfQmddNode(QmddNodeAndPathsPerEdge& qmd
 }
 
 bool QmddTransformer::tryMakeSharedPathOfQmddNodeUnique(QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const {
-    const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfPPrimeSubtree = getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths.pPrimeEdgePaths, qmddNodeAndEdgePaths.nEdgePaths, true);
-    const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfNPrimeSubtree = !transformationDataForQmddPathOfPPrimeSubtree.has_value() ? getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths.nPrimeEdgePaths, qmddNodeAndEdgePaths.pEdgePaths, true) : std::nullopt;
+    const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfPPrimeSubtree = getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths.pPrimeEdgePaths, qmddNodeAndEdgePaths.nEdgePaths);
+    const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfNPrimeSubtree = !transformationDataForQmddPathOfPPrimeSubtree.has_value() ? getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths.nPrimeEdgePaths, qmddNodeAndEdgePaths.pEdgePaths) : std::nullopt;
 
     if (!transformationDataForQmddPathOfPPrimeSubtree.has_value() && !transformationDataForQmddPathOfNPrimeSubtree.has_value()) {
         return false;

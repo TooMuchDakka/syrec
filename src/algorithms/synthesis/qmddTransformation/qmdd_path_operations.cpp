@@ -127,7 +127,7 @@ namespace syrec {
         return ostream;
     }
 
-    std::optional<ToUniqueQmddPathSignatureOperands> getOperandsToMakeQmddPathSignatureUnique(const OptimizedQmddPath& qmddPathToTurnUnique, const std::vector<OptimizedQmddPath>& comparedToQmddPaths, const bool skipFirstQmddPathEntry) {
+    std::optional<ToUniqueQmddPathSignatureOperands> getOperandsToMakeQmddPathSignatureUnique(const OptimizedQmddPath& qmddPathToTurnUnique, const std::vector<OptimizedQmddPath>& comparedToQmddPaths) {
         if (std::ranges::any_of(comparedToQmddPaths, [&qmddPathToTurnUnique](const OptimizedQmddPath& comparedToQmddPath) {
                 return getUnrolledLengthOfOptimizedQmddPath(qmddPathToTurnUnique) != getUnrolledLengthOfOptimizedQmddPath(comparedToQmddPath);
             }) ||
@@ -176,11 +176,11 @@ namespace syrec {
         return std::nullopt;
     }
 
-    std::optional<ToUniqueQmddPathSignatureOperands> getOperandsToMakeOneOfQmddPathSignaturesUnique(const std::vector<OptimizedQmddPath>& qmddPathsContainingPotentiallyTransformableOne, const std::vector<OptimizedQmddPath>& comparedToQmddPaths, const bool skipFirstQmddPathEntry) {
+    std::optional<ToUniqueQmddPathSignatureOperands> getOperandsToMakeOneOfQmddPathSignaturesUnique(const std::vector<OptimizedQmddPath>& qmddPathsContainingPotentiallyTransformableOne, const std::vector<OptimizedQmddPath>& comparedToQmddPaths) {
         std::optional<ToUniqueQmddPathSignatureOperands> operandsToMakeQmddPathUnique;
         if (!comparedToQmddPaths.empty()) {
             for (std::size_t i = 0; i < qmddPathsContainingPotentiallyTransformableOne.size() && !operandsToMakeQmddPathUnique.has_value(); ++i) {
-                operandsToMakeQmddPathUnique = getOperandsToMakeQmddPathSignatureUnique(qmddPathsContainingPotentiallyTransformableOne.at(i), comparedToQmddPaths, skipFirstQmddPathEntry);
+                operandsToMakeQmddPathUnique = getOperandsToMakeQmddPathSignatureUnique(qmddPathsContainingPotentiallyTransformableOne.at(i), comparedToQmddPaths);
             }
         }
         return operandsToMakeQmddPathUnique;
