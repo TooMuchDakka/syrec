@@ -87,13 +87,13 @@ namespace syrec {
                 os << "N";
                 break;
             case QmddNodeEdge::PPrime:
-                os << "N";
+                os << "PPrime";
                 break;
             case QmddNodeEdge::NPrime:
-                os << "N";
+                os << "NPrime";
                 break;
             case QmddNodeEdge::P:
-                os << "N";
+                os << "P";
                 break;
             default:
                 os << "UNKNOWN";
@@ -103,12 +103,45 @@ namespace syrec {
     }
 
     inline std::ostream& operator<<(std::ostream& os, const QmddPathComponent& qmddPathComponent) {
-        os << "Q: " << qmddPathComponent.qubitAssociatedWithQmddNode << " | E: " << qmddPathComponent.qmddEdgeToChildNode;
+        os << "(Q: " << qmddPathComponent.qubitAssociatedWithQmddNode << " | E: " << qmddPathComponent.qmddEdgeToChildNode << ")";
         return os;
     }
 
     inline std::ostream& operator<<(std::ostream& os, const QmddPathGap& qmddPathGap) {
-        os << "GAP FIRST QUBIT: " << qmddPathGap.qubitAssociatedWithFirstQmddNodeOfGap << " | # qubits covered by gap: " << qmddPathGap.nConsecutiveQubitInGap;
+        os << "(GAP FIRST QUBIT: " << qmddPathGap.qubitAssociatedWithFirstQmddNodeOfGap << " | NUM QUBITS IN GAP: " << qmddPathGap.nConsecutiveQubitInGap << ")";
+        return os;
+    }
+
+    inline std::ostream& operator<<(std::ostream& os, const UnoptimizedQmddPath& unoptimizedQmddPath) {
+        if (unoptimizedQmddPath.empty()) {
+            return os;
+        }
+
+        for (auto qmddPathIterator = unoptimizedQmddPath.cbegin(); qmddPathIterator != std::prev(unoptimizedQmddPath.cend()); ++qmddPathIterator) {
+            os << *qmddPathIterator << "->";
+        }
+        os << unoptimizedQmddPath.back();
+        return os;
+    }
+
+    inline std::ostream& operator<<(std::ostream& os, const std::variant<QmddPathComponent, QmddPathGap>& optimizedQmddPathComponent) {
+        if (const QmddPathComponent* qmddPathComponent = std::get_if<QmddPathComponent>(&optimizedQmddPathComponent); qmddPathComponent != nullptr) {
+            os << *qmddPathComponent;
+        } else {
+            os << std::get<QmddPathGap>(optimizedQmddPathComponent);
+        }
+        return os;
+    }
+
+    inline std::ostream& operator<<(std::ostream& os, const OptimizedQmddPath& optimizedQmddPath) {
+        if (optimizedQmddPath.empty()) {
+            return os;
+        }
+
+        for (auto qmddPathIterator = optimizedQmddPath.cbegin(); qmddPathIterator != std::prev(optimizedQmddPath.cend()); ++qmddPathIterator) {
+            os << *qmddPathIterator << "->";
+        }
+        os << optimizedQmddPath.back();
         return os;
     }
 } // namespace syrec
