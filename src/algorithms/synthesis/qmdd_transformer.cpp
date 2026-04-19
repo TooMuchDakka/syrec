@@ -172,18 +172,18 @@ void QmddTransformer::exportQmddToFile(const dd::mEdge* edgeToRootNodeOfQmdd, co
 }
 
 // TODO: Make static?
-dd::mEdge QmddTransformer::applyMCXGateToQmdd(const dd::mEdge& edgeToRootNodeOfQmdd, const qc::Qubit targetQubit, const qc::Controls& controlQubits) const {
+void QmddTransformer::applyMCXGateToQmdd(const dd::mEdge& edgeToRootNodeOfQmdd, const qc::Qubit targetQubit, const qc::Controls& controlQubits) const {
     qc.get().mcx(controlQubits, targetQubit);
     const qc::Operation& generatedQuantumOperationForMCXGate = *qc.get().back();
     // TODO:
     //++numGates;
-    return dd::applyUnitaryOperation(generatedQuantumOperationForMCXGate, edgeToRootNodeOfQmdd, qmddPkg, {}, false);
+    dd::applyUnitaryOperation(generatedQuantumOperationForMCXGate, edgeToRootNodeOfQmdd, qmddPkg, {}, false);
 }
 
 // This algorithm swaps the paths present in the p' edge to the n edge and vice versa.
 // TODO: In the reimplementation this check is not implemented: "If n' and p paths exists, we move on to P2 algorithm"
 // Refer to the P1 algorithm of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf
-bool QmddTransformer::trySwapPathsOfEdgesOfQmddNode(QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const {
+bool QmddTransformer::trySwapPathsOfEdgesOfQmddNode(const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const {
     if (getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.pPrimeEdgePaths) <= getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.nEdgePaths)) {
         return false;
     }
@@ -216,7 +216,7 @@ bool QmddTransformer::trySwapPathsOfEdgesOfQmddNode(QmddNodeAndPathsPerEdge& qmd
 // This algorithm moves the unique paths present in the p' edge to the n edge.
 // TODO: In the reimplementation this step is not implemented: 'If there are no unique paths in p' edge, the unique paths present in the n' edge are moved to the p edge if required.'
 // Refer to the P2 algorithm of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf
-bool QmddTransformer::tryShiftUniquePathsOfQmddNode(QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const {
+bool QmddTransformer::tryShiftUniquePathsOfQmddNode(const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const {
     // TODO: Currently SHE exception with code 0xc0000005 for multiple paths since QMDD could be changed after an operation is applied.
     // TODO: We currently restrict ourselves to the first found unique path while in the reference paper all unique paths are shifted.
     const std::optional<UnoptimizedQmddPath> uniquePathThatCanBeShiftedInPPrimeEdgeSubtree = findFirstQmddPathWithUniqueSignature(qmddNodeAndEdgePaths.pPrimeEdgePaths, qmddNodeAndEdgePaths.nEdgePaths, true);
@@ -264,7 +264,7 @@ bool QmddTransformer::tryShiftUniquePathsOfQmddNode(QmddNodeAndPathsPerEdge& qmd
     return true;
 }
 
-bool QmddTransformer::tryMakeSharedPathOfQmddNodeUnique(QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const {
+bool QmddTransformer::tryMakeSharedPathOfQmddNodeUnique(const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const {
     const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfPPrimeSubtree = getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths.pPrimeEdgePaths, qmddNodeAndEdgePaths.nEdgePaths);
     const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfNPrimeSubtree = !transformationDataForQmddPathOfPPrimeSubtree.has_value() ? getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths.nPrimeEdgePaths, qmddNodeAndEdgePaths.pEdgePaths) : std::nullopt;
 

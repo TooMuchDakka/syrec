@@ -44,10 +44,10 @@ namespace syrec {
         [[nodiscard]] static dd::mEdge constructQmddFromGatesOfQuantumComputation(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig = std::nullopt);
 
     protected:
-        [[maybe_unused]] dd::mEdge applyMCXGateToQmdd(const dd::mEdge& edgeToRootNodeOfQmdd, qc::Qubit targetQubit, const qc::Controls& controlQubits) const;
-        [[nodiscard]] bool         trySwapPathsOfEdgesOfQmddNode(QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const;
-        [[nodiscard]] bool         tryShiftUniquePathsOfQmddNode(QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const;
-        [[nodiscard]] bool         tryMakeSharedPathOfQmddNodeUnique(QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const;
+        void               applyMCXGateToQmdd(const dd::mEdge& edgeToRootNodeOfQmdd, qc::Qubit targetQubit, const qc::Controls& controlQubits) const;
+        [[nodiscard]] bool trySwapPathsOfEdgesOfQmddNode(const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const;
+        [[nodiscard]] bool tryShiftUniquePathsOfQmddNode(const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const;
+        [[nodiscard]] bool tryMakeSharedPathOfQmddNodeUnique(const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const;
 
         [[nodiscard]] static const dd::mEdge* tryGetEdgeToQmddRootNode(dd::Package& qmddPkgToGetRootFrom);
         [[nodiscard]] static bool             terminate(const dd::mNode& nodeToCheck);
