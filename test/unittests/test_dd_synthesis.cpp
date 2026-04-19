@@ -56,9 +56,8 @@ INSTANTIATE_TEST_SUITE_P(TestDDSynth, TestDDSynth,
                                  "adder2Bit",
                                  // TODO: OK
                                  "adder3Bit",
-                                 // TODO: INFINITE LOOP
+                                 // TODO: FAILS (NOT SOLVABLE)
                                  "4_49_7",
-                                 // TODO: INFINITE LOOP
                                  "hwb4_12",
                                  "hwb5_13",
                                  "hwb6_14",
@@ -67,62 +66,23 @@ INSTANTIATE_TEST_SUITE_P(TestDDSynth, TestDDSynth,
                                  "hwb9_65",
                                  // TODO: OK
                                  "graycode",
-                                 // TODO: INFINITE LOOP
+                                 // TODO: FAILS (NOT SOLVABLE)
                                  "hamming_7",
+                                 // TODO: OK
                                  "mod4096",
                                  "mod8192",
                                  "mod638192",
+                                 // TODO: INFINITE LOOP
                                  "14_bit",
                                  "urf1",
                                  "urf2",
                                  "urf3",
+                                 // TODO: INFINITE LOOP
                                  "urf4",
+                                 // TODO: UNKNOWN
                                  "urf5",
                                  // TODO: OK
-                                 "dd_synth_paper_example"
-                                 // TODO: OK
-                                 //"swap",
-                                 // TODO: OK
-                                 //"toffoli",
-                                 // TODO: OK
-                                 //"x2Bit",
-                                 // TODO: OK
-                                 //"test_dd_synthesis_1",
-                                 // TODO: OK
-                                 //"test_dd_synthesis_2",
-                                 // TODO: OK
-                                 //"3_17_6",
-                                 // TODO: OK
-                                 //"bitwiseXor2Bit",
-                                 // TODO: OK
-                                 //"adder2Bit",
-                                 // TODO: OK
-                                 //"adder3Bit"
-                                 // TODO: INFINITE LOOP
-                                 //"4_49_7",
-                                 // TODO: INFINITE LOOP
-                                 //"hwb4_12",
-                                 // "hwb5_13",
-                                 // "hwb6_14",
-                                 // "hwb7_15",
-                                 // "hwb8_64",
-                                 // "hwb9_65",
-                                 // TODO: OK
-                                 //"graycode",
-                                 // TODO: INFINITE LOOP
-                                 //"hamming_7",
-                                 //"mod4096",
-                                 //"mod8192",
-                                 //"mod638192",
-                                 //"14_bit",
-                                 //"urf1",
-                                 //"urf2",
-                                 //"urf3",
-                                 //"urf4",
-                                 //"urf5",
-                                 // TODO: OK
-                                 //"dd_synth_paper_example"
-                                 ),
+                                 "dd_synth_paper_example"),
                          [](const testing::TestParamInfo<TestDDSynth::ParamType>& info) {
                              auto s = info.param;
                              std::ranges::replace(s, '-', '_');

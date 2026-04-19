@@ -286,32 +286,72 @@ TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWith
     assertGeneratedPathsCollectionsMatchesExpectedOne(qmddPathGenerator, {});
 }
 
-TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWithoutGapsThatDoesNotCoverRequiredQubitRange) {
-    const auto optimizedQmddPath = OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::PPrime}),
-                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime})});
+TEST(QmddPathGeneratorTests, CheckGeneratorForQmddPathWithSingleEntryWithoutGapNotCoveringFullPotentialRange) {
+    const auto optimizedQmddPath = OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::P})});
     auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
-    assertGeneratedPathsCollectionsMatchesExpectedOne(qmddPathGenerator, {});
+    assertGeneratedPathsCollectionsMatchesExpectedOne(qmddPathGenerator, {UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::P})})});
 }
 
-TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWithGapsThatDoesNotCoverRequiredQubitRange) {
-    const auto optimizedQmddPath = OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::PPrime}),
-                                                      QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 3U, .nConsecutiveQubitInGap = 2U}),
-                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 1U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime})});
+TEST(QmddPathGeneratorTests, CheckGeneratorForQmddPathWithSingleEntryWithGapNotCoveringFullPotentialRange) {
+    const auto optimizedQmddPath = OptimizedQmddPath({QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 4U, .nConsecutiveQubitInGap = 2U})});
     auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
-    ASSERT_FALSE(qmddPathGenerator.canGenerateCombinations());
-    ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
+    assertGeneratedPathsCollectionsMatchesExpectedOne(qmddPathGenerator, {UnoptimizedQmddPath({
+                                                                                  QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                  QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                          }),
+                                                                          UnoptimizedQmddPath({
+                                                                                  QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                  QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                          }),
+                                                                          UnoptimizedQmddPath({
+                                                                                  QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                  QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                          }),
+                                                                          UnoptimizedQmddPath({
+                                                                                  QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                  QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                          })});
 }
 
-TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWithSingleEntryWithoutGapsNotCoveringRequiredQubitRange) {
-    const auto optimizedQmddPath = OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 1U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime})});
+TEST(QmddPathGeneratorTests, CheckGeneratorForQmddPathWithNEntriesNotCoveringFullPotentialRange) {
+    const auto optimizedQmddPath = OptimizedQmddPath({
+            QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 5U, .nConsecutiveQubitInGap = 2U}),
+            QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+            QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 2U, .nConsecutiveQubitInGap = 1U}),
+    });
     auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
-    ASSERT_FALSE(qmddPathGenerator.canGenerateCombinations());
-    ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
-}
-
-TEST(QmddPathGeneratorTests, CheckGeneratorWillNotGenerateEntriesForQmddPathWithSingleEntryWithGapNotCoveringRequiredQubitRange) {
-    const auto optimizedQmddPath = OptimizedQmddPath({QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 3U, .nConsecutiveQubitInGap = 2U})});
-    auto       qmddPathGenerator = QmddPathGenerator(optimizedQmddPath);
-    ASSERT_FALSE(qmddPathGenerator.canGenerateCombinations());
-    ASSERT_THAT(qmddPathGenerator.tryGenerateNextPath(), testing::IsNull());
+    assertGeneratedPathsCollectionsMatchesExpectedOne(qmddPathGenerator, {
+                                                                                 UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 5U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::N})}),
+                                                                                 UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 5U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::P})}),
+                                                                                 UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 5U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::N})}),
+                                                                                 UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 5U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::P})}),
+                                                                                 UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 5U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::N})}),
+                                                                                 UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 5U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::P})}),
+                                                                                 UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 5U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::N})}),
+                                                                                 UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 5U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 4U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 3U, .qmddEdgeToChildNode = QmddNodeEdge::P}),
+                                                                                                      QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::P})}),
+                                                                         });
 }

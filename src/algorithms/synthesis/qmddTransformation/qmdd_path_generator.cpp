@@ -46,7 +46,11 @@ namespace {
 QmddPathGenerator::QmddPathGenerator(const OptimizedQmddPath& qmddPath) {
     // The generator will not append any qmdd path entries that are not covered by the reference qmdd path (i.e. the constructor argument) and expects that the latter
     // will define entries that cover the whole qubit range from [U, 0] with U equal to the qubit of the first entry of the reference qmdd path.
-    if (qmddPath.empty() || getLastQubitCoveredByQmddPathEntry(qmddPath.back()) != 0U) {
+    // TODO: Requirement that qmdd path ends at qubit 0U might be to strict.
+    // if (qmddPath.empty() || getLastQubitCoveredByQmddPathEntry(qmddPath.back()) != 0U) {
+    //     return;
+    // }
+    if (qmddPath.empty()) {
         return;
     }
 
@@ -64,18 +68,18 @@ QmddPathGenerator::QmddPathGenerator(const OptimizedQmddPath& qmddPath) {
         return;
     }
 
-    std::size_t unoptimizedQmddPathLength = 0U;
+    dd::Qubit largestQubitInQmddPath;
     if (const QmddPathGap* qmddPathHeadAsGapEntry = std::get_if<QmddPathGap>(&qmddPath.front()); qmddPathHeadAsGapEntry != nullptr) {
-        unoptimizedQmddPathLength = qmddPathHeadAsGapEntry->qubitAssociatedWithFirstQmddNodeOfGap + 1U;
+        largestQubitInQmddPath = qmddPathHeadAsGapEntry->qubitAssociatedWithFirstQmddNodeOfGap;
     } else {
         assert(std::holds_alternative<QmddPathComponent>(qmddPath.front()));
-        const auto& qmddPathHeadAsQmddPathComponent = std::get<QmddPathComponent>(qmddPath.front());
-        unoptimizedQmddPathLength                   = qmddPathHeadAsQmddPathComponent.qubitAssociatedWithQmddNode + 1U;
+        largestQubitInQmddPath = std::get<QmddPathComponent>(qmddPath.front()).qubitAssociatedWithQmddNode;
     }
-
+    const dd::Qubit   smallestQubitInQmddPath   = getLastQubitCoveredByQmddPathEntry(qmddPath.back());
+    const std::size_t unoptimizedQmddPathLength = (largestQubitInQmddPath - smallestQubitInQmddPath) + 1U;
     lastGeneratedCombination.reserve(unoptimizedQmddPathLength);
     // Qubits in qmdd path are expected to be defined in the same order as the variable ordering of the associated qmdd which in turn defines the variable ordering as starting with the "largest" qubit down to the "lowest" qubit.
-    for (const dd::Qubit qubit: std::views::iota(static_cast<dd::Qubit>(0U), static_cast<dd::Qubit>(unoptimizedQmddPathLength)) | std::views::reverse) {
+    for (const dd::Qubit qubit: std::views::iota(smallestQubitInQmddPath, largestQubitInQmddPath + 1U) | std::views::reverse) {
         lastGeneratedCombination.emplace_back(qubit, QmddNodeEdge::P);
     }
 

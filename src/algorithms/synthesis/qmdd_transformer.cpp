@@ -219,9 +219,6 @@ bool QmddTransformer::trySwapPathsOfEdgesOfQmddNode(QmddNodeAndPathsPerEdge& qmd
 bool QmddTransformer::tryShiftUniquePathsOfQmddNode(QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) const {
     // TODO: Currently SHE exception with code 0xc0000005 for multiple paths since QMDD could be changed after an operation is applied.
     // TODO: We currently restrict ourselves to the first found unique path while in the reference paper all unique paths are shifted.
-    // const std::optional<UnoptimizedQmddPath> uniquePathThatCanBeShiftedInPPrimeEdgeSubtree = findQmddPathWithUniqueSignature(qmddNodeAndEdgePaths.pPrimeEdgePaths, qmddNodeAndEdgePaths.nEdgePaths);
-    // const std::optional<UnoptimizedQmddPath> uniquePathThatCanBeShiftedInNPrimeEdgeSubtree = !uniquePathThatCanBeShiftedInPPrimeEdgeSubtree.has_value() ? findQmddPathWithUniqueSignature(qmddNodeAndEdgePaths.nPrimeEdgePaths, qmddNodeAndEdgePaths.pEdgePaths) : std::nullopt;
-
     const std::optional<UnoptimizedQmddPath> uniquePathThatCanBeShiftedInPPrimeEdgeSubtree = findFirstQmddPathWithUniqueSignature(qmddNodeAndEdgePaths.pPrimeEdgePaths, qmddNodeAndEdgePaths.nEdgePaths, true);
     const std::optional<UnoptimizedQmddPath> uniquePathThatCanBeShiftedInNPrimeEdgeSubtree = !uniquePathThatCanBeShiftedInPPrimeEdgeSubtree.has_value() ? findFirstQmddPathWithUniqueSignature(qmddNodeAndEdgePaths.nPrimeEdgePaths, qmddNodeAndEdgePaths.pEdgePaths, true) : std::nullopt;
 
@@ -234,27 +231,18 @@ bool QmddTransformer::tryShiftUniquePathsOfQmddNode(QmddNodeAndPathsPerEdge& qmd
     assert(edgeToRootNode->p != nullptr);
     const dd::mNode& rootNode = *edgeToRootNode->p;
 
-    const qc::Qubit targetQubit = qmddNodeAndEdgePaths.associatedQmddNode.get().v;
-    qc::Controls    controlQubitsForQmddPathStartingFromNodeToOneTerminal;
-    if (uniquePathThatCanBeShiftedInPPrimeEdgeSubtree.has_value()) {
-        assert(!uniquePathThatCanBeShiftedInPPrimeEdgeSubtree->empty());
-        // TODO: Temporary solution
-        for (const QmddPathComponent& qmddPathComponent: uniquePathThatCanBeShiftedInPPrimeEdgeSubtree.value() | std::views::drop(1)) {
-            controlQubitsForQmddPathStartingFromNodeToOneTerminal.emplace(getControlQubitFromSignatureOfQmddPathComponent(qmddPathComponent));
-        }
-        //controlQubitsForQmddPathStartingFromNodeToOneTerminal = getControlQubitsFromSignatureOfQmddPathComponents(*uniquePathThatCanBeShiftedInPPrimeEdgeSubtree);
-    } else {
-        assert(!uniquePathThatCanBeShiftedInNPrimeEdgeSubtree->empty());
-        // TODO: Temporary solution, one could add an optional parameter to getControlQubitsFromSignatureOfQmddPathComponents(...) function to skip the first entry of the qmdd path or accept a view instead
-        for (const QmddPathComponent& qmddPathComponent: uniquePathThatCanBeShiftedInNPrimeEdgeSubtree.value() | std::views::drop(1)) {
-            controlQubitsForQmddPathStartingFromNodeToOneTerminal.emplace(getControlQubitFromSignatureOfQmddPathComponent(qmddPathComponent));
-        }
-        //controlQubitsForQmddPathStartingFromNodeToOneTerminal = getControlQubitsFromSignatureOfQmddPathComponents(*uniquePathThatCanBeShiftedInNPrimeEdgeSubtree);
-    }
+    const qc::Qubit            targetQubit                  = qmddNodeAndEdgePaths.associatedQmddNode.get().v;
+    const UnoptimizedQmddPath& shiftableQmddPathFromSubtree = uniquePathThatCanBeShiftedInPPrimeEdgeSubtree.has_value() ? *uniquePathThatCanBeShiftedInPPrimeEdgeSubtree : *uniquePathThatCanBeShiftedInNPrimeEdgeSubtree;
+    assert(!shiftableQmddPathFromSubtree.empty());
+
+    qc::Controls controlQubitsForQmddPathStartingFromNodeToOneTerminal;
+    // TODO: Update comment
     // The control qubits of the operation to shift a unique path P includes the control qubits from the root up to but excluding the current qmdd node N as well as the control qubits for the subpath from the first child
     // node of N to the 1-terminal. Since we performed the transformation of P to its associated control qubits for each component of the path we also need to remove the generated control qubit for the current qmdd node N on P
     // since the target qubit of the to be generated operation is defined as the associated qubit of N.
-    controlQubitsForQmddPathStartingFromNodeToOneTerminal.erase(targetQubit);
+    for (const auto& controlQubit: shiftableQmddPathFromSubtree | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent)) {
+        controlQubitsForQmddPathStartingFromNodeToOneTerminal.emplace(controlQubit);
+    }
 
     const std::vector<UnoptimizedQmddPath> pathsFromRootToCurrentNode = getAllPathsFromRootToNode(rootNode, qmddNodeAndEdgePaths.associatedQmddNode);
     if (pathsFromRootToCurrentNode.empty()) {
