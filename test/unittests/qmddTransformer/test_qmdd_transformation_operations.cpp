@@ -166,8 +166,8 @@ TEST(QmddTransformationOperationsTest, TrySwapPathsOfEdgesOfQmddNodeWithNPrimeEd
     const auto            qmddPkg            = std::make_unique<dd::Package>(nQubits);
     auto                  quantumComputation = qc::QuantumComputation(nQubits);
 
-    const dd::mEdge& edgeNPrime1Node0   = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::NPrime);
-    const dd::mEdge& edgeP1Node0        = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::N | QmddNodeEdge::NPrime);
+    const dd::mEdge& edgeNPrime1Node0   = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::N | QmddNodeEdge::NPrime);
+    const dd::mEdge& edgeP1Node0        = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::P);
     const dd::mEdge& edgeToQmddRootNode = createNonLeafQmddNode(*qmddPkg, 1U, dd::mEdge::zero(), dd::mEdge::zero(), edgeNPrime1Node0, edgeP1Node0);
     qmddPkg->incRef(edgeToQmddRootNode);
 
@@ -177,7 +177,7 @@ TEST(QmddTransformationOperationsTest, TrySwapPathsOfEdgesOfQmddNodeWithNPrimeEd
     ASSERT_EQ(1U, quantumComputation.getNops());
 
     const qc::Controls  controlQubits{};
-    constexpr dd::Qubit targetQubit        = 2U;
+    constexpr dd::Qubit targetQubit        = 1U;
     const auto          expectedXOperation = qc::StandardOperation(controlQubits, targetQubit, qc::X);
     ASSERT_EQ(expectedXOperation, *quantumComputation.back());
 }
@@ -218,7 +218,7 @@ TEST(QmddTransformationOperationsTest, TrySwapPathsOfEdgesOfQmddNodeWithNPrimeEd
     const dd::mEdge& edgeN4P3NPrime2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::one(), edgeN4P3NPrime2P1Node0);
 
     const dd::mEdge& edgeN4P3P2N1Node0 = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::NPrime);
-    const dd::mEdge& edgeN4P3P2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, dd::mEdge::one(), dd::mEdge::zero(), dd::mEdge::one(), edgeN4P3P2N1Node0);
+    const dd::mEdge& edgeN4P3P2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, dd::mEdge::one(), dd::mEdge::zero(), dd::mEdge::zero(), edgeN4P3P2N1Node0);
 
     const dd::mEdge& edgeN4P3Node2      = createNonLeafQmddNode(*qmddPkg, 2U, dd::mEdge::zero(), dd::mEdge::zero(), edgeN4P3NPrime2Node1, edgeN4P3P2Node1);
     const dd::mEdge& edgeN4Node3        = createNonLeafQmddNode(*qmddPkg, 3U, edgeN4P3Node2, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero());
@@ -440,7 +440,7 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInPPrimeEdgeOf
     auto                  quantumComputation = qc::QuantumComputation(nQubits);
 
     const dd::mEdge& edgeP3N2X1Node0 = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::P);
-    const dd::mEdge& edgeP3N2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, edgeP3N2X1Node0, dd::mEdge::zero(), dd::mEdge::zero(), edgeP3N2X1Node0);
+    const dd::mEdge& edgeP3N2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, edgeP3N2X1Node0, edgeP3N2X1Node0, dd::mEdge::zero(), dd::mEdge::zero());
 
     const dd::mEdge& edgeP3PPrime2N1Node0 = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::P);
     const dd::mEdge& edgeP3PPrime2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, edgeP3PPrime2N1Node0, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero());
@@ -466,7 +466,7 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInNPrimeEdgeOf
     auto                  quantumComputation = qc::QuantumComputation(nQubits);
 
     const dd::mEdge& edgeN3P2X1Node0 = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::P);
-    const dd::mEdge& edgeN3P2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, edgeN3P2X1Node0, dd::mEdge::zero(), dd::mEdge::zero(), edgeN3P2X1Node0);
+    const dd::mEdge& edgeN3P2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, edgeN3P2X1Node0, edgeN3P2X1Node0, dd::mEdge::zero(), dd::mEdge::zero());
 
     const dd::mEdge& edgeN3NPrime2N1Node0 = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::P);
     const dd::mEdge& edgeN3NPrime2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, edgeN3NPrime2N1Node0, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero());

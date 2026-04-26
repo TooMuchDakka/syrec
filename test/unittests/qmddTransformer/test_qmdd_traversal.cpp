@@ -328,6 +328,24 @@ TEST(QmddTraversalTest, CheckAllPathsToOneTerminalInSubtreeFound) {
     ASSERT_NO_FATAL_FAILURE(assertQmddPathCollectionsMatch(expectedPEdgePaths, qmddPathsContainer.pEdgePaths));
 }
 
+TEST(QmddTraversalTest, CheckSearchForAllPathsToOneTerminalCorrectlyHandlesOptimizationGapsAtStartOfPaths) {
+    const auto      qmddPkg        = std::make_unique<dd::Package>(3U);
+    const dd::mEdge edgeToRootNode = createNonLeafQmddNode(*qmddPkg, 2U, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::one(), dd::mEdge::zero());
+    qmddPkg->incRef(edgeToRootNode);
+
+    const auto& rootSet = qmddPkg->getRootSet<dd::mNode>();
+    ASSERT_EQ(1U, rootSet.size());
+    ASSERT_EQ(edgeToRootNode.p, rootSet.cbegin()->first.p);
+    const dd::mNode* rootNode = edgeToRootNode.p;
+
+    QmddNodeAndPathsPerEdge qmddPathsContainer = {.associatedQmddNode = *rootNode, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
+    getPathsToOneTerminalThroughEdgeOfQmddNode(qmddPathsContainer.associatedQmddNode, QmddNodeEdge::NPrime, qmddPathsContainer);
+
+    const auto expectedQmddPaths = std::vector({OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime}),
+                                                                   QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 1U, .nConsecutiveQubitInGap = 2U})})});
+    ASSERT_NO_FATAL_FAILURE(assertQmddPathCollectionsMatch(expectedQmddPaths, qmddPathsContainer.nPrimeEdgePaths));
+}
+
 TEST(QmddTraversalTest, CheckAllPathsForNEdgeAreFound) {
     getAllPathsForQmddEdgeAndAssertAllExpectedOnesAreFound(QmddNodeEdge::N);
 }

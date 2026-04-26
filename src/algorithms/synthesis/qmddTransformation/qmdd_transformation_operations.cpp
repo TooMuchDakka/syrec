@@ -33,11 +33,11 @@ namespace syrec {
         dd::applyUnitaryOperation(generatedQuantumOperationForMCXGate, edgeToRootNodeOfQmdd, qmddPkg, {}, false);
     }
 
-    // This algorithm swaps the paths present in the p' edge to the n edge and vice versa.
-    // TODO: In the reimplementation this check is not implemented: "If n' and p paths exists, we move on to P2 algorithm"
+    // For two edge E_1 and E_2 of the currently processed qmdd node, this algorithm swaps the collection of paths starting from E_1 and E_2 if the number of elements
+    // in the latter is larger than in the former. This check will be performed for two following two edge tuples: (N, P') and (N', P).
     // Refer to the P1 algorithm of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf
     bool trySwapPathsOfEdgesOfQmddNode(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) {
-        if (getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.pPrimeEdgePaths) <= getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.nEdgePaths)) {
+        if (getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.pPrimeEdgePaths) <= getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.nEdgePaths) && getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.nPrimeEdgePaths) <= getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.pEdgePaths)) {
             return false;
         }
 

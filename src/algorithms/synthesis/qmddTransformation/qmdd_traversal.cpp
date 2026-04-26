@@ -92,7 +92,29 @@ namespace syrec {
 
     void generateQmddPath(OptimizedQmddPath& qmddPathContainer, const dd::Qubit qubitAtRootOfGeneratedQmddPath, const std::vector<VisitedQmddNodeEdgesAggregation>& visitedQmddNodesStack) {
         dd::Qubit qubitAssociatedWithLastProcessedQmddNodeStackEntry = qubitAtRootOfGeneratedQmddPath;
-        for (const auto& toBeVisitedQmddNodesStackEntry: visitedQmddNodesStack) {
+        if (visitedQmddNodesStack.empty()) {
+            return;
+        }
+
+        const dd::mNode* firstVisitedQmddNodeInStack = visitedQmddNodesStack.front().associatedQmddNode;
+        assert(firstVisitedQmddNodeInStack != nullptr);
+
+        auto visitedQmddNodesStackIterator = visitedQmddNodesStack.begin();
+        if (dd::mNode::isTerminal(firstVisitedQmddNodeInStack)) {
+            const dd::Qubit qubitAssociatedWithFirstVisitedQmddNode = firstVisitedQmddNodeInStack->v;
+            dd::Qubit       expectedQubitForNextComponentInQmddPath = 0U;
+            if (visitedQmddNodesStack.size() > 1U) {
+                assert(visitedQmddNodesStack.at(1U).associatedQmddNode != nullptr);
+                expectedQubitForNextComponentInQmddPath = visitedQmddNodesStack.at(1U).associatedQmddNode->v;
+            }
+            const std::size_t qmddPathGapSize = (qubitAssociatedWithFirstVisitedQmddNode - expectedQubitForNextComponentInQmddPath) + 1U;
+            qmddPathContainer.emplace_back(QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = qubitAssociatedWithFirstVisitedQmddNode, .nConsecutiveQubitInGap = qmddPathGapSize}));
+            qubitAssociatedWithLastProcessedQmddNodeStackEntry = (qubitAssociatedWithFirstVisitedQmddNode - static_cast<dd::Qubit>(qmddPathGapSize)) + 1U;
+            ++visitedQmddNodesStackIterator;
+        }
+
+        while (visitedQmddNodesStackIterator != visitedQmddNodesStack.end()) {
+            const auto&     toBeVisitedQmddNodesStackEntry                          = *visitedQmddNodesStackIterator;
             const dd::Qubit qubitAssociatedWithCurrentlyProcessedQmddNodeStackEntry = toBeVisitedQmddNodesStackEntry.associatedQmddNode->v;
             const dd::Qubit expectedQubitForNextComponentInQmddPath                 = qubitAssociatedWithLastProcessedQmddNodeStackEntry - 1U;
 
@@ -101,9 +123,19 @@ namespace syrec {
                 // Since the qmdd transformation algorithm is assumed to require all paths in the qmdd requires us to also record these gaps to correctly calculate the number of qmdd paths through an edge in the qmdd.
                 const std::size_t qmddPathGapSize = expectedQubitForNextComponentInQmddPath - qubitAssociatedWithCurrentlyProcessedQmddNodeStackEntry;
                 qmddPathContainer.emplace_back(QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = expectedQubitForNextComponentInQmddPath, .nConsecutiveQubitInGap = qmddPathGapSize}));
+                qubitAssociatedWithLastProcessedQmddNodeStackEntry = (expectedQubitForNextComponentInQmddPath - static_cast<dd::Qubit>(qmddPathGapSize)) + 1U;
+                continue;
             }
+
             qmddPathContainer.emplace_back(QmddPathComponent({.qubitAssociatedWithQmddNode = qubitAssociatedWithCurrentlyProcessedQmddNodeStackEntry, .qmddEdgeToChildNode = *toBeVisitedQmddNodesStackEntry.currVisitedEdge}));
+            if (toBeVisitedQmddNodesStackEntry.associatedQmddNode->e[convertQmddNodeEdgeEnumValueToArrayIdx(*toBeVisitedQmddNodesStackEntry.currVisitedEdge)].isOneTerminal() && qubitAssociatedWithCurrentlyProcessedQmddNodeStackEntry != 0U) {
+                const dd::Qubit qubitAssociatedWithSuccessorOfQmddNodeEdgeToOneTerminal = qubitAssociatedWithCurrentlyProcessedQmddNodeStackEntry - 1U;
+                const auto      qmddPathGapSize                                         = static_cast<std::size_t>(qubitAssociatedWithCurrentlyProcessedQmddNodeStackEntry);
+                qmddPathContainer.emplace_back(QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = qubitAssociatedWithSuccessorOfQmddNodeEdgeToOneTerminal, .nConsecutiveQubitInGap = qmddPathGapSize}));
+                return;
+            }
             qubitAssociatedWithLastProcessedQmddNodeStackEntry = qubitAssociatedWithCurrentlyProcessedQmddNodeStackEntry;
+            ++visitedQmddNodesStackIterator;
         }
     }
 
@@ -122,8 +154,9 @@ namespace syrec {
             if (firstEdgeInQmddNodePath.isOneTerminal()) {
                 auto qmddPathToOneTerminal = OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = qmddNodeToStartPathsFrom.v, .qmddEdgeToChildNode = availableQmddNodeEdge})});
                 if (qmddNodeToStartPathsFrom.v > 0U) {
-                    const dd::Qubit firstQubitInOptimizedQmddPathGap = qmddNodeToStartPathsFrom.v - 1U;
-                    qmddPathToOneTerminal.emplace_back(QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = firstQubitInOptimizedQmddPathGap, .nConsecutiveQubitInGap = 1 + (firstQubitInOptimizedQmddPathGap > 0 ? firstQubitInOptimizedQmddPathGap - 1U : 0U)}));
+                    const dd::Qubit   firstQubitInOptimizedQmddPathGap = qmddNodeToStartPathsFrom.v - 1U;
+                    const std::size_t qmddPathGapSize                  = firstQubitInOptimizedQmddPathGap + 1U;
+                    qmddPathToOneTerminal.emplace_back(QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = firstQubitInOptimizedQmddPathGap, .nConsecutiveQubitInGap = qmddPathGapSize}));
                 }
                 // TODO: Refactor into helper function of anonymous namespace?
                 switch (availableQmddNodeEdge) {
@@ -163,17 +196,6 @@ namespace syrec {
                     qmddPathToOneTerminal.reserve(toBeVisitedQmddNodesStack.size() + 1U);
                     qmddPathToOneTerminal.emplace_back(QmddPathComponent({.qubitAssociatedWithQmddNode = qmddNodeToStartPathsFrom.v, .qmddEdgeToChildNode = availableQmddNodeEdge}));
                     generateQmddPath(qmddPathToOneTerminal, qmddNodeToStartPathsFrom.v, toBeVisitedQmddNodesStack);
-
-                    // TODO: Add a comment as to why this is necessary (check wording)
-                    // If the edge of the currently processed qmdd node points to a one terminal then we need to "repeat" our previous check for gaps in
-                    // the qmdd path that we performed for the intermediate notes in the visited qmdd nodes stack but this time for the qubits that follow
-                    // after the one of the currently processed one. If this qubit is not equal to zero then we need to record the gap from the current qubit
-                    // up to the one-terminal in our recorded qmdd path
-                    if (toBeVisitedQmddNodesStack.back().associatedQmddNode->v != 0) {
-                        const dd::Qubit firstQubitOnOptimizedPathToOneTerminal = toBeVisitedQmddNodesStack.back().associatedQmddNode->v - 1U;
-                        qmddPathToOneTerminal.emplace_back(QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = firstQubitOnOptimizedPathToOneTerminal,
-                                                                        .nConsecutiveQubitInGap                = static_cast<std::size_t>(firstQubitOnOptimizedPathToOneTerminal + 1U)}));
-                    }
 
                     switch (availableQmddNodeEdge) {
                         case QmddNodeEdge::N:
