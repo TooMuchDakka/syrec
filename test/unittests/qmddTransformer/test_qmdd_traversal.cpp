@@ -12,42 +12,13 @@
 #include "algorithms/synthesis/qmddTransformation/qmdd_traversal.hpp"
 #include "dd/Node.hpp"
 #include "dd/Package.hpp"
+#include "qmdd_pkg_test_utils.hpp"
 
 #include "gmock/gmock-matchers.h"
 #include <gtest/gtest.h>
 using namespace syrec;
 
 namespace {
-    constexpr std::array<dd::mEdge, 4U> createEdgeArrayForLeafNode(const QmddNodeEdge aggregateOfEdgesToOneTerminals) {
-        static_assert(convertQmddNodeEdgeEnumValueToArrayIdx(QmddNodeEdge::N) == 0U);
-        static_assert(convertQmddNodeEdgeEnumValueToArrayIdx(QmddNodeEdge::PPrime) == 1U);
-        static_assert(convertQmddNodeEdgeEnumValueToArrayIdx(QmddNodeEdge::NPrime) == 2U);
-        static_assert(convertQmddNodeEdgeEnumValueToArrayIdx(QmddNodeEdge::P) == 3U);
-
-        return {
-                aggregateOfEdgesToOneTerminals & QmddNodeEdge::N ? dd::mEdge::one() : dd::mEdge::zero(),
-                aggregateOfEdgesToOneTerminals & QmddNodeEdge::PPrime ? dd::mEdge::one() : dd::mEdge::zero(),
-                aggregateOfEdgesToOneTerminals & QmddNodeEdge::NPrime ? dd::mEdge::one() : dd::mEdge::zero(),
-                aggregateOfEdgesToOneTerminals & QmddNodeEdge::P ? dd::mEdge::one() : dd::mEdge::zero()};
-    }
-
-    dd::mEdge createLeafQmddNode(dd::Package& ddPkg, const dd::Qubit qubit, const QmddNodeEdge aggregateOfEdgesToOneTerminals) {
-        return ddPkg.makeDDNode<dd::mNode>(qubit, createEdgeArrayForLeafNode(aggregateOfEdgesToOneTerminals));
-    }
-
-    dd::mEdge createNonLeafQmddNode(dd::Package& ddPkg, const dd::Qubit qubit,
-                                    const dd::mEdge& nEdge      = dd::mEdge::zero(),
-                                    const dd::mEdge& pPrimeEdge = dd::mEdge::zero(),
-                                    const dd::mEdge& nPrimeEdge = dd::mEdge::zero(),
-                                    const dd::mEdge& pEdge      = dd::mEdge::zero()) {
-        static_assert(convertQmddNodeEdgeEnumValueToArrayIdx(QmddNodeEdge::N) == 0U);
-        static_assert(convertQmddNodeEdgeEnumValueToArrayIdx(QmddNodeEdge::PPrime) == 1U);
-        static_assert(convertQmddNodeEdgeEnumValueToArrayIdx(QmddNodeEdge::NPrime) == 2U);
-        static_assert(convertQmddNodeEdgeEnumValueToArrayIdx(QmddNodeEdge::P) == 3U);
-
-        return ddPkg.makeDDNode<dd::mNode>(qubit, std::array<dd::mEdge, 4U>({nEdge, pPrimeEdge, nPrimeEdge, pEdge}));
-    }
-
     bool operator==(const OptimizedQmddPath& expectedQmddPath, const OptimizedQmddPath& actualQmddPath) {
         return expectedQmddPath.size() == actualQmddPath.size() && std::find_first_of(
                                                                            expectedQmddPath.cbegin(), expectedQmddPath.cend(),
