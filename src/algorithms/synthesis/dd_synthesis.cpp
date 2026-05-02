@@ -118,7 +118,7 @@ namespace syrec {
 
     // Refer to the decoder algorithm of https://www.cda.cit.tum.de/files/eda/2018_aspdac_coding_techniques_in_synthesis.pdf.
     template<class T>
-    bool DDSynthesizer::decoder(const T& codewords, SynthesizerComponents& synthesizerComponents) {
+    bool DDSynthesizer::decoder(const T& codewords, SynthesizerComponents& synthesizerComponents, const QmddTransformer::QmddDumpConfig* qmddDumpConfig) {
         const auto codeLength = codewords.begin()->second.size();
 
         // decode the r most significant bits of the original output pattern.
@@ -174,7 +174,7 @@ namespace syrec {
 
         const auto ttCorrectionDD = buildDD(ttCorrection, *synthesizerComponents.qmddPackage);
         // garbageFlag               = true;
-        return synthesize(ttCorrectionDD, *synthesizerComponents.qmddPackage, *synthesizerComponents.qc);
+        return synthesize(ttCorrectionDD, *synthesizerComponents.qmddPackage, *synthesizerComponents.qc, qmddDumpConfig);
     }
 
     DDSynthesizer::SynthesizerComponents DDSynthesizer::initializeSynthesizerComponents(const TruthTable& tt) {
@@ -192,18 +192,18 @@ namespace syrec {
                                       .qc                    = std::make_unique<qc::QuantumComputation>(truthTableQubitInformation.totalNoQubits, truthTableQubitInformation.totalNoQubits)});
     }
 
-    bool DDSynthesizer::buildAndSynthesize(const TruthTable& tt, dd::Package& qmddPackage, qc::QuantumComputation& qc) {
+    bool DDSynthesizer::buildAndSynthesize(const TruthTable& tt, dd::Package& qmddPackage, qc::QuantumComputation& qc, const QmddTransformer::QmddDumpConfig* qmddDumpConfig) {
         // the garbage and constants stored in the tt must be equal to the garbage and constants stored in qc.
         assert(tt.getGarbage() == qc.getGarbage() && tt.getConstants() == qc.getAncillary());
         const auto start = std::chrono::steady_clock::now();
 
         const auto src = buildDD(tt, qmddPackage);
-        return synthesize(src, qmddPackage, qc);
+        return synthesize(src, qmddPackage, qc, qmddDumpConfig);
 
         //runtime = static_cast<double>((std::chrono::steady_clock::now() - start).count());
     }
 
-    std::unique_ptr<qc::QuantumComputation> DDSynthesizer::synthesizeOnePassTT(TruthTable tt) {
+    std::unique_ptr<qc::QuantumComputation> DDSynthesizer::synthesizeOnePassTT(TruthTable tt, const QmddTransformer::QmddDumpConfig* qmddDumpConfig) {
         SynthesizerComponents synthesizerComponents = initializeSynthesizerComponents(tt);
         if (tt.empty()) {
             return std::move(synthesizerComponents.qc);
@@ -224,10 +224,10 @@ namespace syrec {
 
         // If the one-pass synthesis is selected, the appended garbage bits need not be considered during the synthesis process.
         //garbageFlag = true;
-        return buildAndSynthesize(tt, *synthesizerComponents.qmddPackage, *synthesizerComponents.qc) ? std::move(synthesizerComponents.qc) : nullptr;
+        return buildAndSynthesize(tt, *synthesizerComponents.qmddPackage, *synthesizerComponents.qc, qmddDumpConfig) ? std::move(synthesizerComponents.qc) : nullptr;
     }
 
-    std::unique_ptr<qc::QuantumComputation> DDSynthesizer::synthesizeCodingTechniquesTT(TruthTable tt, bool withAdditionalLine) {
+    std::unique_ptr<qc::QuantumComputation> DDSynthesizer::synthesizeCodingTechniquesTT(TruthTable tt, const bool withAdditionalLine, const QmddTransformer::QmddDumpConfig* qmddDumpConfig) {
         SynthesizerComponents synthesizerComponents = initializeSynthesizerComponents(tt);
 
         TruthTable::CubeMultiMap codewordWithoutAdditionalLine;
@@ -261,7 +261,7 @@ namespace syrec {
 
         // Builds the QMDD for the given truth table (T) and transforms it so that QMDD represents the identity permutation matrix with the generated quantum operations being equal to the reversible circuit for T^(-1).
         // The transformation algorithm to get the identity permutation matrix for a given QMDD is described in (https://agra.informatik.uni-bremen.de/doc/konf/12aspdac_qmdd_synth_rev.pdf [Section IV - Algorithm Algorithm Q])
-        if (!buildAndSynthesize(tt, *synthesizerComponents.qmddPackage, *synthesizerComponents.qc)) {
+        if (!buildAndSynthesize(tt, *synthesizerComponents.qmddPackage, *synthesizerComponents.qc, qmddDumpConfig)) {
             return nullptr;
         }
 
@@ -270,26 +270,20 @@ namespace syrec {
         // synthesizing the corresponding decoder circuit.
         // TODO: Is deencoder correct?
         if (withAdditionalLine) {
-            return decoder(codewordWithAdditionalLine, synthesizerComponents) ? std::move(synthesizerComponents.qc) : nullptr;
+            return decoder(codewordWithAdditionalLine, synthesizerComponents, qmddDumpConfig) ? std::move(synthesizerComponents.qc) : nullptr;
         }
-        return decoder(codewordWithoutAdditionalLine, synthesizerComponents) ? std::move(synthesizerComponents.qc) : nullptr;
+        return decoder(codewordWithoutAdditionalLine, synthesizerComponents, qmddDumpConfig) ? std::move(synthesizerComponents.qc) : nullptr;
         //runtime = runtime + static_cast<double>((std::chrono::steady_clock::now() - start).count());
         //return std::move(synthesizerComponents.qc);
     }
 
-    bool DDSynthesizer::synthesize(const dd::mEdge& src, dd::Package& qmddPackage, qc::QuantumComputation& qc) {
-        //const auto qmddToIdentityTransformer = std::make_unique<QmddToIdentityTransformer>(qc, qmddPackage);
-        // TODO: Add additional parameter to configure qmdd dump
-        //const QmddToIdentityTransformer::QmddDumpConfig qmddDumpConfig({.pathToFileToDumpQmddTo = "C:\\School\\MThesis\\test.txt", .clearContentsOfFileBeforeExport = true});
-        //return qmddToIdentityTransformer->synthesize(src, nullptr, qmddDumpConfig);
-
-        const auto                            qmddTransformer = std::make_unique<QmddTransformer>(qc, qmddPackage);
-        const QmddTransformer::QmddDumpConfig qmddDumpConfig({.pathToDumpFile = "C:\\School\\MThesis\\test.txt"});
+    bool DDSynthesizer::synthesize(const dd::mEdge& src, dd::Package& qmddPackage, qc::QuantumComputation& qc, const QmddTransformer::QmddDumpConfig* qmddDumpConfig) {
+        const auto qmddTransformer = std::make_unique<QmddTransformer>(qc, qmddPackage);
         return qmddTransformer->synthesizeQmdd(src, nullptr, qmddDumpConfig);
     }
 
     // explicitly instantiate the template function decoder.
-    template bool DDSynthesizer::decoder(const TruthTable::CubeMap& codewords, SynthesizerComponents& synthesizerComponents);
+    template bool DDSynthesizer::decoder(const TruthTable::CubeMap& codewords, SynthesizerComponents& synthesizerComponents, const QmddTransformer::QmddDumpConfig* qmddDumpConfig);
 
-    template bool DDSynthesizer::decoder(const TruthTable::CubeMultiMap& codewords, SynthesizerComponents& synthesizerComponents);
+    template bool DDSynthesizer::decoder(const TruthTable::CubeMultiMap& codewords, SynthesizerComponents& synthesizerComponents, const QmddTransformer::QmddDumpConfig* qmddDumpConfig);
 } // namespace syrec

@@ -17,7 +17,6 @@
 
 #include <cstdint>
 #include <functional>
-#include <optional>
 #include <string>
 
 namespace syrec {
@@ -34,15 +33,15 @@ namespace syrec {
         explicit QmddTransformer(const std::reference_wrapper<qc::QuantumComputation> quantumComputation, const std::reference_wrapper<dd::Package> qmddPkg):
             qc(quantumComputation), qmddPkg(qmddPkg) {}
 
-        [[nodiscard]] bool             synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformationStatistic* optionalTransformationStatistics = nullptr, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig = std::nullopt);
-        [[nodiscard]] static dd::mEdge constructQmddFromGatesOfQuantumComputation(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig = std::nullopt);
+        [[nodiscard]] bool             synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformationStatistic* optionalTransformationStatistics = nullptr, const QmddDumpConfig* optionalQmddDumpConfig = nullptr) const;
+        [[nodiscard]] static dd::mEdge constructQmddFromGatesOfQuantumComputation(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage, const QmddDumpConfig* optionalQmddDumpConfig = nullptr);
 
     protected:
         enum class QmddExportOutputStreamOperation : std::uint8_t {
             OverwriteExisting,
             Append
         };
-        static void exportQmddToFile(const dd::mEdge* edgeToRootNodeOfQmdd, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig = std::nullopt, QmddExportOutputStreamOperation qmddExportOutputStreamOperation = QmddExportOutputStreamOperation::Append);
+        static void exportQmddToFile(const dd::mEdge* edgeToRootNodeOfQmdd, const QmddDumpConfig* optionalQmddDumpConfig = nullptr, QmddExportOutputStreamOperation qmddExportOutputStreamOperation = QmddExportOutputStreamOperation::Append);
 
         std::reference_wrapper<qc::QuantumComputation> qc;
         std::reference_wrapper<dd::Package>            qmddPkg;

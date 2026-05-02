@@ -16,7 +16,6 @@
 #include "dd/Export.hpp"
 #include "dd/Operations.hpp"
 
-#include <cmath>
 #include <queue>
 
 using namespace syrec;
@@ -25,7 +24,7 @@ namespace {
 
 } // namespace
 
-bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformationStatistic* optionalTransformationStatistics, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig) {
+bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformationStatistic* optionalTransformationStatistics, const QmddDumpConfig* optionalQmddDumpConfig) const {
     if (edgeToQmddRoot.isTerminal() || qc.get().getNqubitsWithoutAncillae() == 0) {
         return false;
     }
@@ -86,16 +85,8 @@ bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformatio
         }
 
         // TODO: In test_dd_synthesis_1 some of the found paths contain duplicate entries that are associated with the same qubit but a different edge.
-        // auto qmddPathsStartingFromNode = QmddNodeAndPathsPerEdge(nodeToProcess);
-        // getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::N | QmddNodeEdge::PPrime, qmddPathsStartingFromNode);
         // P1 algorithm
-        bool resetQueue = trySwapPathsOfEdgesOfQmddNode(qc, qmddPkg, NPathsToOneTerminalPerEdgeOfQmddNode(nodeToProcess));
-
-        // if (!resetQueue) {
-        //     // Avoid unnecessary work by only determine the paths in the N' and P edge if the swap operation for the P' and N edge did perform no swap.
-        //     getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::NPrime | QmddNodeEdge::P, qmddPathsStartingFromNode);
-        //     resetQueue = trySwapPathsOfEdgesOfQmddNode(qc, qmddPkg, qmddPathsStartingFromNode);
-        // }
+        bool resetQueue = trySwapPathsOfEdgesOfQmddNode(qc, qmddPkg, getNPathsToOneTerminalPerEdgeOfQmddNode(nodeToProcess));
         // P2 algorithm.
         auto qmddPathsStartingFromNode = QmddNodeAndPathsPerEdge(nodeToProcess);
         getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, qmddPathsStartingFromNode);
@@ -140,7 +131,7 @@ bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformatio
     return !forceCancellationOfTransformation;
 }
 
-dd::mEdge QmddTransformer::constructQmddFromGatesOfQuantumComputation(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig) {
+dd::mEdge QmddTransformer::constructQmddFromGatesOfQuantumComputation(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage, const QmddDumpConfig* optionalQmddDumpConfig) {
     // TODO: Implementation taken from dd::FunctionalityConstruction::buildFunctionality(...) which does not apply the inverse of each operation.
     auto permutation    = quantumComputation.initialLayout;
     auto edgeToRootNode = qmddPackage.createInitialMatrix(quantumComputation.getAncillary());
@@ -159,8 +150,8 @@ dd::mEdge QmddTransformer::constructQmddFromGatesOfQuantumComputation(const qc::
     return qmddPackage.reduceGarbage(edgeToRootNode, quantumComputation.getGarbage());
 }
 
-void QmddTransformer::exportQmddToFile(const dd::mEdge* edgeToRootNodeOfQmdd, const std::optional<QmddDumpConfig>& optionalQmddDumpConfig, const QmddExportOutputStreamOperation qmddExportOutputStreamOperation) {
-    if (edgeToRootNodeOfQmdd == nullptr || !optionalQmddDumpConfig.has_value()) {
+void QmddTransformer::exportQmddToFile(const dd::mEdge* edgeToRootNodeOfQmdd, const QmddDumpConfig* optionalQmddDumpConfig, const QmddExportOutputStreamOperation qmddExportOutputStreamOperation) {
+    if (edgeToRootNodeOfQmdd == nullptr || optionalQmddDumpConfig == nullptr) {
         return;
     }
 
