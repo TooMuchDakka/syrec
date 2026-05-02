@@ -130,8 +130,7 @@ TEST(QmddTransformationOperationsTest, TrySwapPathsOfEdgesOfQmddNodeWithPPrimeAn
     const dd::mEdge& edgeToQmddRootNode   = createNonLeafQmddNode(*qmddPkg, 1U, edgeN1QmddNode0, edgePPrime1QmddNode0, edgeNPrime1QmddNode0, edgeP1QmddNode0);
     qmddPkg->incRef(edgeToQmddRootNode);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeToQmddRootNode.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRootNode.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
+    const NPathsToOneTerminalPerEdgeOfQmddNode& pathsFromRootToOneTerminals = getNPathsToOneTerminalPerEdgeOfQmddNode(*edgeToQmddRootNode.p);
     ASSERT_FALSE(syrec::trySwapPathsOfEdgesOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(0U, quantumComputation.getNops());
 }
@@ -150,8 +149,7 @@ TEST(QmddTransformationOperationsTest, TrySwapPathsOfEdgesOfQmddNodeWithPPrimeEd
     const dd::mEdge& edgeToQmddRootNode = createNonLeafQmddNode(*qmddPkg, 2U, edgeN2QmddNode1, edgePPrime2Node1, dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRootNode);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeToQmddRootNode.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRootNode.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
+    const NPathsToOneTerminalPerEdgeOfQmddNode& pathsFromRootToOneTerminals = getNPathsToOneTerminalPerEdgeOfQmddNode(*edgeToQmddRootNode.p);
     ASSERT_TRUE(syrec::trySwapPathsOfEdgesOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
 
@@ -171,8 +169,7 @@ TEST(QmddTransformationOperationsTest, TrySwapPathsOfEdgesOfQmddNodeWithNPrimeEd
     const dd::mEdge& edgeToQmddRootNode = createNonLeafQmddNode(*qmddPkg, 1U, dd::mEdge::zero(), dd::mEdge::zero(), edgeNPrime1Node0, edgeP1Node0);
     qmddPkg->incRef(edgeToQmddRootNode);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeToQmddRootNode.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRootNode.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
+    const NPathsToOneTerminalPerEdgeOfQmddNode& pathsFromRootToOneTerminals = getNPathsToOneTerminalPerEdgeOfQmddNode(*edgeToQmddRootNode.p);
     ASSERT_TRUE(syrec::trySwapPathsOfEdgesOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
 
@@ -198,9 +195,8 @@ TEST(QmddTransformationOperationsTest, TrySwapPathsOfEdgesOfQmddNodeWithPPrimeEd
     const dd::mEdge& edgeToQmddRootNode = createNonLeafQmddNode(*qmddPkg, 4U, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero(), edgeP4Node3);
     qmddPkg->incRef(edgeToQmddRootNode);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeP4N3Node2.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeP4N3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
-    ASSERT_TRUE(syrec::trySwapPathsOfEdgesOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
+    const NPathsToOneTerminalPerEdgeOfQmddNode& pathsFromNonRootToOneTerminals = getNPathsToOneTerminalPerEdgeOfQmddNode(*edgeP4N3Node2.p);
+    ASSERT_TRUE(syrec::trySwapPathsOfEdgesOfQmddNode(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
 
     const qc::Controls  controlQubits{qc::Control(4U, qc::Control::Type::Pos), qc::Control(3U, qc::Control::Type::Neg)};
@@ -225,25 +221,14 @@ TEST(QmddTransformationOperationsTest, TrySwapPathsOfEdgesOfQmddNodeWithNPrimeEd
     const dd::mEdge& edgeToQmddRootNode = createNonLeafQmddNode(*qmddPkg, 4U, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero(), edgeN4Node3);
     qmddPkg->incRef(edgeToQmddRootNode);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeN4P3Node2.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeN4P3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
-    ASSERT_TRUE(syrec::trySwapPathsOfEdgesOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
+    const NPathsToOneTerminalPerEdgeOfQmddNode& pathsFromNonRootToOneTerminals = getNPathsToOneTerminalPerEdgeOfQmddNode(*edgeN4P3Node2.p);
+    ASSERT_TRUE(syrec::trySwapPathsOfEdgesOfQmddNode(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
 
     const qc::Controls  controlQubits{qc::Control(4U, qc::Control::Type::Pos), qc::Control(3U, qc::Control::Type::Neg)};
     constexpr dd::Qubit targetQubit        = 2U;
     const auto          expectedXOperation = qc::StandardOperation(controlQubits, targetQubit, qc::X);
     ASSERT_EQ(expectedXOperation, *quantumComputation.back());
-}
-
-TEST(QmddTransformationOperationsTest, TrySwapPathsOfEdgesOfEmptyQmddNode) {
-    const auto qmddPkg            = std::make_unique<dd::Package>(1U);
-    auto       quantumComputation = qc::QuantumComputation(1U);
-
-    const auto                    qmddNode                    = qmddPkg->makeDDNode<dd::mNode>(0U, std::array<dd::mEdge, 4U>({dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero()}));
-    const QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *qmddNode.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    ASSERT_FALSE(syrec::trySwapPathsOfEdgesOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
-    ASSERT_EQ(0U, quantumComputation.getNops());
 }
 
 TEST(QmddTransformationOperationsTest, TryShiftUniquePathOfPPrimeEdgeToNEdgeOfQmddRoot) {
@@ -258,7 +243,7 @@ TEST(QmddTransformationOperationsTest, TryShiftUniquePathOfPPrimeEdgeToNEdgeOfQm
     const dd::mEdge& edgeToQmddRoot     = createNonLeafQmddNode(*qmddPkg, 2U, edgeN2Node1, edgePPrime2Node1, dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeToQmddRoot.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
+    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals(*edgeToQmddRoot.p);
     getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRoot.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
     ASSERT_TRUE(syrec::tryShiftUniquePathsOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
@@ -281,7 +266,7 @@ TEST(QmddTransformationOperationsTest, TryShiftUniquePathFromNPrimeEdgeToPEdgeOf
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 2U, dd::mEdge::zero(), dd::mEdge::zero(), edgeNPrime2Node1, edgeP2Node1);
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeToQmddRoot.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
+    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals(*edgeToQmddRoot.p);
     getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRoot.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
     ASSERT_TRUE(syrec::tryShiftUniquePathsOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
@@ -309,9 +294,9 @@ TEST(QmddTransformationOperationsTest, TryShiftUniquePathFromPPrimeEdgeToNEdgeOf
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 4U, edgeN4Node3, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeN4P3Node2.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeN4P3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
-    ASSERT_TRUE(syrec::tryShiftUniquePathsOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
+    QmddNodeAndPathsPerEdge pathsFromNonRootToOneTerminals(*edgeN4P3Node2.p);
+    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeN4P3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromNonRootToOneTerminals);
+    ASSERT_TRUE(syrec::tryShiftUniquePathsOfQmddNode(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
 
     const qc::Controls  controlQubits{qc::Control(4U, qc::Control::Type::Neg), qc::Control(3U, qc::Control::Type::Pos), qc::Control(1U, qc::Control::Type::Neg), qc::Control(0U, qc::Control::Type::Pos)};
@@ -337,9 +322,9 @@ TEST(QmddTransformationOperationsTest, TryShiftUniquePathFromNPrimeEdgeToPEdgeOf
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 4U, edgeN4Node3, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeN4P3Node2.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeN4P3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
-    ASSERT_TRUE(syrec::tryShiftUniquePathsOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
+    QmddNodeAndPathsPerEdge pathsFromNonRootToOneTerminals(*edgeN4P3Node2.p);
+    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeN4P3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromNonRootToOneTerminals);
+    ASSERT_TRUE(syrec::tryShiftUniquePathsOfQmddNode(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
 
     const qc::Controls  controlQubits{qc::Control(4U, qc::Control::Type::Neg), qc::Control(3U, qc::Control::Type::Pos), qc::Control(1U, qc::Control::Type::Neg), qc::Control(0U, qc::Control::Type::Neg)};
@@ -370,9 +355,9 @@ TEST(QmddTransformationOperationsTest, TryShiftUniquePathsFromPPrimeOrNPrimeEdge
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 4U, edgeN4Node3, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeN4P3Node2.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeN4P3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
-    ASSERT_FALSE(syrec::tryShiftUniquePathsOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
+    QmddNodeAndPathsPerEdge pathsFromNonRootToOneTerminals(*edgeN4P3Node2.p);
+    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeN4P3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromNonRootToOneTerminals);
+    ASSERT_FALSE(syrec::tryShiftUniquePathsOfQmddNode(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
     ASSERT_EQ(0U, quantumComputation.getNops());
 }
 
@@ -380,8 +365,8 @@ TEST(QmddTransformationOperationsTest, TryShiftUniquePathsFromEmptyQmddNode) {
     const auto qmddPkg            = std::make_unique<dd::Package>(1U);
     auto       quantumComputation = qc::QuantumComputation(1U);
 
-    const auto                    qmddNode                    = qmddPkg->makeDDNode<dd::mNode>(0U, std::array<dd::mEdge, 4U>({dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero()}));
-    const QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *qmddNode.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
+    const auto                    qmddNode = qmddPkg->makeDDNode<dd::mNode>(0U, std::array<dd::mEdge, 4U>({dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero()}));
+    const QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals(*qmddNode.p);
     ASSERT_FALSE(syrec::tryShiftUniquePathsOfQmddNode(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(0U, quantumComputation.getNops());
 }
@@ -398,7 +383,7 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInPPrimeEdgeOf
     const dd::mEdge& edgeToQmddRoot     = createNonLeafQmddNode(*qmddPkg, 2U, edgeN2Node1, edgePPrime2Node1, dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeToQmddRoot.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
+    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals(*edgeToQmddRoot.p);
     getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRoot.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
     ASSERT_TRUE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
@@ -423,7 +408,7 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInNPrimeEdgeOf
     const dd::mEdge& edgeToQmddRoot          = createNonLeafQmddNode(*qmddPkg, 2U, dd::mEdge::zero(), dd::mEdge::zero(), edgeNPrime2Node1, edgeP2Node1);
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeToQmddRoot.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
+    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals(*edgeToQmddRoot.p);
     getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRoot.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
     ASSERT_TRUE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
@@ -449,9 +434,9 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInPPrimeEdgeOf
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 3U, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero(), edgeP3Node2);
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeP3Node2.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeP3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
-    ASSERT_TRUE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
+    QmddNodeAndPathsPerEdge pathsFromNonRootToOneTerminals(*edgeP3Node2.p);
+    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeP3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromNonRootToOneTerminals);
+    ASSERT_TRUE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
 
     const qc::Controls  controlQubits{qc::Control(3U, qc::Control::Type::Pos), qc::Control(2U, qc::Control::Type::Pos), qc::Control(1U, qc::Control::Type::Neg)};
@@ -475,9 +460,9 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInNPrimeEdgeOf
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 3U, edgeN3Node2, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeN3Node2.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeN3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
-    ASSERT_TRUE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
+    QmddNodeAndPathsPerEdge pathsFromNonRootToOneTerminals(*edgeN3Node2.p);
+    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeN3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromNonRootToOneTerminals);
+    ASSERT_TRUE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
     ASSERT_EQ(1U, quantumComputation.getNops());
 
     const qc::Controls  controlQubits{qc::Control(3U, qc::Control::Type::Neg), qc::Control(2U, qc::Control::Type::Neg), qc::Control(1U, qc::Control::Type::Neg)};
@@ -490,8 +475,8 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInEmptyQmddNod
     const auto qmddPkg            = std::make_unique<dd::Package>(1U);
     auto       quantumComputation = qc::QuantumComputation(1U);
 
-    const auto                    qmddNode                    = qmddPkg->makeDDNode<dd::mNode>(0U, std::array<dd::mEdge, 4U>({dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero()}));
-    const QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *qmddNode.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
+    const auto                    qmddNode = qmddPkg->makeDDNode<dd::mNode>(0U, std::array<dd::mEdge, 4U>({dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero()}));
+    const QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals(*qmddNode.p);
     ASSERT_FALSE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(0U, quantumComputation.getNops());
 }
@@ -507,7 +492,7 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInPPrimeEdgeOf
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 2U, dd::mEdge::one(), edgePPrime2Node1, dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeToQmddRoot.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
+    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals(*edgeToQmddRoot.p);
     getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRoot.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
     ASSERT_FALSE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(0U, quantumComputation.getNops());
@@ -524,7 +509,7 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInNPrimeEdgeOf
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 2U, dd::mEdge::zero(), dd::mEdge::zero(), edgeNPrime2Node1, dd::mEdge::one());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeToQmddRoot.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
+    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals(*edgeToQmddRoot.p);
     getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRoot.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
     ASSERT_FALSE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
     ASSERT_EQ(0U, quantumComputation.getNops());
@@ -542,9 +527,9 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInPPrimeEdgeOf
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 3U, edgeP3Node2, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeP3Node2.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeP3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
-    ASSERT_FALSE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
+    QmddNodeAndPathsPerEdge pathsFromNonRootToOneTerminals(*edgeP3Node2.p);
+    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeP3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromNonRootToOneTerminals);
+    ASSERT_FALSE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
     ASSERT_EQ(0U, quantumComputation.getNops());
 }
 
@@ -560,9 +545,9 @@ TEST(QmddTransformationOperationsTest, TryMakeSharedQmddPathUniqueInNPrimeEdgeOf
     const dd::mEdge& edgeToQmddRoot = createNonLeafQmddNode(*qmddPkg, 3U, edgeP3Node2, dd::mEdge::zero(), dd::mEdge::zero(), dd::mEdge::zero());
     qmddPkg->incRef(edgeToQmddRoot);
 
-    QmddNodeAndPathsPerEdge pathsFromRootToOneTerminals = {.associatedQmddNode = *edgeP3Node2.p, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeP3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromRootToOneTerminals);
-    ASSERT_FALSE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromRootToOneTerminals));
+    QmddNodeAndPathsPerEdge pathsFromNonRootToOneTerminals(*edgeP3Node2.p);
+    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeP3Node2.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromNonRootToOneTerminals);
+    ASSERT_FALSE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
     ASSERT_EQ(0U, quantumComputation.getNops());
 }
 

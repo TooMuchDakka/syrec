@@ -17,7 +17,7 @@
 
 namespace syrec {
     void               applyMCXGateToQmdd(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const dd::mEdge& edgeToRootNodeOfQmdd, qc::Qubit targetQubit, const qc::Controls& controlQubits);
-    [[nodiscard]] bool trySwapPathsOfEdgesOfQmddNode(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths);
+    [[nodiscard]] bool trySwapPathsOfEdgesOfQmddNode(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const NPathsToOneTerminalPerEdgeOfQmddNode& nPathsToOneTerminalPerEdgeOfQmddNode);
     [[nodiscard]] bool tryShiftUniquePathsOfQmddNode(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths);
     [[nodiscard]] bool tryMakeSharedPathOfQmddNodeUnique(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths);
 

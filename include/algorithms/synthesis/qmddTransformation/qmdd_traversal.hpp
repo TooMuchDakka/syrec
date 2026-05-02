@@ -14,19 +14,33 @@
 #include "dd/Node.hpp"
 
 #include <functional>
+#include <optional>
 #include <vector>
 
 namespace syrec {
     struct QmddNodeAndPathsPerEdge {
-        std::reference_wrapper<const dd::mNode> associatedQmddNode;
-        std::vector<OptimizedQmddPath>          nEdgePaths;
-        std::vector<OptimizedQmddPath>          pPrimeEdgePaths;
-        std::vector<OptimizedQmddPath>          nPrimeEdgePaths;
-        std::vector<OptimizedQmddPath>          pEdgePaths;
+        std::reference_wrapper<const dd::mNode>        associatedQmddNode;
+        std::array<std::vector<OptimizedQmddPath>, 4U> pathsPerEdgeLookup{};
+
+        QmddNodeAndPathsPerEdge() = delete;
+        explicit QmddNodeAndPathsPerEdge(const dd::mNode& associatedQmddNode): associatedQmddNode(associatedQmddNode) {}
+
+        const std::vector<OptimizedQmddPath>& operator[](QmddNodeEdge qmddNodeEdge) const;
+        std::vector<OptimizedQmddPath>&       operator[](QmddNodeEdge qmddNodeEdge);
     };
 
-    void getPathsToOneTerminalThroughEdgeOfQmddNode(const dd::mNode& qmddNodeToStartPathsFrom, QmddNodeEdge edgesToGeneratePathsFor, QmddNodeAndPathsPerEdge& containerStoringFoundPaths);
-    // TODO: A node should only be reachable from the root node by traversing either the P or N edge of the traversed node until the searched for node is found.
-    // TODO: "Truncated" nodes from the "original" qmdd root to the current qmdd root should be ignorable?
-    std::vector<UnoptimizedQmddPath> getAllPathsFromRootToNode(const dd::mNode& qmddRootNode, const dd::mNode& qmddNodeToReach);
+    struct NPathsToOneTerminalPerEdgeOfQmddNode {
+        std::reference_wrapper<const dd::mNode> associatedQmddNode;
+        std::array<std::size_t, 4>              nPathsPerEdgeLookup{0U, 0U, 0U, 0U};
+
+        NPathsToOneTerminalPerEdgeOfQmddNode() = delete;
+        explicit NPathsToOneTerminalPerEdgeOfQmddNode(const dd::mNode& associatedQmddNode): associatedQmddNode(associatedQmddNode) {}
+
+        std::size_t  operator[](QmddNodeEdge qmddNodeEdge) const;
+        std::size_t& operator[](QmddNodeEdge qmddNodeEdge);
+    };
+
+    [[nodiscard]] NPathsToOneTerminalPerEdgeOfQmddNode getNPathsToOneTerminalPerEdgeOfQmddNode(const dd::mNode& qmddNode);
+    void                                               getPathsToOneTerminalThroughEdgeOfQmddNode(const dd::mNode& qmddNodeToStartPathsFrom, QmddNodeEdge edgesToGeneratePathsFor, QmddNodeAndPathsPerEdge& containerStoringFoundPaths);
+    [[nodiscard]] std::vector<UnoptimizedQmddPath>     getAllPathsFromRootToNode(const dd::mNode& qmddRootNode, const dd::mNode& qmddNodeToReach);
 } // namespace syrec

@@ -108,21 +108,6 @@ TEST(QmddPathOperationTests, CheckNumberPathsForQmddPathContainingOptimizedGaps)
     ASSERT_EQ(16U, getNumberOfPathsToOneTerminalForQmddPath(qmddPathWithGaps));
 }
 
-TEST(QmddPathOperationTests, CheckNumberOfPathsForEmptyCollectionOfQmddPaths) {
-    ASSERT_EQ(0U, getNumberOfPathsToOneTerminalForQmddPaths({}));
-}
-
-TEST(QmddPathOperationTests, CheckNumberOfPathsForCollectionOfQmddPaths) {
-    auto                    qmddPathCollection  = std::vector<OptimizedQmddPath>();
-    const OptimizedQmddPath qmddPathWithoutGaps = createOptimizedQmddPathWithoutGaps({std::make_pair(2U, QmddNodeEdge::N),
-                                                                                      std::make_pair(1U, QmddNodeEdge::P),
-                                                                                      std::make_pair(0U, QmddNodeEdge::NPrime)});
-    const auto              emptyQmddPath       = OptimizedQmddPath();
-    const auto              qmddPathWithGaps    = OptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime}),
-                                                                     QmddPathGap({.qubitAssociatedWithFirstQmddNodeOfGap = 1U, .nConsecutiveQubitInGap = 2U})});
-    ASSERT_EQ(1U + 4U, getNumberOfPathsToOneTerminalForQmddPaths({qmddPathWithoutGaps, emptyQmddPath, qmddPathWithGaps}));
-}
-
 TEST(QmddPathOperationTests, CheckQmddPathsMatch) {
     const auto referenceQmddPath = UnoptimizedQmddPath({QmddPathComponent({.qubitAssociatedWithQmddNode = 2U, .qmddEdgeToChildNode = QmddNodeEdge::N}),
                                                         QmddPathComponent({.qubitAssociatedWithQmddNode = 1U, .qmddEdgeToChildNode = QmddNodeEdge::NPrime}),

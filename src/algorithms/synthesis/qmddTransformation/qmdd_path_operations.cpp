@@ -42,10 +42,6 @@ namespace syrec {
         });
     }
 
-    std::size_t getNumberOfPathsToOneTerminalForQmddPaths(const std::vector<OptimizedQmddPath>& qmddPaths) {
-        return std::transform_reduce(qmddPaths.cbegin(), qmddPaths.cend(), 0U, std::plus{}, getNumberOfPathsToOneTerminalForQmddPath);
-    }
-
     std::optional<bool> doQmddPathSignaturesMatch(const UnoptimizedQmddPath& lQmddPath, const UnoptimizedQmddPath& rQmddPath, const bool skipFirstQmddPathEntry) {
         if (lQmddPath.size() != rQmddPath.size() || (!lQmddPath.empty() && lQmddPath.front().qubitAssociatedWithQmddNode != rQmddPath.front().qubitAssociatedWithQmddNode)) {
             return std::nullopt;

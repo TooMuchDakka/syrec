@@ -86,14 +86,19 @@ bool QmddTransformer::synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformatio
         }
 
         // TODO: In test_dd_synthesis_1 some of the found paths contain duplicate entries that are associated with the same qubit but a different edge.
-        QmddNodeAndPathsPerEdge qmddPathsStartingFromNode = {.associatedQmddNode = nodeToProcess, .nEdgePaths = {}, .pPrimeEdgePaths = {}, .nPrimeEdgePaths = {}, .pEdgePaths = {}};
-        getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::N | QmddNodeEdge::PPrime, qmddPathsStartingFromNode);
+        // auto qmddPathsStartingFromNode = QmddNodeAndPathsPerEdge(nodeToProcess);
+        // getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::N | QmddNodeEdge::PPrime, qmddPathsStartingFromNode);
         // P1 algorithm
-        bool resetQueue = trySwapPathsOfEdgesOfQmddNode(qc, qmddPkg, qmddPathsStartingFromNode);
-        if (!resetQueue) {
-            getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::NPrime | QmddNodeEdge::P, qmddPathsStartingFromNode);
-        }
+        bool resetQueue = trySwapPathsOfEdgesOfQmddNode(qc, qmddPkg, NPathsToOneTerminalPerEdgeOfQmddNode(nodeToProcess));
+
+        // if (!resetQueue) {
+        //     // Avoid unnecessary work by only determine the paths in the N' and P edge if the swap operation for the P' and N edge did perform no swap.
+        //     getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::NPrime | QmddNodeEdge::P, qmddPathsStartingFromNode);
+        //     resetQueue = trySwapPathsOfEdgesOfQmddNode(qc, qmddPkg, qmddPathsStartingFromNode);
+        // }
         // P2 algorithm.
+        auto qmddPathsStartingFromNode = QmddNodeAndPathsPerEdge(nodeToProcess);
+        getPathsToOneTerminalThroughEdgeOfQmddNode(nodeToProcess, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, qmddPathsStartingFromNode);
         // Note: The E1 |= E2 assignment operator is equal to E1 = E1 | E2 with the operator | not short circuiting does our P algorithms steps would still be evaluated in case the E1 is true thus explaining our usage of the E1 = E1 || E2 assignment.
         resetQueue = resetQueue || tryShiftUniquePathsOfQmddNode(qc, qmddPkg, qmddPathsStartingFromNode);
 

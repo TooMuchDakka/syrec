@@ -33,11 +33,13 @@ namespace syrec {
         dd::applyUnitaryOperation(generatedQuantumOperationForMCXGate, edgeToRootNodeOfQmdd, qmddPkg, {}, false);
     }
 
+    // TODO: Update signature to accept path collections.
+    // TODO: It would also be sufficient to only determine the number of paths instead of the actual paths which would require less allocations.
     // For two edge E_1 and E_2 of the currently processed qmdd node, this algorithm swaps the collection of paths starting from E_1 and E_2 if the number of elements
     // in the latter is larger than in the former. This check will be performed for two following two edge tuples: (N, P') and (N', P).
     // Refer to the P1 algorithm of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf
-    bool trySwapPathsOfEdgesOfQmddNode(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) {
-        if (getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.pPrimeEdgePaths) <= getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.nEdgePaths) && getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.nPrimeEdgePaths) <= getNumberOfPathsToOneTerminalForQmddPaths(qmddNodeAndEdgePaths.pEdgePaths)) {
+    bool trySwapPathsOfEdgesOfQmddNode(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const NPathsToOneTerminalPerEdgeOfQmddNode& nPathsToOneTerminalPerEdgeOfQmddNode) {
+        if (nPathsToOneTerminalPerEdgeOfQmddNode[QmddNodeEdge::PPrime] <= nPathsToOneTerminalPerEdgeOfQmddNode[QmddNodeEdge::N] && nPathsToOneTerminalPerEdgeOfQmddNode[QmddNodeEdge::NPrime] <= nPathsToOneTerminalPerEdgeOfQmddNode[QmddNodeEdge::P]) {
             return false;
         }
 
@@ -46,13 +48,13 @@ namespace syrec {
         assert(edgeToRootNode->p != nullptr);
         const dd::mNode& rootNode = *edgeToRootNode->p;
 
-        const dd::Qubit targetQubit = qmddNodeAndEdgePaths.associatedQmddNode.get().v;
+        const dd::Qubit targetQubit = nPathsToOneTerminalPerEdgeOfQmddNode.associatedQmddNode.get().v;
         if (targetQubit == rootNode.v) {
             const qc::Controls controlQubitsForPathFromRootToCurrentNode;
             applyMCXGateToQmdd(quantumComputation, qmddPkg, *edgeToRootNode, targetQubit, controlQubitsForPathFromRootToCurrentNode);
         } else {
             // TODO: Iterate all paths from the root to the current node and record the controls for each path P as c(P) then add a toffoli gate TOFF(controls: c(P), target: current)
-            for (const UnoptimizedQmddPath& pathFromRootToCurrentNode: getAllPathsFromRootToNode(rootNode, qmddNodeAndEdgePaths.associatedQmddNode)) {
+            for (const UnoptimizedQmddPath& pathFromRootToCurrentNode: getAllPathsFromRootToNode(rootNode, nPathsToOneTerminalPerEdgeOfQmddNode.associatedQmddNode)) {
                 assert(!pathFromRootToCurrentNode.empty());
                 const qc::Controls controlQubitsForPathFromRootToCurrentNode = getControlQubitsFromSignatureOfQmddPathComponents(pathFromRootToCurrentNode);
                 // TODO: Root can change?
@@ -67,13 +69,12 @@ namespace syrec {
     }
 
     // This algorithm moves the unique paths present in the p' edge to the n edge.
-    // TODO: In the reimplementation this step is not implemented: 'If there are no unique paths in p' edge, the unique paths present in the n' edge are moved to the p edge if required.'
     // Refer to the P2 algorithm of http://www.informatik.uni-bremen.de/agra/doc/konf/12aspdac_qmdd_synth_rev.pdf
     bool tryShiftUniquePathsOfQmddNode(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) {
         // TODO: Currently SHE exception with code 0xc0000005 for multiple paths since QMDD could be changed after an operation is applied.
         // TODO: We currently restrict ourselves to the first found unique path while in the reference paper all unique paths are shifted.
-        const std::optional<UnoptimizedQmddPath> uniquePathThatCanBeShiftedInPPrimeEdgeSubtree = findFirstQmddPathWithUniqueSignature(qmddNodeAndEdgePaths.pPrimeEdgePaths, qmddNodeAndEdgePaths.nEdgePaths, true);
-        const std::optional<UnoptimizedQmddPath> uniquePathThatCanBeShiftedInNPrimeEdgeSubtree = !uniquePathThatCanBeShiftedInPPrimeEdgeSubtree.has_value() ? findFirstQmddPathWithUniqueSignature(qmddNodeAndEdgePaths.nPrimeEdgePaths, qmddNodeAndEdgePaths.pEdgePaths, true) : std::nullopt;
+        const std::optional<UnoptimizedQmddPath> uniquePathThatCanBeShiftedInPPrimeEdgeSubtree = findFirstQmddPathWithUniqueSignature(qmddNodeAndEdgePaths[QmddNodeEdge::PPrime], qmddNodeAndEdgePaths[QmddNodeEdge::N], true);
+        const std::optional<UnoptimizedQmddPath> uniquePathThatCanBeShiftedInNPrimeEdgeSubtree = !uniquePathThatCanBeShiftedInPPrimeEdgeSubtree.has_value() ? findFirstQmddPathWithUniqueSignature(qmddNodeAndEdgePaths[QmddNodeEdge::NPrime], qmddNodeAndEdgePaths[QmddNodeEdge::P], true) : std::nullopt;
 
         if (!uniquePathThatCanBeShiftedInPPrimeEdgeSubtree.has_value() && !uniquePathThatCanBeShiftedInNPrimeEdgeSubtree.has_value()) {
             return false;
@@ -118,8 +119,8 @@ namespace syrec {
     }
 
     bool tryMakeSharedPathOfQmddNodeUnique(qc::QuantumComputation& quantumComputation, dd::Package& qmddPkg, const QmddNodeAndPathsPerEdge& qmddNodeAndEdgePaths) {
-        const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfPPrimeSubtree = getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths.pPrimeEdgePaths, qmddNodeAndEdgePaths.nEdgePaths);
-        const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfNPrimeSubtree = !transformationDataForQmddPathOfPPrimeSubtree.has_value() ? getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths.nPrimeEdgePaths, qmddNodeAndEdgePaths.pEdgePaths) : std::nullopt;
+        const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfPPrimeSubtree = getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths[QmddNodeEdge::PPrime], qmddNodeAndEdgePaths[QmddNodeEdge::N]);
+        const std::optional<ToUniqueQmddPathSignatureOperands> transformationDataForQmddPathOfNPrimeSubtree = !transformationDataForQmddPathOfPPrimeSubtree.has_value() ? getOperandsToMakeOneOfQmddPathSignaturesUnique(qmddNodeAndEdgePaths[QmddNodeEdge::NPrime], qmddNodeAndEdgePaths[QmddNodeEdge::P]) : std::nullopt;
 
         if (!transformationDataForQmddPathOfPPrimeSubtree.has_value() && !transformationDataForQmddPathOfNPrimeSubtree.has_value()) {
             return false;

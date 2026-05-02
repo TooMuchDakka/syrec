@@ -22,7 +22,6 @@ namespace syrec {
     // TODO: Add documentation
     std::size_t getUnrolledLengthOfOptimizedQmddPath(const OptimizedQmddPath& optimizedQmddPath);
     std::size_t getNumberOfPathsToOneTerminalForQmddPath(const OptimizedQmddPath& qmddPath);
-    std::size_t getNumberOfPathsToOneTerminalForQmddPaths(const std::vector<OptimizedQmddPath>& qmddPaths);
 
     std::optional<bool> doQmddPathSignaturesMatch(const UnoptimizedQmddPath& lQmddPath, const UnoptimizedQmddPath& rQmddPath, bool skipFirstQmddPathEntry);
     std::optional<bool> existsQmddPathWithSameSignature(const UnoptimizedQmddPath& referenceQmddPath, const OptimizedQmddPath& comparedToQmddPath, bool skipFirstQmddPathEntry);
