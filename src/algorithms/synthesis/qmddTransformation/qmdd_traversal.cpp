@@ -314,6 +314,8 @@ namespace syrec {
 
                     for (const UnoptimizedQmddPath* generatedQmddPath = unoptimizedQmddPathGenerator.tryGenerateNextPath(); generatedQmddPath != nullptr; generatedQmddPath = unoptimizedQmddPathGenerator.tryGenerateNextPath()) {
                         containerForFoundQmddpaths.emplace_back(*generatedQmddPath);
+                        // TODO: Only for faster testing but might also be the expected behaviour of this function in the future.
+                        return containerForFoundQmddpaths;
                     }
                 }
             } else {

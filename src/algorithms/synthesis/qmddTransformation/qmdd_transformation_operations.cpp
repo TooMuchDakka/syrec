@@ -57,6 +57,7 @@ namespace syrec {
             for (const UnoptimizedQmddPath& pathFromRootToCurrentNode: getAllPathsFromRootToNode(rootNode, nPathsToOneTerminalPerEdgeOfQmddNode.associatedQmddNode)) {
                 assert(!pathFromRootToCurrentNode.empty());
                 const qc::Controls controlQubitsForPathFromRootToCurrentNode = getControlQubitsFromSignatureOfQmddPathComponents(pathFromRootToCurrentNode);
+                assert(std::ranges::none_of(controlQubitsForPathFromRootToCurrentNode, [targetQubit](const qc::Control& controlQubit) { return controlQubit.qubit <= targetQubit; }));
                 // TODO: Root can change?
                 applyMCXGateToQmdd(quantumComputation, qmddPkg, *edgeToRootNode, targetQubit, controlQubitsForPathFromRootToCurrentNode);
                 // TODO: Application of QMDD operation can change structure of QMDD thus previously determined paths may no longer exist.
@@ -97,6 +98,7 @@ namespace syrec {
         for (const auto& controlQubit: shiftableQmddPathFromSubtree | std::views::drop(1) | std::views::transform(getControlQubitFromSignatureOfQmddPathComponent)) {
             controlQubitsForQmddPathStartingFromNodeToOneTerminal.emplace(controlQubit);
         }
+        assert(std::ranges::none_of(controlQubitsForQmddPathStartingFromNodeToOneTerminal, [targetQubit](const qc::Control& controlQubit) { return controlQubit.qubit >= targetQubit; }));
 
         const std::vector<UnoptimizedQmddPath> pathsFromRootToCurrentNode = getAllPathsFromRootToNode(rootNode, qmddNodeAndEdgePaths.associatedQmddNode);
         if (pathsFromRootToCurrentNode.empty()) {
@@ -107,6 +109,8 @@ namespace syrec {
             for (const UnoptimizedQmddPath& pathFromRootToCurrentNode: pathsFromRootToCurrentNode) {
                 assert(!pathFromRootToCurrentNode.empty());
                 qc::Controls controlQubitsToTargetPathFromRootToCurrentNode = getControlQubitsFromSignatureOfQmddPathComponents(pathFromRootToCurrentNode);
+                assert(std::ranges::none_of(controlQubitsToTargetPathFromRootToCurrentNode, [targetQubit](const qc::Control& controlQubit) { return controlQubit.qubit <= targetQubit; }));
+
                 controlQubitsToTargetPathFromRootToCurrentNode.insert(controlQubitsForQmddPathStartingFromNodeToOneTerminal.cbegin(), controlQubitsForQmddPathStartingFromNodeToOneTerminal.cend());
                 // TODO: Root could change?
                 applyMCXGateToQmdd(quantumComputation, qmddPkg, *edgeToRootNode, targetQubit, controlQubitsToTargetPathFromRootToCurrentNode);

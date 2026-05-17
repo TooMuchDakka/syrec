@@ -29,26 +29,24 @@ namespace syrec {
         };
 
         struct QmddSynthesisResult {
-            dd::mEdge                               edgeToRootOfQmdd;
             std::unique_ptr<qc::QuantumComputation> quantumComputation;
             std::unique_ptr<dd::Package>            qmddPackage;
             SynthesisStatistics                     synthesisStatistics;
         };
 
-        static std::unique_ptr<qc::QuantumComputation> synthesizeCodingTechniques(const TruthTable& tt, const bool withAdditionalLine = true, const QmddTransformer::QmddDumpConfig* qmddDumpConfig = nullptr) {
-            return synthesizeCodingTechniquesTT(tt, withAdditionalLine, qmddDumpConfig);
+        static std::unique_ptr<qc::QuantumComputation> synthesizeCodingTechniques(const TruthTable& tt, const bool withAdditionalLine = true, BaseQmddDumper* qmddDumper = nullptr) {
+            return synthesizeCodingTechniquesTT(tt, withAdditionalLine, qmddDumper);
         }
 
-        static std::unique_ptr<qc::QuantumComputation> synthesizeOnePass(const TruthTable& tt, const QmddTransformer::QmddDumpConfig* qmddDumpConfig = nullptr) {
-            return synthesizeOnePassTT(tt, qmddDumpConfig);
+        static std::unique_ptr<qc::QuantumComputation> synthesizeOnePass(const TruthTable& tt, BaseQmddDumper* qmddDumper = nullptr) {
+            return synthesizeOnePassTT(tt, qmddDumper);
         }
 
         // TODO: One could optionally pass a dd::Package parameter?
-        static std::optional<QmddSynthesisResult> synthesizeQmdd(const TruthTable& tt, const QmddTransformer::QmddDumpConfig* qmddDumpConfig = nullptr) {
+        static std::optional<QmddSynthesisResult> synthesizeQmdd(const TruthTable& tt, BaseQmddDumper* qmddDumper = nullptr) {
             SynthesizerComponents synthesizerComponents = initializeSynthesizerComponents(tt);
-            const dd::mEdge       edgeToRootOfQmdd      = buildDD(tt, *synthesizerComponents.qmddPackage);
-            if (synthesize(edgeToRootOfQmdd, *synthesizerComponents.qmddPackage, *synthesizerComponents.qc, qmddDumpConfig)) {
-                return QmddSynthesisResult({.edgeToRootOfQmdd = edgeToRootOfQmdd, .quantumComputation = std::move(synthesizerComponents.qc), .qmddPackage = std::move(synthesizerComponents.qmddPackage), .synthesisStatistics = SynthesisStatistics()});
+            if (const dd::mEdge edgeToRootOfQmdd = buildDD(tt, *synthesizerComponents.qmddPackage); synthesize(edgeToRootOfQmdd, *synthesizerComponents.qmddPackage, *synthesizerComponents.qc, qmddDumper)) {
+                return QmddSynthesisResult({.quantumComputation = std::move(synthesizerComponents.qc), .qmddPackage = std::move(synthesizerComponents.qmddPackage), .synthesisStatistics = SynthesisStatistics()});
             }
             return std::nullopt;
         }
@@ -72,14 +70,14 @@ namespace syrec {
         };
 
         template<class T>
-        [[nodiscard]] static bool decoder(const T& codewords, SynthesizerComponents& synthesizerComponents, const QmddTransformer::QmddDumpConfig* qmddDumpConfig);
+        [[nodiscard]] static bool decoder(const T& codewords, SynthesizerComponents& synthesizerComponents, BaseQmddDumper* qmddDumper);
 
-        [[nodiscard]] static std::unique_ptr<qc::QuantumComputation> synthesizeOnePassTT(TruthTable tt, const QmddTransformer::QmddDumpConfig* qmddDumpConfig);
-        [[nodiscard]] static std::unique_ptr<qc::QuantumComputation> synthesizeCodingTechniquesTT(TruthTable tt, bool withAdditionalLine, const QmddTransformer::QmddDumpConfig* qmddDumpConfig);
+        [[nodiscard]] static std::unique_ptr<qc::QuantumComputation> synthesizeOnePassTT(TruthTable tt, BaseQmddDumper* qmddDumper);
+        [[nodiscard]] static std::unique_ptr<qc::QuantumComputation> synthesizeCodingTechniquesTT(TruthTable tt, bool withAdditionalLine, BaseQmddDumper* qmddDumper);
 
         [[nodiscard]] static SynthesizerComponents initializeSynthesizerComponents(const TruthTable& tt);
-        [[nodiscard]] static bool                  buildAndSynthesize(const TruthTable& tt, dd::Package& qmddPackage, qc::QuantumComputation& qc, const QmddTransformer::QmddDumpConfig* qmddDumpConfig);
-        [[nodiscard]] static bool                  synthesize(const dd::mEdge& src, dd::Package& qmddPackage, qc::QuantumComputation& qc, const QmddTransformer::QmddDumpConfig* qmddDumpConfig);
+        [[nodiscard]] static bool                  buildAndSynthesize(const TruthTable& tt, dd::Package& qmddPackage, qc::QuantumComputation& qc, BaseQmddDumper* qmddDumper);
+        [[nodiscard]] static bool                  synthesize(const dd::mEdge& src, dd::Package& qmddPackage, qc::QuantumComputation& qc, BaseQmddDumper* qmddDumper);
     };
 
 } // namespace syrec

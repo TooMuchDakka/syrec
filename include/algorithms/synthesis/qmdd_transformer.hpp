@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "algorithms/synthesis/qmddTransformation/qmdd_dumper.hpp"
 #include "algorithms/synthesis/qmddTransformation/qmdd_path_definitions.hpp"
 #include "dd/Node.hpp"
 #include "dd/Package.hpp"
@@ -17,7 +18,6 @@
 
 #include <cstdint>
 #include <functional>
-#include <string>
 
 namespace syrec {
     class QmddTransformer {
@@ -26,23 +26,13 @@ namespace syrec {
             std::uint64_t transformationRuntimeInMilliseconds;
         };
 
-        struct QmddDumpConfig {
-            std::string pathToDumpFile;
-        };
-
         explicit QmddTransformer(const std::reference_wrapper<qc::QuantumComputation> quantumComputation, const std::reference_wrapper<dd::Package> qmddPkg):
             qc(quantumComputation), qmddPkg(qmddPkg) {}
 
-        [[nodiscard]] bool             synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformationStatistic* optionalTransformationStatistics = nullptr, const QmddDumpConfig* optionalQmddDumpConfig = nullptr) const;
-        [[nodiscard]] static dd::mEdge constructQmddFromGatesOfQuantumComputation(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage, const QmddDumpConfig* optionalQmddDumpConfig = nullptr);
+        [[nodiscard]] bool             synthesizeQmdd(dd::mEdge edgeToQmddRoot, QmddTransformationStatistic* optionalTransformationStatistics = nullptr, BaseQmddDumper* qmddDumper = nullptr) const;
+        [[nodiscard]] static dd::mEdge constructQmddFromGatesOfQuantumComputation(const qc::QuantumComputation& quantumComputation, dd::Package& qmddPackage, BaseQmddDumper* qmddDumper = nullptr);
 
     protected:
-        enum class QmddExportOutputStreamOperation : std::uint8_t {
-            OverwriteExisting,
-            Append
-        };
-        static void exportQmddToFile(const dd::mEdge* edgeToRootNodeOfQmdd, const QmddDumpConfig* optionalQmddDumpConfig = nullptr, QmddExportOutputStreamOperation qmddExportOutputStreamOperation = QmddExportOutputStreamOperation::Append);
-
         std::reference_wrapper<qc::QuantumComputation> qc;
         std::reference_wrapper<dd::Package>            qmddPkg;
     };

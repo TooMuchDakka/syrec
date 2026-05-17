@@ -589,3 +589,25 @@ TEST(QmddTransformationOperationsTest, CheckTerminateConditionOfQmddNodeWithPPri
     const auto& edgeToRootOfQmddTree = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::N | QmddNodeEdge::PPrime);
     ASSERT_FALSE(syrec::terminate(*edgeToRootOfQmddTree.p));
 }
+
+TEST(QmddTransformationOperationsTest, Test) {
+    constexpr std::size_t nQubits            = 4U;
+    const auto            qmddPkg            = std::make_unique<dd::Package>(nQubits);
+    auto                  quantumComputation = qc::QuantumComputation(nQubits);
+
+    const dd::mEdge& edgeP3P2P1Node0 = createLeafQmddNode(*qmddPkg, 0U, QmddNodeEdge::PPrime | QmddNodeEdge::NPrime);
+    const dd::mEdge& edgeP3P2Node1   = createNonLeafQmddNode(*qmddPkg, 1U, dd::mEdge::one(), dd::mEdge::zero(), dd::mEdge::zero(), edgeP3P2P1Node0);
+    const dd::mEdge& edgeP3Node2     = createNonLeafQmddNode(*qmddPkg, 2U, dd::mEdge::one(), dd::mEdge::zero(), dd::mEdge::zero(), edgeP3P2Node1);
+    const dd::mEdge& edgeToQmddRoot  = createNonLeafQmddNode(*qmddPkg, 3U, dd::mEdge::one(), dd::mEdge::zero(), dd::mEdge::zero(), edgeP3Node2);
+    qmddPkg->incRef(edgeToQmddRoot);
+
+    //QmddNodeAndPathsPerEdge pathsFromNonRootToOneTerminals(*edgeToQmddRoot.p);
+    //getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeToQmddRoot.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromNonRootToOneTerminals);
+    QmddNodeAndPathsPerEdge pathsFromNonRootToOneTerminals(*edgeP3P2P1Node0.p);
+    getPathsToOneTerminalThroughEdgeOfQmddNode(*edgeP3P2P1Node0.p, QmddNodeEdge::N | QmddNodeEdge::PPrime | QmddNodeEdge::NPrime | QmddNodeEdge::P, pathsFromNonRootToOneTerminals);
+    const auto x          = getNPathsToOneTerminalPerEdgeOfQmddNode(*edgeP3P2P1Node0.p);
+    bool       resetQueue = trySwapPathsOfEdgesOfQmddNode(quantumComputation, *qmddPkg, getNPathsToOneTerminalPerEdgeOfQmddNode(*edgeP3P2P1Node0.p));
+
+    ASSERT_FALSE(syrec::tryMakeSharedPathOfQmddNodeUnique(quantumComputation, *qmddPkg, pathsFromNonRootToOneTerminals));
+    ASSERT_EQ(0U, quantumComputation.getNops());
+}
